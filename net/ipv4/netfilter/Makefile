@@ -72,3 +72,5 @@ obj-$(CONFIG_IP_NF_ARPFILTER) += arptable_filter.o
 
 obj-$(CONFIG_IP_NF_QUEUE) += ip_queue.o
 
+# Vyatta
+obj-$(CONFIG_IP_NF_MATCH_RLSNMPSTATS) += ipt_rlsnmpstats.o
