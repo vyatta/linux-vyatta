@@ -218,16 +218,16 @@ bool is_newer_lower(const struct dentry *dentry)
 		 */
 		if (unlikely(timespec_compare(&inode->i_mtime,
 					      &lower_inode->i_mtime) < 0)) {
-			pr_info("unionfs: new lower inode mtime "
-				"(bindex=%d, name=%s)\n", bindex,
+			pr_debug("unionfs: new lower inode mtime "
+				 "(bindex=%d, name=%s)\n", bindex,
 				dentry->d_name.name);
 			show_dinode_times(dentry);
 			return true; /* mtime changed! */
 		}
 		if (unlikely(timespec_compare(&inode->i_ctime,
 					      &lower_inode->i_ctime) < 0)) {
-			pr_info("unionfs: new lower inode ctime "
-				"(bindex=%d, name=%s)\n", bindex,
+			pr_debug("unionfs: new lower inode ctime "
+				 "(bindex=%d, name=%s)\n", bindex,
 				dentry->d_name.name);
 			show_dinode_times(dentry);
 			return true; /* ctime changed! */
