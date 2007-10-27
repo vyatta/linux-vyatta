@@ -1,0 +1,5 @@
+linux-2.6 (2.6.23-1~vyatta) unstable; urgency=low
+
+  * Initial debianization: 2.6.23.1 + vyatta changes.
+
+ -- An-Cheng Huang <ancheng@vyatta.com>  Fri, 26 Oct 2007 15:20:14 -0700

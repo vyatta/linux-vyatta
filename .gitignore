@@ -16,6 +16,7 @@
 *.i
 *.lst
 *.symtypes
+*.pyc
 
 #
 # Top-level generic files
@@ -50,3 +51,8 @@ cscope.*
 
 *.orig
 *.rej
+
+/debian/build
+/debian/stamps
+/debian/files
+/debian/linux-*
