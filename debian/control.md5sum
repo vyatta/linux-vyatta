@@ -1,5 +1,5 @@
 5adba02d2ece8f5b5e4c69b9043b4710  debian/bin/gencontrol.py
-188d1a603e3599202b2300dd13130656  debian/changelog
+f71ff032925c83e0718df10edd704d19  debian/changelog
 ce82e3825316fde901185d02696f355d  debian/templates/control.headers.arch.in
 994cfec3b3e4e249bf63775dd3d3dd7f  debian/templates/control.headers.in
 e6c816aff9f0d2242e35c2ba1b1c7e3b  debian/templates/control.headers.subarch.in
@@ -19,4 +19,4 @@ e78ef4f93e1efb9c4d89b6367d9c3a30  debian/templates/image.xen.postinst.in
 229732de0a08e2bfd7b67ea9a58c2d03  debian/templates/patch.apply.in
 064a3dfe9f798fdd256bcd7c34a651b3  debian/templates/patch.unpatch.in
 b7296ce7cefbe626916c7643f6564dda  debian/arch/defines
-d1871d5cbf2bea213140edd9b6432a14  debian/arch/i386/defines
+8873b7a2dbe66e2de488135f3ddfa167  debian/arch/i386/defines
