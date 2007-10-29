@@ -30,7 +30,7 @@
 #include <asm/uaccess.h>/* for copy_from_user */
 #include <net/checksum.h>
 #include <linux/netfilter_ipv4/ipt_rlsnmpstats.h>
-#include <linux/netfilter_ipv4/ip_tables.h>
+#include <linux/netfilter/x_tables.h>
 #include <linux/ip.h>       
 #include <linux/types.h>
 #include <linux/types.h>   
@@ -79,6 +79,10 @@ struct rl_data {
 } g_rl_data;
 
 
+/* Functin Prototypes */
+void rl_reset_values();
+
+
 /*
  *
  * More snmp stuff here--probably should go in a header
@@ -118,7 +122,7 @@ static int match(const struct sk_buff *skb,
                  u_int16_t datalen,
                  int *hotdrop)
 {
-   struct iphdr *iph = skb->nh.iph;
+   struct iphdr *iph = ip_hdr(skb);
    struct udphdr *udph = (struct udphdr *)((u_int32_t *)iph + iph->ihl);
    u_int16_t udplen = ntohs(udph->len);
    u_int16_t paylen = udplen - sizeof(struct udphdr);
@@ -129,7 +133,7 @@ static int match(const struct sk_buff *skb,
 
 
 
-   if(skb->nh.iph->protocol != 17) { 
+   if(iph->protocol != 17) { 
        return 1; 
    }           
    if((udph->dest) == 161) {  /*snmp port*/
@@ -180,8 +184,9 @@ static int rlsnmpstats_checkentry(const char *tablename,
    return 1;
 }
 
-static struct ipt_match rlsnmpstats_match = { 
+static struct xt_match rlsnmpstats_match = { 
   .name = "rlsnmpstats", 
+  .family = AF_INET,
   .match = match, 
   .checkentry = rlsnmpstats_checkentry, 
   .me =  THIS_MODULE 
@@ -196,9 +201,10 @@ static int __init init(void)
    rl_reset_values();
 
 
-   return ipt_register_match(&rlsnmpstats_match);
+   return xt_register_match(&rlsnmpstats_match);
 }
 
+void
 rl_reset_values()
 {
    g_rl_data.in_snmp_packet = 0;
@@ -242,7 +248,7 @@ static void __exit fini(void)
 {
   //   printk(KERN_INFO "ipt_rlsnmpstats: exit!\n");
    cleanup_proc();
-   ipt_unregister_match(&rlsnmpstats_match);
+   xt_unregister_match(&rlsnmpstats_match);
 }
 
 module_init(init);
