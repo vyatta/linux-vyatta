@@ -1690,10 +1690,10 @@ static void rtl8139_tx_timeout (struct net_device *dev)
 {
 	struct rtl8139_private *tp = netdev_priv(dev);
 
-	tp->watchdog_fired = 1;
-	if (!tp->have_thread) {
-		INIT_DELAYED_WORK(&tp->thread, rtl8139_thread);
-		schedule_delayed_work(&tp->thread, next_tick);
+	if (!tp->watchdog_fired) {
+		tp->watchdog_fired = 1;
+		if (!tp->have_thread)
+			schedule_delayed_work(&tp->thread, next_tick);
 	}
 }
 
