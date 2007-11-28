@@ -20,12 +20,6 @@
 #include "union.h"
 
 /*
- * Unionfs doesn't implement ->writepages, which is OK with the VFS and
- * keeps our code simpler and smaller.  Nevertheless, somehow, our own
- * ->writepage must be called so we can sync the upper pages with the lower
- * pages: otherwise data changed at the upper layer won't get written to the
- * lower layer.
- *
  * Some lower file systems (e.g., NFS) expect the VFS to call its writepages
  * only, which in turn will call generic_writepages and invoke each of the
  * lower file system's ->writepage.  NFS in particular uses the
@@ -58,89 +52,99 @@ static int unionfs_writepage(struct page *page, struct writeback_control *wbc)
 	struct inode *inode;
 	struct inode *lower_inode;
 	struct page *lower_page;
-	char *kaddr, *lower_kaddr;
 	int saved_for_writepages = wbc->for_writepages;
+	struct address_space *lower_mapping; /* lower inode mapping */
+	gfp_t mask;
 
+	BUG_ON(!PageUptodate(page));
 	inode = page->mapping->host;
 	lower_inode = unionfs_lower_inode(inode);
+	lower_mapping = lower_inode->i_mapping;
 
 	/*
 	 * find lower page (returns a locked page)
 	 *
-	 * NOTE: we used to call grab_cache_page(), but that was unnecessary
-	 * as it would have tried to create a new lower page if it didn't
-	 * exist, leading to deadlocks (esp. under memory-pressure
-	 * conditions, when it is really a bad idea to *consume* more
-	 * memory).  Instead, we assume the lower page exists, and if we can
-	 * find it, then we ->writepage on it; if we can't find it, then it
-	 * couldn't have disappeared unless the kernel already flushed it,
-	 * in which case we're still OK.  This is especially correct if
-	 * wbc->sync_mode is WB_SYNC_NONE (as per
-	 * Documentation/filesystems/vfs.txt).  If we can't flush our page
-	 * because we can't find a lower page, then at least we re-mark our
-	 * page as dirty, and return AOP_WRITEPAGE_ACTIVATE as the VFS
-	 * expects us to.  (Note, if in the future it'd turn out that we
-	 * have to find a lower page no matter what, then we'd have to
-	 * resort to RAIF's page pointer flipping trick.)
+	 * We turn off __GFP_FS while we look for or create a new lower
+	 * page.  This prevents a recursion into the file system code, which
+	 * under memory pressure conditions could lead to a deadlock.  This
+	 * is similar to how the loop driver behaves (see loop_set_fd in
+	 * drivers/block/loop.c).  If we can't find the lower page, we
+	 * redirty our page and return "success" so that the VM will call us
+	 * again in the (hopefully near) future.
 	 */
-	lower_page = find_lock_page(lower_inode->i_mapping, page->index);
+	mask = mapping_gfp_mask(lower_mapping) & ~(__GFP_FS);
+	lower_page = find_or_create_page(lower_mapping, page->index, mask);
 	if (!lower_page) {
-		err = AOP_WRITEPAGE_ACTIVATE;
+		err = 0;
 		set_page_dirty(page);
 		goto out;
 	}
 
-	/* get page address, and encode it */
-	kaddr = kmap(page);
-	lower_kaddr = kmap(lower_page);
+	/* copy page data from our upper page to the lower page */
+	copy_highpage(lower_page, page);
+	flush_dcache_page(lower_page);
+	SetPageUptodate(lower_page);
 
-	memcpy(lower_kaddr, kaddr, PAGE_CACHE_SIZE);
-
-	kunmap(page);
-	kunmap(lower_page);
-
-	BUG_ON(!lower_inode->i_mapping->a_ops->writepage);
-
+	/*
+	 * Call lower writepage (expects locked page).  However, if we are
+	 * called with wbc->for_reclaim, then the VFS/VM just wants to
+	 * reclaim our page.  Therefore, we don't need to call the lower
+	 * ->writepage: just copy our data to the lower page (already done
+	 * above), then mark the lower page dirty and unlock it, and return
+	 * success.
+	 */
+	if (wbc->for_reclaim) {
+		set_page_dirty(lower_page);
+		unlock_page(lower_page);
+		goto out_release;
+	}
 	/* workaround for some lower file systems: see big comment on top */
 	if (wbc->for_writepages && !wbc->fs_private)
 		wbc->for_writepages = 0;
 
-	/* call lower writepage (expects locked page) */
+	BUG_ON(!lower_mapping->a_ops->writepage);
+	set_page_dirty(lower_page);
 	clear_page_dirty_for_io(lower_page); /* emulate VFS behavior */
-	err = lower_inode->i_mapping->a_ops->writepage(lower_page, wbc);
+	err = lower_mapping->a_ops->writepage(lower_page, wbc);
 	wbc->for_writepages = saved_for_writepages; /* restore value */
+	if (err < 0)
+		goto out_release;
 
-	/* b/c find_lock_page locked it and ->writepage unlocks on success */
-	if (err)
-		unlock_page(lower_page);
-	/* b/c grab_cache_page increased refcnt */
-	page_cache_release(lower_page);
-
-	if (err < 0) {
-		ClearPageUptodate(page);
-		goto out;
-	}
+	/*
+	 * Lower file systems such as ramfs and tmpfs, may return
+	 * AOP_WRITEPAGE_ACTIVATE so that the VM won't try to (pointlessly)
+	 * write the page again for a while.  But those lower file systems
+	 * also set the page dirty bit back again.  Since we successfully
+	 * copied our page data to the lower page, then the VM will come
+	 * back to the lower page (directly) and try to flush it.  So we can
+	 * save the VM the hassle of coming back to our page and trying to
+	 * flush too.  Therefore, we don't re-dirty our own page, and we
+	 * never return AOP_WRITEPAGE_ACTIVATE back to the VM (we consider
+	 * this a success).
+	 *
+	 * We also unlock the lower page if the lower ->writepage returned
+	 * AOP_WRITEPAGE_ACTIVATE.  (This "anomalous" behaviour may be
+	 * addressed in future shmem/VM code.)
+	 */
 	if (err == AOP_WRITEPAGE_ACTIVATE) {
-		/*
-		 * Lower file systems such as ramfs and tmpfs, may return
-		 * AOP_WRITEPAGE_ACTIVATE so that the VM won't try to
-		 * (pointlessly) write the page again for a while.  But
-		 * those lower file systems also set the page dirty bit back
-		 * again.  So we mimic that behaviour here.
-		 */
-		if (PageDirty(lower_page))
-			set_page_dirty(page);
-		goto out;
+		err = 0;
+		unlock_page(lower_page);
 	}
 
 	/* all is well */
-	SetPageUptodate(page);
-	/* lower mtimes has changed: update ours */
+
+	/* lower mtimes have changed: update ours */
 	unionfs_copy_attr_times(inode);
 
-	unlock_page(page);
-
+out_release:
+	/* b/c find_or_create_page increased refcnt */
+	page_cache_release(lower_page);
 out:
+	/*
+	 * We unlock our page unconditionally, because we never return
+	 * AOP_WRITEPAGE_ACTIVATE.
+	 */
+	unlock_page(page);
 	return err;
 }
 
@@ -158,29 +162,28 @@ static int unionfs_writepages(struct address_space *mapping,
 	if (!mapping_cap_writeback_dirty(lower_inode->i_mapping))
 		goto out;
 
-	/* Note: generic_writepages may return AOP_WRITEPAGE_ACTIVATE */
 	err = generic_writepages(mapping, wbc);
-	if (err == 0)
+	if (!err)
 		unionfs_copy_attr_times(inode);
 out:
 	return err;
 }
 
-/*
- * readpage is called from generic_page_read and the fault handler.
- * If your file system uses generic_page_read for the read op, it
- * must implement readpage.
- *
- * Readpage expects a locked page, and must unlock it.
- */
-static int unionfs_do_readpage(struct file *file, struct page *page)
+/* Readpage expects a locked page, and must unlock it */
+static int unionfs_readpage(struct file *file, struct page *page)
 {
-	int err = -EIO;
+	int err;
 	struct file *lower_file;
 	struct inode *inode;
 	mm_segment_t old_fs;
 	char *page_data = NULL;
 	loff_t offset;
+
+	unionfs_read_lock(file->f_path.dentry->d_sb);
+	err = unionfs_file_revalidate(file, false);
+	if (unlikely(err))
+		goto out;
+	unionfs_check_file(file);
 
 	if (!UNIONFS_F(file)) {
 		err = -ENOENT;
@@ -208,7 +211,8 @@ static int unionfs_do_readpage(struct file *file, struct page *page)
 	err = vfs_read(lower_file, page_data, PAGE_CACHE_SIZE,
 		       &lower_file->f_pos);
 	set_fs(old_fs);
-
+	if (err >= 0 && err < PAGE_CACHE_SIZE)
+		memset(page_data + err, 0, PAGE_CACHE_SIZE - err);
 	kunmap(page);
 
 	if (err < 0)
@@ -220,39 +224,17 @@ static int unionfs_do_readpage(struct file *file, struct page *page)
 
 	flush_dcache_page(page);
 
-out:
-	if (err == 0)
-		SetPageUptodate(page);
-	else
-		ClearPageUptodate(page);
-
-	return err;
-}
-
-static int unionfs_readpage(struct file *file, struct page *page)
-{
-	int err;
-
-	unionfs_read_lock(file->f_path.dentry->d_sb);
-	err = unionfs_file_revalidate(file, false);
-	if (unlikely(err))
-		goto out;
-	unionfs_check_file(file);
-
-	err = unionfs_do_readpage(file, page);
-
-	if (!err) {
-		touch_atime(unionfs_lower_mnt(file->f_path.dentry),
-			    unionfs_lower_dentry(file->f_path.dentry));
-		unionfs_copy_attr_times(file->f_path.dentry->d_inode);
-	}
-
 	/*
 	 * we have to unlock our page, b/c we _might_ have gotten a locked
 	 * page.  but we no longer have to wakeup on our page here, b/c
 	 * UnlockPage does it
 	 */
 out:
+	if (err == 0)
+		SetPageUptodate(page);
+	else
+		ClearPageUptodate(page);
+
 	unlock_page(page);
 	unionfs_check_file(file);
 	unionfs_read_unlock(file->f_path.dentry->d_sb);
@@ -347,51 +329,9 @@ out:
 	if (err < 0)
 		ClearPageUptodate(page);
 
-	unionfs_read_unlock(file->f_path.dentry->d_sb);
 	unionfs_check_file(file);
+	unionfs_read_unlock(file->f_path.dentry->d_sb);
 	return err;		/* assume all is ok */
-}
-
-static void unionfs_sync_page(struct page *page)
-{
-	struct inode *inode;
-	struct inode *lower_inode;
-	struct page *lower_page;
-	struct address_space *mapping;
-
-	inode = page->mapping->host;
-	lower_inode = unionfs_lower_inode(inode);
-
-	/*
-	 * Find lower page (returns a locked page).
-	 *
-	 * NOTE: we used to call grab_cache_page(), but that was unnecessary
-	 * as it would have tried to create a new lower page if it didn't
-	 * exist, leading to deadlocks.  All our sync_page method needs to
-	 * do is ensure that pending I/O gets done.
-	 */
-	lower_page = find_lock_page(lower_inode->i_mapping, page->index);
-	if (!lower_page) {
-		printk(KERN_ERR "unionfs: find_lock_page failed\n");
-		goto out;
-	}
-
-	/* do the actual sync */
-	mapping = lower_page->mapping;
-	/*
-	 * XXX: can we optimize ala RAIF and set the lower page to be
-	 * discarded after a successful sync_page?
-	 */
-	if (mapping && mapping->a_ops && mapping->a_ops->sync_page)
-		mapping->a_ops->sync_page(lower_page);
-
-	/* b/c find_lock_page locked it */
-	unlock_page(lower_page);
-	/* b/c find_lock_page increased refcnt */
-	page_cache_release(lower_page);
-
-out:
-	return;
 }
 
 struct address_space_operations unionfs_aops = {
@@ -400,5 +340,4 @@ struct address_space_operations unionfs_aops = {
 	.readpage	= unionfs_readpage,
 	.prepare_write	= unionfs_prepare_write,
 	.commit_write	= unionfs_commit_write,
-	.sync_page	= unionfs_sync_page,
 };

@@ -49,6 +49,9 @@ void __unionfs_check_inode(const struct inode *inode,
 	sb = inode->i_sb;
 	istart = ibstart(inode);
 	iend = ibend(inode);
+	/* don't check inode if no lower branches */
+	if (istart < 0 && iend < 0)
+		return;
 	if (unlikely(istart > iend)) {
 		PRINT_CALLER(fname, fxn, line);
 		pr_debug(" Ci0: inode=%p istart/end=%d:%d\n",
@@ -221,6 +224,9 @@ check_inode:
 		return;
 	istart = ibstart(inode);
 	iend = ibend(inode);
+	/* don't check inode if no lower branches */
+	if (istart < 0 && iend < 0)
+		return;
 	BUG_ON(istart > iend);
 	if (unlikely((istart == -1 && iend != -1) ||
 		     (istart != -1 && iend == -1))) {
@@ -293,7 +299,7 @@ check_inode:
 	 * be NULL.  But, check that all three are NULL: lower dentry, mnt,
 	 * and inode.
 	 */
-	if (S_ISDIR(inode->i_mode))
+	if (dstart >= 0 && dend >= 0 && S_ISDIR(inode->i_mode))
 		for (bindex = dstart+1; bindex < dend; bindex++) {
 			lower_inode = unionfs_lower_inode_idx(inode, bindex);
 			lower_dentry = unionfs_lower_dentry_idx(dentry,

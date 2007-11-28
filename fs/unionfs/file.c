@@ -31,13 +31,9 @@ static ssize_t unionfs_read(struct file *file, char __user *buf,
 
 	err = do_sync_read(file, buf, count, ppos);
 
-	if (err >= 0)
-		touch_atime(unionfs_lower_mnt(file->f_path.dentry),
-			    unionfs_lower_dentry(file->f_path.dentry));
-
 out:
-	unionfs_read_unlock(file->f_path.dentry->d_sb);
 	unionfs_check_file(file);
+	unionfs_read_unlock(file->f_path.dentry->d_sb);
 	return err;
 }
 
@@ -58,13 +54,9 @@ static ssize_t unionfs_aio_read(struct kiocb *iocb, const struct iovec *iov,
 	if (err == -EIOCBQUEUED)
 		err = wait_on_sync_kiocb(iocb);
 
-	if (err >= 0)
-		touch_atime(unionfs_lower_mnt(file->f_path.dentry),
-			    unionfs_lower_dentry(file->f_path.dentry));
-
 out:
-	unionfs_read_unlock(file->f_path.dentry->d_sb);
 	unionfs_check_file(file);
+	unionfs_read_unlock(file->f_path.dentry->d_sb);
 	return err;
 }
 
@@ -135,13 +127,13 @@ static int unionfs_mmap(struct file *file, struct vm_area_struct *vma)
 	}
 
 out:
-	unionfs_read_unlock(file->f_path.dentry->d_sb);
 	if (!err) {
 		/* copyup could cause parent dir times to change */
 		unionfs_copy_attr_times(file->f_path.dentry->d_parent->d_inode);
 		unionfs_check_file(file);
 		unionfs_check_dentry(file->f_path.dentry->d_parent);
 	}
+	unionfs_read_unlock(file->f_path.dentry->d_sb);
 	return err;
 }
 
@@ -188,8 +180,8 @@ int unionfs_fsync(struct file *file, struct dentry *dentry, int datasync)
 	unionfs_copy_attr_times(inode);
 
 out:
-	unionfs_read_unlock(file->f_path.dentry->d_sb);
 	unionfs_check_file(file);
+	unionfs_read_unlock(file->f_path.dentry->d_sb);
 	return err;
 }
 
@@ -234,8 +226,8 @@ int unionfs_fasync(int fd, struct file *file, int flag)
 	unionfs_copy_attr_times(inode);
 
 out:
-	unionfs_read_unlock(file->f_path.dentry->d_sb);
 	unionfs_check_file(file);
+	unionfs_read_unlock(file->f_path.dentry->d_sb);
 	return err;
 }
 

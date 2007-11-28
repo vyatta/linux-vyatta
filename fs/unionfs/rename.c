@@ -41,7 +41,7 @@ static int __unionfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 				       bindex);
 		if (IS_ERR(lower_new_dentry)) {
 			err = PTR_ERR(lower_new_dentry);
-			if (err == -EROFS)
+			if (IS_COPYUP_ERR(err))
 				goto out;
 			printk(KERN_ERR "unionfs: error creating directory "
 			       "tree for rename, bindex=%d err=%d\n",
@@ -234,8 +234,8 @@ static int do_unionfs_rename(struct inode *old_dir,
 			err = copyup_dentry(old_dentry->d_parent->d_inode,
 					    old_dentry, old_bstart, bindex,
 					    old_dentry->d_name.name,
-					    old_dentry->d_name.len,
-					    NULL, old_dentry->d_inode->i_size);
+					    old_dentry->d_name.len, NULL,
+					    i_size_read(old_dentry->d_inode));
 			/* if copyup failed, try next branch to the left */
 			if (err)
 				continue;

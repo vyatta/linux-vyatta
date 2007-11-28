@@ -90,6 +90,23 @@ static int unionfs_create(struct inode *parent, struct dentry *dentry,
 			err = vfs_unlink(lower_dir_dentry->d_inode, wh_dentry);
 			unlock_dir(lower_dir_dentry);
 
+			/*
+			 * Whiteouts are special files and should be deleted
+			 * no matter what (as if they never existed), in
+			 * order to allow this create operation to succeed.
+			 * This is especially important in sticky
+			 * directories: a whiteout may have been created by
+			 * one user, but the newly created file may be
+			 * created by another user.  Therefore, in order to
+			 * maintain Unix semantics, if the vfs_unlink above
+			 * ailed, then we have to try to directly unlink the
+			 * whiteout.  Note: in the ODF version of unionfs,
+			 * whiteout are handled much more cleanly.
+			 */
+			if (err == -EPERM) {
+				struct inode *inode = lower_dir_dentry->d_inode;
+				err = inode->i_op->unlink(inode, wh_dentry);
+			}
 			if (err) {
 				printk(KERN_ERR "unionfs: create: could not "
 				       "unlink whiteout, err = %d\n", err);
@@ -141,8 +158,6 @@ out:
 
 	if (!err)
 		unionfs_postcopyup_setmnt(dentry);
-	unionfs_unlock_dentry(dentry);
-	unionfs_read_unlock(dentry->d_sb);
 
 	unionfs_check_inode(parent);
 	if (!err) {
@@ -150,6 +165,8 @@ out:
 		unionfs_check_nd(nd);
 	}
 	unionfs_check_dentry(dentry);
+	unionfs_unlock_dentry(dentry);
+	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }
 
@@ -189,13 +206,14 @@ static struct dentry *unionfs_lookup(struct inode *parent,
 			dentry = ret;
 		/* parent times may have changed */
 		unionfs_copy_attr_times(dentry->d_parent->d_inode);
-		unionfs_unlock_dentry(dentry);
 	}
 
 	unionfs_check_inode(parent);
 	unionfs_check_dentry(dentry);
 	unionfs_check_dentry(dentry->d_parent);
 	unionfs_check_nd(nd);
+	if (!IS_ERR(ret))
+		unionfs_unlock_dentry(dentry);
 	unionfs_read_unlock(dentry->d_sb);
 
 	return ret;
@@ -295,7 +313,7 @@ docopyup:
 					    old_dentry, old_bstart,
 					    bindex, old_dentry->d_name.name,
 					    old_dentry->d_name.len, NULL,
-					    old_dentry->d_inode->i_size);
+					    i_size_read(old_dentry->d_inode));
 			if (!err) {
 				lower_new_dentry =
 					create_parents(dir, new_dentry,
@@ -339,12 +357,12 @@ out:
 	if (!err)
 		unionfs_postcopyup_setmnt(new_dentry);
 
-	unionfs_unlock_dentry(new_dentry);
-	unionfs_unlock_dentry(old_dentry);
-
 	unionfs_check_inode(dir);
 	unionfs_check_dentry(new_dentry);
 	unionfs_check_dentry(old_dentry);
+
+	unionfs_unlock_dentry(new_dentry);
+	unionfs_unlock_dentry(old_dentry);
 	unionfs_read_unlock(old_dentry->d_sb);
 
 	return err;
@@ -448,10 +466,11 @@ static int unionfs_symlink(struct inode *dir, struct dentry *dentry,
 			if (!lower_dentry || IS_ERR(lower_dentry)) {
 				if (IS_ERR(lower_dentry))
 					err = PTR_ERR(lower_dentry);
-
-				printk(KERN_ERR "unionfs: lower dentry "
-				       "NULL (or error) for bindex = %d\n",
-				       bindex);
+				if (!IS_COPYUP_ERR(err))
+					printk(KERN_ERR
+					       "unionfs: create_parents for "
+					       "symlink failed: bindex=%d "
+					       "err=%d\n", bindex, err);
 				continue;
 			}
 		}
@@ -504,10 +523,10 @@ out:
 	kfree(name);
 	if (!err)
 		unionfs_postcopyup_setmnt(dentry);
-	unionfs_unlock_dentry(dentry);
 
 	unionfs_check_inode(dir);
 	unionfs_check_dentry(dentry);
+	unionfs_unlock_dentry(dentry);
 	unionfs_read_unlock(dentry->d_sb);
 
 	return err;
@@ -657,9 +676,9 @@ out:
 
 	if (!err)
 		unionfs_copy_attr_times(dentry->d_inode);
-	unionfs_unlock_dentry(dentry);
 	unionfs_check_inode(parent);
 	unionfs_check_dentry(dentry);
+	unionfs_unlock_dentry(dentry);
 	unionfs_read_unlock(dentry->d_sb);
 
 	return err;
@@ -787,10 +806,10 @@ out:
 
 	if (!err)
 		unionfs_postcopyup_setmnt(dentry);
-	unionfs_unlock_dentry(dentry);
 
 	unionfs_check_inode(dir);
 	unionfs_check_dentry(dentry);
+	unionfs_unlock_dentry(dentry);
 	unionfs_read_unlock(dentry->d_sb);
 
 	return err;
@@ -825,8 +844,8 @@ static int unionfs_readlink(struct dentry *dentry, char __user *buf,
 					lower_dentry->d_inode);
 
 out:
-	unionfs_unlock_dentry(dentry);
 	unionfs_check_dentry(dentry);
+	unionfs_unlock_dentry(dentry);
 	unionfs_read_unlock(dentry->d_sb);
 
 	return err;
@@ -888,65 +907,12 @@ static void unionfs_put_link(struct dentry *dentry, struct nameidata *nd,
 	if (unlikely(!__unionfs_d_revalidate_chain(dentry, nd, false)))
 		printk(KERN_ERR
 		       "unionfs: put_link failed to revalidate dentry\n");
-	unionfs_unlock_dentry(dentry);
 
 	unionfs_check_dentry(dentry);
 	unionfs_check_nd(nd);
 	kfree(nd_get_link(nd));
+	unionfs_unlock_dentry(dentry);
 	unionfs_read_unlock(dentry->d_sb);
-}
-
-/*
- * Basically copied from the kernel vfs permission(), but we've changed
- * the following:
- *   (1) the IS_RDONLY check is skipped, and
- *   (2) We return 0 (success) if the non-leftmost branch is mounted
- *       readonly, to allow copyup to work.
- *   (3) we do call security_inode_permission, and therefore security inside
- *       SELinux, etc. are performed.
- *
- * @inode: the lower inode we're checking permission on
- */
-static int inode_permission(struct super_block *sb, struct inode *inode,
-			    int mask, struct nameidata *nd, int bindex)
-{
-	int retval, submask;
-
-	if (mask & MAY_WRITE) {
-		umode_t mode = inode->i_mode;
-		/* The first branch is allowed to be really readonly. */
-		if (bindex == 0 &&
-		    IS_RDONLY(inode) &&
-		    (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)))
-			return -EROFS;
-		/*
-		 * Nobody gets write access to an immutable file.
-		 */
-		if (IS_IMMUTABLE(inode))
-			return -EACCES;
-		/*
-		 * For all other branches than the first one, we ignore
-		 * EROFS or if the branch is mounted as readonly, to let
-		 * copyup take place.
-		 */
-		if (bindex > 0 &&
-		    is_robranch_super(sb, bindex) &&
-		    (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)))
-			return 0;
-	}
-
-	/* Ordinary permission routines do not understand MAY_APPEND. */
-	submask = mask & ~MAY_APPEND;
-	if (inode->i_op && inode->i_op->permission)
-		retval = inode->i_op->permission(inode, submask, nd);
-	else
-		retval = generic_permission(inode, submask, NULL);
-
-	if (retval && retval != -EROFS)	/* ignore EROFS */
-		return retval;
-
-	retval = security_inode_permission(inode, mask, nd);
-	return ((retval == -EROFS) ? 0 : retval);	/* ignore EROFS */
 }
 
 /*
@@ -994,11 +960,20 @@ static int unionfs_permission(struct inode *inode, int mask,
 			continue;
 
 		/*
-		 * We use our own special version of permission, such that
-		 * only the first branch returns -EROFS.
+		 * We check basic permissions, but we ignore any conditions
+		 * such as readonly file systems or branches marked as
+		 * readonly, because those conditions should lead to a
+		 * copyup taking place later on.
 		 */
-		err = inode_permission(inode->i_sb, lower_inode, mask, nd,
-				       bindex);
+		err = permission(lower_inode, mask, nd);
+		if (err && bindex > 0) {
+			umode_t mode = lower_inode->i_mode;
+			if (is_robranch_super(inode->i_sb, bindex) &&
+			    (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)))
+				err = 0;
+			if (IS_COPYUP_ERR(err))
+				err = 0;
+		}
 
 		/*
 		 * The permissions are an intersection of the overall directory
@@ -1062,7 +1037,7 @@ static int unionfs_setattr(struct dentry *dentry, struct iattr *ia)
 				continue;
 			/* Only if its the leftmost file, copyup the file */
 			for (i = bstart - 1; i >= 0; i--) {
-				loff_t size = dentry->d_inode->i_size;
+				loff_t size = i_size_read(dentry->d_inode);
 				if (ia->ia_valid & ATTR_SIZE)
 					size = ia->ia_size;
 				err = copyup_dentry(dentry->d_parent->d_inode,
@@ -1109,9 +1084,9 @@ static int unionfs_setattr(struct dentry *dentry, struct iattr *ia)
 	/* if setattr succeeded, then parent dir may have changed */
 	unionfs_copy_attr_times(dentry->d_parent->d_inode);
 out:
-	unionfs_unlock_dentry(dentry);
 	unionfs_check_dentry(dentry);
 	unionfs_check_dentry(dentry->d_parent);
+	unionfs_unlock_dentry(dentry);
 	unionfs_read_unlock(dentry->d_sb);
 
 	return err;

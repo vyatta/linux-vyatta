@@ -72,7 +72,8 @@ retry:
 	dput(tmp_dentry);
 
 	err = copyup_named_file(dentry->d_parent->d_inode, file, name, bstart,
-				bindex, file->f_path.dentry->d_inode->i_size);
+				bindex,
+				i_size_read(file->f_path.dentry->d_inode));
 	if (err) {
 		if (unlikely(err == -EEXIST))
 			goto retry;
@@ -199,7 +200,6 @@ static int open_highest_file(struct file *file, bool willwrite)
 	struct dentry *dentry = file->f_path.dentry;
 	struct inode *parent_inode = dentry->d_parent->d_inode;
 	struct super_block *sb = dentry->d_sb;
-	size_t inode_size = dentry->d_inode->i_size;
 
 	bstart = dbstart(dentry);
 	bend = dbend(dentry);
@@ -208,7 +208,7 @@ static int open_highest_file(struct file *file, bool willwrite)
 	if (willwrite && IS_WRITE_FLAG(file->f_flags) && is_robranch(dentry)) {
 		for (bindex = bstart - 1; bindex >= 0; bindex--) {
 			err = copyup_file(parent_inode, file, bstart, bindex,
-					  inode_size);
+					  i_size_read(dentry->d_inode));
 			if (!err)
 				break;
 		}
@@ -243,7 +243,6 @@ static int do_delayed_copyup(struct file *file)
 	int bindex, bstart, bend, err = 0;
 	struct dentry *dentry = file->f_path.dentry;
 	struct inode *parent_inode = dentry->d_parent->d_inode;
-	loff_t inode_size = dentry->d_inode->i_size;
 
 	bstart = fbstart(file);
 	bend = fbend(file);
@@ -255,7 +254,8 @@ static int do_delayed_copyup(struct file *file)
 	for (bindex = bstart - 1; bindex >= 0; bindex--) {
 		if (!d_deleted(dentry))
 			err = copyup_file(parent_inode, file, bstart,
-					  bindex, inode_size);
+					  bindex,
+					  i_size_read(dentry->d_inode));
 		else
 			err = copyup_deleted_file(file, dentry, bstart,
 						  bindex);
@@ -551,9 +551,6 @@ int unionfs_open(struct inode *inode, struct file *file)
 	bstart = fbstart(file) = dbstart(dentry);
 	bend = fbend(file) = dbend(dentry);
 
-	/* increment, so that we can flush appropriately */
-	atomic_inc(&UNIONFS_I(dentry->d_inode)->totalopens);
-
 	/*
 	 * open all directories and make the unionfs file struct point to
 	 * these lower file structs
@@ -565,7 +562,6 @@ int unionfs_open(struct inode *inode, struct file *file)
 
 	/* freeing the allocated resources, and fput the opened files */
 	if (err) {
-		atomic_dec(&UNIONFS_I(dentry->d_inode)->totalopens);
 		for (bindex = bstart; bindex <= bend; bindex++) {
 			lower_file = unionfs_lower_file_idx(file, bindex);
 			if (!lower_file)
@@ -577,6 +573,7 @@ int unionfs_open(struct inode *inode, struct file *file)
 		}
 	}
 
+	/* XXX: should this unlock be moved to the function bottom? */
 	unionfs_unlock_dentry(dentry);
 
 out:
@@ -586,12 +583,12 @@ out:
 		kfree(UNIONFS_F(file));
 	}
 out_nofree:
-	unionfs_read_unlock(inode->i_sb);
 	unionfs_check_inode(inode);
 	if (!err) {
 		unionfs_check_file(file);
 		unionfs_check_dentry(file->f_path.dentry->d_parent);
 	}
+	unionfs_read_unlock(inode->i_sb);
 	return err;
 }
 
@@ -606,6 +603,7 @@ int unionfs_file_release(struct inode *inode, struct file *file)
 	struct unionfs_file_info *fileinfo;
 	struct unionfs_inode_info *inodeinfo;
 	struct super_block *sb = inode->i_sb;
+	struct dentry *dentry = file->f_path.dentry;
 	int bindex, bstart, bend;
 	int fgen, err = 0;
 
@@ -628,6 +626,7 @@ int unionfs_file_release(struct inode *inode, struct file *file)
 	bstart = fbstart(file);
 	bend = fbend(file);
 
+	unionfs_lock_dentry(dentry);
 	for (bindex = bstart; bindex <= bend; bindex++) {
 		lower_file = unionfs_lower_file_idx(file, bindex);
 
@@ -635,7 +634,15 @@ int unionfs_file_release(struct inode *inode, struct file *file)
 			fput(lower_file);
 			branchput(sb, bindex);
 		}
+
+		/* if there are no more refs to the dentry, dput it */
+		if (d_deleted(dentry)) {
+			dput(unionfs_lower_dentry_idx(dentry, bindex));
+			unionfs_set_lower_dentry_idx(dentry, bindex, NULL);
+		}
 	}
+	unionfs_unlock_dentry(dentry);
+
 	kfree(fileinfo->lower_files);
 	kfree(fileinfo->saved_branch_ids);
 
@@ -668,10 +675,6 @@ static long do_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	int err;
 
 	lower_file = unionfs_lower_file(file);
-
-	err = security_file_ioctl(lower_file, cmd, arg);
-	if (err)
-		goto out;
 
 	err = -ENOTTY;
 	if (!lower_file || !lower_file->f_op)
@@ -784,8 +787,8 @@ long unionfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	}
 
 out:
-	unionfs_read_unlock(file->f_path.dentry->d_sb);
 	unionfs_check_file(file);
+	unionfs_read_unlock(file->f_path.dentry->d_sb);
 	return err;
 }
 
@@ -803,11 +806,6 @@ int unionfs_flush(struct file *file, fl_owner_t id)
 		goto out;
 	unionfs_check_file(file);
 
-	if (!atomic_dec_and_test(&UNIONFS_I(dentry->d_inode)->totalopens))
-		goto out;
-
-	unionfs_lock_dentry(dentry);
-
 	bstart = fbstart(file);
 	bend = fbend(file);
 	for (bindex = bstart; bindex <= bend; bindex++) {
@@ -817,14 +815,7 @@ int unionfs_flush(struct file *file, fl_owner_t id)
 		    lower_file->f_op->flush) {
 			err = lower_file->f_op->flush(lower_file, id);
 			if (err)
-				goto out_lock;
-
-			/* if there are no more refs to the dentry, dput it */
-			if (d_deleted(dentry)) {
-				dput(unionfs_lower_dentry_idx(dentry, bindex));
-				unionfs_set_lower_dentry_idx(dentry, bindex,
-							     NULL);
-			}
+				goto out;
 		}
 
 	}
@@ -834,10 +825,8 @@ int unionfs_flush(struct file *file, fl_owner_t id)
 	/* parent time could have changed too (async) */
 	unionfs_copy_attr_times(dentry->d_parent->d_inode);
 
-out_lock:
-	unionfs_unlock_dentry(dentry);
 out:
-	unionfs_read_unlock(dentry->d_sb);
 	unionfs_check_file(file);
+	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }

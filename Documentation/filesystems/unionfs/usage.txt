@@ -74,6 +74,23 @@ to read-write, and change /bar from read-write to read-only:
 
 # mount -t unionfs -o remount,mode=/foo=rw,mode=/bar=ro none MOUNTPOINT
 
+Note: in Unionfs 2.x, you cannot set the leftmost branch to readonly because
+then Unionfs won't have any writable place for copyups to take place.
+Moreover, the VFS can get confused when it tries to modify something in a
+file system mounted read-write, but isn't permitted to write to it.
+Instead, you should set the whole union as readonly, as described above.
+If, however, you must set the leftmost branch as readonly, perhaps so you
+can get a snapshot of it at a point in time, then you should insert a new
+writable top-level branch, and mark the one you want as readonly.  This can
+be accomplished as follows, assuming that /foo is your current leftmost
+branch:
+
+# mount -t tmpfs -o size=NNN /new
+# mount -t unionfs -o remount,add=/new,mode=/foo=ro none MOUNTPOINT
+<do what you want safely in /foo>
+# mount -t unionfs -o remount,del=/new,mode=/foo=rw none MOUNTPOINT
+<check if there's anything in /new you want to preserve>
+# umount /new
 
 CACHE CONSISTENCY
 =================

@@ -61,8 +61,12 @@ int create_whiteout(struct dentry *dentry, int start)
 						      dentry->d_name.name,
 						      bindex);
 			if (!lower_dentry || IS_ERR(lower_dentry)) {
-				printk(KERN_ERR "unionfs: create_parents "
-				       "failed for bindex = %d\n", bindex);
+				int ret = PTR_ERR(lower_dentry);
+				if (!IS_COPYUP_ERR(ret))
+					printk(KERN_ERR
+					       "unionfs: create_parents for "
+					       "whiteout failed: bindex=%d "
+					       "err=%d\n", bindex, ret);
 				continue;
 			}
 		}

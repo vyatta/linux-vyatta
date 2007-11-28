@@ -76,10 +76,10 @@ static int guesstimate_hash_size(struct inode *inode)
 		if (!lower_inode)
 			continue;
 
-		if (lower_inode->i_size == DENTPAGE)
+		if (i_size_read(lower_inode) == DENTPAGE)
 			hashsize += DENTPERONEPAGE;
 		else
-			hashsize += (lower_inode->i_size / DENTPAGE) *
+			hashsize += (i_size_read(lower_inode) / DENTPAGE) *
 				DENTPERPAGE;
 	}
 

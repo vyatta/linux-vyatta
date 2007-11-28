@@ -192,6 +192,16 @@ out:
 /*
  * Determine if the lower inode objects have changed from below the unionfs
  * inode.  Return true if changed, false otherwise.
+ *
+ * We check if the mtime or ctime have changed.  However, the inode times
+ * can be changed by anyone without much protection, including
+ * asynchronously.  This can sometimes cause unionfs to find that the lower
+ * file system doesn't change its inode times quick enough, resulting in a
+ * false positive indication (which is harmless, it just makes unionfs do
+ * extra work in re-validating the objects).  To minimize the chances of
+ * these situations, we delay the detection of changed times by
+ * UNIONFS_MIN_CC_TIME (which defaults to 3 seconds, as with NFS's
+ * acregmin).
  */
 bool is_newer_lower(const struct dentry *dentry)
 {
@@ -211,26 +221,23 @@ bool is_newer_lower(const struct dentry *dentry)
 		lower_inode = unionfs_lower_inode_idx(inode, bindex);
 		if (!lower_inode)
 			continue;
-		/*
-		 * We may want to apply other tests to determine if the
-		 * lower inode's data has changed, but checking for changed
-		 * ctime and mtime on the lower inode should be enough.
-		 */
-		if (unlikely(timespec_compare(&inode->i_mtime,
-					      &lower_inode->i_mtime) < 0)) {
-			pr_debug("unionfs: new lower inode mtime "
-				 "(bindex=%d, name=%s)\n", bindex,
+
+		/* check if mtime/ctime have changed */
+		if (unlikely((lower_inode->i_mtime.tv_sec -
+			      inode->i_mtime.tv_sec) > UNIONFS_MIN_CC_TIME)) {
+			pr_info("unionfs: new lower inode mtime "
+				"(bindex=%d, name=%s)\n", bindex,
 				dentry->d_name.name);
 			show_dinode_times(dentry);
-			return true; /* mtime changed! */
+			return true;
 		}
-		if (unlikely(timespec_compare(&inode->i_ctime,
-					      &lower_inode->i_ctime) < 0)) {
-			pr_debug("unionfs: new lower inode ctime "
-				 "(bindex=%d, name=%s)\n", bindex,
+		if (unlikely((lower_inode->i_ctime.tv_sec -
+			      inode->i_ctime.tv_sec) > UNIONFS_MIN_CC_TIME)) {
+			pr_info("unionfs: new lower inode ctime "
+				"(bindex=%d, name=%s)\n", bindex,
 				dentry->d_name.name);
 			show_dinode_times(dentry);
-			return true; /* ctime changed! */
+			return true;
 		}
 	}
 	return false;		/* default: lower is not newer */
@@ -426,11 +433,11 @@ static int unionfs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 
 	unionfs_lock_dentry(dentry);
 	err = __unionfs_d_revalidate_chain(dentry, nd, false);
-	unionfs_unlock_dentry(dentry);
 	if (likely(err > 0)) { /* true==1: dentry is valid */
 		unionfs_check_dentry(dentry);
 		unionfs_check_nd(nd);
 	}
+	unionfs_unlock_dentry(dentry);
 
 	unionfs_read_unlock(dentry->d_sb);
 
