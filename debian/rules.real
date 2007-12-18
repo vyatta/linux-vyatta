@@ -57,13 +57,15 @@ setup_env += DISTRIBUTION_OFFICIAL_BUILD=1 DISTRIBUTION_UPLOADER=$(UPLOADER) DIS
 #
 # Targets
 #
-binary-arch-arch:
-	@echo "binary-arch-arch skipped"; true
-binary-arch-subarch:
-	@echo "binary-arch-subarch skipped"; true
+binary-arch-arch: install-headers-$(ARCH)
+binary-arch-arch: install-libc-dev_$(ARCH)
+binary-arch-subarch: install-headers-$(ARCH)-$(SUBARCH)
 binary-arch-flavour: install-image-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-$(TYPE)
+ifeq ($(MODULES),True)
+  binary-arch-flavour: install-headers-$(ARCH)-$(SUBARCH)-$(FLAVOUR)
+endif
 
-binary-indep:
+binary-indep: install-source
 	@echo "binary-indep skipped"; true
 
 build: $(STAMPS_DIR)/build-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-$(TYPE)
@@ -89,7 +91,7 @@ define patch_cmd
 cd '$(DIR)'; python2.4 '$(CURDIR)/debian/bin/patch.apply' --overwrite-home='$(CURDIR)/debian/patches'
 endef
 
-$(STAMPS_DIR)/source: SOURCE_FILES = $(filter-out debian, $(wildcard * .[^.]*))
+$(STAMPS_DIR)/source: SOURCE_FILES = $(filter-out debian .git, $(wildcard * .[^.]*))
 $(STAMPS_DIR)/source: DIR = $(BUILD_DIR)/source
 $(STAMPS_DIR)/source:
 	rm -rf '$(DIR)'
