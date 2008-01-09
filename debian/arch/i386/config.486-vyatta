@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.23
-# Wed Jan  9 15:30:29 2008
+# Wed Jan  9 15:32:37 2008
 #
 CONFIG_X86_32=y
 CONFIG_GENERIC_TIME=y
@@ -1752,7 +1752,7 @@ CONFIG_PPPOATM=m
 # CONFIG_SLIP is not set
 CONFIG_SLHC=m
 CONFIG_NET_FC=y
-CONFIG_SHAPER=m
+# CONFIG_SHAPER is not set
 CONFIG_NETCONSOLE=m
 CONFIG_NETPOLL=y
 CONFIG_NETPOLL_TRAP=y
