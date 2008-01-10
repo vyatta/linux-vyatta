@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.23
-# Wed Jan  9 15:59:51 2008
+# Wed Jan  9 16:02:19 2008
 #
 CONFIG_X86_32=y
 CONFIG_GENERIC_TIME=y
@@ -105,9 +105,9 @@ CONFIG_DEFAULT_IOSCHED="cfq"
 #
 # Processor type and features
 #
-# CONFIG_TICK_ONESHOT is not set
+CONFIG_TICK_ONESHOT=y
 # CONFIG_NO_HZ is not set
-# CONFIG_HIGH_RES_TIMERS is not set
+CONFIG_HIGH_RES_TIMERS=y
 CONFIG_SMP=y
 CONFIG_X86_PC=y
 # CONFIG_X86_ELAN is not set
