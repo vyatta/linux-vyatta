@@ -143,6 +143,7 @@ struct trie_stat {
 	unsigned int tnodes;
 	unsigned int leaves;
 	unsigned int nullpointers;
+	unsigned int prefixes;
 	unsigned int nodesizes[MAX_STAT_DEPTH];
 };
 
@@ -1557,9 +1558,6 @@ static int trie_leaf_remove(struct trie *t, t_key key)
 	 * Key found.
 	 * Remove the leaf and rebalance the tree
 	 */
-
-	t->size--;
-
 	tp = node_parent(n);
 	tnode_free((struct tnode *) n);
 
@@ -2085,10 +2083,17 @@ static void trie_collect_stats(struct trie *t, struct trie_stat *s)
 	for (n = fib_trie_get_first(&iter, t); n;
 	     n = fib_trie_get_next(&iter)) {
 		if (IS_LEAF(n)) {
+			struct leaf *l = (struct leaf *)n;
+			struct leaf_info *li;
+			struct hlist_node *tmp;
+
 			s->leaves++;
 			s->totdepth += iter.depth;
 			if (iter.depth > s->maxdepth)
 				s->maxdepth = iter.depth;
+
+			hlist_for_each_entry_rcu(li, tmp, &l->list, hlist)
+				++s->prefixes;
 		} else {
 			const struct tnode *tn = (const struct tnode *) n;
 			int i;
@@ -2121,8 +2126,11 @@ static void trie_show_stats(struct seq_file *seq, struct trie_stat *stat)
 	seq_printf(seq, "\tMax depth:      %u\n", stat->maxdepth);
 
 	seq_printf(seq, "\tLeaves:         %u\n", stat->leaves);
-
 	bytes = sizeof(struct leaf) * stat->leaves;
+
+	seq_printf(seq, "\tPrefixes:       %u\n", stat->prefixes);
+	bytes += sizeof(struct leaf_info) * stat->prefixes;
+
 	seq_printf(seq, "\tInternal nodes: %u\n\t", stat->tnodes);
 	bytes += sizeof(struct tnode) * stat->tnodes;
 
