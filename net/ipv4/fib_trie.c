@@ -443,7 +443,6 @@ static void tnode_put_child_reorg(struct tnode *tn, int i, struct node *n, int w
 
 	BUG_ON(i >= 1<<tn->bits);
 
-
 	/* update emptyChildren */
 	if (n == NULL && chi != NULL)
 		tn->empty_children++;
@@ -1301,7 +1300,6 @@ err:
 	return err;
 }
 
-
 /* should be called with rcu_read_lock */
 static inline int check_leaf(struct trie *t, struct leaf *l,
 			     t_key key, int *plen, const struct flowi *flp,
@@ -1702,7 +1700,6 @@ static struct leaf *leaf_walk_rcu(struct tnode *p, struct node *c)
 	return NULL; /* Root of trie */
 }
 
-
 static struct leaf *trie_firstleaf(struct trie *t)
 {
 	struct tnode *n = (struct tnode *) rcu_dereference(t->trie);
@@ -1839,7 +1836,6 @@ static int fn_trie_dump_fa(t_key key, int plen, struct list_head *fah, struct fi
 {
 	int i, s_i;
 	struct fib_alias *fa;
-
 	__be32 xkey = htonl(key);
 
 	s_i = cb->args[5];
@@ -2367,7 +2363,6 @@ static int fib_trie_seq_show(struct seq_file *seq, void *v)
 		struct leaf *l = (struct leaf *) n;
 		struct leaf_info *li;
 		struct hlist_node *node;
-
 		__be32 val = htonl(l->key);
 
 		seq_indent(seq, iter->depth);
