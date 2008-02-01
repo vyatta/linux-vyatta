@@ -1727,6 +1727,19 @@ static struct leaf *trie_nextleaf(struct leaf *l)
 	return leaf_walk_rcu(p, c);
 }
 
+static struct leaf *trie_leafindex(struct trie *t, int index)
+{
+	struct leaf *l = trie_firstleaf(t);
+
+	while (index-- > 0) {
+		l = trie_nextleaf(l);
+		if (!l)
+			break;
+	}
+	return l;
+}
+
+
 /*
  * Caller must hold RTNL.
  */
@@ -1831,7 +1844,7 @@ static int fn_trie_dump_fa(t_key key, int plen, struct list_head *fah, struct fi
 
 	__be32 xkey = htonl(key);
 
-	s_i = cb->args[4];
+	s_i = cb->args[5];
 	i = 0;
 
 	/* rcu_read_lock is hold by caller */
@@ -1852,12 +1865,12 @@ static int fn_trie_dump_fa(t_key key, int plen, struct list_head *fah, struct fi
 				  plen,
 				  fa->fa_tos,
 				  fa->fa_info, NLM_F_MULTI) < 0) {
-			cb->args[4] = i;
+			cb->args[5] = i;
 			return -1;
 		}
 		i++;
 	}
-	cb->args[4] = i;
+	cb->args[5] = i;
 	return skb->len;
 }
 
@@ -1868,7 +1881,7 @@ static int fn_trie_dump_leaf(struct leaf *l, struct fib_table *tb,
 	struct hlist_node *node;
 	int i, s_i;
 
-	s_i = cb->args[3];
+	s_i = cb->args[4];
 	i = 0;
 
 	/* rcu_read_lock is hold by caller */
@@ -1879,19 +1892,19 @@ static int fn_trie_dump_leaf(struct leaf *l, struct fib_table *tb,
 		}
 
 		if (i > s_i)
-			cb->args[4] = 0;
+			cb->args[5] = 0;
 
 		if (list_empty(&li->falh))
 			continue;
 
 		if (fn_trie_dump_fa(l->key, li->plen, &li->falh, tb, skb, cb) < 0) {
-			cb->args[3] = i;
+			cb->args[4] = i;
 			return -1;
 		}
 		i++;
 	}
 
-	cb->args[3] = i;
+	cb->args[4] = i;
 	return skb->len;
 }
 
@@ -1901,35 +1914,37 @@ static int fn_trie_dump(struct fib_table *tb, struct sk_buff *skb,
 	struct leaf *l;
 	struct trie *t = (struct trie *) tb->tb_data;
 	t_key key = cb->args[2];
+	int count = cb->args[3];
 
 	rcu_read_lock();
 	/* Dump starting at last key.
 	 * Note: 0.0.0.0/0 (ie default) is first key.
 	 */
-	if (!key)
+	if (count == 0)
 		l = trie_firstleaf(t);
 	else {
+		/* Normally, continue from last key, but if that is missing
+		 * fallback to using slow rescan
+		 */
 		l = fib_find_node(t, key);
-		if (!l) {
-			/* The table changed during the dump, rather than
-			 * giving partial data, just make application retry.
-			 */
-			rcu_read_unlock();
-			return -EBUSY;
-		}
+		if (!l)
+			l = trie_leafindex(t, count);
 	}
 
 	while (l) {
 		cb->args[2] = l->key;
 		if (fn_trie_dump_leaf(l, tb, skb, cb) < 0) {
+			cb->args[3] = count;
 			rcu_read_unlock();
 			return -1;
 		}
 
+		++count;
 		l = trie_nextleaf(l);
-		memset(&cb->args[3], 0,
-		       sizeof(cb->args) - 3*sizeof(cb->args[0]));
+		memset(&cb->args[4], 0,
+		       sizeof(cb->args) - 4*sizeof(cb->args[0]));
 	}
+	cb->args[3] = count;
 	rcu_read_unlock();
 
 	return skb->len;
