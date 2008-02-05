@@ -2378,8 +2378,7 @@ static int fib_trie_seq_show(struct seq_file *seq, void *v)
 					   rtn_scope(fa->fa_scope),
 					   rtn_type(fa->fa_type));
 				if (fa->fa_tos)
-					seq_printf(seq, "tos =%d\n",
-						   fa->fa_tos);
+					seq_printf(seq, " tos=%d", fa->fa_tos);
 				seq_putc(seq, '\n');
 			}
 		}
