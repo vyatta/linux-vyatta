@@ -2424,14 +2424,15 @@ static const struct file_operations fib_trie_fops = {
 };
 
 struct fib_route_iter {
+	struct trie *main_trie;
 	loff_t	pos;
 	t_key	key;
 };
 
 static struct leaf *fib_route_get_idx(struct fib_route_iter *iter, loff_t pos)
 {
-	struct trie *t = trie_main;
 	struct leaf *l = NULL;
+	struct trie *t = iter->main_trie;
 
 	/* use cache location of last found key */
 	if (iter->pos > 0 && pos >= iter->pos &&
@@ -2462,6 +2463,8 @@ static void *fib_route_seq_start(struct seq_file *seq, loff_t *pos)
 	struct fib_table *tb;
 	
 	rcu_read_lock();
+	iter->main_trie = trie_main;
+
 	if (*pos == 0)
 		return SEQ_START_TOKEN;
 	else
@@ -2476,7 +2479,7 @@ static void *fib_route_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	++*pos;
 	if (v == SEQ_START_TOKEN) {
 		iter->pos = 0;
-		l = trie_firstleaf(trie_main);
+		l = trie_firstleaf(iter->main_trie);
 	} else {
 		iter->pos++;
 		l = trie_nextleaf(l);
@@ -2580,7 +2583,7 @@ static int fib_route_seq_open(struct inode *inode, struct file *file)
 {
 	struct seq_file *seq;
 	int rc = -ENOMEM;
-	struct fib_trie_iter *s = kmalloc(sizeof(*s), GFP_KERNEL);
+	struct fib_route_iter *s = kzalloc(sizeof(*s), GFP_KERNEL);
 
 	if (!s)
 		goto out;
@@ -2591,7 +2594,6 @@ static int fib_route_seq_open(struct inode *inode, struct file *file)
 
 	seq	     = file->private_data;
 	seq->private = s;
-	memset(s, 0, sizeof(*s));
 out:
 	return rc;
 out_kfree:
