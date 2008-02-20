@@ -128,7 +128,7 @@ else
 	echo 'endif' >> '$(DIR)/.kernelvariables'
 endif
 	echo 'CFLAGS += $(CFLAGS)'  >> '$(DIR)/.kernelvariables'
-	cd '$(DIR)'; $(setup_env) make reportoldconfig
+	#cd '$(DIR)'; $(setup_env) make reportoldconfig
 
 $(STAMPS_DIR)/setup-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-$(TYPE): DIR=$(BUILD_DIR)/build-$(ARCH)-$(SUBARCH)-$(FLAVOUR)
 $(STAMPS_DIR)/setup-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-$(TYPE): $(STAMPS_DIR)/source-$(ARCH)-$(SUBARCH)
