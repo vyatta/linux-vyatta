@@ -2458,9 +2458,11 @@ static void *fib_route_seq_start(struct seq_file *seq, loff_t *pos)
 	__acquires(RCU)
 {
 	struct fib_route_iter *iter = seq->private;
-	struct fib_table *tb;
 	
 	rcu_read_lock();
+	if (!trie_main)
+		return NULL;	/* no table yet */
+
 	if (*pos == 0)
 		return SEQ_START_TOKEN;
 	else
