@@ -2424,7 +2424,6 @@ static const struct file_operations fib_trie_fops = {
 };
 
 struct fib_route_iter {
-	struct trie *main_trie;
 	loff_t	pos;
 	t_key	key;
 };
@@ -2432,15 +2431,14 @@ struct fib_route_iter {
 static struct leaf *fib_route_get_idx(struct fib_route_iter *iter, loff_t pos)
 {
 	struct leaf *l = NULL;
-	struct trie *t = iter->main_trie;
 
 	/* use cache location of last found key */
 	if (iter->pos > 0 && pos >= iter->pos &&
-	    (l = fib_find_node(t, iter->key)))
+	    (l = fib_find_node(trie_main, iter->key)))
 		pos -= iter->pos;
 	else {
 		iter->pos = 0;
-		l = trie_firstleaf(t);
+		l = trie_firstleaf(trie_main);
 	}
 
 	while (l && pos-- > 0) {
@@ -2463,8 +2461,6 @@ static void *fib_route_seq_start(struct seq_file *seq, loff_t *pos)
 	struct fib_table *tb;
 	
 	rcu_read_lock();
-	iter->main_trie = trie_main;
-
 	if (*pos == 0)
 		return SEQ_START_TOKEN;
 	else
@@ -2479,7 +2475,7 @@ static void *fib_route_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	++*pos;
 	if (v == SEQ_START_TOKEN) {
 		iter->pos = 0;
-		l = trie_firstleaf(iter->main_trie);
+		l = trie_firstleaf(trie_main);
 	} else {
 		iter->pos++;
 		l = trie_nextleaf(l);
