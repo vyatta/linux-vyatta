@@ -106,11 +106,16 @@ static struct pci_device_id e1000_pci_tbl[] = {
 	INTEL_E1000_ETHERNET_DEVICE(0x10BA),
 	INTEL_E1000_ETHERNET_DEVICE(0x10BB),
 	INTEL_E1000_ETHERNET_DEVICE(0x10BC),
+	INTEL_E1000_ETHERNET_DEVICE(0x10BD),
+	INTEL_E1000_ETHERNET_DEVICE(0x10C0),
+	INTEL_E1000_ETHERNET_DEVICE(0x10C2),
+	INTEL_E1000_ETHERNET_DEVICE(0x10C3),
 	INTEL_E1000_ETHERNET_DEVICE(0x10C4),
 	INTEL_E1000_ETHERNET_DEVICE(0x10C5),
 	INTEL_E1000_ETHERNET_DEVICE(0x10D5),
 	INTEL_E1000_ETHERNET_DEVICE(0x10D9),
 	INTEL_E1000_ETHERNET_DEVICE(0x10DA),
+	INTEL_E1000_ETHERNET_DEVICE(0x294C),
 	/* required last entry */
 	{0,}
 };
@@ -416,6 +421,7 @@ e1000_release_hw_control(struct e1000_adapter *adapter)
 	case e1000_82572:
 	case e1000_80003es2lan:
 	case e1000_ich8lan:
+	case e1000_ich9lan:
 		ctrl_ext = E1000_READ_REG(&adapter->hw, CTRL_EXT);
 		E1000_WRITE_REG(&adapter->hw, CTRL_EXT,
 				ctrl_ext & ~E1000_CTRL_EXT_DRV_LOAD);
@@ -453,6 +459,7 @@ e1000_get_hw_control(struct e1000_adapter *adapter)
 	case e1000_82572:
 	case e1000_80003es2lan:
 	case e1000_ich8lan:
+	case e1000_ich9lan:
 		ctrl_ext = E1000_READ_REG(&adapter->hw, CTRL_EXT);
 		E1000_WRITE_REG(&adapter->hw, CTRL_EXT,
 				ctrl_ext | E1000_CTRL_EXT_DRV_LOAD);
@@ -608,6 +615,7 @@ static void e1000_power_down_phy(struct e1000_adapter *adapter)
 		case e1000_82573:
 		case e1000_80003es2lan:
 		case e1000_ich8lan:
+		case e1000_ich9lan:
 			if (e1000_check_mng_mode(&adapter->hw) ||
 			    e1000_check_phy_reset_block(&adapter->hw))
 				goto out;
@@ -707,6 +715,11 @@ e1000_reset(struct e1000_adapter *adapter)
 		break;
 	case e1000_ich8lan:
 		pba = E1000_PBA_8K;
+		break;
+	case e1000_ich9lan:
+#define E1000_PBA_10K 0x000A
+		pba = E1000_PBA_10K;
+		break;
 	case e1000_undefined:
 	case e1000_num_macs:
 		break;
@@ -769,6 +782,7 @@ e1000_reset(struct e1000_adapter *adapter)
 			if (pba < min_rx_space) {
 				switch (adapter->hw.mac_type) {
 				case e1000_82573:
+				case e1000_ich9lan:
 					/* ERT enabled in e1000_configure_rx */
 					break;
 				default:
@@ -961,7 +975,8 @@ e1000_probe(struct pci_dev *pdev,
 	err = -EIO;
 	/* Flash BAR mapping must happen after e1000_sw_init
 	 * because it depends on mac_type */
-	if ((adapter->hw.mac_type == e1000_ich8lan) &&
+	if (((adapter->hw.mac_type == e1000_ich8lan) ||
+	     (adapter->hw.mac_type == e1000_ich9lan)) &&
 	   (pci_resource_flags(pdev, 1) & IORESOURCE_MEM)) {
 		flash_start = pci_resource_start(pdev, 1);
 		flash_len = pci_resource_len(pdev, 1);
@@ -979,7 +994,8 @@ e1000_probe(struct pci_dev *pdev,
 				   NETIF_F_HW_VLAN_TX |
 				   NETIF_F_HW_VLAN_RX |
 				   NETIF_F_HW_VLAN_FILTER;
-		if (adapter->hw.mac_type == e1000_ich8lan)
+		if ((adapter->hw.mac_type == e1000_ich8lan) ||
+		    (adapter->hw.mac_type == e1000_ich9lan))
 			netdev->features &= ~NETIF_F_HW_VLAN_FILTER;
 	}
 
@@ -1061,6 +1077,7 @@ e1000_probe(struct pci_dev *pdev,
 		eeprom_apme_mask = E1000_EEPROM_82544_APM;
 		break;
 	case e1000_ich8lan:
+	case e1000_ich9lan:
 		e1000_read_eeprom(&adapter->hw,
 			EEPROM_INIT_CONTROL1_REG, 1, &eeprom_data);
 		eeprom_apme_mask = E1000_EEPROM_ICH8_APME;
@@ -1144,7 +1161,9 @@ e1000_probe(struct pci_dev *pdev,
 	 * DRV_LOAD until the interface is up.  For all other cases,
 	 * let the f/w know that the h/w is now under the control
 	 * of the driver. */
-	if (adapter->hw.mac_type != e1000_82573 ||
+	if (((adapter->hw.mac_type != e1000_82573) &&
+	     (adapter->hw.mac_type != e1000_ich8lan) &&
+	     (adapter->hw.mac_type != e1000_ich9lan)) ||
 	    !e1000_check_mng_mode(&adapter->hw))
 		e1000_get_hw_control(adapter);
 
@@ -1425,7 +1444,9 @@ e1000_open(struct net_device *netdev)
 
 	/* If AMT is enabled, let the firmware know that the network
 	 * interface is now open */
-	if (adapter->hw.mac_type == e1000_82573 &&
+	if (((adapter->hw.mac_type == e1000_82573) ||
+	     (adapter->hw.mac_type == e1000_ich8lan) ||
+	     (adapter->hw.mac_type == e1000_ich9lan)) &&
 	    e1000_check_mng_mode(&adapter->hw))
 		e1000_get_hw_control(adapter);
 
@@ -1501,7 +1522,9 @@ e1000_close(struct net_device *netdev)
 
 	/* If AMT is enabled, let the firmware know that the network
 	 * interface is now closed */
-	if (adapter->hw.mac_type == e1000_82573 &&
+	if (((adapter->hw.mac_type == e1000_82573) ||
+	     (adapter->hw.mac_type == e1000_ich8lan) ||
+	     (adapter->hw.mac_type == e1000_ich9lan)) &&
 	    e1000_check_mng_mode(&adapter->hw))
 		e1000_release_hw_control(adapter);
 
@@ -2090,7 +2113,7 @@ e1000_configure_rx(struct e1000_adapter *adapter)
 	/* enable early receives on 82573, only takes effect if using > 2048
 	 * byte total frame size.  for example only for jumbo frames */
 #define E1000_ERT_2048 0x100
-	if (hw->mac_type == e1000_82573)
+	if (hw->mac_type == e1000_82573 || hw->mac_type == e1000_ich9lan)
 		E1000_WRITE_REG(hw, ERT, E1000_ERT_2048);
 
 	/* Enable Receives */
@@ -2435,12 +2458,14 @@ e1000_set_multi(struct net_device *netdev)
 	uint32_t rctl;
 	uint32_t hash_value;
 	int i, rar_entries = E1000_RAR_ENTRIES;
-	int mta_reg_count = (hw->mac_type == e1000_ich8lan) ?
+	int mta_reg_count = ((hw->mac_type == e1000_ich8lan) || (hw->mac_type == e1000_ich9lan)) ?
 				E1000_NUM_MTA_REGISTERS_ICH8LAN :
 				E1000_NUM_MTA_REGISTERS;
 
 	if (adapter->hw.mac_type == e1000_ich8lan)
 		rar_entries = E1000_RAR_ENTRIES_ICH8LAN;
+	else if (adapter->hw.mac_type == e1000_ich9lan)
+		rar_entries = E1000_RAR_ENTRIES_ICH9LAN;
 
 	/* reserve RAR[14] for LAA over-write work-around */
 	if (adapter->hw.mac_type == e1000_82571)
@@ -3324,6 +3349,7 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 			case e1000_82572:
 			case e1000_82573:
 			case e1000_ich8lan:
+			case e1000_ich9lan:
 				pull_size = min((unsigned int)4, skb->data_len);
 				if (!__pskb_pull_tail(skb, pull_size)) {
 					DPRINTK(DRV, ERR,
@@ -3521,6 +3547,14 @@ e1000_change_mtu(struct net_device *netdev, int new_mtu)
 		/* ERT will be enabled later to enable wire speed receives */
 
 		/* fall through to get support */
+	case e1000_ich9lan:
+		if ((adapter->hw.phy_type == e1000_phy_ife) &&
+		    (max_frame > ETH_FRAME_LEN + ETHERNET_FCS_SIZE)) {
+			DPRINTK(PROBE, ERR, "Jumbo Frames not supported.\n");
+			return -EINVAL;
+		}
+
+		/* fall through to get support */
 	case e1000_82571:
 	case e1000_82572:
 	case e1000_80003es2lan:
@@ -3609,7 +3643,8 @@ e1000_update_stats(struct e1000_adapter *adapter)
 	adapter->stats.mprc += E1000_READ_REG(hw, MPRC);
 	adapter->stats.roc += E1000_READ_REG(hw, ROC);
 
-	if (adapter->hw.mac_type != e1000_ich8lan) {
+	if ((adapter->hw.mac_type != e1000_ich8lan) &&
+	    (adapter->hw.mac_type != e1000_ich9lan)) {
 		adapter->stats.prc64 += E1000_READ_REG(hw, PRC64);
 		adapter->stats.prc127 += E1000_READ_REG(hw, PRC127);
 		adapter->stats.prc255 += E1000_READ_REG(hw, PRC255);
@@ -3645,7 +3680,8 @@ e1000_update_stats(struct e1000_adapter *adapter)
 	adapter->stats.toth += E1000_READ_REG(hw, TOTH);
 	adapter->stats.tpr += E1000_READ_REG(hw, TPR);
 
-	if (adapter->hw.mac_type != e1000_ich8lan) {
+	if ((adapter->hw.mac_type != e1000_ich8lan) &&
+	    (adapter->hw.mac_type != e1000_ich9lan)) {
 		adapter->stats.ptc64 += E1000_READ_REG(hw, PTC64);
 		adapter->stats.ptc127 += E1000_READ_REG(hw, PTC127);
 		adapter->stats.ptc255 += E1000_READ_REG(hw, PTC255);
@@ -3676,7 +3712,8 @@ e1000_update_stats(struct e1000_adapter *adapter)
 		adapter->stats.iac += E1000_READ_REG(hw, IAC);
 		adapter->stats.icrxoc += E1000_READ_REG(hw, ICRXOC);
 
-		if (adapter->hw.mac_type != e1000_ich8lan) {
+		if ((adapter->hw.mac_type != e1000_ich8lan) &&
+		    (adapter->hw.mac_type != e1000_ich9lan)) {
 			adapter->stats.icrxptc += E1000_READ_REG(hw, ICRXPTC);
 			adapter->stats.icrxatc += E1000_READ_REG(hw, ICRXATC);
 			adapter->stats.ictxptc += E1000_READ_REG(hw, ICTXPTC);
@@ -4948,7 +4985,8 @@ e1000_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp)
 		ctrl |= E1000_CTRL_VME;
 		E1000_WRITE_REG(&adapter->hw, CTRL, ctrl);
 
-		if (adapter->hw.mac_type != e1000_ich8lan) {
+		if ((adapter->hw.mac_type != e1000_ich8lan) &&
+		    (adapter->hw.mac_type != e1000_ich9lan)) {
 			/* enable VLAN receive filtering */
 			rctl = E1000_READ_REG(&adapter->hw, RCTL);
 			rctl |= E1000_RCTL_VFE;
@@ -4962,7 +5000,8 @@ e1000_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp)
 		ctrl &= ~E1000_CTRL_VME;
 		E1000_WRITE_REG(&adapter->hw, CTRL, ctrl);
 
-		if (adapter->hw.mac_type != e1000_ich8lan) {
+		if ((adapter->hw.mac_type != e1000_ich8lan) &&
+		    (adapter->hw.mac_type != e1000_ich9lan)) {
 			/* disable VLAN filtering */
 			rctl = E1000_READ_REG(&adapter->hw, RCTL);
 			rctl &= ~E1000_RCTL_VFE;
@@ -5207,7 +5246,9 @@ e1000_resume(struct pci_dev *pdev)
 	 * DRV_LOAD until the interface is up.  For all other cases,
 	 * let the f/w know that the h/w is now under the control
 	 * of the driver. */
-	if (adapter->hw.mac_type != e1000_82573 ||
+	if (((adapter->hw.mac_type != e1000_82573) &&
+	     (adapter->hw.mac_type != e1000_ich8lan) &&
+	     (adapter->hw.mac_type != e1000_ich9lan)) ||
 	    !e1000_check_mng_mode(&adapter->hw))
 		e1000_get_hw_control(adapter);
 
@@ -5319,7 +5360,9 @@ static void e1000_io_resume(struct pci_dev *pdev)
 	 * DRV_LOAD until the interface is up.  For all other cases,
 	 * let the f/w know that the h/w is now under the control
 	 * of the driver. */
-	if (adapter->hw.mac_type != e1000_82573 ||
+	if (((adapter->hw.mac_type != e1000_82573) &&
+             (adapter->hw.mac_type != e1000_ich8lan) &&
+             (adapter->hw.mac_type != e1000_ich9lan)) ||
 	    !e1000_check_mng_mode(&adapter->hw))
 		e1000_get_hw_control(adapter);
 

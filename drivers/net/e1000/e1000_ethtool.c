@@ -608,6 +608,7 @@ e1000_get_drvinfo(struct net_device *netdev,
 	case e1000_82573:
 	case e1000_80003es2lan:
 	case e1000_ich8lan:
+	case e1000_ich9lan:
 		sprintf(firmware_version, "%d.%d-%d",
 			(eeprom_data & 0xF000) >> 12,
 			(eeprom_data & 0x0FF0) >> 4,
@@ -785,6 +786,7 @@ e1000_reg_test(struct e1000_adapter *adapter, uint64_t *data)
 		break;
 	case e1000_82573:
 	case e1000_ich8lan:
+	case e1000_ich9lan:
 		toggle = 0x7FFFF033;
 		break;
 	default:
@@ -805,7 +807,8 @@ e1000_reg_test(struct e1000_adapter *adapter, uint64_t *data)
 	/* restore previous status */
 	E1000_WRITE_REG(&adapter->hw, STATUS, before);
 
-	if (adapter->hw.mac_type != e1000_ich8lan) {
+	if ((adapter->hw.mac_type != e1000_ich8lan) &&
+	    (adapter->hw.mac_type != e1000_ich9lan)) {
 		REG_PATTERN_TEST(FCAL, 0xFFFFFFFF, 0xFFFFFFFF);
 		REG_PATTERN_TEST(FCAH, 0x0000FFFF, 0xFFFFFFFF);
 		REG_PATTERN_TEST(FCT, 0x0000FFFF, 0xFFFFFFFF);
@@ -825,8 +828,9 @@ e1000_reg_test(struct e1000_adapter *adapter, uint64_t *data)
 
 	REG_SET_AND_CHECK(RCTL, 0xFFFFFFFF, 0x00000000);
 
-	before = (adapter->hw.mac_type == e1000_ich8lan ?
-	          0x06C3B33E : 0x06DFB3FE);
+	before = ((adapter->hw.mac_type == e1000_ich8lan) ||
+		  (adapter->hw.mac_type == e1000_ich9lan)) ?
+	          0x06C3B33E : 0x06DFB3FE;
 	REG_SET_AND_CHECK(RCTL, before, 0x003FFFFB);
 	REG_SET_AND_CHECK(TCTL, 0xFFFFFFFF, 0x00000000);
 
@@ -834,12 +838,24 @@ e1000_reg_test(struct e1000_adapter *adapter, uint64_t *data)
 
 		REG_SET_AND_CHECK(RCTL, before, 0xFFFFFFFF);
 		REG_PATTERN_TEST(RDBAL, 0xFFFFFFF0, 0xFFFFFFFF);
-		if (adapter->hw.mac_type != e1000_ich8lan)
+		if ((adapter->hw.mac_type != e1000_ich8lan) &&
+		    (adapter->hw.mac_type != e1000_ich9lan))
 			REG_PATTERN_TEST(TXCW, 0xC000FFFF, 0x0000FFFF);
 		REG_PATTERN_TEST(TDBAL, 0xFFFFFFF0, 0xFFFFFFFF);
 		REG_PATTERN_TEST(TIDV, 0x0000FFFF, 0x0000FFFF);
-		value = (adapter->hw.mac_type == e1000_ich8lan ?
-		         E1000_RAR_ENTRIES_ICH8LAN : E1000_RAR_ENTRIES);
+
+		switch (adapter->hw.mac_type) {
+		case e1000_ich8lan:
+			value = E1000_RAR_ENTRIES_ICH8LAN;
+			break;
+		case e1000_ich9lan:
+			value = E1000_RAR_ENTRIES_ICH9LAN;
+			break;
+		default:
+			value = E1000_RAR_ENTRIES;
+			break;
+		}
+
 		for (i = 0; i < value; i++) {
 			REG_PATTERN_TEST(RA + (((i << 1) + 1) << 2), 0x8003FFFF,
 			                 0xFFFFFFFF);
@@ -854,8 +870,9 @@ e1000_reg_test(struct e1000_adapter *adapter, uint64_t *data)
 
 	}
 
-	value = (adapter->hw.mac_type == e1000_ich8lan ?
-			E1000_MC_TBL_SIZE_ICH8LAN : E1000_MC_TBL_SIZE);
+	value = ((adapter->hw.mac_type == e1000_ich8lan) ||
+		 (adapter->hw.mac_type == e1000_ich9lan)) ?
+			E1000_MC_TBL_SIZE_ICH8LAN : E1000_MC_TBL_SIZE;
 	for (i = 0; i < value; i++)
 		REG_PATTERN_TEST(MTA + (i << 2), 0xFFFFFFFF, 0xFFFFFFFF);
 
@@ -927,7 +944,8 @@ e1000_intr_test(struct e1000_adapter *adapter, uint64_t *data)
 	/* Test each interrupt */
 	for (; i < 10; i++) {
 
-		if (adapter->hw.mac_type == e1000_ich8lan && i == 8)
+		if (((adapter->hw.mac_type == e1000_ich8lan) ||
+		     (adapter->hw.mac_type == e1000_ich9lan)) && i == 8)
 			continue;
 
 		/* Interrupt to test */
@@ -1374,6 +1392,7 @@ e1000_set_phy_loopback(struct e1000_adapter *adapter)
 	case e1000_82573:
 	case e1000_80003es2lan:
 	case e1000_ich8lan:
+	case e1000_ich9lan:
 		return e1000_integrated_phy_loopback(adapter);
 		break;
 
