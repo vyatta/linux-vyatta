@@ -212,6 +212,9 @@ static int ethtool_get_wol(struct net_device *dev, char __user *useraddr)
 
 	dev->ethtool_ops->get_wol(dev, &wol);
 
+	if (!capable(CAP_NET_ADMIN))
+		memset(wol.sopass, 0, SOPASS_MAX);
+
 	if (copy_to_user(useraddr, &wol, sizeof(wol)))
 		return -EFAULT;
 	return 0;
