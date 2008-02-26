@@ -804,11 +804,8 @@ int dev_ethtool(struct ifreq *ifr)
 
 	/* Allow some commands to be done by anyone */
 	switch(ethcmd) {
-	case ETHTOOL_GSET:
 	case ETHTOOL_GDRVINFO:
-	case ETHTOOL_GWOL:
 	case ETHTOOL_GMSGLVL:
-	case ETHTOOL_GLINK:
 	case ETHTOOL_GCOALESCE:
 	case ETHTOOL_GRINGPARAM:
 	case ETHTOOL_GPAUSEPARAM:
