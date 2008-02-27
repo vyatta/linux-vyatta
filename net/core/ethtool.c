@@ -212,6 +212,9 @@ static int ethtool_get_wol(struct net_device *dev, char __user *useraddr)
 
 	dev->ethtool_ops->get_wol(dev, &wol);
 
+	if (!capable(CAP_NET_ADMIN))
+		memset(wol.sopass, 0, sizeof(wol.sopass));
+	
 	if (copy_to_user(useraddr, &wol, sizeof(wol)))
 		return -EFAULT;
 	return 0;
@@ -817,6 +820,11 @@ int dev_ethtool(struct ifreq *ifr)
 	case ETHTOOL_GPERMADDR:
 	case ETHTOOL_GUFO:
 	case ETHTOOL_GGSO:
+	/* Vyatta extensions */
+	case ETHTOOL_GWOL:
+	case ETHTOOL_GLINK:
+	case ETHTOOL_GSET:
+	case ETHTOOL_PHYS_ID:
 		break;
 	default:
 		if (!capable(CAP_NET_ADMIN))
