@@ -824,7 +824,6 @@ int dev_ethtool(struct ifreq *ifr)
 	case ETHTOOL_GWOL:
 	case ETHTOOL_GLINK:
 	case ETHTOOL_GSET:
-	case ETHTOOL_PHYS_ID:
 		break;
 	default:
 		if (!capable(CAP_NET_ADMIN))
