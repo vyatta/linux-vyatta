@@ -2062,6 +2062,9 @@ compat_do_ipt_get_ctl(struct sock *sk, int cmd, void __user *user, int *len)
 {
 	int ret;
 
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
 	switch (cmd) {
 	case IPT_SO_GET_INFO:
 		ret = get_info(user, len, 1);
@@ -2105,6 +2108,9 @@ static int
 do_ipt_get_ctl(struct sock *sk, int cmd, void __user *user, int *len)
 {
 	int ret;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
 
 	switch (cmd) {
 	case IPT_SO_GET_INFO:

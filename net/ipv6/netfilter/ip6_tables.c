@@ -1236,6 +1236,9 @@ do_ip6t_get_ctl(struct sock *sk, int cmd, void __user *user, int *len)
 {
 	int ret;
 
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
 	switch (cmd) {
 	case IP6T_SO_GET_INFO: {
 		char name[IP6T_TABLE_MAXNAMELEN];
