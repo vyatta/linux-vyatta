@@ -1,3 +1,44 @@
+linux-2.6 (2.6.23-1+vyatta+3) unstable; urgency=low
+
+  3.0.1
+  [ Mark O'Brien ]
+
+
+  [ Benjamin Herrenschmidt ]
+  * Disable G5 NAP mode during SMU commands on U3
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.23.17
+
+  [ Ingo Molnar ]
+  * x86_64: CPA, fix cache attribute inconsistency bug
+
+  [ James Bottomley ]
+  * SCSI: sd: handle bad lba in sense information
+
+  [ Jonathan Corbet ]
+  * Be more robust about bad arguments in get_user_pages()
+
+  [ Jozsef Kadlecsik ]
+  * NETFILTER: nf_conntrack_tcp: conntrack reopening fix
+
+  [ Stephen Hemminger ]
+  * allow non-root to query iptables
+  * allow any user to query ethernet status
+  * block non-root from querying iptables
+  * block non-root from doing ethtool -p
+
+  [ Thomas Gleixner ]
+  * hrtimer: check relative timeouts for overflow
+  * genirq: do not leave interupts enabled on free_irq
+
+  [ Trond Myklebust ]
+  * NFS: Fix a potential file corruption issue when writing
+
+  [ Mark O'Brien ]
+
+ -- Mark O'Brien <mobrien@vyatta.com>  Tue, 18 Mar 2008 19:03:12 -0700
+
 linux-2.6 (2.6.23-1+vyatta+2) unstable; urgency=low
 
   vc4.0.0
