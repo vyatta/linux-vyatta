@@ -839,6 +839,14 @@ retry:
 		kfree_skb(skb);
 		return PTR_ERR(sk);
 	}
+
+	if (sk_filter(sk, skb)) {
+ 		int err = skb->len;
+ 		kfree_skb(skb);
+ 		sock_put(sk);
+ 		return err;
+ 	}
+
 	err = netlink_attachskb(sk, skb, nonblock, &timeo, ssk);
 	if (err == 1)
 		goto retry;
@@ -927,6 +935,9 @@ static inline int do_one_broadcast(struct sock *sk,
 		netlink_overrun(sk);
 		/* Clone failed. Notify ALL listeners. */
 		p->failure = 1;
+	} else if (sk_filter(sk, p->skb2)) {
+		kfree_skb(p->skb2);
+		p->skb2 = NULL;
 	} else if ((val = netlink_broadcast_deliver(sk, p->skb2)) < 0) {
 		netlink_overrun(sk);
 	} else {
@@ -1461,8 +1472,13 @@ static int netlink_dump(struct sock *sk)
 
 	if (len > 0) {
 		mutex_unlock(nlk->cb_mutex);
-		skb_queue_tail(&sk->sk_receive_queue, skb);
-		sk->sk_data_ready(sk, len);
+
+		if (sk_filter(sk, skb))
+			kfree_skb(skb);
+		else {
+			skb_queue_tail(&sk->sk_receive_queue, skb);
+			sk->sk_data_ready(sk, skb->len);
+		}
 		return 0;
 	}
 
@@ -1472,8 +1488,12 @@ static int netlink_dump(struct sock *sk)
 
 	memcpy(nlmsg_data(nlh), &len, sizeof(len));
 
-	skb_queue_tail(&sk->sk_receive_queue, skb);
-	sk->sk_data_ready(sk, skb->len);
+	if (sk_filter(sk, skb))
+		kfree_skb(skb);
+	else {
+		skb_queue_tail(&sk->sk_receive_queue, skb);
+		sk->sk_data_ready(sk, skb->len);
+	}
 
 	if (cb->done)
 		cb->done(cb);
