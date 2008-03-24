@@ -50,14 +50,13 @@
 #define FFprint(a...) printk(KERN_DEBUG a)
 
 static struct sock *fibnl;
+struct hlist_head fib_table_hash[FIB_TABLE_HASHSZ];
+
 
 #ifndef CONFIG_IP_MULTIPLE_TABLES
 
 struct fib_table *ip_fib_local_table;
 struct fib_table *ip_fib_main_table;
-
-#define FIB_TABLE_HASHSZ 1
-static struct hlist_head fib_table_hash[FIB_TABLE_HASHSZ];
 
 static void __init fib4_rules_init(void)
 {
@@ -67,9 +66,6 @@ static void __init fib4_rules_init(void)
 	hlist_add_head_rcu(&ip_fib_main_table->tb_hlist, &fib_table_hash[0]);
 }
 #else
-
-#define FIB_TABLE_HASHSZ 256
-static struct hlist_head fib_table_hash[FIB_TABLE_HASHSZ];
 
 struct fib_table *fib_new_table(u32 id)
 {

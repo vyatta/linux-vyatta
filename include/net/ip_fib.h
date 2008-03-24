@@ -155,6 +155,7 @@ struct fib_table {
 };
 
 #ifndef CONFIG_IP_MULTIPLE_TABLES
+#define FIB_TABLE_HASHSZ 1
 
 extern struct fib_table *ip_fib_local_table;
 extern struct fib_table *ip_fib_main_table;
@@ -186,6 +187,7 @@ static inline void fib_select_default(const struct flowi *flp, struct fib_result
 }
 
 #else /* CONFIG_IP_MULTIPLE_TABLES */
+#define FIB_TABLE_HASHSZ 256
 extern void __init fib4_rules_init(void);
 
 #ifdef CONFIG_NET_CLS_ROUTE
@@ -204,6 +206,7 @@ extern void fib_select_default(const struct flowi *flp, struct fib_result *res);
 #endif /* CONFIG_IP_MULTIPLE_TABLES */
 
 /* Exported by fib_frontend.c */
+extern struct hlist_head fib_table_hash[FIB_TABLE_HASHSZ];
 extern const struct nla_policy rtm_ipv4_policy[];
 extern void		ip_fib_init(void);
 extern int fib_validate_source(__be32 src, __be32 dst, u8 tos, int oif,
