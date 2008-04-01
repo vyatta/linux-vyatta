@@ -86,7 +86,7 @@ my $realimageloc    = "/$image_dir/";
 my $have_conffile   = "";
 my $CONF_LOC        = '/etc/kernel-img.conf';
 my $relative_links  = '';
-my $silent_modules  = '';
+my $silent_modules  = 'Yes';
 my $silent_loader   = '';
 my $warn_reboot     = 'Yes';     # Warn that we are installing a version of
                                  # the kernel we are running
@@ -302,27 +302,27 @@ if ($initrd && !$do_initrd) {
   }
   $answer =~ s/^\s+//;
   $answer =~ s/\s+$//;
-  print STDERR "Ok, Aborting\n" unless $answer =~ /^(f|n)/i;
-  if ($answer !~ /^(f|n)/i && $invisible) {
-    my $note = "${package_name}/preinst/abort-install-$version";
-
-    ($ret,$seen) = fset ("$note", 'seen', 'false');
-    die "Error setting debconf flags in $note: $seen" if $ret;
-
-    ($ret,$seen) = fset ("$note", 'seen', 'false');
-    die "Error setting debconf flags in $note: $seen" if $ret;
-
-    ($ret,$seen) = input('critical', "$note");
-    if ($ret && $ret != 30 ) {
-      die "Error setting debconf note $note: $seen";
-    }
-
-    ($ret,$seen) = go ();
-    if ($ret && $ret != 30 ) {
-      die "Error asking debconf question $note: $seen";
-    }
-  }
-  exit 1 unless  $answer =~ /^(f|n)/i;
+####  print STDERR "Ok, Aborting\n" unless $answer =~ /^(f|n)/i;
+####  if ($answer !~ /^(f|n)/i && $invisible) {
+####    my $note = "${package_name}/preinst/abort-install-$version";
+####
+####    ($ret,$seen) = fset ("$note", 'seen', 'false');
+####    die "Error setting debconf flags in $note: $seen" if $ret;
+####
+####    ($ret,$seen) = fset ("$note", 'seen', 'false');
+####    die "Error setting debconf flags in $note: $seen" if $ret;
+####
+####    ($ret,$seen) = input('critical', "$note");
+####    if ($ret && $ret != 30 ) {
+####      die "Error setting debconf note $note: $seen";
+####    }
+####
+####    ($ret,$seen) = go ();
+####    if ($ret && $ret != 30 ) {
+####      die "Error asking debconf question $note: $seen";
+####    }
+####  }
+####  exit 1 unless  $answer =~ /^(f|n)/i;
 }
 
 
@@ -446,27 +446,27 @@ if (-d "$modules_base/$version/kernel") {
 
     $answer =~ s/^\s+//;
     $answer =~ s/\s+$//;
-    print STDERR "Ok, Aborting\n" unless $answer =~ /^(f|n)/i;
-    if ($answer !~ /^(f|n)/i && $invisible) {
-      my $note = "${package_name}/preinst/abort-overwrite-$version";
-
-      ($ret,$seen) = fset ("$note", 'seen', 'false');
-      die "Error setting debconf flags in $note: $seen" if $ret;
-
-      ($ret,$seen) = fset ("$note", 'seen', 'false');
-      die "Error setting debconf flags in $note: $seen" if $ret;
-
-      ($ret,$seen) = input('critical', "$note");
-      if ($ret && $ret != 30 ) {
-        die "Error setting debconf note $note: $seen";
-      }
-
-      ($ret,$seen) = go ();
-      if ($ret && $ret != 30 ) {
-        die "Error asking debconf question $note: $seen";
-      }
-    }
-    exit 1 unless  $answer =~ /^(f|n)/i;
+####    print STDERR "Ok, Aborting\n" unless $answer =~ /^(f|n)/i;
+####    if ($answer !~ /^(f|n)/i && $invisible) {
+####      my $note = "${package_name}/preinst/abort-overwrite-$version";
+####
+####      ($ret,$seen) = fset ("$note", 'seen', 'false');
+####      die "Error setting debconf flags in $note: $seen" if $ret;
+####
+####      ($ret,$seen) = fset ("$note", 'seen', 'false');
+####      die "Error setting debconf flags in $note: $seen" if $ret;
+####
+####      ($ret,$seen) = input('critical', "$note");
+####      if ($ret && $ret != 30 ) {
+####        die "Error setting debconf note $note: $seen";
+####      }
+####
+####      ($ret,$seen) = go ();
+####      if ($ret && $ret != 30 ) {
+####        die "Error asking debconf question $note: $seen";
+####      }
+####    }
+####    exit 1 unless  $answer =~ /^(f|n)/i;
   }
   else {
     print STDERR <<EOF;
