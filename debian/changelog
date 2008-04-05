@@ -1,3 +1,23 @@
+linux-2.6 (2.6.23-1+vyatta+4) unstable; urgency=low
+
+  3.0.2
+  [ Mark O'Brien ]
+
+  * 3.0.1
+
+  [ Robert Bays ]
+  * add ifb module to kernel
+
+  [ Stephen Hemminger ]
+  * make socket filters work for AF_NETLINK
+
+  [ rbalocca ]
+  * Fix linux-image pre-install to run without interaction
+
+  [ Mark O'Brien ]
+
+ -- Mark O'Brien <mobrien@vyatta.com>  Fri, 04 Apr 2008 18:00:02 -0700
+
 linux-2.6 (2.6.23-1+vyatta+3) unstable; urgency=low
 
   VC4.0.1
