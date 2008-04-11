@@ -65,16 +65,16 @@ static int input_defuzz_abs_event(int value, int old_val, int fuzz)
 
 /*
  * Pass event through all open handles. This function is called with
- * dev->event_lock held and interrupts disabled. Because of that we
- * do not need to use rcu_read_lock() here although we are using RCU
- * to access handle list. Note that because of that write-side uses
- * synchronize_sched() instead of synchronize_ru().
+ * dev->event_lock held and interrupts disabled.
  */
 static void input_pass_event(struct input_dev *dev,
 			     unsigned int type, unsigned int code, int value)
 {
-	struct input_handle *handle = rcu_dereference(dev->grab);
+	struct input_handle *handle;
 
+	rcu_read_lock();
+
+	handle = rcu_dereference(dev->grab);
 	if (handle)
 		handle->handler->event(handle, type, code, value);
 	else
@@ -82,6 +82,7 @@ static void input_pass_event(struct input_dev *dev,
 			if (handle->open)
 				handle->handler->event(handle,
 							type, code, value);
+	rcu_read_unlock();
 }
 
 /*
@@ -234,6 +235,10 @@ static void input_handle_event(struct input_dev *dev,
 		if (value >= 0)
 			disposition = INPUT_PASS_TO_ALL;
 		break;
+
+	case EV_PWR:
+		disposition = INPUT_PASS_TO_ALL;
+		break;
 	}
 
 	if (type != EV_SYN)
@@ -293,9 +298,11 @@ void input_inject_event(struct input_handle *handle,
 	if (is_event_supported(type, dev->evbit, EV_MAX)) {
 		spin_lock_irqsave(&dev->event_lock, flags);
 
+		rcu_read_lock();
 		grab = rcu_dereference(dev->grab);
 		if (!grab || grab == handle)
 			input_handle_event(dev, type, code, value);
+		rcu_read_unlock();
 
 		spin_unlock_irqrestore(&dev->event_lock, flags);
 	}
@@ -325,11 +332,7 @@ int input_grab_device(struct input_handle *handle)
 	}
 
 	rcu_assign_pointer(dev->grab, handle);
-	/*
-	 * Not using synchronize_rcu() because read-side is protected
-	 * by a spinlock with interrupts off instead of rcu_read_lock().
-	 */
-	synchronize_sched();
+	synchronize_rcu();
 
  out:
 	mutex_unlock(&dev->mutex);
@@ -344,7 +347,7 @@ static void __input_release_device(struct input_handle *handle)
 	if (dev->grab == handle) {
 		rcu_assign_pointer(dev->grab, NULL);
 		/* Make sure input_pass_event() notices that grab is gone */
-		synchronize_sched();
+		synchronize_rcu();
 
 		list_for_each_entry(handle, &dev->h_list, d_node)
 			if (handle->open && handle->handler->start)
@@ -404,7 +407,7 @@ int input_open_device(struct input_handle *handle)
 			 * Make sure we are not delivering any more events
 			 * through this handle
 			 */
-			synchronize_sched();
+			synchronize_rcu();
 		}
 	}
 
@@ -451,11 +454,11 @@ void input_close_device(struct input_handle *handle)
 
 	if (!--handle->open) {
 		/*
-		 * synchronize_sched() makes sure that input_pass_event()
+		 * synchronize_rcu() makes sure that input_pass_event()
 		 * completed and that no more input events are delivered
 		 * through this handle
 		 */
-		synchronize_sched();
+		synchronize_rcu();
 	}
 
 	mutex_unlock(&dev->mutex);
@@ -585,10 +588,10 @@ static int input_default_setkeycode(struct input_dev *dev,
 
 
 #define MATCH_BIT(bit, max) \
-		for (i = 0; i < NBITS(max); i++) \
+		for (i = 0; i < BITS_TO_LONGS(max); i++) \
 			if ((id->bit[i] & dev->bit[i]) != id->bit[i]) \
 				break; \
-		if (i != NBITS(max)) \
+		if (i != BITS_TO_LONGS(max)) \
 			continue;
 
 static const struct input_device_id *input_match_device(const struct input_device_id *id,
@@ -699,7 +702,7 @@ static void input_seq_print_bitmap(struct seq_file *seq, const char *name,
 {
 	int i;
 
-	for (i = NBITS(max) - 1; i > 0; i--)
+	for (i = BITS_TO_LONGS(max) - 1; i > 0; i--)
 		if (bitmap[i])
 			break;
 
@@ -893,7 +896,7 @@ static int input_print_modalias_bits(char *buf, int size,
 
 	len += snprintf(buf, max(size, 0), "%c", name);
 	for (i = min_bit; i < max_bit; i++)
-		if (bm[LONG(i)] & BIT(i))
+		if (bm[BIT_WORD(i)] & BIT_MASK(i))
 			len += snprintf(buf + len, max(size - len, 0), "%X,", i);
 	return len;
 }
@@ -992,7 +995,7 @@ static int input_print_bitmap(char *buf, int buf_size, unsigned long *bitmap,
 	int i;
 	int len = 0;
 
-	for (i = NBITS(max) - 1; i > 0; i--)
+	for (i = BITS_TO_LONGS(max) - 1; i > 0; i--)
 		if (bitmap[i])
 			break;
 
@@ -1067,87 +1070,66 @@ static void input_dev_release(struct device *device)
  * Input uevent interface - loading event handlers based on
  * device bitfields.
  */
-static int input_add_uevent_bm_var(char **envp, int num_envp, int *cur_index,
-				   char *buffer, int buffer_size, int *cur_len,
+static int input_add_uevent_bm_var(struct kobj_uevent_env *env,
 				   const char *name, unsigned long *bitmap, int max)
 {
-	if (*cur_index >= num_envp - 1)
+	int len;
+
+	if (add_uevent_var(env, "%s=", name))
 		return -ENOMEM;
 
-	envp[*cur_index] = buffer + *cur_len;
-
-	*cur_len += snprintf(buffer + *cur_len, max(buffer_size - *cur_len, 0), name);
-	if (*cur_len >= buffer_size)
+	len = input_print_bitmap(&env->buf[env->buflen - 1],
+				 sizeof(env->buf) - env->buflen,
+				 bitmap, max, 0);
+	if (len >= (sizeof(env->buf) - env->buflen))
 		return -ENOMEM;
 
-	*cur_len += input_print_bitmap(buffer + *cur_len,
-					max(buffer_size - *cur_len, 0),
-					bitmap, max, 0) + 1;
-	if (*cur_len > buffer_size)
-		return -ENOMEM;
-
-	(*cur_index)++;
+	env->buflen += len;
 	return 0;
 }
 
-static int input_add_uevent_modalias_var(char **envp, int num_envp, int *cur_index,
-					 char *buffer, int buffer_size, int *cur_len,
+static int input_add_uevent_modalias_var(struct kobj_uevent_env *env,
 					 struct input_dev *dev)
 {
-	if (*cur_index >= num_envp - 1)
+	int len;
+
+	if (add_uevent_var(env, "MODALIAS="))
 		return -ENOMEM;
 
-	envp[*cur_index] = buffer + *cur_len;
-
-	*cur_len += snprintf(buffer + *cur_len, max(buffer_size - *cur_len, 0),
-			     "MODALIAS=");
-	if (*cur_len >= buffer_size)
+	len = input_print_modalias(&env->buf[env->buflen - 1],
+				   sizeof(env->buf) - env->buflen,
+				   dev, 0);
+	if (len >= (sizeof(env->buf) - env->buflen))
 		return -ENOMEM;
 
-	*cur_len += input_print_modalias(buffer + *cur_len,
-					 max(buffer_size - *cur_len, 0),
-					 dev, 0) + 1;
-	if (*cur_len > buffer_size)
-		return -ENOMEM;
-
-	(*cur_index)++;
+	env->buflen += len;
 	return 0;
 }
 
 #define INPUT_ADD_HOTPLUG_VAR(fmt, val...)				\
 	do {								\
-		int err = add_uevent_var(envp, num_envp, &i,		\
-					buffer, buffer_size, &len,	\
-					fmt, val);			\
+		int err = add_uevent_var(env, fmt, val);		\
 		if (err)						\
 			return err;					\
 	} while (0)
 
 #define INPUT_ADD_HOTPLUG_BM_VAR(name, bm, max)				\
 	do {								\
-		int err = input_add_uevent_bm_var(envp, num_envp, &i,	\
-					buffer, buffer_size, &len,	\
-					name, bm, max);			\
+		int err = input_add_uevent_bm_var(env, name, bm, max);	\
 		if (err)						\
 			return err;					\
 	} while (0)
 
 #define INPUT_ADD_HOTPLUG_MODALIAS_VAR(dev)				\
 	do {								\
-		int err = input_add_uevent_modalias_var(envp,		\
-					num_envp, &i,			\
-					buffer, buffer_size, &len,	\
-					dev);				\
+		int err = input_add_uevent_modalias_var(env, dev);	\
 		if (err)						\
 			return err;					\
 	} while (0)
 
-static int input_dev_uevent(struct device *device, char **envp,
-			    int num_envp, char *buffer, int buffer_size)
+static int input_dev_uevent(struct device *device, struct kobj_uevent_env *env)
 {
 	struct input_dev *dev = to_input_dev(device);
-	int i = 0;
-	int len = 0;
 
 	INPUT_ADD_HOTPLUG_VAR("PRODUCT=%x/%x/%x/%x",
 				dev->id.bustype, dev->id.vendor,
@@ -1179,7 +1161,6 @@ static int input_dev_uevent(struct device *device, char **envp,
 
 	INPUT_ADD_HOTPLUG_MODALIAS_VAR(dev);
 
-	envp[i] = NULL;
 	return 0;
 }
 
@@ -1287,6 +1268,10 @@ void input_set_capability(struct input_dev *dev, unsigned int type, unsigned int
 
 	case EV_FF:
 		__set_bit(code, dev->ffbit);
+		break;
+
+	case EV_PWR:
+		/* do nothing */
 		break;
 
 	default:
@@ -1499,12 +1484,7 @@ int input_register_handle(struct input_handle *handle)
 		return error;
 	list_add_tail_rcu(&handle->d_node, &dev->h_list);
 	mutex_unlock(&dev->mutex);
-	/*
-	 * We don't use synchronize_rcu() here because we rely
-	 * on dev->event_lock to protect read-side critical
-	 * section in input_pass_event().
-	 */
-	synchronize_sched();
+	synchronize_rcu();
 
 	/*
 	 * Since we are supposed to be called from ->connect()
@@ -1543,7 +1523,7 @@ void input_unregister_handle(struct input_handle *handle)
 	mutex_lock(&dev->mutex);
 	list_del_rcu(&handle->d_node);
 	mutex_unlock(&dev->mutex);
-	synchronize_sched();
+	synchronize_rcu();
 }
 EXPORT_SYMBOL(input_unregister_handle);
 

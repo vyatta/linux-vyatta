@@ -472,6 +472,7 @@ geode_aes_exit(void)
 MODULE_AUTHOR("Advanced Micro Devices, Inc.");
 MODULE_DESCRIPTION("Geode LX Hardware AES driver");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("aes");
 
 module_init(geode_aes_init);
 module_exit(geode_aes_exit);

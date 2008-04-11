@@ -63,10 +63,7 @@ static void evdev_pass_event(struct evdev_client *client,
 }
 
 /*
- * Pass incoming event to all connected clients. Note that we are
- * caleld under a spinlock with interrupts off so we don't need
- * to use rcu_read_lock() here. Writers will be using syncronize_sched()
- * instead of synchrnoize_rcu().
+ * Pass incoming event to all connected clients.
  */
 static void evdev_event(struct input_handle *handle,
 			unsigned int type, unsigned int code, int value)
@@ -80,12 +77,16 @@ static void evdev_event(struct input_handle *handle,
 	event.code = code;
 	event.value = value;
 
+	rcu_read_lock();
+
 	client = rcu_dereference(evdev->grab);
 	if (client)
 		evdev_pass_event(client, &event);
 	else
 		list_for_each_entry_rcu(client, &evdev->client_list, node)
 			evdev_pass_event(client, &event);
+
+	rcu_read_unlock();
 
 	wake_up_interruptible(&evdev->wait);
 }
@@ -142,12 +143,7 @@ static int evdev_grab(struct evdev *evdev, struct evdev_client *client)
 		return error;
 
 	rcu_assign_pointer(evdev->grab, client);
-	/*
-	 * We don't use synchronize_rcu() here because read-side
-	 * critical section is protected by a spinlock instead
-	 * of rcu_read_lock().
-	 */
-	synchronize_sched();
+	synchronize_rcu();
 
 	return 0;
 }
@@ -158,7 +154,7 @@ static int evdev_ungrab(struct evdev *evdev, struct evdev_client *client)
 		return  -EINVAL;
 
 	rcu_assign_pointer(evdev->grab, NULL);
-	synchronize_sched();
+	synchronize_rcu();
 	input_release_device(&evdev->handle);
 
 	return 0;
@@ -170,7 +166,7 @@ static void evdev_attach_client(struct evdev *evdev,
 	spin_lock(&evdev->client_lock);
 	list_add_tail_rcu(&client->node, &evdev->client_list);
 	spin_unlock(&evdev->client_lock);
-	synchronize_sched();
+	synchronize_rcu();
 }
 
 static void evdev_detach_client(struct evdev *evdev,
@@ -179,7 +175,7 @@ static void evdev_detach_client(struct evdev *evdev,
 	spin_lock(&evdev->client_lock);
 	list_del_rcu(&client->node);
 	spin_unlock(&evdev->client_lock);
-	synchronize_sched();
+	synchronize_rcu();
 }
 
 static int evdev_open_device(struct evdev *evdev)
@@ -499,7 +495,7 @@ static unsigned int evdev_poll(struct file *file, poll_table *wait)
 #ifdef CONFIG_COMPAT
 
 #define BITS_PER_LONG_COMPAT (sizeof(compat_long_t) * 8)
-#define NBITS_COMPAT(x) ((((x) - 1) / BITS_PER_LONG_COMPAT) + 1)
+#define BITS_TO_LONGS_COMPAT(x) ((((x) - 1) / BITS_PER_LONG_COMPAT) + 1)
 
 #ifdef __BIG_ENDIAN
 static int bits_to_user(unsigned long *bits, unsigned int maxbit,
@@ -508,7 +504,7 @@ static int bits_to_user(unsigned long *bits, unsigned int maxbit,
 	int len, i;
 
 	if (compat) {
-		len = NBITS_COMPAT(maxbit) * sizeof(compat_long_t);
+		len = BITS_TO_LONGS_COMPAT(maxbit) * sizeof(compat_long_t);
 		if (len > maxlen)
 			len = maxlen;
 
@@ -519,7 +515,7 @@ static int bits_to_user(unsigned long *bits, unsigned int maxbit,
 					 sizeof(compat_long_t)))
 				return -EFAULT;
 	} else {
-		len = NBITS(maxbit) * sizeof(long);
+		len = BITS_TO_LONGS(maxbit) * sizeof(long);
 		if (len > maxlen)
 			len = maxlen;
 
@@ -534,8 +530,8 @@ static int bits_to_user(unsigned long *bits, unsigned int maxbit,
 			unsigned int maxlen, void __user *p, int compat)
 {
 	int len = compat ?
-			NBITS_COMPAT(maxbit) * sizeof(compat_long_t) :
-			NBITS(maxbit) * sizeof(long);
+			BITS_TO_LONGS_COMPAT(maxbit) * sizeof(compat_long_t) :
+			BITS_TO_LONGS(maxbit) * sizeof(long);
 
 	if (len > maxlen)
 		len = maxlen;
@@ -549,7 +545,7 @@ static int bits_to_user(unsigned long *bits, unsigned int maxbit,
 static int bits_to_user(unsigned long *bits, unsigned int maxbit,
 			unsigned int maxlen, void __user *p, int compat)
 {
-	int len = NBITS(maxbit) * sizeof(long);
+	int len = BITS_TO_LONGS(maxbit) * sizeof(long);
 
 	if (len > maxlen)
 		len = maxlen;

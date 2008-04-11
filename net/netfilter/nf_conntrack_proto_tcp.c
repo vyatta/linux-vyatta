@@ -861,7 +861,7 @@ static int tcp_packet(struct nf_conn *conntrack,
 		}
 		/* Fall through */
 	case TCP_CONNTRACK_IGNORE:
-		/* Ignored packets:
+		/* Ignored packets: 
 		 *
 		 * Our connection entry may be out of sync, so ignore
 		 * packets which may signal the real connection between
@@ -871,7 +871,7 @@ static int tcp_packet(struct nf_conn *conntrack,
 		 * b) SYN/ACK in REPLY
 		 * c) ACK in reply direction after initial SYN in original.
 		 *
-		 * If the ignored packet is invalid, the receiver will send
+		 * If the ignored packet is invalid, the receiver will send 
 		 * a RST we'll catch below.
 		 */
 		if (index == TCP_SYNACK_SET
@@ -1082,93 +1082,96 @@ static int tcp_new(struct nf_conn *conntrack,
 #include <linux/netfilter/nfnetlink.h>
 #include <linux/netfilter/nfnetlink_conntrack.h>
 
-static int tcp_to_nfattr(struct sk_buff *skb, struct nfattr *nfa,
+static int tcp_to_nlattr(struct sk_buff *skb, struct nlattr *nla,
 			 const struct nf_conn *ct)
 {
-	struct nfattr *nest_parms;
+	struct nlattr *nest_parms;
 	struct nf_ct_tcp_flags tmp = {};
 
 	read_lock_bh(&tcp_lock);
-	nest_parms = NFA_NEST(skb, CTA_PROTOINFO_TCP);
-	NFA_PUT(skb, CTA_PROTOINFO_TCP_STATE, sizeof(u_int8_t),
+	nest_parms = nla_nest_start(skb, CTA_PROTOINFO_TCP | NLA_F_NESTED);
+	if (!nest_parms)
+		goto nla_put_failure;
+
+	NLA_PUT(skb, CTA_PROTOINFO_TCP_STATE, sizeof(u_int8_t),
 		&ct->proto.tcp.state);
 
-	NFA_PUT(skb, CTA_PROTOINFO_TCP_WSCALE_ORIGINAL, sizeof(u_int8_t),
+	NLA_PUT(skb, CTA_PROTOINFO_TCP_WSCALE_ORIGINAL, sizeof(u_int8_t),
 		&ct->proto.tcp.seen[0].td_scale);
 
-	NFA_PUT(skb, CTA_PROTOINFO_TCP_WSCALE_REPLY, sizeof(u_int8_t),
+	NLA_PUT(skb, CTA_PROTOINFO_TCP_WSCALE_REPLY, sizeof(u_int8_t),
 		&ct->proto.tcp.seen[1].td_scale);
 
 	tmp.flags = ct->proto.tcp.seen[0].flags;
-	NFA_PUT(skb, CTA_PROTOINFO_TCP_FLAGS_ORIGINAL,
+	NLA_PUT(skb, CTA_PROTOINFO_TCP_FLAGS_ORIGINAL,
 		sizeof(struct nf_ct_tcp_flags), &tmp);
 
 	tmp.flags = ct->proto.tcp.seen[1].flags;
-	NFA_PUT(skb, CTA_PROTOINFO_TCP_FLAGS_REPLY,
+	NLA_PUT(skb, CTA_PROTOINFO_TCP_FLAGS_REPLY,
 		sizeof(struct nf_ct_tcp_flags), &tmp);
 	read_unlock_bh(&tcp_lock);
 
-	NFA_NEST_END(skb, nest_parms);
+	nla_nest_end(skb, nest_parms);
 
 	return 0;
 
-nfattr_failure:
+nla_put_failure:
 	read_unlock_bh(&tcp_lock);
 	return -1;
 }
 
-static const size_t cta_min_tcp[CTA_PROTOINFO_TCP_MAX] = {
-	[CTA_PROTOINFO_TCP_STATE-1]	      = sizeof(u_int8_t),
-	[CTA_PROTOINFO_TCP_WSCALE_ORIGINAL-1] = sizeof(u_int8_t),
-	[CTA_PROTOINFO_TCP_WSCALE_REPLY-1]    = sizeof(u_int8_t),
-	[CTA_PROTOINFO_TCP_FLAGS_ORIGINAL-1]  = sizeof(struct nf_ct_tcp_flags),
-	[CTA_PROTOINFO_TCP_FLAGS_REPLY-1]     = sizeof(struct nf_ct_tcp_flags)
+static const struct nla_policy tcp_nla_policy[CTA_PROTOINFO_TCP_MAX+1] = {
+	[CTA_PROTOINFO_TCP_STATE]	    = { .type = NLA_U8 },
+	[CTA_PROTOINFO_TCP_WSCALE_ORIGINAL] = { .type = NLA_U8 },
+	[CTA_PROTOINFO_TCP_WSCALE_REPLY]    = { .type = NLA_U8 },
+	[CTA_PROTOINFO_TCP_FLAGS_ORIGINAL]  = { .len = sizeof(struct nf_ct_tcp_flags) },
+	[CTA_PROTOINFO_TCP_FLAGS_REPLY]	    = { .len =  sizeof(struct nf_ct_tcp_flags) },
 };
 
-static int nfattr_to_tcp(struct nfattr *cda[], struct nf_conn *ct)
+static int nlattr_to_tcp(struct nlattr *cda[], struct nf_conn *ct)
 {
-	struct nfattr *attr = cda[CTA_PROTOINFO_TCP-1];
-	struct nfattr *tb[CTA_PROTOINFO_TCP_MAX];
+	struct nlattr *attr = cda[CTA_PROTOINFO_TCP];
+	struct nlattr *tb[CTA_PROTOINFO_TCP_MAX+1];
+	int err;
 
 	/* updates could not contain anything about the private
 	 * protocol info, in that case skip the parsing */
 	if (!attr)
 		return 0;
 
-	nfattr_parse_nested(tb, CTA_PROTOINFO_TCP_MAX, attr);
+	err = nla_parse_nested(tb, CTA_PROTOINFO_TCP_MAX, attr, tcp_nla_policy);
+	if (err < 0)
+		return err;
 
-	if (nfattr_bad_size(tb, CTA_PROTOINFO_TCP_MAX, cta_min_tcp))
-		return -EINVAL;
-
-	if (!tb[CTA_PROTOINFO_TCP_STATE-1])
+	if (!tb[CTA_PROTOINFO_TCP_STATE])
 		return -EINVAL;
 
 	write_lock_bh(&tcp_lock);
 	ct->proto.tcp.state =
-		*(u_int8_t *)NFA_DATA(tb[CTA_PROTOINFO_TCP_STATE-1]);
+		*(u_int8_t *)nla_data(tb[CTA_PROTOINFO_TCP_STATE]);
 
-	if (tb[CTA_PROTOINFO_TCP_FLAGS_ORIGINAL-1]) {
+	if (tb[CTA_PROTOINFO_TCP_FLAGS_ORIGINAL]) {
 		struct nf_ct_tcp_flags *attr =
-			NFA_DATA(tb[CTA_PROTOINFO_TCP_FLAGS_ORIGINAL-1]);
+			nla_data(tb[CTA_PROTOINFO_TCP_FLAGS_ORIGINAL]);
 		ct->proto.tcp.seen[0].flags &= ~attr->mask;
 		ct->proto.tcp.seen[0].flags |= attr->flags & attr->mask;
 	}
 
-	if (tb[CTA_PROTOINFO_TCP_FLAGS_REPLY-1]) {
+	if (tb[CTA_PROTOINFO_TCP_FLAGS_REPLY]) {
 		struct nf_ct_tcp_flags *attr =
-			NFA_DATA(tb[CTA_PROTOINFO_TCP_FLAGS_REPLY-1]);
+			nla_data(tb[CTA_PROTOINFO_TCP_FLAGS_REPLY]);
 		ct->proto.tcp.seen[1].flags &= ~attr->mask;
 		ct->proto.tcp.seen[1].flags |= attr->flags & attr->mask;
 	}
 
-	if (tb[CTA_PROTOINFO_TCP_WSCALE_ORIGINAL-1] &&
-	    tb[CTA_PROTOINFO_TCP_WSCALE_REPLY-1] &&
+	if (tb[CTA_PROTOINFO_TCP_WSCALE_ORIGINAL] &&
+	    tb[CTA_PROTOINFO_TCP_WSCALE_REPLY] &&
 	    ct->proto.tcp.seen[0].flags & IP_CT_TCP_FLAG_WINDOW_SCALE &&
 	    ct->proto.tcp.seen[1].flags & IP_CT_TCP_FLAG_WINDOW_SCALE) {
 		ct->proto.tcp.seen[0].td_scale = *(u_int8_t *)
-			NFA_DATA(tb[CTA_PROTOINFO_TCP_WSCALE_ORIGINAL-1]);
+			nla_data(tb[CTA_PROTOINFO_TCP_WSCALE_ORIGINAL]);
 		ct->proto.tcp.seen[1].td_scale = *(u_int8_t *)
-			NFA_DATA(tb[CTA_PROTOINFO_TCP_WSCALE_REPLY-1]);
+			nla_data(tb[CTA_PROTOINFO_TCP_WSCALE_REPLY]);
 	}
 	write_unlock_bh(&tcp_lock);
 
@@ -1181,7 +1184,6 @@ static unsigned int tcp_sysctl_table_users;
 static struct ctl_table_header *tcp_sysctl_header;
 static struct ctl_table tcp_sysctl_table[] = {
 	{
-		.ctl_name	= NET_NF_CONNTRACK_TCP_TIMEOUT_SYN_SENT,
 		.procname	= "nf_conntrack_tcp_timeout_syn_sent",
 		.data		= &nf_ct_tcp_timeout_syn_sent,
 		.maxlen		= sizeof(unsigned int),
@@ -1189,7 +1191,6 @@ static struct ctl_table tcp_sysctl_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
-		.ctl_name	= NET_NF_CONNTRACK_TCP_TIMEOUT_SYN_RECV,
 		.procname	= "nf_conntrack_tcp_timeout_syn_recv",
 		.data		= &nf_ct_tcp_timeout_syn_recv,
 		.maxlen		= sizeof(unsigned int),
@@ -1197,7 +1198,6 @@ static struct ctl_table tcp_sysctl_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
-		.ctl_name	= NET_NF_CONNTRACK_TCP_TIMEOUT_ESTABLISHED,
 		.procname	= "nf_conntrack_tcp_timeout_established",
 		.data		= &nf_ct_tcp_timeout_established,
 		.maxlen		= sizeof(unsigned int),
@@ -1205,7 +1205,6 @@ static struct ctl_table tcp_sysctl_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
-		.ctl_name	= NET_NF_CONNTRACK_TCP_TIMEOUT_FIN_WAIT,
 		.procname	= "nf_conntrack_tcp_timeout_fin_wait",
 		.data		= &nf_ct_tcp_timeout_fin_wait,
 		.maxlen		= sizeof(unsigned int),
@@ -1213,7 +1212,6 @@ static struct ctl_table tcp_sysctl_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
-		.ctl_name	= NET_NF_CONNTRACK_TCP_TIMEOUT_CLOSE_WAIT,
 		.procname	= "nf_conntrack_tcp_timeout_close_wait",
 		.data		= &nf_ct_tcp_timeout_close_wait,
 		.maxlen		= sizeof(unsigned int),
@@ -1221,7 +1219,6 @@ static struct ctl_table tcp_sysctl_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
-		.ctl_name	= NET_NF_CONNTRACK_TCP_TIMEOUT_LAST_ACK,
 		.procname	= "nf_conntrack_tcp_timeout_last_ack",
 		.data		= &nf_ct_tcp_timeout_last_ack,
 		.maxlen		= sizeof(unsigned int),
@@ -1229,7 +1226,6 @@ static struct ctl_table tcp_sysctl_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
-		.ctl_name	= NET_NF_CONNTRACK_TCP_TIMEOUT_TIME_WAIT,
 		.procname	= "nf_conntrack_tcp_timeout_time_wait",
 		.data		= &nf_ct_tcp_timeout_time_wait,
 		.maxlen		= sizeof(unsigned int),
@@ -1237,7 +1233,6 @@ static struct ctl_table tcp_sysctl_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
-		.ctl_name	= NET_NF_CONNTRACK_TCP_TIMEOUT_CLOSE,
 		.procname	= "nf_conntrack_tcp_timeout_close",
 		.data		= &nf_ct_tcp_timeout_close,
 		.maxlen		= sizeof(unsigned int),
@@ -1245,7 +1240,6 @@ static struct ctl_table tcp_sysctl_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
-		.ctl_name	= NET_NF_CONNTRACK_TCP_TIMEOUT_MAX_RETRANS,
 		.procname	= "nf_conntrack_tcp_timeout_max_retrans",
 		.data		= &nf_ct_tcp_timeout_max_retrans,
 		.maxlen		= sizeof(unsigned int),
@@ -1284,7 +1278,6 @@ static struct ctl_table tcp_sysctl_table[] = {
 #ifdef CONFIG_NF_CONNTRACK_PROC_COMPAT
 static struct ctl_table tcp_compat_sysctl_table[] = {
 	{
-		.ctl_name	= NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_SYN_SENT,
 		.procname	= "ip_conntrack_tcp_timeout_syn_sent",
 		.data		= &nf_ct_tcp_timeout_syn_sent,
 		.maxlen		= sizeof(unsigned int),
@@ -1292,7 +1285,6 @@ static struct ctl_table tcp_compat_sysctl_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
-		.ctl_name	= NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_SYN_RECV,
 		.procname	= "ip_conntrack_tcp_timeout_syn_recv",
 		.data		= &nf_ct_tcp_timeout_syn_recv,
 		.maxlen		= sizeof(unsigned int),
@@ -1300,7 +1292,6 @@ static struct ctl_table tcp_compat_sysctl_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
-		.ctl_name	= NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_ESTABLISHED,
 		.procname	= "ip_conntrack_tcp_timeout_established",
 		.data		= &nf_ct_tcp_timeout_established,
 		.maxlen		= sizeof(unsigned int),
@@ -1308,7 +1299,6 @@ static struct ctl_table tcp_compat_sysctl_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
-		.ctl_name	= NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_FIN_WAIT,
 		.procname	= "ip_conntrack_tcp_timeout_fin_wait",
 		.data		= &nf_ct_tcp_timeout_fin_wait,
 		.maxlen		= sizeof(unsigned int),
@@ -1316,7 +1306,6 @@ static struct ctl_table tcp_compat_sysctl_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
-		.ctl_name	= NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_CLOSE_WAIT,
 		.procname	= "ip_conntrack_tcp_timeout_close_wait",
 		.data		= &nf_ct_tcp_timeout_close_wait,
 		.maxlen		= sizeof(unsigned int),
@@ -1324,7 +1313,6 @@ static struct ctl_table tcp_compat_sysctl_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
-		.ctl_name	= NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_LAST_ACK,
 		.procname	= "ip_conntrack_tcp_timeout_last_ack",
 		.data		= &nf_ct_tcp_timeout_last_ack,
 		.maxlen		= sizeof(unsigned int),
@@ -1332,7 +1320,6 @@ static struct ctl_table tcp_compat_sysctl_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
-		.ctl_name	= NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_TIME_WAIT,
 		.procname	= "ip_conntrack_tcp_timeout_time_wait",
 		.data		= &nf_ct_tcp_timeout_time_wait,
 		.maxlen		= sizeof(unsigned int),
@@ -1340,7 +1327,6 @@ static struct ctl_table tcp_compat_sysctl_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
-		.ctl_name	= NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_CLOSE,
 		.procname	= "ip_conntrack_tcp_timeout_close",
 		.data		= &nf_ct_tcp_timeout_close,
 		.maxlen		= sizeof(unsigned int),
@@ -1348,7 +1334,6 @@ static struct ctl_table tcp_compat_sysctl_table[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
-		.ctl_name	= NET_IPV4_NF_CONNTRACK_TCP_TIMEOUT_MAX_RETRANS,
 		.procname	= "ip_conntrack_tcp_timeout_max_retrans",
 		.data		= &nf_ct_tcp_timeout_max_retrans,
 		.maxlen		= sizeof(unsigned int),
@@ -1399,10 +1384,11 @@ struct nf_conntrack_l4proto nf_conntrack_l4proto_tcp4 __read_mostly =
 	.new 			= tcp_new,
 	.error			= tcp_error,
 #if defined(CONFIG_NF_CT_NETLINK) || defined(CONFIG_NF_CT_NETLINK_MODULE)
-	.to_nfattr		= tcp_to_nfattr,
-	.from_nfattr		= nfattr_to_tcp,
-	.tuple_to_nfattr	= nf_ct_port_tuple_to_nfattr,
-	.nfattr_to_tuple	= nf_ct_port_nfattr_to_tuple,
+	.to_nlattr		= tcp_to_nlattr,
+	.from_nlattr		= nlattr_to_tcp,
+	.tuple_to_nlattr	= nf_ct_port_tuple_to_nlattr,
+	.nlattr_to_tuple	= nf_ct_port_nlattr_to_tuple,
+	.nla_policy		= nf_ct_port_nla_policy,
 #endif
 #ifdef CONFIG_SYSCTL
 	.ctl_table_users	= &tcp_sysctl_table_users,
@@ -1428,10 +1414,11 @@ struct nf_conntrack_l4proto nf_conntrack_l4proto_tcp6 __read_mostly =
 	.new 			= tcp_new,
 	.error			= tcp_error,
 #if defined(CONFIG_NF_CT_NETLINK) || defined(CONFIG_NF_CT_NETLINK_MODULE)
-	.to_nfattr		= tcp_to_nfattr,
-	.from_nfattr		= nfattr_to_tcp,
-	.tuple_to_nfattr	= nf_ct_port_tuple_to_nfattr,
-	.nfattr_to_tuple	= nf_ct_port_nfattr_to_tuple,
+	.to_nlattr		= tcp_to_nlattr,
+	.from_nlattr		= nlattr_to_tcp,
+	.tuple_to_nlattr	= nf_ct_port_tuple_to_nlattr,
+	.nlattr_to_tuple	= nf_ct_port_nlattr_to_tuple,
+	.nla_policy		= nf_ct_port_nla_policy,
 #endif
 #ifdef CONFIG_SYSCTL
 	.ctl_table_users	= &tcp_sysctl_table_users,

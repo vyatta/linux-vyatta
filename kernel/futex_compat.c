@@ -8,6 +8,7 @@
 
 #include <linux/linkage.h>
 #include <linux/compat.h>
+#include <linux/nsproxy.h>
 #include <linux/futex.h>
 
 #include <asm/uaccess.h>
@@ -53,6 +54,9 @@ void compat_exit_robust_list(struct task_struct *curr)
 	compat_long_t futex_offset;
 	int rc;
 
+	if (!futex_cmpxchg_enabled)
+		return;
+
 	/*
 	 * Fetch the list head (which was registered earlier, via
 	 * sys_set_robust_list()):
@@ -85,8 +89,7 @@ void compat_exit_robust_list(struct task_struct *curr)
 		 * dont process it twice:
 		 */
 		if (entry != pending) {
-			void __user *uaddr = futex_uaddr(entry,
-							 futex_offset);
+			void __user *uaddr = futex_uaddr(entry, futex_offset);
 
 			if (handle_futex_death(uaddr, curr, pi))
 				return;
@@ -115,6 +118,9 @@ asmlinkage long
 compat_sys_set_robust_list(struct compat_robust_list_head __user *head,
 			   compat_size_t len)
 {
+	if (!futex_cmpxchg_enabled)
+		return -ENOSYS;
+
 	if (unlikely(len != sizeof(*head)))
 		return -EINVAL;
 
@@ -130,6 +136,9 @@ compat_sys_get_robust_list(int pid, compat_uptr_t __user *head_ptr,
 	struct compat_robust_list_head __user *head;
 	unsigned long ret;
 
+	if (!futex_cmpxchg_enabled)
+		return -ENOSYS;
+
 	if (!pid)
 		head = current->compat_robust_list;
 	else {
@@ -137,7 +146,7 @@ compat_sys_get_robust_list(int pid, compat_uptr_t __user *head_ptr,
 
 		ret = -ESRCH;
 		read_lock(&tasklist_lock);
-		p = find_task_by_pid(pid);
+		p = find_task_by_vpid(pid);
 		if (!p)
 			goto err_unlock;
 		ret = -EPERM;

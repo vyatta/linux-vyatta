@@ -70,6 +70,8 @@ static struct acpi_blacklist_item acpi_blacklist[] __initdata = {
 	/* IBM 600E - _ADR should return 7, but it returns 1 */
 	{"IBM   ", "TP600E  ", 0x00000105, ACPI_SIG_DSDT, less_than_or_equal,
 	 "Incorrect _ADR", 1},
+	{"ASUS\0\0", "P2B-S   ", 0, ACPI_SIG_DSDT, all_versions,
+	 "Bogus PCI routing", 1},
 
 	{""}
 };
@@ -171,17 +173,17 @@ int __init acpi_blacklisted(void)
 	return blacklisted;
 }
 #ifdef CONFIG_DMI
-static int __init dmi_enable_osi_linux(struct dmi_system_id *d)
+static int __init dmi_enable_osi_linux(const struct dmi_system_id *d)
 {
 	acpi_dmi_osi_linux(1, d);	/* enable */
 	return 0;
 }
-static int __init dmi_disable_osi_linux(struct dmi_system_id *d)
+static int __init dmi_disable_osi_linux(const struct dmi_system_id *d)
 {
 	acpi_dmi_osi_linux(0, d);	/* disable */
 	return 0;
 }
-static int __init dmi_unknown_osi_linux(struct dmi_system_id *d)
+static int __init dmi_unknown_osi_linux(const struct dmi_system_id *d)
 {
 	acpi_dmi_osi_linux(-1, d);	/* unknown */
 	return 0;

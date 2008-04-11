@@ -149,8 +149,10 @@ static void joydev_event(struct input_handle *handle,
 
 	event.time = jiffies_to_msecs(jiffies);
 
+	rcu_read_lock();
 	list_for_each_entry_rcu(client, &joydev->client_list, node)
 		joydev_pass_event(client, &event);
+	rcu_read_unlock();
 
 	wake_up_interruptible(&joydev->wait);
 }
@@ -178,12 +180,7 @@ static void joydev_attach_client(struct joydev *joydev,
 	spin_lock(&joydev->client_lock);
 	list_add_tail_rcu(&client->node, &joydev->client_list);
 	spin_unlock(&joydev->client_lock);
-	/*
-	 * We don't use synchronize_rcu() here because read-side
-	 * critical section is protected by a spinlock (dev->event_lock)
-	 * instead of rcu_read_lock().
-	 */
-	synchronize_sched();
+	synchronize_rcu();
 }
 
 static void joydev_detach_client(struct joydev *joydev,
@@ -192,7 +189,7 @@ static void joydev_detach_client(struct joydev *joydev,
 	spin_lock(&joydev->client_lock);
 	list_del_rcu(&client->node);
 	spin_unlock(&joydev->client_lock);
-	synchronize_sched();
+	synchronize_rcu();
 }
 
 static int joydev_open_device(struct joydev *joydev)
@@ -847,8 +844,8 @@ static const struct input_device_id joydev_blacklist[] = {
 	{
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
 				INPUT_DEVICE_ID_MATCH_KEYBIT,
-		.evbit = { BIT(EV_KEY) },
-		.keybit = { [LONG(BTN_TOUCH)] = BIT(BTN_TOUCH) },
+		.evbit = { BIT_MASK(EV_KEY) },
+		.keybit = { [BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH) },
 	},	/* Avoid itouchpads, touchscreens and tablets */
 	{ }	/* Terminating entry */
 };
@@ -857,20 +854,20 @@ static const struct input_device_id joydev_ids[] = {
 	{
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
 				INPUT_DEVICE_ID_MATCH_ABSBIT,
-		.evbit = { BIT(EV_ABS) },
-		.absbit = { BIT(ABS_X) },
+		.evbit = { BIT_MASK(EV_ABS) },
+		.absbit = { BIT_MASK(ABS_X) },
 	},
 	{
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
 				INPUT_DEVICE_ID_MATCH_ABSBIT,
-		.evbit = { BIT(EV_ABS) },
-		.absbit = { BIT(ABS_WHEEL) },
+		.evbit = { BIT_MASK(EV_ABS) },
+		.absbit = { BIT_MASK(ABS_WHEEL) },
 	},
 	{
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
 				INPUT_DEVICE_ID_MATCH_ABSBIT,
-		.evbit = { BIT(EV_ABS) },
-		.absbit = { BIT(ABS_THROTTLE) },
+		.evbit = { BIT_MASK(EV_ABS) },
+		.absbit = { BIT_MASK(ABS_THROTTLE) },
 	},
 	{ }	/* Terminating entry */
 };

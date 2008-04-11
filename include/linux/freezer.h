@@ -128,8 +128,8 @@ static inline void set_freezable(void)
 }
 
 /*
- * Freezer-friendly wrapper around wait_event_interruptible(), originally
- * defined in <linux/wait.h>
+ * Freezer-friendly wrappers around wait_event_interruptible() and
+ * wait_event_interruptible_timeout(), originally defined in <linux/wait.h>
  */
 
 #define wait_event_freezable(wq, condition)				\
@@ -142,6 +142,18 @@ static inline void set_freezable(void)
 			break;						\
 		else if (!(condition))					\
 			__retval = -ERESTARTSYS;			\
+	} while (try_to_freeze());					\
+	__retval;							\
+})
+
+
+#define wait_event_freezable_timeout(wq, condition, timeout)		\
+({									\
+	long __retval = timeout;					\
+	do {								\
+		__retval = wait_event_interruptible_timeout(wq,		\
+				(condition) || freezing(current),	\
+				__retval); 				\
 	} while (try_to_freeze());					\
 	__retval;							\
 })
@@ -165,6 +177,9 @@ static inline void set_freezable(void) {}
 
 #define wait_event_freezable(wq, condition)				\
 		wait_event_interruptible(wq, condition)
+
+#define wait_event_freezable_timeout(wq, condition, timeout)		\
+		wait_event_interruptible_timeout(wq, condition, timeout)
 
 #endif /* !CONFIG_PM_SLEEP */
 

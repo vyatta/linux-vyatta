@@ -149,14 +149,11 @@ union futex_key {
 		int offset;
 	} both;
 };
-int get_futex_key(u32 __user *uaddr, struct rw_semaphore *shared,
-		  union futex_key *key);
-void get_futex_key_refs(union futex_key *key);
-void drop_futex_key_refs(union futex_key *key);
 
 #ifdef CONFIG_FUTEX
 extern void exit_robust_list(struct task_struct *curr);
 extern void exit_pi_state_list(struct task_struct *curr);
+extern int futex_cmpxchg_enabled;
 #else
 static inline void exit_robust_list(struct task_struct *curr)
 {
