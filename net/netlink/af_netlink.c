@@ -762,11 +762,7 @@ int netlink_attachskb(struct sock *sk, struct sk_buff *skb, int nonblock,
 	    test_bit(0, &nlk->state)) {
 		DECLARE_WAITQUEUE(wait, current);
 		if (!*timeo) {
-<<<<<<< HEAD:net/netlink/af_netlink.c
-			if (!ssk || nlk_sk(ssk)->pid == 0)
-=======
 			if (!ssk || netlink_is_kernel(ssk))
->>>>>>> 49914084e797530d9baaf51df9eda77babc98fa8:net/netlink/af_netlink.c
 				netlink_overrun(sk);
 			sock_put(sk);
 			kfree_skb(skb);
@@ -878,7 +874,6 @@ retry:
 		kfree_skb(skb);
 		return PTR_ERR(sk);
 	}
-<<<<<<< HEAD:net/netlink/af_netlink.c
 
 	if (sk_filter(sk, skb)) {
  		int err = skb->len;
@@ -886,10 +881,9 @@ retry:
  		sock_put(sk);
  		return err;
  	}
-=======
+
 	if (netlink_is_kernel(sk))
 		return netlink_unicast_kernel(sk, skb);
->>>>>>> 49914084e797530d9baaf51df9eda77babc98fa8:net/netlink/af_netlink.c
 
 	err = netlink_attachskb(sk, skb, nonblock, &timeo, ssk);
 	if (err == 1)
