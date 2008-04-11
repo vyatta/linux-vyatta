@@ -90,7 +90,7 @@ int create_whiteout(struct dentry *dentry, int start)
 		err = init_lower_nd(&nd, LOOKUP_CREATE);
 		if (unlikely(err < 0))
 			goto out;
-		lower_dir_dentry = lock_parent(lower_wh_dentry);
+		lower_dir_dentry = lock_parent_wh(lower_wh_dentry);
 		err = is_robranch_super(dentry->d_sb, bindex);
 		if (!err)
 			err = vfs_create(lower_dir_dentry->d_inode,
@@ -126,7 +126,7 @@ int unionfs_refresh_lower_dentry(struct dentry *dentry, int bindex)
 
 	verify_locked(dentry);
 
-	unionfs_lock_dentry(dentry->d_parent);
+	unionfs_lock_dentry(dentry->d_parent, UNIONFS_DMUTEX_CHILD);
 	lower_parent = unionfs_lower_dentry_idx(dentry->d_parent, bindex);
 	unionfs_unlock_dentry(dentry->d_parent);
 
@@ -162,6 +162,19 @@ int make_dir_opaque(struct dentry *dentry, int bindex)
 	struct dentry *lower_dentry, *diropq;
 	struct inode *lower_dir;
 	struct nameidata nd;
+	kernel_cap_t orig_cap;
+
+	/*
+	 * Opaque directory whiteout markers are special files (like regular
+	 * whiteouts), and should appear to the users as if they don't
+	 * exist.  They should be created/deleted regardless of directory
+	 * search/create permissions, but only for the duration of this
+	 * creation of the .wh.__dir_opaque: file.  Note, this does not
+	 * circumvent normal ->permission).
+	 */
+	orig_cap = current->cap_effective;
+	cap_raise(current->cap_effective, CAP_DAC_READ_SEARCH);
+	cap_raise(current->cap_effective, CAP_DAC_OVERRIDE);
 
 	lower_dentry = unionfs_lower_dentry_idx(dentry, bindex);
 	lower_dir = lower_dentry->d_inode;
@@ -189,6 +202,7 @@ int make_dir_opaque(struct dentry *dentry, int bindex)
 
 out:
 	mutex_unlock(&lower_dir->i_mutex);
+	current->cap_effective = orig_cap;
 	return err;
 }
 
@@ -225,4 +239,60 @@ char *alloc_whname(const char *name, int len)
 	strlcat(buf, name, len + UNIONFS_WHLEN + 1);
 
 	return buf;
+}
+
+/* copy a/m/ctime from the lower branch with the newest times */
+void unionfs_copy_attr_times(struct inode *upper)
+{
+	int bindex;
+	struct inode *lower;
+
+	if (!upper)
+		return;
+	if (ibstart(upper) < 0) {
+#ifdef CONFIG_UNION_FS_DEBUG
+		WARN_ON(ibstart(upper) < 0);
+#endif /* CONFIG_UNION_FS_DEBUG */
+		return;
+	}
+	for (bindex = ibstart(upper); bindex <= ibend(upper); bindex++) {
+		lower = unionfs_lower_inode_idx(upper, bindex);
+		if (!lower)
+			continue; /* not all lower dir objects may exist */
+		if (unlikely(timespec_compare(&upper->i_mtime,
+					      &lower->i_mtime) < 0))
+			upper->i_mtime = lower->i_mtime;
+		if (unlikely(timespec_compare(&upper->i_ctime,
+					      &lower->i_ctime) < 0))
+			upper->i_ctime = lower->i_ctime;
+		if (unlikely(timespec_compare(&upper->i_atime,
+					      &lower->i_atime) < 0))
+			upper->i_atime = lower->i_atime;
+	}
+}
+
+/*
+ * A unionfs/fanout version of fsstack_copy_attr_all.  Uses a
+ * unionfs_get_nlinks to properly calcluate the number of links to a file.
+ * Also, copies the max() of all a/m/ctimes for all lower inodes (which is
+ * important if the lower inode is a directory type)
+ */
+void unionfs_copy_attr_all(struct inode *dest,
+			   const struct inode *src)
+{
+	dest->i_mode = src->i_mode;
+	dest->i_uid = src->i_uid;
+	dest->i_gid = src->i_gid;
+	dest->i_rdev = src->i_rdev;
+
+	unionfs_copy_attr_times(dest);
+
+	dest->i_blkbits = src->i_blkbits;
+	dest->i_flags = src->i_flags;
+
+	/*
+	 * Update the nlinks AFTER updating the above fields, because the
+	 * get_links callback may depend on them.
+	 */
+	dest->i_nlink = unionfs_get_nlinks(dest);
 }

@@ -106,7 +106,7 @@ static inline void unionfs_set_lower_file_idx(struct file *f, int index,
 	UNIONFS_F(f)->lower_files[index] = val;
 	/* save branch ID (may be redundant?) */
 	UNIONFS_F(f)->saved_branch_ids[index] =
-		branch_id((f)->f_dentry->d_sb, index);
+		branch_id((f)->f_path.dentry->d_sb, index);
 }
 
 static inline void unionfs_set_lower_file(struct file *f, struct file *val)
@@ -284,10 +284,21 @@ static inline struct vfsmount *unionfs_lower_mnt(const struct dentry *dent)
 }
 
 /* Macros for locking a dentry. */
-static inline void unionfs_lock_dentry(struct dentry *d)
+enum unionfs_dentry_lock_class {
+	UNIONFS_DMUTEX_NORMAL,
+	UNIONFS_DMUTEX_ROOT,
+	UNIONFS_DMUTEX_PARENT,
+	UNIONFS_DMUTEX_CHILD,
+	UNIONFS_DMUTEX_WHITEOUT,
+	UNIONFS_DMUTEX_REVAL_PARENT, /* for file/dentry revalidate */
+	UNIONFS_DMUTEX_REVAL_CHILD,   /* for file/dentry revalidate */
+};
+
+static inline void unionfs_lock_dentry(struct dentry *d,
+				       unsigned int subclass)
 {
 	BUG_ON(!d);
-	mutex_lock(&UNIONFS_D(d)->lock);
+	mutex_lock_nested(&UNIONFS_D(d)->lock, subclass);
 }
 
 static inline void unionfs_unlock_dentry(struct dentry *d)
@@ -300,56 +311,6 @@ static inline void verify_locked(struct dentry *d)
 {
 	BUG_ON(!d);
 	BUG_ON(!mutex_is_locked(&UNIONFS_D(d)->lock));
-}
-
-/* copy a/m/ctime from the lower branch with the newest times */
-static inline void unionfs_copy_attr_times(struct inode *upper)
-{
-	int bindex;
-	struct inode *lower;
-
-	if (!upper || ibstart(upper) < 0)
-		return;
-	for (bindex = ibstart(upper); bindex <= ibend(upper); bindex++) {
-		lower = unionfs_lower_inode_idx(upper, bindex);
-		if (!lower)
-			continue; /* not all lower dir objects may exist */
-		if (unlikely(timespec_compare(&upper->i_mtime,
-					      &lower->i_mtime) < 0))
-			upper->i_mtime = lower->i_mtime;
-		if (unlikely(timespec_compare(&upper->i_ctime,
-					      &lower->i_ctime) < 0))
-			upper->i_ctime = lower->i_ctime;
-		if (unlikely(timespec_compare(&upper->i_atime,
-					      &lower->i_atime) < 0))
-			upper->i_atime = lower->i_atime;
-	}
-}
-
-/*
- * A unionfs/fanout version of fsstack_copy_attr_all.  Uses a
- * unionfs_get_nlinks to properly calcluate the number of links to a file.
- * Also, copies the max() of all a/m/ctimes for all lower inodes (which is
- * important if the lower inode is a directory type)
- */
-static inline void unionfs_copy_attr_all(struct inode *dest,
-					 const struct inode *src)
-{
-	dest->i_mode = src->i_mode;
-	dest->i_uid = src->i_uid;
-	dest->i_gid = src->i_gid;
-	dest->i_rdev = src->i_rdev;
-
-	unionfs_copy_attr_times(dest);
-
-	dest->i_blkbits = src->i_blkbits;
-	dest->i_flags = src->i_flags;
-
-	/*
-	 * Update the nlinks AFTER updating the above fields, because the
-	 * get_links callback may depend on them.
-	 */
-	dest->i_nlink = unionfs_get_nlinks(dest);
 }
 
 #endif	/* not _FANOUT_H */

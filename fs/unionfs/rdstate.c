@@ -188,7 +188,8 @@ void free_rdstate(struct unionfs_dir_state *state)
 }
 
 struct filldir_node *find_filldir_node(struct unionfs_dir_state *rdstate,
-				       const char *name, int namelen)
+				       const char *name, int namelen,
+				       int is_whiteout)
 {
 	int index;
 	unsigned int hash;
@@ -215,10 +216,12 @@ struct filldir_node *find_filldir_node(struct unionfs_dir_state *rdstate,
 			found = 1;
 
 			/*
-			 * if the duplicate is in this branch, then the file
-			 * system is corrupted.
+			 * if a duplicate is found in this branch, and is
+			 * not due to the caller looking for an entry to
+			 * whiteout, then the file system may be corrupted.
 			 */
-			if (unlikely(cursor->bindex == rdstate->bindex))
+			if (unlikely(!is_whiteout &&
+				     cursor->bindex == rdstate->bindex))
 				printk(KERN_ERR "unionfs: filldir: possible "
 				       "I/O error: a file is duplicated "
 				       "in the same branch %d: %s\n",

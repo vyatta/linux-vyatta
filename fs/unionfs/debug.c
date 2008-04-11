@@ -97,24 +97,22 @@ void __unionfs_check_inode(const struct inode *inode,
 					 "istart/end=%d:%d\n", inode,
 					 lower_inode, bindex, istart, iend);
 			}
-		} else {	/* lower_inode == NULL */
-			if (bindex >= istart && bindex <= iend) {
-				/*
-				 * directories can have NULL lower inodes in
-				 * b/t start/end, but NOT if at the
-				 * start/end range.
-				 */
-				if (unlikely(!(S_ISDIR(inode->i_mode) &&
-					       bindex > istart &&
-					       bindex < iend))) {
-					PRINT_CALLER(fname, fxn, line);
-					pr_debug(" Ci7: inode/linode=%p:%p "
-						 "bindex=%d istart/end=%d:%d\n",
-						 inode, lower_inode, bindex,
-						 istart, iend);
-				}
-			}
+			continue;
 		}
+		/* if we get here, then lower_inode == NULL */
+		if (bindex < istart || bindex > iend)
+			continue;
+		/*
+		 * directories can have NULL lower inodes in b/t start/end,
+		 * but NOT if at the start/end range.
+		 */
+		if (unlikely(S_ISDIR(inode->i_mode) &&
+			     bindex > istart && bindex < iend))
+			continue;
+		PRINT_CALLER(fname, fxn, line);
+		pr_debug(" Ci7: inode/linode=%p:%p "
+			 "bindex=%d istart/end=%d:%d\n",
+			 inode, lower_inode, bindex, istart, iend);
 	}
 }
 
@@ -274,24 +272,22 @@ check_inode:
 					 "istart/end=%d:%d\n", dentry,
 					 lower_inode, bindex, istart, iend);
 			}
-		} else {	/* lower_inode == NULL */
-			if (bindex >= istart && bindex <= iend) {
-				/*
-				 * directories can have NULL lower inodes in
-				 * b/t start/end, but NOT if at the
-				 * start/end range.
-				 */
-				if (unlikely(!(S_ISDIR(inode->i_mode) &&
-					       bindex > istart &&
-					       bindex < iend))) {
-					PRINT_CALLER(fname, fxn, line);
-					pr_debug(" CI7: dentry/linode=%p:%p "
-						 "bindex=%d istart/end=%d:%d\n",
-						 dentry, lower_inode, bindex,
-						 istart, iend);
-				}
-			}
+			continue;
 		}
+		/* if we get here, then lower_inode == NULL */
+		if (bindex < istart || bindex > iend)
+			continue;
+		/*
+		 * directories can have NULL lower inodes in b/t start/end,
+		 * but NOT if at the start/end range.
+		 */
+		if (unlikely(S_ISDIR(inode->i_mode) &&
+			     bindex > istart && bindex < iend))
+			continue;
+		PRINT_CALLER(fname, fxn, line);
+		pr_debug(" CI7: dentry/linode=%p:%p "
+			 "bindex=%d istart/end=%d:%d\n",
+			 dentry, lower_inode, bindex, istart, iend);
 	}
 
 	/*
@@ -437,7 +433,7 @@ void __unionfs_check_nd(const struct nameidata *nd,
 	if (nd->flags & LOOKUP_OPEN) {
 		file = nd->intent.open.file;
 		if (unlikely(file->f_path.dentry &&
-			     strcmp(file->f_dentry->d_sb->s_type->name,
+			     strcmp(file->f_path.dentry->d_sb->s_type->name,
 				    UNIONFS_NAME))) {
 			PRINT_CALLER(fname, fxn, line);
 			pr_debug(" CND1: lower_file of type %s\n",
@@ -460,9 +456,10 @@ void __show_branch_counts(const struct super_block *sb,
 			mnt = UNIONFS_D(sb->s_root)->lower_paths[i].mnt;
 		else
 			mnt = NULL;
-		pr_debug("%d:", (mnt ? atomic_read(&mnt->mnt_count) : -99));
+		printk(KERN_CONT "%d:",
+		       (mnt ? atomic_read(&mnt->mnt_count) : -99));
 	}
-	pr_debug("%s:%s:%d\n", file, fxn, line);
+	printk(KERN_CONT "%s:%s:%d\n", file, fxn, line);
 }
 
 void __show_inode_times(const struct inode *inode,
@@ -475,13 +472,13 @@ void __show_inode_times(const struct inode *inode,
 		lower_inode = unionfs_lower_inode_idx(inode, bindex);
 		if (unlikely(!lower_inode))
 			continue;
-		pr_debug("IT(%lu:%d): ", inode->i_ino, bindex);
-		pr_debug("%s:%s:%d ", file, fxn, line);
-		pr_debug("um=%lu/%lu lm=%lu/%lu ",
+		pr_debug("IT(%lu:%d): %s:%s:%d "
+			 "um=%lu/%lu lm=%lu/%lu uc=%lu/%lu lc=%lu/%lu\n",
+			 inode->i_ino, bindex,
+			 file, fxn, line,
 			 inode->i_mtime.tv_sec, inode->i_mtime.tv_nsec,
 			 lower_inode->i_mtime.tv_sec,
-			 lower_inode->i_mtime.tv_nsec);
-		pr_debug("uc=%lu/%lu lc=%lu/%lu\n",
+			 lower_inode->i_mtime.tv_nsec,
 			 inode->i_ctime.tv_sec, inode->i_ctime.tv_nsec,
 			 lower_inode->i_ctime.tv_sec,
 			 lower_inode->i_ctime.tv_nsec);
@@ -499,14 +496,13 @@ void __show_dinode_times(const struct dentry *dentry,
 		lower_inode = unionfs_lower_inode_idx(inode, bindex);
 		if (!lower_inode)
 			continue;
-		pr_debug("DT(%s:%lu:%d): ", dentry->d_name.name, inode->i_ino,
-			 bindex);
-		pr_debug("%s:%s:%d ", file, fxn, line);
-		pr_debug("um=%lu/%lu lm=%lu/%lu ",
+		pr_debug("DT(%s:%lu:%d): %s:%s:%d "
+			 "um=%lu/%lu lm=%lu/%lu uc=%lu/%lu lc=%lu/%lu\n",
+			 dentry->d_name.name, inode->i_ino, bindex,
+			 file, fxn, line,
 			 inode->i_mtime.tv_sec, inode->i_mtime.tv_nsec,
 			 lower_inode->i_mtime.tv_sec,
-			 lower_inode->i_mtime.tv_nsec);
-		pr_debug("uc=%lu/%lu lc=%lu/%lu\n",
+			 lower_inode->i_mtime.tv_nsec,
 			 inode->i_ctime.tv_sec, inode->i_ctime.tv_nsec,
 			 lower_inode->i_ctime.tv_sec,
 			 lower_inode->i_ctime.tv_nsec);
@@ -528,9 +524,10 @@ void __show_inode_counts(const struct inode *inode,
 		lower_inode = unionfs_lower_inode_idx(inode, bindex);
 		if (unlikely(!lower_inode))
 			continue;
-		pr_debug("SIC(%lu:%d:%d): ", inode->i_ino, bindex,
-			 atomic_read(&(inode)->i_count));
-		pr_debug("lc=%d ", atomic_read(&(lower_inode)->i_count));
-		pr_debug("%s:%s:%d\n", file, fxn, line);
+		pr_debug("SIC(%lu:%d:%d): lc=%d %s:%s:%d\n",
+			 inode->i_ino, bindex,
+			 atomic_read(&(inode)->i_count),
+			 atomic_read(&(lower_inode)->i_count),
+			 file, fxn, line);
 	}
 }

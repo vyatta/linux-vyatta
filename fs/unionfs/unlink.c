@@ -18,7 +18,32 @@
 
 #include "union.h"
 
-/* unlink a file by creating a whiteout */
+/*
+ * Helper function for Unionfs's unlink operation.
+ *
+ * The main goal of this function is to optimize the unlinking of non-dir
+ * objects in unionfs by deleting all possible lower inode objects from the
+ * underlying branches having same dentry name as the non-dir dentry on
+ * which this unlink operation is called.  This way we delete as many lower
+ * inodes as possible, and save space.  Whiteouts need to be created in
+ * branch0 only if unlinking fails on any of the lower branch other than
+ * branch0, or if a lower branch is marked read-only.
+ *
+ * Also, while unlinking a file, if we encounter any dir type entry in any
+ * intermediate branch, then we remove the directory by calling vfs_rmdir.
+ * The following special cases are also handled:
+
+ * (1) If an error occurs in branch0 during vfs_unlink, then we return
+ *     appropriate error.
+ *
+ * (2) If we get an error during unlink in any of other lower branch other
+ *     than branch0, then we create a whiteout in branch0.
+ *
+ * (3) If a whiteout already exists in any intermediate branch, we delete
+ *     all possible inodes only up to that branch (this is an "opaqueness"
+ *     as as per Documentation/filesystems/unionfs/concepts.txt).
+ *
+ */
 static int unionfs_unlink_whiteout(struct inode *dir, struct dentry *dentry)
 {
 	struct dentry *lower_dentry;
@@ -30,43 +55,62 @@ static int unionfs_unlink_whiteout(struct inode *dir, struct dentry *dentry)
 	if (err)
 		goto out;
 
-	bindex = dbstart(dentry);
+	/* trying to unlink all possible valid instances */
+	for (bindex = dbstart(dentry); bindex <= dbend(dentry); bindex++) {
+		lower_dentry = unionfs_lower_dentry_idx(dentry, bindex);
+		if (!lower_dentry || !lower_dentry->d_inode)
+			continue;
 
-	lower_dentry = unionfs_lower_dentry_idx(dentry, bindex);
-	if (!lower_dentry)
-		goto out;
+		lower_dir_dentry = lock_parent(lower_dentry);
 
-	lower_dir_dentry = lock_parent(lower_dentry);
+		/* avoid destroying the lower inode if the object is in use */
+		dget(lower_dentry);
+		err = is_robranch_super(dentry->d_sb, bindex);
+		if (!err) {
+			/* see Documentation/filesystems/unionfs/issues.txt */
+			lockdep_off();
+			if (!S_ISDIR(lower_dentry->d_inode->i_mode))
+				err = vfs_unlink(lower_dir_dentry->d_inode,
+								lower_dentry);
+			else
+				err = vfs_rmdir(lower_dir_dentry->d_inode,
+								lower_dentry);
+			lockdep_on();
+		}
 
-	/* avoid destroying the lower inode if the file is in use */
-	dget(lower_dentry);
-	err = is_robranch_super(dentry->d_sb, bindex);
-	if (!err)
-		err = vfs_unlink(lower_dir_dentry->d_inode, lower_dentry);
-	/* if vfs_unlink succeeded, update our inode's times */
-	if (!err)
-		unionfs_copy_attr_times(dentry->d_inode);
-	dput(lower_dentry);
-	fsstack_copy_attr_times(dir, lower_dir_dentry->d_inode);
-	unlock_dir(lower_dir_dentry);
+		/* if lower object deletion succeeds, update inode's times */
+		if (!err)
+			unionfs_copy_attr_times(dentry->d_inode);
+		dput(lower_dentry);
+		fsstack_copy_attr_times(dir, lower_dir_dentry->d_inode);
+		unlock_dir(lower_dir_dentry);
 
-	if (err && !IS_COPYUP_ERR(err))
-		goto out;
+		if (err)
+			break;
+	}
 
+	/*
+	 * Create the whiteout in branch 0 (highest priority) only if (a)
+	 * there was an error in any intermediate branch other than branch 0
+	 * due to failure of vfs_unlink/vfs_rmdir or (b) a branch marked or
+	 * mounted read-only.
+	 */
 	if (err) {
-		if (dbstart(dentry) == 0)
+		if ((bindex == 0) ||
+		    ((bindex == dbstart(dentry)) &&
+		     (!IS_COPYUP_ERR(err))))
 			goto out;
-		err = create_whiteout(dentry, dbstart(dentry) - 1);
-	} else if (dbopaque(dentry) != -1) {
-		/* There is a lower lower-priority file with the same name. */
-		err = create_whiteout(dentry, dbopaque(dentry));
-	} else {
-		err = create_whiteout(dentry, dbstart(dentry));
+		else {
+			if (!IS_COPYUP_ERR(err))
+				pr_debug("unionfs: lower object deletion "
+					     "failed in branch:%d\n", bindex);
+			err = create_whiteout(dentry, sbstart(dentry->d_sb));
+		}
 	}
 
 out:
 	if (!err)
-		dentry->d_inode->i_nlink--;
+		inode_dec_link_count(dentry->d_inode);
 
 	/* We don't want to leave negative leftover dentries for revalidate. */
 	if (!err && (dbopaque(dentry) != -1))
@@ -78,11 +122,21 @@ out:
 int unionfs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	int err = 0;
+	struct inode *inode = dentry->d_inode;
+	int valid;
 
-	unionfs_read_lock(dentry->d_sb);
-	unionfs_lock_dentry(dentry);
+	BUG_ON(S_ISDIR(inode->i_mode));
+	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
+	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
+	unionfs_lock_dentry(dentry->d_parent, UNIONFS_DMUTEX_PARENT);
 
-	if (unlikely(!__unionfs_d_revalidate_chain(dentry, NULL, false))) {
+	valid = __unionfs_d_revalidate_chain(dentry->d_parent, NULL, false);
+	if (unlikely(!valid)) {
+		err = -ESTALE;
+		goto out;
+	}
+	valid = __unionfs_d_revalidate_one_locked(dentry, NULL, false);
+	if (unlikely(!valid)) {
 		err = -ESTALE;
 		goto out;
 	}
@@ -91,8 +145,13 @@ int unionfs_unlink(struct inode *dir, struct dentry *dentry)
 	err = unionfs_unlink_whiteout(dir, dentry);
 	/* call d_drop so the system "forgets" about us */
 	if (!err) {
-		if (!S_ISDIR(dentry->d_inode->i_mode))
-			unionfs_postcopyup_release(dentry);
+		unionfs_postcopyup_release(dentry);
+		if (inode->i_nlink == 0) {
+			/* drop lower inodes */
+			iput(unionfs_lower_inode(inode));
+			unionfs_set_lower_inode(inode, NULL);
+			ibstart(inode) = ibend(inode) = -1;
+		}
 		d_drop(dentry);
 		/*
 		 * if unlink/whiteout succeeded, parent dir mtime has
@@ -106,6 +165,7 @@ out:
 		unionfs_check_dentry(dentry);
 		unionfs_check_inode(dir);
 	}
+	unionfs_unlock_dentry(dentry->d_parent);
 	unionfs_unlock_dentry(dentry);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
@@ -130,8 +190,12 @@ static int unionfs_rmdir_first(struct inode *dir, struct dentry *dentry,
 	/* avoid destroying the lower inode if the file is in use */
 	dget(lower_dentry);
 	err = is_robranch(dentry);
-	if (!err)
+	if (!err) {
+		/* see Documentation/filesystems/unionfs/issues.txt */
+		lockdep_off();
 		err = vfs_rmdir(lower_dir_dentry->d_inode, lower_dentry);
+		lockdep_on();
+	}
 	dput(lower_dentry);
 
 	fsstack_copy_attr_times(dir, lower_dir_dentry->d_inode);
@@ -148,9 +212,10 @@ int unionfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
 	int err = 0;
 	struct unionfs_dir_state *namelist = NULL;
+	int dstart, dend;
 
-	unionfs_read_lock(dentry->d_sb);
-	unionfs_lock_dentry(dentry);
+	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
+	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
 	if (unlikely(!__unionfs_d_revalidate_chain(dentry, NULL, false))) {
 		err = -ESTALE;
@@ -164,28 +229,60 @@ int unionfs_rmdir(struct inode *dir, struct dentry *dentry)
 		goto out;
 
 	err = unionfs_rmdir_first(dir, dentry, namelist);
-	/* create whiteout */
+	dstart = dbstart(dentry);
+	dend = dbend(dentry);
+	/*
+	 * We create a whiteout for the directory if there was an error to
+	 * rmdir the first directory entry in the union.  Otherwise, we
+	 * create a whiteout only if there is no chance that a lower
+	 * priority branch might also have the same named directory.  IOW,
+	 * if there is not another same-named directory at a lower priority
+	 * branch, then we don't need to create a whiteout for it.
+	 */
 	if (!err) {
-		err = create_whiteout(dentry, dbstart(dentry));
+		if (dstart < dend)
+			err = create_whiteout(dentry, dstart);
 	} else {
 		int new_err;
 
-		if (dbstart(dentry) == 0)
+		if (dstart == 0)
 			goto out;
 
 		/* exit if the error returned was NOT -EROFS */
 		if (!IS_COPYUP_ERR(err))
 			goto out;
 
-		new_err = create_whiteout(dentry, dbstart(dentry) - 1);
+		new_err = create_whiteout(dentry, dstart - 1);
 		if (new_err != -EEXIST)
 			err = new_err;
 	}
 
 out:
-	/* call d_drop so the system "forgets" about us */
-	if (!err)
+	/*
+	 * Drop references to lower dentry/inode so storage space for them
+	 * can be reclaimed.  Then, call d_drop so the system "forgets"
+	 * about us.
+	 */
+	if (!err) {
+		struct inode *inode = dentry->d_inode;
+		BUG_ON(!inode);
+		iput(unionfs_lower_inode_idx(inode, dstart));
+		unionfs_set_lower_inode_idx(inode, dstart, NULL);
+		dput(unionfs_lower_dentry_idx(dentry, dstart));
+		unionfs_set_lower_dentry_idx(dentry, dstart, NULL);
+		/*
+		 * If the last directory is unlinked, then mark istart/end
+		 * as -1, (to maintain the invariant that if there are no
+		 * lower objects, then branch index start and end are set to
+		 * -1).
+		 */
+		if (!unionfs_lower_inode_idx(inode, dstart) &&
+		    !unionfs_lower_inode_idx(inode, dend))
+			ibstart(inode) = ibend(inode) = -1;
 		d_drop(dentry);
+		/* update our lower vfsmnts, in case a copyup took place */
+		unionfs_postcopyup_setmnt(dentry);
+	}
 
 	if (namelist)
 		free_rdstate(namelist);

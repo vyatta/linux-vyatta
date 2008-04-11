@@ -21,8 +21,14 @@
  */
 void fsstack_copy_inode_size(struct inode *dst, const struct inode *src)
 {
-	i_size_write(dst, i_size_read((struct inode *)src));
+#if BITS_PER_LONG == 32 && defined(CONFIG_SMP)
+	spin_lock(&dst->i_lock);
+#endif
+	i_size_write(dst, i_size_read(src));
 	dst->i_blocks = src->i_blocks;
+#if BITS_PER_LONG == 32 && defined(CONFIG_SMP)
+	spin_unlock(&dst->i_lock);
+#endif
 }
 EXPORT_SYMBOL_GPL(fsstack_copy_inode_size);
 

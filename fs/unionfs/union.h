@@ -46,6 +46,7 @@
 #include <linux/poison.h>
 #include <linux/mman.h>
 #include <linux/backing-dev.h>
+#include <linux/splice.h>
 
 #include <asm/system.h>
 
@@ -74,10 +75,22 @@ extern struct inode_operations unionfs_dir_iops;
 extern struct inode_operations unionfs_symlink_iops;
 extern struct super_operations unionfs_sops;
 extern struct dentry_operations unionfs_dops;
-extern struct address_space_operations unionfs_aops;
+extern struct address_space_operations unionfs_aops, unionfs_dummy_aops;
+extern struct vm_operations_struct unionfs_vm_ops;
 
 /* How long should an entry be allowed to persist */
 #define RDCACHE_JIFFIES	(5*HZ)
+
+/* compatibility with Real-Time patches */
+#ifdef CONFIG_PREEMPT_RT
+# define unionfs_rw_semaphore	compat_rw_semaphore
+#else /* not CONFIG_PREEMPT_RT */
+# define unionfs_rw_semaphore	rw_semaphore
+#endif /* not CONFIG_PREEMPT_RT */
+
+#ifndef noinline_for_stack
+# define noinline_for_stack noinline
+#endif /* not noinline_for_stack */
 
 /* file private data. */
 struct unionfs_file_info {
@@ -88,6 +101,7 @@ struct unionfs_file_info {
 	struct unionfs_dir_state *rdstate;
 	struct file **lower_files;
 	int *saved_branch_ids; /* IDs of branches when file was opened */
+	struct vm_operations_struct *lower_vm_ops;
 };
 
 /* unionfs inode data in memory */
@@ -127,7 +141,7 @@ struct unionfs_dentry_info {
 
 /* These are the pointers to our various objects. */
 struct unionfs_data {
-	struct super_block *sb;
+	struct super_block *sb;	/* lower super_block */
 	atomic_t open_files;	/* number of open files on branch */
 	int branchperms;
 	int branch_id;		/* unique branch ID at re/mount time */
@@ -153,13 +167,10 @@ struct unionfs_sb_info {
 	 * branch-management is used on a pivot_root'ed union, because we
 	 * have to ->lookup paths which belong to the same union.
 	 */
-#ifdef CONFIG_PREEMPT_RT
-	struct compat_rw_semaphore rwsem;
-#else /* not CONFIG_PREEMPT_RT */
-	struct rw_semaphore rwsem;
-#endif /* not CONFIG_PREEMPT_RT */
+	struct unionfs_rw_semaphore rwsem;
 	pid_t write_lock_owner;	/* PID of rw_sem owner (write lock) */
 	int high_branch_id;	/* last unique branch ID given */
+	char *dev_name;		/* to identify different unions in pr_debug */
 	struct unionfs_data *data;
 };
 
@@ -203,6 +214,8 @@ struct unionfs_dir_state {
 
 /* externs needed for fanout.h or sioq.h */
 extern int unionfs_get_nlinks(const struct inode *inode);
+extern void unionfs_copy_attr_times(struct inode *upper);
+extern void unionfs_copy_attr_all(struct inode *dest, const struct inode *src);
 
 /* include miscellaneous macros */
 #include "fanout.h"
@@ -227,7 +240,8 @@ extern int add_filldir_node(struct unionfs_dir_state *rdstate,
 			    const char *name, int namelen, int bindex,
 			    int whiteout);
 extern struct filldir_node *find_filldir_node(struct unionfs_dir_state *rdstate,
-					      const char *name, int namelen);
+					      const char *name, int namelen,
+					      int is_whiteout);
 
 extern struct dentry **alloc_new_dentries(int objs);
 extern struct unionfs_data *alloc_new_data(int objs);
@@ -246,12 +260,18 @@ static inline off_t rdstate2offset(struct unionfs_dir_state *buf)
 	return tmp;
 }
 
-static inline void unionfs_read_lock(struct super_block *sb)
+/* Macros for locking a super_block. */
+enum unionfs_super_lock_class {
+	UNIONFS_SMUTEX_NORMAL,
+	UNIONFS_SMUTEX_PARENT,	/* when locking on behalf of file */
+	UNIONFS_SMUTEX_CHILD,	/* when locking on behalf of dentry */
+};
+static inline void unionfs_read_lock(struct super_block *sb, int subclass)
 {
 	if (UNIONFS_SB(sb)->write_lock_owner &&
 	    UNIONFS_SB(sb)->write_lock_owner == current->pid)
 		return;
-	down_read(&UNIONFS_SB(sb)->rwsem);
+	down_read_nested(&UNIONFS_SB(sb)->rwsem, subclass);
 }
 static inline void unionfs_read_unlock(struct super_block *sb)
 {
@@ -274,16 +294,17 @@ static inline void unionfs_write_unlock(struct super_block *sb)
 static inline void unionfs_double_lock_dentry(struct dentry *d1,
 					      struct dentry *d2)
 {
-	if (d2 < d1) {
-		struct dentry *tmp = d1;
-		d1 = d2;
-		d2 = tmp;
+	BUG_ON(d1 == d2);
+	if (d1 < d2) {
+		unionfs_lock_dentry(d2, UNIONFS_DMUTEX_CHILD);
+		unionfs_lock_dentry(d1, UNIONFS_DMUTEX_PARENT);
+	} else {
+		unionfs_lock_dentry(d1, UNIONFS_DMUTEX_CHILD);
+		unionfs_lock_dentry(d2, UNIONFS_DMUTEX_PARENT);
 	}
-	unionfs_lock_dentry(d1);
-	unionfs_lock_dentry(d2);
 }
 
-extern int new_dentry_private_data(struct dentry *dentry);
+extern int new_dentry_private_data(struct dentry *dentry, int subclass);
 extern void free_dentry_private_data(struct dentry *dentry);
 extern void update_bstart(struct dentry *dentry);
 extern int init_lower_nd(struct nameidata *nd, unsigned int flags);
@@ -362,9 +383,13 @@ extern int unionfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 extern int unionfs_unlink(struct inode *dir, struct dentry *dentry);
 extern int unionfs_rmdir(struct inode *dir, struct dentry *dentry);
 
+extern bool __unionfs_d_revalidate_one_locked(struct dentry *dentry,
+					      struct nameidata *nd,
+					      bool willwrite);
 extern bool __unionfs_d_revalidate_chain(struct dentry *dentry,
 					 struct nameidata *nd, bool willwrite);
 extern bool is_newer_lower(const struct dentry *dentry);
+extern void purge_sb_data(struct super_block *sb);
 
 /* The values for unionfs_interpose's flag. */
 #define INTERPOSE_DEFAULT	0
@@ -477,18 +502,20 @@ static inline int is_robranch(const struct dentry *dentry)
  */
 extern char *alloc_whname(const char *name, int len);
 extern int check_branch(struct nameidata *nd);
-extern int __parse_branch_mode(const char *name);
-extern int parse_branch_mode(const char *name);
+extern int parse_branch_mode(const char *name, int *perms);
 
-/*
- * These two functions are here because it is kind of daft to copy and paste
- * the contents of the two functions to 32+ places in unionfs
- */
+/* locking helpers */
 static inline struct dentry *lock_parent(struct dentry *dentry)
 {
-	struct dentry *dir = dget(dentry->d_parent);
+	struct dentry *dir = dget_parent(dentry);
+	mutex_lock_nested(&dir->d_inode->i_mutex, I_MUTEX_PARENT);
+	return dir;
+}
+static inline struct dentry *lock_parent_wh(struct dentry *dentry)
+{
+	struct dentry *dir = dget_parent(dentry);
 
-	mutex_lock(&dir->d_inode->i_mutex);
+	mutex_lock_nested(&dir->d_inode->i_mutex, UNIONFS_DMUTEX_WHITEOUT);
 	return dir;
 }
 
@@ -541,24 +568,24 @@ static inline void unionfs_mntput(struct dentry *dentry, int bindex)
 #ifdef CONFIG_UNION_FS_DEBUG
 
 /* useful for tracking code reachability */
-#define UDBG pr_debug("DBG:%s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__)
+#define UDBG pr_debug("DBG:%s:%s:%d\n", __FILE__, __func__, __LINE__)
 
 #define unionfs_check_inode(i)	__unionfs_check_inode((i),	\
-	__FILE__, __FUNCTION__, __LINE__)
+	__FILE__, __func__, __LINE__)
 #define unionfs_check_dentry(d)	__unionfs_check_dentry((d),	\
-	__FILE__, __FUNCTION__, __LINE__)
+	__FILE__, __func__, __LINE__)
 #define unionfs_check_file(f)	__unionfs_check_file((f),	\
-	__FILE__, __FUNCTION__, __LINE__)
+	__FILE__, __func__, __LINE__)
 #define unionfs_check_nd(n)	__unionfs_check_nd((n),		\
-	__FILE__, __FUNCTION__, __LINE__)
+	__FILE__, __func__, __LINE__)
 #define show_branch_counts(sb)	__show_branch_counts((sb),	\
-	__FILE__, __FUNCTION__, __LINE__)
+	__FILE__, __func__, __LINE__)
 #define show_inode_times(i)	__show_inode_times((i),		\
-	__FILE__, __FUNCTION__, __LINE__)
+	__FILE__, __func__, __LINE__)
 #define show_dinode_times(d)	__show_dinode_times((d),	\
-	__FILE__, __FUNCTION__, __LINE__)
+	__FILE__, __func__, __LINE__)
 #define show_inode_counts(i)	__show_inode_counts((i),	\
-	__FILE__, __FUNCTION__, __LINE__)
+	__FILE__, __func__, __LINE__)
 
 extern void __unionfs_check_inode(const struct inode *inode, const char *fname,
 				  const char *fxn, int line);

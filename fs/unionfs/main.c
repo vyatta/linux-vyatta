@@ -149,9 +149,7 @@ skip:
 		break;
 	case INTERPOSE_LOOKUP:
 		spliced = d_splice_alias(inode, dentry);
-		if (IS_ERR(spliced)) {
-			err = PTR_ERR(spliced);
-		} else if (spliced && spliced != dentry) {
+		if (spliced && spliced != dentry) {
 			/*
 			 * d_splice can return a dentry if it was
 			 * disconnected and had to be moved.  We must ensure
@@ -169,6 +167,12 @@ skip:
 				unionfs_fill_inode(dentry, inode);
 			}
 			goto out_spliced;
+		} else if (!spliced) {
+			if (need_fill_inode) {
+				need_fill_inode = 0;
+				unionfs_fill_inode(dentry, inode);
+				goto out_spliced;
+			}
 		}
 		break;
 	case INTERPOSE_REVAL:
@@ -256,30 +260,21 @@ static int is_branch_overlap(struct dentry *dent1, struct dentry *dent2)
 }
 
 /*
- * Parse branch mode helper function
+ * Parse "ro" or "rw" options, but default to "rw" if no mode options was
+ * specified.  Fill the mode bits in @perms.  If encounter an unknown
+ * string, return -EINVAL.  Otherwise return 0.
  */
-int __parse_branch_mode(const char *name)
+int parse_branch_mode(const char *name, int *perms)
 {
-	if (!name)
+	if (!name || !strcmp(name, "rw")) {
+		*perms = MAY_READ | MAY_WRITE;
 		return 0;
-	if (!strcmp(name, "ro"))
-		return MAY_READ;
-	if (!strcmp(name, "rw"))
-		return (MAY_READ | MAY_WRITE);
-	return 0;
-}
-
-/*
- * Parse "ro" or "rw" options, but default to "rw" of no mode options
- * was specified.
- */
-int parse_branch_mode(const char *name)
-{
-	int perms = __parse_branch_mode(name);
-
-	if (perms == 0)
-		perms = MAY_READ | MAY_WRITE;
-	return perms;
+	}
+	if (!strcmp(name, "ro")) {
+		*perms = MAY_READ;
+		return 0;
+	}
+	return -EINVAL;
 }
 
 /*
@@ -350,8 +345,17 @@ static int parse_dirs_option(struct super_block *sb, struct unionfs_dentry_info
 		if (mode)
 			*mode++ = '\0';
 
-		perms = parse_branch_mode(mode);
+		err = parse_branch_mode(mode, &perms);
+		if (err) {
+			printk(KERN_ERR "unionfs: invalid mode \"%s\" for "
+			       "branch %d\n", mode, bindex);
+			goto out;
+		}
+		/* ensure that leftmost branch is writeable */
 		if (!bindex && !(perms & MAY_WRITE)) {
+			printk(KERN_ERR "unionfs: leftmost branch cannot be "
+			       "read-only (use \"-o ro\" to create a "
+			       "read-only union)\n");
 			err = -EINVAL;
 			goto out;
 		}
@@ -632,11 +636,19 @@ static int unionfs_read_super(struct super_block *sb, void *raw_data,
 	sbend(sb) = bend = lower_root_info->bend;
 	for (bindex = bstart; bindex <= bend; bindex++) {
 		struct dentry *d = lower_root_info->lower_paths[bindex].dentry;
+		atomic_inc(&d->d_sb->s_active);
 		unionfs_set_lower_super_idx(sb, bindex, d->d_sb);
 	}
 
 	/* max Bytes is the maximum bytes from highest priority branch */
 	sb->s_maxbytes = unionfs_lower_super_idx(sb, 0)->s_maxbytes;
+
+	/*
+	 * Our c/m/atime granularity is 1 ns because we may stack on file
+	 * systems whose granularity is as good.  This is important for our
+	 * time-based cache coherency.
+	 */
+	sb->s_time_gran = 1;
 
 	sb->s_op = &unionfs_sops;
 
@@ -649,7 +661,7 @@ static int unionfs_read_super(struct super_block *sb, void *raw_data,
 
 	/* link the upper and lower dentries */
 	sb->s_root->d_fsdata = NULL;
-	err = new_dentry_private_data(sb->s_root);
+	err = new_dentry_private_data(sb->s_root, UNIONFS_DMUTEX_ROOT);
 	if (unlikely(err))
 		goto out_freedpd;
 
@@ -700,6 +712,8 @@ out_dput:
 			dput(d);
 			/* initializing: can't use unionfs_mntput here */
 			mntput(m);
+			/* drop refs we took earlier */
+			atomic_dec(&d->d_sb->s_active);
 		}
 		kfree(lower_root_info->lower_paths);
 		kfree(lower_root_info);
@@ -723,7 +737,12 @@ static int unionfs_get_sb(struct file_system_type *fs_type,
 			  int flags, const char *dev_name,
 			  void *raw_data, struct vfsmount *mnt)
 {
-	return get_sb_nodev(fs_type, flags, raw_data, unionfs_read_super, mnt);
+	int err;
+	err = get_sb_nodev(fs_type, flags, raw_data, unionfs_read_super, mnt);
+	if (!err)
+		UNIONFS_SB(mnt->mnt_sb)->dev_name =
+			kstrdup(dev_name, GFP_KERNEL);
+	return err;
 }
 
 static struct file_system_type unionfs_fs_type = {

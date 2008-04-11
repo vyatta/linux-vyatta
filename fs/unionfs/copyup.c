@@ -297,11 +297,14 @@ static int __copyup_reg_data(struct dentry *dentry,
 			break;
 		}
 
+		/* see Documentation/filesystems/unionfs/issues.txt */
+		lockdep_off();
 		write_bytes =
 			output_file->f_op->write(output_file,
 						 (char __user *)buf,
 						 read_bytes,
 						 &output_file->f_pos);
+		lockdep_on();
 		if ((write_bytes < 0) || (write_bytes < read_bytes)) {
 			err = write_bytes;
 			break;
@@ -460,8 +463,8 @@ int copyup_dentry(struct inode *dir, struct dentry *dentry, int bstart,
 		goto out_unlink;
 
 	/* Set permissions. */
-	if ((err = copyup_permissions(sb, old_lower_dentry,
-				      new_lower_dentry)))
+	err = copyup_permissions(sb, old_lower_dentry, new_lower_dentry);
+	if (err)
 		goto out_unlink;
 
 #ifdef CONFIG_UNION_FS_XATTR
@@ -505,13 +508,12 @@ out_unlock:
 
 out_free:
 	/*
-	 * If old_lower_dentry was a directory, we need to dput it.  If it
-	 * was a file, then it was already dput indirectly by other
+	 * If old_lower_dentry was not a file, then we need to dput it.  If
+	 * it was a file, then it was already dput indirectly by other
 	 * functions we call above which operate on regular files.
 	 */
 	if (old_lower_dentry && old_lower_dentry->d_inode &&
-	    (S_ISDIR(old_lower_dentry->d_inode->i_mode) ||
-	     S_ISLNK(old_lower_dentry->d_inode->i_mode)))
+	    !S_ISREG(old_lower_dentry->d_inode->i_mode))
 		dput(old_lower_dentry);
 	kfree(symbuf);
 
@@ -714,8 +716,7 @@ struct dentry *create_parents(struct inode *dir, struct dentry *dentry,
 		child_dentry = parent_dentry;
 
 		/* find the parent directory dentry in unionfs */
-		parent_dentry = child_dentry->d_parent;
-		unionfs_lock_dentry(parent_dentry);
+		parent_dentry = dget_parent(child_dentry);
 
 		/* find out the lower_parent_dentry in the given branch */
 		lower_parent_dentry =
@@ -750,7 +751,7 @@ struct dentry *create_parents(struct inode *dir, struct dentry *dentry,
 begin:
 	/* get lower parent dir in the current branch */
 	lower_parent_dentry = unionfs_lower_dentry_idx(parent_dentry, bindex);
-	unionfs_unlock_dentry(parent_dentry);
+	dput(parent_dentry);
 
 	/* init the values to lookup */
 	childname = child_dentry->d_name.name;
@@ -805,19 +806,6 @@ begin:
 						 lower_dentry);
 		unlock_dir(lower_parent_dentry);
 		if (err) {
-			struct inode *inode = lower_dentry->d_inode;
-			/*
-			 * If we get here, it means that we created a new
-			 * dentry+inode, but copying permissions failed.
-			 * Therefore, we should delete this inode and dput
-			 * the dentry so as not to leave cruft behind.
-			 */
-			if (lower_dentry->d_op && lower_dentry->d_op->d_iput)
-				lower_dentry->d_op->d_iput(lower_dentry,
-							   inode);
-			else
-				iput(inode);
-			lower_dentry->d_inode = NULL;
 			dput(lower_dentry);
 			lower_dentry = ERR_PTR(err);
 			goto out;
@@ -831,7 +819,8 @@ begin:
 	 * update times of this dentry, but also the parent, because if
 	 * we changed, the parent may have changed too.
 	 */
-	unionfs_copy_attr_times(parent_dentry->d_inode);
+	fsstack_copy_attr_times(parent_dentry->d_inode,
+				lower_parent_dentry->d_inode);
 	unionfs_copy_attr_times(child_dentry->d_inode);
 
 	parent_dentry = child_dentry;
@@ -841,7 +830,7 @@ out:
 	/* cleanup any leftover locks from the do/while loop above */
 	if (IS_ERR(lower_dentry))
 		while (count)
-			unionfs_unlock_dentry(path[count--]);
+			dput(path[count--]);
 	kfree(path);
 	return lower_dentry;
 }

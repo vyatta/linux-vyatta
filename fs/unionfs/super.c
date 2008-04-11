@@ -29,8 +29,6 @@ static void unionfs_read_inode(struct inode *inode)
 	int size;
 	struct unionfs_inode_info *info = UNIONFS_I(inode);
 
-	unionfs_read_lock(inode->i_sb);
-
 	memset(info, 0, offsetof(struct unionfs_inode_info, vfs_inode));
 	info->bstart = -1;
 	info->bend = -1;
@@ -55,7 +53,14 @@ static void unionfs_read_inode(struct inode *inode)
 
 	inode->i_mapping->a_ops = &unionfs_aops;
 
-	unionfs_read_unlock(inode->i_sb);
+	/*
+	 * reset times so unionfs_copy_attr_all can keep out time invariants
+	 * right (upper inode time being the max of all lower ones).
+	 */
+	inode->i_atime.tv_sec = inode->i_atime.tv_nsec = 0;
+	inode->i_mtime.tv_sec = inode->i_mtime.tv_nsec = 0;
+	inode->i_ctime.tv_sec = inode->i_ctime.tv_nsec = 0;
+
 }
 
 /*
@@ -69,7 +74,13 @@ static void unionfs_read_inode(struct inode *inode)
  */
 static void unionfs_delete_inode(struct inode *inode)
 {
+#if BITS_PER_LONG == 32 && defined(CONFIG_SMP)
+	spin_lock(&inode->i_lock);
+#endif
 	i_size_write(inode, 0);	/* every f/s seems to do that */
+#if BITS_PER_LONG == 32 && defined(CONFIG_SMP)
+	spin_unlock(&inode->i_lock);
+#endif
 
 	if (inode->i_data.nrpages)
 		truncate_inode_pages(&inode->i_data, 0);
@@ -105,6 +116,15 @@ static void unionfs_put_super(struct super_block *sb)
 		}
 	BUG_ON(leaks != 0);
 
+	/* decrement lower super references */
+	for (bindex = bstart; bindex <= bend; bindex++) {
+		struct super_block *s;
+		s = unionfs_lower_super_idx(sb, bindex);
+		unionfs_set_lower_super_idx(sb, bindex, NULL);
+		atomic_dec(&s->s_active);
+	}
+
+	kfree(spd->dev_name);
 	kfree(spd->data);
 	kfree(spd);
 	sb->s_fs_info = NULL;
@@ -123,8 +143,8 @@ static int unionfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 
 	sb = dentry->d_sb;
 
-	unionfs_read_lock(sb);
-	unionfs_lock_dentry(dentry);
+	unionfs_read_lock(sb, UNIONFS_SMUTEX_CHILD);
+	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
 	if (unlikely(!__unionfs_d_revalidate_chain(dentry, NULL, false))) {
 		err = -ESTALE;
@@ -160,9 +180,11 @@ out:
 }
 
 /* handle mode changing during remount */
-static noinline int do_remount_mode_option(char *optarg, int cur_branches,
-					   struct unionfs_data *new_data,
-					   struct path *new_lower_paths)
+static noinline_for_stack int do_remount_mode_option(
+					char *optarg,
+					int cur_branches,
+					struct unionfs_data *new_data,
+					struct path *new_lower_paths)
 {
 	int err = -EINVAL;
 	int perms, idx;
@@ -181,8 +203,8 @@ static noinline int do_remount_mode_option(char *optarg, int cur_branches,
 		goto out;
 	}
 	*modename++ = '\0';
-	perms = __parse_branch_mode(modename);
-	if (perms == 0) {
+	err = parse_branch_mode(modename, &perms);
+	if (err) {
 		printk(KERN_ERR "unionfs: invalid mode \"%s\" for \"%s\"\n",
 		       modename, optarg);
 		goto out;
@@ -221,9 +243,10 @@ out:
 }
 
 /* handle branch deletion during remount */
-static noinline int do_remount_del_option(char *optarg, int cur_branches,
-					  struct unionfs_data *new_data,
-					  struct path *new_lower_paths)
+static noinline_for_stack int do_remount_del_option(
+					char *optarg, int cur_branches,
+					struct unionfs_data *new_data,
+					struct path *new_lower_paths)
 {
 	int err = -EINVAL;
 	int idx;
@@ -284,10 +307,11 @@ out:
 }
 
 /* handle branch insertion during remount */
-static noinline int do_remount_add_option(char *optarg, int cur_branches,
-					  struct unionfs_data *new_data,
-					  struct path *new_lower_paths,
-					  int *high_branch_id)
+static noinline_for_stack int do_remount_add_option(
+					char *optarg, int cur_branches,
+					struct unionfs_data *new_data,
+					struct path *new_lower_paths,
+					int *high_branch_id)
 {
 	int err = -EINVAL;
 	int perms;
@@ -350,11 +374,15 @@ found_insertion_point:
 		modename = strchr(new_branch, '=');
 	if (modename)
 		*modename++ = '\0';
-	perms = parse_branch_mode(modename);
-
 	if (!new_branch || !*new_branch) {
 		printk(KERN_ERR "unionfs: null new branch\n");
 		err = -EINVAL;
+		goto out;
+	}
+	err = parse_branch_mode(modename, &perms);
+	if (err) {
+		printk(KERN_ERR "unionfs: invalid mode \"%s\" for "
+		       "branch \"%s\"\n", modename, new_branch);
 		goto out;
 	}
 	err = path_lookup(new_branch, LOOKUP_FOLLOW, &nd);
@@ -700,29 +728,27 @@ out_no_change:
 	 */
 
 	/*
-	 * Now we call drop_pagecache_sb() to invalidate all pages in this
-	 * super.  This function calls invalidate_inode_pages(mapping),
-	 * which calls invalidate_mapping_pages(): the latter, however, will
-	 * not invalidate pages which are dirty, locked, under writeback, or
-	 * mapped into page tables.  We shouldn't have to worry about dirty
-	 * or under-writeback pages, because do_remount_sb() called
-	 * fsync_super() which would not have returned until all dirty pages
-	 * were flushed.
-	 *
-	 * But do we have to worry about locked pages?  Is there any chance
-	 * that in here we'll get locked pages?
-	 *
-	 * XXX: what about pages mapped into pagetables?  Are these pages
-	 * which user processes may have mmap(2)'ed?  If so, then we need to
-	 * invalidate those too, no?  Maybe we'll have to write our own
-	 * version of invalidate_mapping_pages() which also handled mapped
-	 * pages.
-	 *
-	 * XXX: Alternatively, maybe we should call truncate_inode_pages(),
-	 * which use two passes over the pages list, and will truncate all
-	 * pages.
+	 * Once we finish the remounting successfully, our superblock
+	 * generation number will have increased.  This will be detected by
+	 * our dentry-revalidation code upon subsequent f/s operations
+	 * through unionfs.  The revalidation code will rebuild the union of
+	 * lower inodes for a given unionfs inode and invalidate any pages
+	 * of such "stale" inodes (by calling our purge_inode_data
+	 * function).  This revalidation will happen lazily and
+	 * incrementally, as users perform operations on cached inodes.  We
+	 * would like to encourage this revalidation to happen sooner if
+	 * possible, so we like to try to invalidate as many other pages in
+	 * our superblock as we can.  We used to call drop_pagecache_sb() or
+	 * a variant thereof, but either method was racy (drop_caches alone
+	 * is known to be racy).  So now we let the revalidation happen on a
+	 * per file basis in ->d_revalidate.
 	 */
-	drop_pagecache_sb(sb);
+
+	/* grab new lower super references; release old ones */
+	for (i = 0; i < new_branches; i++)
+		atomic_inc(&new_data[i].sb->s_active);
+	for (i = 0; i < sbmax(sb); i++)
+		atomic_dec(&UNIONFS_SB(sb)->data[i].sb->s_active);
 
 	/* copy new vectors into their correct place */
 	tmp_data = UNIONFS_SB(sb)->data;
@@ -772,7 +798,8 @@ out_no_change:
 	atomic_set(&UNIONFS_D(sb->s_root)->generation, i);
 	atomic_set(&UNIONFS_I(sb->s_root->d_inode)->generation, i);
 	if (!(*flags & MS_SILENT))
-		pr_info("unionfs: new generation number %d\n", i);
+		pr_info("unionfs: %s: new generation number %d\n",
+			UNIONFS_SB(sb)->dev_name, i);
 	/* finally, update the root dentry's times */
 	unionfs_copy_attr_times(sb->s_root->d_inode);
 	err = 0;		/* reset to success */
@@ -834,7 +861,11 @@ static void unionfs_clear_inode(struct inode *inode)
 			lower_inode = unionfs_lower_inode_idx(inode, bindex);
 			if (!lower_inode)
 				continue;
+			unionfs_set_lower_inode_idx(inode, bindex, NULL);
+			/* see Documentation/filesystems/unionfs/issues.txt */
+			lockdep_off();
 			iput(lower_inode);
+			lockdep_on();
 		}
 	}
 
@@ -863,9 +894,9 @@ static void unionfs_destroy_inode(struct inode *inode)
 }
 
 /* unionfs inode cache constructor */
-static void init_once(void *v, struct kmem_cache *cachep, unsigned long flags)
+static void init_once(struct kmem_cache *cachep, void *obj)
 {
-	struct unionfs_inode_info *i = v;
+	struct unionfs_inode_info *i = obj;
 
 	inode_init_once(&i->vfs_inode);
 }
@@ -935,7 +966,7 @@ static void unionfs_umount_begin(struct vfsmount *mnt, int flags)
 
 	sb = mnt->mnt_sb;
 
-	unionfs_read_lock(sb);
+	unionfs_read_lock(sb, UNIONFS_SMUTEX_CHILD);
 
 	bstart = sbstart(sb);
 	bend = sbend(sb);
@@ -960,9 +991,9 @@ static int unionfs_show_options(struct seq_file *m, struct vfsmount *mnt)
 	int bindex, bstart, bend;
 	int perms;
 
-	unionfs_read_lock(sb);
+	unionfs_read_lock(sb, UNIONFS_SMUTEX_CHILD);
 
-	unionfs_lock_dentry(sb->s_root);
+	unionfs_lock_dentry(sb->s_root, UNIONFS_DMUTEX_CHILD);
 
 	tmp_page = (char *) __get_free_page(GFP_KERNEL);
 	if (unlikely(!tmp_page)) {

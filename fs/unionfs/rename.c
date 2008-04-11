@@ -29,6 +29,7 @@ static int __unionfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	struct dentry *lower_new_dir_dentry;
 	struct dentry *lower_wh_dentry;
 	struct dentry *lower_wh_dir_dentry;
+	struct dentry *trap;
 	char *wh_name = NULL;
 
 	lower_new_dentry = unionfs_lower_dentry_idx(new_dentry, bindex);
@@ -76,7 +77,7 @@ static int __unionfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			goto out;
 		}
 
-		lower_wh_dir_dentry = lock_parent(lower_wh_dentry);
+		lower_wh_dir_dentry = lock_parent_wh(lower_wh_dentry);
 		err = is_robranch_super(old_dentry->d_sb, bindex);
 		if (!err)
 			err = vfs_unlink(lower_wh_dir_dentry->d_inode,
@@ -90,15 +91,14 @@ static int __unionfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		dput(lower_wh_dentry);
 	}
 
-	dget(lower_old_dentry);
-	lower_old_dir_dentry = dget_parent(lower_old_dentry);
-	lower_new_dir_dentry = dget_parent(lower_new_dentry);
-
-	lock_rename(lower_old_dir_dentry, lower_new_dir_dentry);
-
 	err = is_robranch_super(old_dentry->d_sb, bindex);
 	if (err)
-		goto out_unlock;
+		goto out;
+
+	dget(lower_old_dentry);
+	dget(lower_new_dentry);
+	lower_old_dir_dentry = dget_parent(lower_old_dentry);
+	lower_new_dir_dentry = dget_parent(lower_new_dentry);
 
 	/*
 	 * ready to whiteout for old_dentry. caller will create the actual
@@ -110,7 +110,7 @@ static int __unionfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 				      old_dentry->d_name.len);
 		err = PTR_ERR(whname);
 		if (unlikely(IS_ERR(whname)))
-			goto out_unlock;
+			goto out_dput;
 		*wh_old = lookup_one_len(whname, lower_old_dir_dentry,
 					 old_dentry->d_name.len +
 					 UNIONFS_WHLEN);
@@ -118,19 +118,39 @@ static int __unionfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		err = PTR_ERR(*wh_old);
 		if (IS_ERR(*wh_old)) {
 			*wh_old = NULL;
-			goto out_unlock;
+			goto out_dput;
 		}
 	}
 
+	/* see Documentation/filesystems/unionfs/issues.txt */
+	lockdep_off();
+	trap = lock_rename(lower_old_dir_dentry, lower_new_dir_dentry);
+	/* source should not be ancenstor of target */
+	if (trap == lower_old_dentry) {
+		err = -EINVAL;
+		goto out_err_unlock;
+	}
+	/* target should not be ancenstor of source */
+	if (trap == lower_new_dentry) {
+		err = -ENOTEMPTY;
+		goto out_err_unlock;
+	}
 	err = vfs_rename(lower_old_dir_dentry->d_inode, lower_old_dentry,
 			 lower_new_dir_dentry->d_inode, lower_new_dentry);
-
-out_unlock:
+out_err_unlock:
+	if (!err) {
+		/* update parent dir times */
+		fsstack_copy_attr_times(old_dir, lower_old_dir_dentry->d_inode);
+		fsstack_copy_attr_times(new_dir, lower_new_dir_dentry->d_inode);
+	}
 	unlock_rename(lower_old_dir_dentry, lower_new_dir_dentry);
+	lockdep_on();
 
+out_dput:
 	dput(lower_old_dir_dentry);
 	dput(lower_new_dir_dentry);
 	dput(lower_old_dentry);
+	dput(lower_new_dentry);
 
 out:
 	if (!err) {
@@ -273,7 +293,7 @@ static int do_unionfs_rename(struct inode *old_dir,
 		err = init_lower_nd(&nd, LOOKUP_CREATE);
 		if (unlikely(err < 0))
 			goto out;
-		lower_parent = lock_parent(wh_old);
+		lower_parent = lock_parent_wh(wh_old);
 		local_err = vfs_create(lower_parent->d_inode, wh_old, S_IRUGO,
 				       &nd);
 		unlock_dir(lower_parent);
@@ -361,7 +381,7 @@ static struct dentry *lookup_whiteout(struct dentry *dentry)
 		return (void *)whname;
 
 	parent = dget_parent(dentry);
-	unionfs_lock_dentry(parent);
+	unionfs_lock_dentry(parent, UNIONFS_DMUTEX_WHITEOUT);
 	bstart = dbstart(parent);
 	bend = dbend(parent);
 	wh_dentry = ERR_PTR(-ENOENT);
@@ -420,7 +440,7 @@ int unionfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	int err = 0;
 	struct dentry *wh_dentry;
 
-	unionfs_read_lock(old_dentry->d_sb);
+	unionfs_read_lock(old_dentry->d_sb, UNIONFS_SMUTEX_CHILD);
 	unionfs_double_lock_dentry(old_dentry, new_dentry);
 
 	if (unlikely(!__unionfs_d_revalidate_chain(old_dentry, NULL, false))) {
@@ -461,7 +481,7 @@ int unionfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		}
 
 		if (S_ISDIR(new_dentry->d_inode->i_mode)) {
-			struct unionfs_dir_state *namelist;
+			struct unionfs_dir_state *namelist = NULL;
 			/* check if this unionfs directory is empty or not */
 			err = check_empty(new_dentry, &namelist);
 			if (err)
@@ -478,54 +498,49 @@ int unionfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 				goto out;
 		}
 	}
+
 	err = do_unionfs_rename(old_dir, old_dentry, new_dir, new_dentry);
-out:
-	if (err) {
-		/* clear the new_dentry stuff created */
-		d_drop(new_dentry);
-	} else {
-		/*
-		 * force re-lookup since the dir on ro branch is not renamed,
-		 * and lower dentries still indicate the un-renamed ones.
-		 */
-		if (S_ISDIR(old_dentry->d_inode->i_mode))
-			atomic_dec(&UNIONFS_D(old_dentry)->generation);
-		else
-			unionfs_postcopyup_release(old_dentry);
-		if (new_dentry->d_inode &&
-		    !S_ISDIR(new_dentry->d_inode->i_mode)) {
-			unionfs_postcopyup_release(new_dentry);
-			unionfs_postcopyup_setmnt(new_dentry);
-			if (!unionfs_lower_inode(new_dentry->d_inode)) {
-				/*
-				 * If we get here, it means that no copyup
-				 * was needed, and that a file by the old
-				 * name already existing on the destination
-				 * branch; that file got renamed earlier in
-				 * this function, so all we need to do here
-				 * is set the lower inode.
-				 */
-				struct inode *inode;
-				inode = unionfs_lower_inode(
-					old_dentry->d_inode);
-				igrab(inode);
-				unionfs_set_lower_inode_idx(
-					new_dentry->d_inode,
-					dbstart(new_dentry), inode);
-			}
+	if (err)
+		goto out;
 
+	/*
+	 * force re-lookup since the dir on ro branch is not renamed, and
+	 * lower dentries still indicate the un-renamed ones.
+	 */
+	if (S_ISDIR(old_dentry->d_inode->i_mode))
+		atomic_dec(&UNIONFS_D(old_dentry)->generation);
+	else
+		unionfs_postcopyup_release(old_dentry);
+	if (new_dentry->d_inode && !S_ISDIR(new_dentry->d_inode->i_mode)) {
+		unionfs_postcopyup_release(new_dentry);
+		unionfs_postcopyup_setmnt(new_dentry);
+		if (!unionfs_lower_inode(new_dentry->d_inode)) {
+			/*
+			 * If we get here, it means that no copyup was
+			 * needed, and that a file by the old name already
+			 * existing on the destination branch; that file got
+			 * renamed earlier in this function, so all we need
+			 * to do here is set the lower inode.
+			 */
+			struct inode *inode;
+			inode = unionfs_lower_inode(old_dentry->d_inode);
+			igrab(inode);
+			unionfs_set_lower_inode_idx(new_dentry->d_inode,
+						    dbstart(new_dentry),
+						    inode);
 		}
-		/* if all of this renaming succeeded, update our times */
-		unionfs_copy_attr_times(old_dir);
-		unionfs_copy_attr_times(new_dir);
-		unionfs_copy_attr_times(old_dentry->d_inode);
-		unionfs_copy_attr_times(new_dentry->d_inode);
-		unionfs_check_inode(old_dir);
-		unionfs_check_inode(new_dir);
-		unionfs_check_dentry(old_dentry);
-		unionfs_check_dentry(new_dentry);
 	}
+	/* if all of this renaming succeeded, update our times */
+	unionfs_copy_attr_times(old_dentry->d_inode);
+	unionfs_copy_attr_times(new_dentry->d_inode);
+	unionfs_check_inode(old_dir);
+	unionfs_check_inode(new_dir);
+	unionfs_check_dentry(old_dentry);
+	unionfs_check_dentry(new_dentry);
 
+out:
+	if (err)		/* clear the new_dentry stuff created */
+		d_drop(new_dentry);
 	unionfs_unlock_dentry(new_dentry);
 	unionfs_unlock_dentry(old_dentry);
 	unionfs_read_unlock(old_dentry->d_sb);

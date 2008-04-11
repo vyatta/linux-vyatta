@@ -32,7 +32,7 @@ static int is_validname(const char *name)
 }
 
 /* The rest of these are utility functions for lookup. */
-static noinline int is_opaque_dir(struct dentry *dentry, int bindex)
+static noinline_for_stack int is_opaque_dir(struct dentry *dentry, int bindex)
 {
 	int err = 0;
 	struct dentry *lower_dentry;
@@ -98,7 +98,6 @@ struct dentry *unionfs_lookup_backend(struct dentry *dentry,
 	struct dentry *first_dentry = NULL;
 	struct dentry *first_lower_dentry = NULL;
 	struct vfsmount *first_lower_mnt = NULL;
-	int locked_parent = 0;
 	int opaque;
 	char *whname = NULL;
 	const char *name;
@@ -119,7 +118,7 @@ struct dentry *unionfs_lookup_backend(struct dentry *dentry,
 	case INTERPOSE_PARTIAL:
 		break;
 	case INTERPOSE_LOOKUP:
-		err = new_dentry_private_data(dentry);
+		err = new_dentry_private_data(dentry, UNIONFS_DMUTEX_CHILD);
 		if (unlikely(err))
 			goto out;
 		break;
@@ -136,10 +135,7 @@ struct dentry *unionfs_lookup_backend(struct dentry *dentry,
 
 	parent_dentry = dget_parent(dentry);
 	/* We never partial lookup the root directory. */
-	if (parent_dentry != dentry) {
-		unionfs_lock_dentry(parent_dentry);
-		locked_parent = 1;
-	} else {
+	if (parent_dentry == dentry) {
 		dput(parent_dentry);
 		parent_dentry = NULL;
 		goto out;
@@ -229,6 +225,7 @@ struct dentry *unionfs_lookup_backend(struct dentry *dentry,
 		wh_lower_dentry = NULL;
 
 		/* Now do regular lookup; lookup foo */
+		BUG_ON(!lower_dir_dentry);
 		lower_dentry = lookup_one_len(name, lower_dir_dentry, namelen);
 		if (IS_ERR(lower_dentry)) {
 			dput(first_lower_dentry);
@@ -259,6 +256,21 @@ struct dentry *unionfs_lookup_backend(struct dentry *dentry,
 			continue;
 		}
 
+		/*
+		 * If we already found at least one positive dentry
+		 * (dentry_count is non-zero), then we skip all remaining
+		 * positive dentries if their type is a non-dir.  This is
+		 * because only directories are allowed to stack on multiple
+		 * branches, but we have to skip non-dirs (to avoid, say,
+		 * calling readdir on a regular file).
+		 */
+		if ((lookupmode != INTERPOSE_PARTIAL) &&
+		    !S_ISDIR(lower_dentry->d_inode->i_mode) &&
+		    dentry_count) {
+			dput(lower_dentry);
+			continue;
+		}
+
 		/* number of positive dentries */
 		dentry_count++;
 
@@ -285,10 +297,6 @@ struct dentry *unionfs_lookup_backend(struct dentry *dentry,
 				continue;
 			if (dentry_count == 1)
 				goto out_positive;
-			/* This can only happen with mixed D-*-F-* */
-			BUG_ON(!S_ISDIR(unionfs_lower_dentry(dentry)->
-					d_inode->i_mode));
-			continue;
 		}
 
 		opaque = is_opaque_dir(dentry, bindex);
@@ -317,6 +325,10 @@ out_negative:
 	if (lookupmode == INTERPOSE_REVAL) {
 		if (dentry->d_inode)
 			UNIONFS_I(dentry->d_inode)->stale = 1;
+		goto out;
+	}
+	if (!lower_dir_dentry) {
+		err = -ENOENT;
 		goto out;
 	}
 	/* This should only happen if we found a whiteout. */
@@ -426,8 +438,6 @@ out:
 		}
 	}
 	kfree(whname);
-	if (locked_parent)
-		unionfs_unlock_dentry(parent_dentry);
 	dput(parent_dentry);
 	if (err && (lookupmode == INTERPOSE_LOOKUP))
 		unionfs_unlock_dentry(dentry);
@@ -441,6 +451,7 @@ out:
 
 /*
  * This is a utility function that fills in a unionfs dentry.
+ * Caller must lock this dentry with unionfs_lock_dentry.
  *
  * Returns: 0 (ok), or -ERRNO if an error occurred.
  */
@@ -530,7 +541,7 @@ static int realloc_dentry_private_data(struct dentry *dentry)
 }
 
 /* allocate new dentry private data */
-int new_dentry_private_data(struct dentry *dentry)
+int new_dentry_private_data(struct dentry *dentry, int subclass)
 {
 	struct unionfs_dentry_info *info = UNIONFS_D(dentry);
 
@@ -541,7 +552,7 @@ int new_dentry_private_data(struct dentry *dentry)
 		return -ENOMEM;
 
 	mutex_init(&info->lock);
-	mutex_lock(&info->lock);
+	mutex_lock_nested(&info->lock, subclass);
 
 	info->lower_paths = NULL;
 

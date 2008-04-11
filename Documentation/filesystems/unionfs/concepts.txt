@@ -1,4 +1,4 @@
-Unionfs 2.1 CONCEPTS:
+Unionfs 2.x CONCEPTS:
 =====================
 
 This file describes the concepts needed by a namespace unification file
@@ -52,6 +52,42 @@ Later, when Unionfs traverses branches (due to lookup or readdir), it
 eliminate 'foo' from the namespace (as well as the whiteout itself.)
 
 
+Opaque Directories:
+===================
+
+Assume we have a unionfs mount comprising of two branches.  Branch 0 is
+empty; branch 1 has the directory /a and file /a/f.  Let's say we mount a
+union of branch 0 as read-write and branch 1 as read-only.  Now, let's say
+we try to perform the following operation in the union:
+
+	rm -fr a
+
+Because branch 1 is not writable, we cannot physically remove the file /a/f
+or the directory /a.  So instead, we will create a whiteout in branch 0
+named /.wh.a, masking out the name "a" from branch 1.  Next, let's say we
+try to create a directory named "a" as follows:
+
+	mkdir a
+
+Because we have a whiteout for "a" already, Unionfs behaves as if "a"
+doesn't exist, and thus will delete the whiteout and replace it with an
+actual directory named "a".
+
+The problem now is that if you try to "ls" in the union, Unionfs will
+perform is normal directory name unification, for *all* directories named
+"a" in all branches.  This will cause the file /a/f from branch 1 to
+re-appear in the union's namespace, which violates Unix semantics.
+
+To avoid this problem, we have a different form of whiteouts for
+directories, called "opaque directories" (same as BSD Union Mount does).
+Whenever we replace a whiteout with a directory, that directory is marked as
+opaque.  In Unionfs 2.x, it means that we create a file named
+/a/.wh.__dir_opaque in branch 0, after having created directory /a there.
+When unionfs notices that a directory is opaque, it stops all namespace
+operations (including merging readdir contents) at that opaque directory.
+This prevents re-exposing names from masked out directories.
+
+
 Duplicate Elimination:
 ======================
 
@@ -62,16 +98,55 @@ simplest solution is to take the instance from the highest priority
 (numerically lowest value) and "hide" the others.
 
 
+Unlinking:
+=========
+
+Unlink operation on non-directory instances is optimized to remove the
+maximum possible objects in case multiple underlying branches have the same
+file name.  The unlink operation will first try to delete file instances
+from highest priority branch and then move further to delete from remaining
+branches in order of their decreasing priority.  Consider a case (F..D..F),
+where F is a file and D is a directory of the same name; here, some
+intermediate branch could have an empty directory instance with the same
+name, so this operation also tries to delete this directory instance and
+proceed further to delete from next possible lower priority branch.  The
+unionfs unlink operation will smoothly delete the files with same name from
+all possible underlying branches.  In case if some error occurs, it creates
+whiteout in highest priority branch that will hide file instance in rest of
+the branches.  An error could occur either if an unlink operations in any of
+the underlying branch failed or if a branch has no write permission.
+
+This unlinking policy is known as "delete all" and it has the benefit of
+overall reducing the number of inodes used by duplicate files, and further
+reducing the total number of inodes consumed by whiteouts.  The cost is of
+extra processing, but testing shows this extra processing is well worth the
+savings.
+
+
 Copyup:
 =======
 
 When a change is made to the contents of a file's data or meta-data, they
-have to be stored somewhere. The best way is to create a copy of the
+have to be stored somewhere.  The best way is to create a copy of the
 original file on a branch that is writable, and then redirect the write
-though to this copy. The copy must be made on a higher priority branch so
+though to this copy.  The copy must be made on a higher priority branch so
 that lookup and readdir return this newer "version" of the file rather than
 the original (see duplicate elimination).
 
+An entire unionfs mount can be read-only or read-write.  If it's read-only,
+then none of the branches will be written to, even if some of the branches
+are physically writeable.  If the unionfs mount is read-write, then the
+leftmost (highest priority) branch must be writeable (for copyup to take
+place); the remaining branches can be any mix of read-write and read-only.
+
+In a writeable mount, unionfs will create new files/dir in the leftmost
+branch.  If one tries to modify a file in a read-only branch/media, unionfs
+will copyup the file to the leftmost branch and modify it there.  If you try
+to modify a file from a writeable branch which is not the leftmost branch,
+then unionfs will modify it in that branch; this is useful if you, say,
+unify differnet packages (e.g., apache, sendmail, ftpd, etc.) and you want
+changes to specific package files to remain logically in the directory where
+they came from.
 
 Cache Coherency:
 ================
@@ -195,5 +270,18 @@ reduce the number of times that unionfs has to revalidate objects, in case
 there's a lot of concurrent activity on both the upper and lower objects,
 for the same file(s).  Lastly, this delayed time attribute detection is
 similar to how NFS clients operate (e.g., acregmin).
+
+Finally, there is no way currently in Linux to prevent lower directories
+from being moved around (i.e., topology changes); there's no way to prevent
+modifications to directory sub-trees of whole file systems which are mounted
+read-write.  It is therefore possible for in-flight operations in unionfs to
+take place, while a lower directory is being moved around.  Therefore, if
+you try to, say, create a new file in a directory through unionfs, while the
+directory is being moved around directly, then the new file may get created
+in the new location where that directory was moved to.  This is a somewhat
+similar behaviour in NFS: an NFS client could be creating a new file while
+th NFS server is moving th directory around; the file will get successfully
+created in the new location.  (The one exception in unionfs is that if the
+branch is marked read-only by unionfs, then a copyup will take place.)
 
 For more information, see <http://unionfs.filesystems.org/>.

@@ -45,8 +45,8 @@ ssize_t unionfs_getxattr(struct dentry *dentry, const char *name, void *value,
 	struct dentry *lower_dentry = NULL;
 	int err = -EOPNOTSUPP;
 
-	unionfs_read_lock(dentry->d_sb);
-	unionfs_lock_dentry(dentry);
+	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
+	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
 	if (unlikely(!__unionfs_d_revalidate_chain(dentry, NULL, false))) {
 		err = -ESTALE;
@@ -74,8 +74,8 @@ int unionfs_setxattr(struct dentry *dentry, const char *name,
 	struct dentry *lower_dentry = NULL;
 	int err = -EOPNOTSUPP;
 
-	unionfs_read_lock(dentry->d_sb);
-	unionfs_lock_dentry(dentry);
+	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
+	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
 	if (unlikely(!__unionfs_d_revalidate_chain(dentry, NULL, false))) {
 		err = -ESTALE;
@@ -103,8 +103,8 @@ int unionfs_removexattr(struct dentry *dentry, const char *name)
 	struct dentry *lower_dentry = NULL;
 	int err = -EOPNOTSUPP;
 
-	unionfs_read_lock(dentry->d_sb);
-	unionfs_lock_dentry(dentry);
+	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
+	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
 	if (unlikely(!__unionfs_d_revalidate_chain(dentry, NULL, false))) {
 		err = -ESTALE;
@@ -132,8 +132,8 @@ ssize_t unionfs_listxattr(struct dentry *dentry, char *list, size_t size)
 	int err = -EOPNOTSUPP;
 	char *encoded_list = NULL;
 
-	unionfs_read_lock(dentry->d_sb);
-	unionfs_lock_dentry(dentry);
+	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
+	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
 	if (unlikely(!__unionfs_d_revalidate_chain(dentry, NULL, false))) {
 		err = -ESTALE;

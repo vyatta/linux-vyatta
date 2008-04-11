@@ -110,7 +110,6 @@ int delete_whiteouts(struct dentry *dentry, int bindex,
 	lower_dir = lower_dir_dentry->d_inode;
 	BUG_ON(!S_ISDIR(lower_dir->i_mode));
 
-	mutex_lock(&lower_dir->i_mutex);
 	if (!permission(lower_dir, MAY_WRITE | MAY_EXEC, NULL)) {
 		err = do_delete_whiteouts(dentry, bindex, namelist);
 	} else {
@@ -120,7 +119,6 @@ int delete_whiteouts(struct dentry *dentry, int bindex,
 		run_sioq(__delete_whiteouts, &args);
 		err = args.err;
 	}
-	mutex_unlock(&lower_dir->i_mutex);
 
 out:
 	return err;
@@ -158,7 +156,7 @@ static int readdir_util_callback(void *dirent, const char *name, int namelen,
 		whiteout = 1;
 	}
 
-	found = find_filldir_node(buf->rdstate, name, namelen);
+	found = find_filldir_node(buf->rdstate, name, namelen, whiteout);
 	/* If it was found in the table there was a previous whiteout. */
 	if (found)
 		goto out;
@@ -184,6 +182,7 @@ int check_empty(struct dentry *dentry, struct unionfs_dir_state **namelist)
 {
 	int err = 0;
 	struct dentry *lower_dentry = NULL;
+	struct vfsmount *mnt;
 	struct super_block *sb;
 	struct file *lower_file;
 	struct unionfs_rdutil_callback *buf = NULL;
@@ -228,15 +227,11 @@ int check_empty(struct dentry *dentry, struct unionfs_dir_state **namelist)
 			continue;
 
 		dget(lower_dentry);
-		unionfs_mntget(dentry, bindex);
+		mnt = unionfs_mntget(dentry, bindex);
 		branchget(sb, bindex);
-		lower_file =
-			dentry_open(lower_dentry,
-				    unionfs_lower_mnt_idx(dentry, bindex),
-				    O_RDONLY);
+		lower_file = dentry_open(lower_dentry, mnt, O_RDONLY);
 		if (IS_ERR(lower_file)) {
 			err = PTR_ERR(lower_file);
-			dput(lower_dentry);
 			branchput(sb, bindex);
 			goto out;
 		}
