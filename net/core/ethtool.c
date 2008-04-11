@@ -580,6 +580,15 @@ static int ethtool_self_test(struct net_device *dev, char __user *useraddr)
 		return test_len;
 	WARN_ON(test_len == 0);
 
+	if (ops->get_sset_count)
+		test_len = ops->get_sset_count(dev, ETH_SS_TEST);
+	else
+		/* code path for obsolete hook */
+		test_len = ops->self_test_count(dev);
+	if (test_len < 0)
+		return test_len;
+	WARN_ON(test_len == 0);
+
 	if (copy_from_user(&test, useraddr, sizeof(test)))
 		return -EFAULT;
 
@@ -684,6 +693,15 @@ static int ethtool_get_stats(struct net_device *dev, void __user *useraddr)
 		return -EOPNOTSUPP;
 	if (!ops->get_sset_count && !ops->get_stats_count)
 		return -EOPNOTSUPP;
+
+	if (ops->get_sset_count)
+		n_stats = ops->get_sset_count(dev, ETH_SS_STATS);
+	else
+		/* code path for obsolete hook */
+		n_stats = ops->get_stats_count(dev);
+	if (n_stats < 0)
+		return n_stats;
+	WARN_ON(n_stats == 0);
 
 	if (ops->get_sset_count)
 		n_stats = ops->get_sset_count(dev, ETH_SS_STATS);

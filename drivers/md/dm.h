@@ -117,11 +117,6 @@ void dm_table_unplug_all(struct dm_table *t);
  */
 #define dm_target_is_valid(t) ((t)->table)
 
-/*
- * To check the return value from dm_table_find_target().
- */
-#define dm_target_is_valid(t) ((t)->table)
-
 /*-----------------------------------------------------------------
  * A registry of target types.
  *---------------------------------------------------------------*/
