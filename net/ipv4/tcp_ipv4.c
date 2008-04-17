@@ -91,8 +91,7 @@ static struct tcp_md5sig_key *tcp_v4_md5_do_lookup(struct sock *sk,
 						   __be32 addr);
 static int tcp_v4_do_calc_md5_hash(char *md5_hash, struct tcp_md5sig_key *key,
 				   __be32 saddr, __be32 daddr,
-				   struct tcphdr *th, int protocol,
-				   unsigned int tcplen);
+				   struct tcphdr *th, unsigned int tcplen);
 #endif
 
 struct inet_hashinfo __cacheline_aligned tcp_hashinfo = {
@@ -582,8 +581,7 @@ static void tcp_v4_send_reset(struct sock *sk, struct sk_buff *skb)
 					key,
 					ip_hdr(skb)->daddr,
 					ip_hdr(skb)->saddr,
-					&rep.th, IPPROTO_TCP,
-					arg.iov[0].iov_len);
+					&rep.th, arg.iov[0].iov_len);
 	}
 #endif
 	arg.csum = csum_tcpudp_nofold(ip_hdr(skb)->daddr,
@@ -676,8 +674,7 @@ static void tcp_v4_send_ack(struct tcp_timewait_sock *twsk,
 					key,
 					ip_hdr(skb)->daddr,
 					ip_hdr(skb)->saddr,
-					&rep.th, IPPROTO_TCP,
-					arg.iov[0].iov_len);
+					&rep.th, arg.iov[0].iov_len);
 	}
 #endif
 	arg.csum = csum_tcpudp_nofold(ip_hdr(skb)->daddr,
@@ -1002,7 +999,7 @@ static int tcp_v4_parse_md5_keys(struct sock *sk, char __user *optval,
 
 static int tcp_v4_do_calc_md5_hash(char *md5_hash, struct tcp_md5sig_key *key,
 				   __be32 saddr, __be32 daddr,
-				   struct tcphdr *th, int protocol,
+				   struct tcphdr *th,
 				   unsigned int tcplen)
 {
 	struct scatterlist sg[4];
@@ -1035,7 +1032,7 @@ static int tcp_v4_do_calc_md5_hash(char *md5_hash, struct tcp_md5sig_key *key,
 	bp->saddr = saddr;
 	bp->daddr = daddr;
 	bp->pad = 0;
-	bp->protocol = protocol;
+	bp->protocol = IPPROTO_TCP;
 	bp->len = htons(tcplen);
 
 	sg_init_table(sg, 4);
@@ -1095,7 +1092,7 @@ int tcp_v4_calc_md5_hash(char *md5_hash, struct tcp_md5sig_key *key,
 			 struct sock *sk,
 			 struct dst_entry *dst,
 			 struct request_sock *req,
-			 struct tcphdr *th, int protocol,
+			 struct tcphdr *th,
 			 unsigned int tcplen)
 {
 	__be32 saddr, daddr;
@@ -1111,7 +1108,7 @@ int tcp_v4_calc_md5_hash(char *md5_hash, struct tcp_md5sig_key *key,
 	}
 	return tcp_v4_do_calc_md5_hash(md5_hash, key,
 				       saddr, daddr,
-				       th, protocol, tcplen);
+				       th, tcplen);
 }
 
 EXPORT_SYMBOL(tcp_v4_calc_md5_hash);
@@ -1202,8 +1199,7 @@ done_opts:
 	genhash = tcp_v4_do_calc_md5_hash(newhash,
 					  hash_expected,
 					  iph->saddr, iph->daddr,
-					  th, sk->sk_protocol,
-					  skb->len);
+					  th, skb->len);
 
 	if (genhash || memcmp(hash_location, newhash, 16) != 0) {
 		if (net_ratelimit()) {
