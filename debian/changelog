@@ -1,3 +1,10 @@
+linux-2.6 (2.6.23-1+vyatta+6) unstable; urgency=low
+
+  VC4.0.2
+
+
+ -- Mark O'Brien <mobrien@vyatta.com>  Sat, 19 Apr 2008 11:55:44 -0700
+
 linux-2.6 (2.6.23-1+vyatta+5) unstable; urgency=low
 
   VC4.0.2
