@@ -7,7 +7,7 @@ linux-2.6 (2.6.23-1+vyatta+6) unstable; urgency=low
 
 linux-2.6 (2.6.23-1+vyatta+5) unstable; urgency=low
 
-  VC4.0.2
+  VC4.0.2 release candidate
 
 
  -- Mark O'Brien <mobrien@vyatta.com>  Wed, 16 Apr 2008 09:49:39 -0700
