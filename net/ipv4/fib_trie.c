@@ -155,7 +155,6 @@ struct trie {
 #ifdef CONFIG_IP_FIB_TRIE_STATS
 	struct trie_use_stats stats;
 #endif
-	int size;
 };
 
 static void put_child(struct trie *t, struct tnode *tn, int i, struct node *n);
@@ -1065,7 +1064,6 @@ static struct list_head *fib_insert_node(struct trie *t, u32 key, int plen)
 		insert_leaf_info(&l->list, li);
 		goto done;
 	}
-	t->size++;
 	l = leaf_new();
 
 	if (!l)
