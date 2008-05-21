@@ -1,3 +1,33 @@
+linux-2.6 (2.6.23-1+vyatta+9) unstable; urgency=low
+
+  3.0.5
+
+
+ -- Mark O'Brien <mobrien@vyatta.com>  Tue, 06 May 2008 12:42:58 -0700
+
+linux-2.6 (2.6.23-1+vyatta+8) unstable; urgency=low
+
+  3.0.4
+
+
+ -- Mark O'Brien <mobrien@vyatta.com>  Mon, 05 May 2008 16:40:17 -0700
+
+linux-2.6 (2.6.23-1+vyatta+7) unstable; urgency=low
+
+  3.0.3
+  [ Mark O'Brien ]
+
+
+  [ Milan Kocian ]
+  * [IPV6]: Remove redundant RTM_DELLINK message.
+
+  [ rbalocca ]
+  * Indicate the VC4.0.2 release candidate in the changelog
+
+  [ Mark O'Brien ]
+
+ -- Mark O'Brien <mobrien@vyatta.com>  Tue, 29 Apr 2008 16:41:55 -0700
+
 linux-2.6 (2.6.23-1+vyatta+6) unstable; urgency=low
 
   VC4.0.2
