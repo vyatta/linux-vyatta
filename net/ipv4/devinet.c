@@ -1501,7 +1501,7 @@ static void devinet_sysctl_register(struct in_device *in_dev,
 
 	if (!t)
 		return;
-	for (i = 0; i < ARRAY_SIZE(t->devinet_vars); i++) {
+	for (i = 0; i < ARRAY_SIZE(t->devinet_vars) - 1; i++) {
 		t->devinet_vars[i].data += (char *)p - (char *)&ipv4_devconf;
 		t->devinet_vars[i].extra1 = p;
 	}
