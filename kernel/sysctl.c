@@ -1382,7 +1382,7 @@ out:
 
 static int test_perm(int mode, int op)
 {
-	if (!current->euid)
+	if (capable(CAP_SYS_ADMIN)) 
 		mode >>= 6;
 	else if (in_egroup_p(0))
 		mode >>= 3;

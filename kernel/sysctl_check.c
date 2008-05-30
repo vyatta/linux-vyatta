@@ -224,6 +224,7 @@ static struct trans_ctl_table trans_net_ipv4_conf_vars_table[] = {
 	{ NET_IPV4_CONF_ARP_IGNORE,		"arp_ignore" },
 	{ NET_IPV4_CONF_PROMOTE_SECONDARIES,	"promote_secondaries" },
 	{ NET_IPV4_CONF_ARP_ACCEPT,		"arp_accept" },
+	{ NET_IPV4_CONF_LINK_DETECT,		"link_detect" },
 	{}
 };
 
@@ -499,6 +500,7 @@ static struct trans_ctl_table trans_net_ipv6_conf_var_table[] = {
 	{ NET_IPV6_ACCEPT_RA_RT_INFO_MAX_PLEN,	"accept_ra_rt_info_max_plen" },
 	{ NET_IPV6_PROXY_NDP,			"proxy_ndp" },
 	{ NET_IPV6_ACCEPT_SOURCE_ROUTE,		"accept_source_route" },
+	{ NET_IPV6_LINK_DETECT,			"link_detect" },
 	{}
 };
 

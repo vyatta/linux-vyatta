@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.24
-# Tue Apr 29 17:23:02 2008
+# Wed May 21 15:37:26 2008
 #
 # CONFIG_64BIT is not set
 CONFIG_X86_32=y
@@ -1533,7 +1533,7 @@ CONFIG_E1000_NAPI=y
 # CONFIG_E1000_DISABLE_PACKET_SPLIT is not set
 CONFIG_E1000E=m
 CONFIG_IP1000=m
-CONFIG_IGB=y
+CONFIG_IGB=m
 CONFIG_NS83820=m
 CONFIG_HAMACHI=m
 CONFIG_YELLOWFIN=m
