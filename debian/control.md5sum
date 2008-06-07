@@ -19,4 +19,4 @@ e78ef4f93e1efb9c4d89b6367d9c3a30  debian/templates/image.xen.postinst.in
 229732de0a08e2bfd7b67ea9a58c2d03  debian/templates/patch.apply.in
 064a3dfe9f798fdd256bcd7c34a651b3  debian/templates/patch.unpatch.in
 b7296ce7cefbe626916c7643f6564dda  debian/arch/defines
-11828b9abe78f0dbc1c7a996a3f5ea8c  debian/arch/i386/defines
+8873b7a2dbe66e2de488135f3ddfa167  debian/arch/i386/defines
