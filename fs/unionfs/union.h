@@ -102,6 +102,7 @@ struct unionfs_file_info {
 	struct file **lower_files;
 	int *saved_branch_ids; /* IDs of branches when file was opened */
 	struct vm_operations_struct *lower_vm_ops;
+	bool wrote_to_file;	/* for delayed copyup */
 };
 
 /* unionfs inode data in memory */
@@ -368,6 +369,7 @@ extern int unionfs_getlk(struct file *file, struct file_lock *fl);
 
 /* Common file operations. */
 extern int unionfs_file_revalidate(struct file *file, bool willwrite);
+extern int unionfs_file_revalidate_locked(struct file *file, bool willwrite);
 extern int unionfs_open(struct inode *inode, struct file *file);
 extern int unionfs_file_release(struct inode *inode, struct file *file);
 extern int unionfs_flush(struct file *file, fl_owner_t id);

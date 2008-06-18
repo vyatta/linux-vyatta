@@ -482,12 +482,14 @@ static void unionfs_d_release(struct dentry *dentry)
 	int bindex, bstart, bend;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
+	if (unlikely(!UNIONFS_D(dentry)))
+		goto out;	/* skip if no lower branches */
 	/* must lock our branch configuration here */
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
 	unionfs_check_dentry(dentry);
 	/* this could be a negative dentry, so check first */
-	if (unlikely(!UNIONFS_D(dentry) || dbstart(dentry) < 0)) {
+	if (dbstart(dentry) < 0) {
 		unionfs_unlock_dentry(dentry);
 		goto out;	/* due to a (normal) failed lookup */
 	}

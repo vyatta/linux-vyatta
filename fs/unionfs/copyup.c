@@ -135,6 +135,7 @@ static int copyup_permissions(struct super_block *sb,
 	newattrs.ia_valid = ATTR_CTIME | ATTR_ATIME | ATTR_MTIME |
 		ATTR_ATIME_SET | ATTR_MTIME_SET | ATTR_FORCE |
 		ATTR_GID | ATTR_UID;
+	mutex_lock(&new_lower_dentry->d_inode->i_mutex);
 	err = notify_change(new_lower_dentry, &newattrs);
 	if (err)
 		goto out;
@@ -152,6 +153,7 @@ static int copyup_permissions(struct super_block *sb,
 	}
 
 out:
+	mutex_unlock(&new_lower_dentry->d_inode->i_mutex);
 	return err;
 }
 

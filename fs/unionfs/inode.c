@@ -128,6 +128,8 @@ begin:
 		err = check_for_whiteout(dentry, lower_dentry);
 		if (err)
 			continue;
+		/* if get here, we can write to the branch */
+		break;
 	}
 	/*
 	 * If istart wasn't already branch 0, and we got any error, then try
@@ -396,28 +398,23 @@ docopyup:
 					    bindex, old_dentry->d_name.name,
 					    old_dentry->d_name.len, NULL,
 					    i_size_read(old_dentry->d_inode));
-			if (!err) {
-				lower_new_dentry =
-					create_parents(dir, new_dentry,
-						       new_dentry->d_name.name,
-						       bindex);
-				lower_old_dentry =
-					unionfs_lower_dentry(old_dentry);
-				lower_dir_dentry =
-					lock_parent(lower_new_dentry);
-				/*
-				 * see
-				 * Documentation/filesystems/unionfs/issues.txt
-				 */
-				lockdep_off();
-				/* do vfs_link */
-				err = vfs_link(lower_old_dentry,
-					       lower_dir_dentry->d_inode,
-					       lower_new_dentry);
-				lockdep_on();
-				unlock_dir(lower_dir_dentry);
-				goto check_link;
-			}
+			if (err)
+				continue;
+			lower_new_dentry =
+				create_parents(dir, new_dentry,
+					       new_dentry->d_name.name,
+					       bindex);
+			lower_old_dentry = unionfs_lower_dentry(old_dentry);
+			lower_dir_dentry = lock_parent(lower_new_dentry);
+			/* see Documentation/filesystems/unionfs/issues.txt */
+			lockdep_off();
+			/* do vfs_link */
+			err = vfs_link(lower_old_dentry,
+				       lower_dir_dentry->d_inode,
+				       lower_new_dentry);
+			lockdep_on();
+			unlock_dir(lower_dir_dentry);
+			goto check_link;
 		}
 		goto out;
 	}
@@ -1045,7 +1042,9 @@ static int unionfs_setattr(struct dentry *dentry, struct iattr *ia)
 	}
 
 	/* notify the (possibly copied-up) lower inode */
+	mutex_lock(&lower_dentry->d_inode->i_mutex);
 	err = notify_change(lower_dentry, ia);
+	mutex_unlock(&lower_dentry->d_inode->i_mutex);
 	if (err)
 		goto out;
 
