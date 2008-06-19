@@ -1,3 +1,47 @@
+linux-2.6 (2.6.24-1+vyatta+2) unstable; urgency=low
+
+	  3.1.0
+  [ Mark O'Brien ]
+
+
+  [ Stephen Hemminger ]
+  * Make frame-buffer console a module
+  * Add vyatta logo to boot
+  * Turn device not found into an notice not an error.
+
+  [ An-Cheng Huang ]
+  * Allow parallel kernel builds (this is a generated file, so we should
+    change
+  * don't build virt kernel for now.
+
+  [ Stephen Hemminger ]
+  * Align the virt config with current non-virt config
+  * Allow parallel kernel builds
+  * Re-enable tickless kernel
+  * Remove duplicate entries for link_detect
+  * Revert "Go back to last known good kernel config."
+  * Go back to last known good kernel config.
+  * Revert "Enable tick-less (no hz)"
+  * Enable tick-less (no hz)
+  * Don't force gcc to inline
+  * Drop support for ancient IBM microchannel
+  * Enable SUSPEND to RAM
+  * link detect configuration for ipv6
+  * Drop support for obsolete filesystems
+  * Do permission checks for sysctl based on capablity, not uid.
+  * Fix off-by-one added in linkdetect changes
+  * Add new ipv4 link-detect configuration
+  * Add new ipv4 link-detect configuration
+  * Build intel IGB as module
+  * Run vyatta-virt config through oldconfig
+
+  [ An-Cheng Huang ]
+  * add "vyatta-virt" kernel flavor
+
+  [ Mark O'Brien ]
+
+ -- Mark O'Brien <mobrien@firebolt.vyatta.com>  Tue, 17 Jun 2008 09:25:39 -0700
+
 linux-2.6 (2.6.24-1+vyatta+1) unstable; urgency=low
 
   Merge in 2.6.24 kernel changes
