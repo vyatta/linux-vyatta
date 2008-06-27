@@ -525,8 +525,10 @@ static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb, int clone_it, 
 	 * room for it.
 	 */
 	md5 = tp->af_specific->md5_lookup(sk, sk);
-	if (md5)
+	if (md5) {
 		tcp_header_size += TCPOLEN_MD5SIG_ALIGNED;
+		sk->sk_route_caps &= ~(NETIF_F_GSO_MASK|NETIF_F_SG);
+	}
 #endif
 
 	skb_push(skb, tcp_header_size);
@@ -586,6 +588,16 @@ static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb, int clone_it, 
 #ifdef CONFIG_TCP_MD5SIG
 	/* Calculate the MD5 hash, as we have all we need now */
 	if (md5) {
+		/* This shouldn't happen, but it is possible that a retransmit
+		 * causes a reroute onto a different interface and we get TSO/SG
+		 * skb that is dropped here, and route_caps has already been
+		 * reset so the next retransmit will be okay.
+		 */
+		if (unlikely(skb_is_nonlinear(skb))) {
+			kfree_skb(skb);
+			return NET_XMIT_DROP;
+		}
+
 		tp->af_specific->calc_md5_hash(md5_hash_location,
 					       md5,
 					       sk, NULL, NULL,

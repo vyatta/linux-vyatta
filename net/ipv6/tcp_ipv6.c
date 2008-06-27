@@ -579,7 +579,7 @@ static int tcp_v6_md5_do_add(struct sock *sk, struct in6_addr *peer,
 				kfree(newkey);
 				return -ENOMEM;
 			}
-			sk->sk_route_caps &= ~NETIF_F_GSO_MASK;
+			sk->sk_route_caps &= ~(NETIF_F_GSO_MASK|NETIF_F_SG);
 		}
 		if (tcp_alloc_md5sig_pool() == NULL) {
 			kfree(newkey);
@@ -716,7 +716,7 @@ static int tcp_v6_parse_md5_keys (struct sock *sk, char __user *optval,
 			return -ENOMEM;
 
 		tp->md5sig_info = p;
-		sk->sk_route_caps &= ~NETIF_F_GSO_MASK;
+		sk->sk_route_caps &= ~(NETIF_F_GSO_MASK|NETIF_F_SG);
 	}
 
 	newkey = kmemdup(cmd.tcpm_key, cmd.tcpm_keylen, GFP_KERNEL);
@@ -1501,6 +1501,7 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 		if (newkey != NULL)
 			tcp_v6_md5_do_add(newsk, &inet6_sk(sk)->daddr,
 					  newkey, key->keylen);
+		newsk->sk_route_caps &= ~(NETIF_F_GSO_MASK|NETIF_F_SG);
 	}
 #endif
 

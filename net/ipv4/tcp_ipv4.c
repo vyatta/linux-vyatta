@@ -878,7 +878,7 @@ int tcp_v4_md5_do_add(struct sock *sk, __be32 addr,
 				kfree(newkey);
 				return -ENOMEM;
 			}
-			sk->sk_route_caps &= ~NETIF_F_GSO_MASK;
+			sk->sk_route_caps &= ~(NETIF_F_GSO_MASK|NETIF_F_SG);
 		}
 		if (tcp_alloc_md5sig_pool() == NULL) {
 			kfree(newkey);
@@ -1007,7 +1007,7 @@ static int tcp_v4_parse_md5_keys(struct sock *sk, char __user *optval,
 			return -EINVAL;
 
 		tp->md5sig_info = p;
-		sk->sk_route_caps &= ~NETIF_F_GSO_MASK;
+		sk->sk_route_caps &= ~(NETIF_F_GSO_MASK|NETIF_F_SG);
 	}
 
 	newkey = kmemdup(cmd.tcpm_key, cmd.tcpm_keylen, GFP_KERNEL);
@@ -1211,6 +1211,14 @@ done_opts:
 			       NIPQUAD(iph->saddr), ntohs(th->source),
 			       NIPQUAD(iph->daddr), ntohs(th->dest));
 		return 1;
+	}
+
+	/* md5 calculation needs linear skb, so if can't fix it. assume mismatch */
+	if (skb_is_nonlinear(skb)) {
+		if (__skb_linearize(skb))
+			return 1;	/* out of memory, assume failed (ie drop) */
+		th = tcp_hdr(skb);
+		iph = ip_hdr(skb);
 	}
 
 	/* Okay, so this is hash_expected and hash_location -
@@ -1475,6 +1483,7 @@ struct sock *tcp_v4_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 		if (newkey != NULL)
 			tcp_v4_md5_do_add(newsk, inet_sk(sk)->daddr,
 					  newkey, key->keylen);
+		newsk->sk_route_caps &= ~(NETIF_F_GSO_MASK|NETIF_F_SG);
 	}
 #endif
 
