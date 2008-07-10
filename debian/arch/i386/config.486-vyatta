@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.24
-# Thu Jul 10 12:39:27 2008
+# Thu Jul 10 12:41:24 2008
 #
 # CONFIG_64BIT is not set
 CONFIG_X86_32=y
@@ -330,7 +330,7 @@ CONFIG_X86_SPEEDSTEP_SMI=m
 CONFIG_X86_P4_CLOCKMOD=m
 CONFIG_X86_CPUFREQ_NFORCE2=m
 CONFIG_X86_LONGRUN=m
-# CONFIG_X86_LONGHAUL is not set
+CONFIG_X86_LONGHAUL=m
 CONFIG_X86_E_POWERSAVER=m
 
 #
