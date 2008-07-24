@@ -1,3 +1,23 @@
+linux-2.6 (2.6.24-1+vyatta+4) unstable; urgency=low
+
+	  3.1.2
+  [ Mark O'Brien ]
+
+
+  [ James Chapman ]
+  * l2tp: Fix potential memory corruption in pppol2tp_recvmsg()
+
+  [ Stephen Hemminger ]
+  * Disable SCTP and DCCP
+  * Enable TIPC, SCTP and DCCP protocols
+  * Enable Power Management on old VIA longhaul
+  * Enable deprecated ACPI interfaces
+
+  [ Mark O'Brien ]
+  * 3.1.1
+
+ -- Mark O'Brien <mobrien@firebolt.vyatta.com>  Wed, 23 Jul 2008 21:35:37 -0700
+
 linux-2.6 (2.6.24-1+vyatta+3) unstable; urgency=low
 
 	  3.1.1
