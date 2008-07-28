@@ -49,8 +49,6 @@
 
 #define DRIVER_NAME			"menelaus"
 
-#define pr_err(fmt, arg...)	printk(KERN_ERR DRIVER_NAME ": ", ## arg);
-
 #define MENELAUS_I2C_ADDRESS		0x72
 
 #define MENELAUS_REV			0x01
@@ -155,7 +153,7 @@ static int menelaus_write_reg(int reg, u8 value)
 	int val = i2c_smbus_write_byte_data(the_menelaus->client, reg, value);
 
 	if (val < 0) {
-		pr_err("write error");
+		pr_err(DRIVER_NAME ": write error");
 		return val;
 	}
 
@@ -167,7 +165,7 @@ static int menelaus_read_reg(int reg)
 	int val = i2c_smbus_read_byte_data(the_menelaus->client, reg);
 
 	if (val < 0)
-		pr_err("read error");
+		pr_err(DRIVER_NAME ": read error");
 
 	return val;
 }
@@ -1151,7 +1149,8 @@ static inline void menelaus_rtc_init(struct menelaus_chip *m)
 
 static struct i2c_driver menelaus_i2c_driver;
 
-static int menelaus_probe(struct i2c_client *client)
+static int menelaus_probe(struct i2c_client *client,
+			  const struct i2c_device_id *id)
 {
 	struct menelaus_chip	*menelaus;
 	int			rev = 0, val;
@@ -1177,7 +1176,7 @@ static int menelaus_probe(struct i2c_client *client)
 	/* If a true probe check the device */
 	rev = menelaus_read_reg(MENELAUS_REV);
 	if (rev < 0) {
-		pr_err("device not found");
+		pr_err(DRIVER_NAME ": device not found");
 		err = -ENODEV;
 		goto fail1;
 	}
@@ -1197,7 +1196,7 @@ static int menelaus_probe(struct i2c_client *client)
 		err = request_irq(client->irq, menelaus_irq, IRQF_DISABLED,
 				  DRIVER_NAME, menelaus);
 		if (err) {
-			dev_dbg(&client->dev,  "can't get IRQ %d, err %d",
+			dev_dbg(&client->dev,  "can't get IRQ %d, err %d\n",
 					client->irq, err);
 			goto fail1;
 		}
@@ -1244,12 +1243,19 @@ static int __exit menelaus_remove(struct i2c_client *client)
 	return 0;
 }
 
+static const struct i2c_device_id menelaus_id[] = {
+	{ "menelaus", 0 },
+	{ }
+};
+MODULE_DEVICE_TABLE(i2c, menelaus_id);
+
 static struct i2c_driver menelaus_i2c_driver = {
 	.driver = {
 		.name		= DRIVER_NAME,
 	},
 	.probe		= menelaus_probe,
 	.remove		= __exit_p(menelaus_remove),
+	.id_table	= menelaus_id,
 };
 
 static int __init menelaus_init(void)
@@ -1258,7 +1264,7 @@ static int __init menelaus_init(void)
 
 	res = i2c_add_driver(&menelaus_i2c_driver);
 	if (res < 0) {
-		pr_err("driver registration failed\n");
+		pr_err(DRIVER_NAME ": driver registration failed\n");
 		return res;
 	}
 

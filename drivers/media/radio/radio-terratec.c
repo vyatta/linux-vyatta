@@ -32,6 +32,7 @@
 #include <asm/uaccess.h>	/* copy to/from user		*/
 #include <linux/videodev2.h>	/* kernel radio structs		*/
 #include <media/v4l2-common.h>
+#include <media/v4l2-ioctl.h>
 #include <linux/spinlock.h>
 
 #include <linux/version.h>      /* for KERNEL_VERSION MACRO     */
@@ -173,7 +174,7 @@ static int tt_setfreq(struct tt_device *dev, unsigned long freq1)
 		i--;
 		p--;
 		temp = temp/2;
-       }
+	}
 
 	spin_lock(&lock);
 
@@ -360,16 +361,13 @@ static const struct file_operations terratec_fops = {
 	.open           = video_exclusive_open,
 	.release        = video_exclusive_release,
 	.ioctl		= video_ioctl2,
+#ifdef CONFIG_COMPAT
 	.compat_ioctl	= v4l_compat_ioctl32,
+#endif
 	.llseek         = no_llseek,
 };
 
-static struct video_device terratec_radio=
-{
-	.owner		= THIS_MODULE,
-	.name		= "TerraTec ActiveRadio",
-	.type		= VID_TYPE_TUNER,
-	.fops           = &terratec_fops,
+static const struct v4l2_ioctl_ops terratec_ioctl_ops = {
 	.vidioc_querycap    = vidioc_querycap,
 	.vidioc_g_tuner     = vidioc_g_tuner,
 	.vidioc_s_tuner     = vidioc_s_tuner,
@@ -382,6 +380,12 @@ static struct video_device terratec_radio=
 	.vidioc_s_audio     = vidioc_s_audio,
 	.vidioc_g_input     = vidioc_g_input,
 	.vidioc_s_input     = vidioc_s_input,
+};
+
+static struct video_device terratec_radio = {
+	.name		= "TerraTec ActiveRadio",
+	.fops           = &terratec_fops,
+	.ioctl_ops 	= &terratec_ioctl_ops,
 };
 
 static int __init terratec_init(void)

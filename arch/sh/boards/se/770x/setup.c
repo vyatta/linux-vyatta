@@ -12,8 +12,7 @@
 #include <asm/se.h>
 #include <asm/io.h>
 #include <asm/smc37c93x.h>
-
-void init_se_IRQ(void);
+#include <asm/heartbeat.h>
 
 /*
  * Configure the Super I/O chip
@@ -72,7 +71,7 @@ static struct resource cf_ide_resources[] = {
 	},
 	[1] = {
 		.start  = PA_MRSHPC_IO + 0x1f0 + 0x206,
-		.end    = PA_MRSHPC_IO + 0x1f0 +8 + 0x206 + 8,
+		.end    = PA_MRSHPC_IO + 0x1f0 + 8 + 0x206 + 8,
 		.flags  = IORESOURCE_MEM,
 	},
 	[2] = {
@@ -90,10 +89,16 @@ static struct platform_device cf_ide_device  = {
 
 static unsigned char heartbeat_bit_pos[] = { 8, 9, 10, 11, 12, 13, 14, 15 };
 
+static struct heartbeat_data heartbeat_data = {
+	.bit_pos	= heartbeat_bit_pos,
+	.nr_bits	= ARRAY_SIZE(heartbeat_bit_pos),
+	.regsize	= 16,
+};
+
 static struct resource heartbeat_resources[] = {
 	[0] = {
 		.start	= PA_LED,
-		.end	= PA_LED + ARRAY_SIZE(heartbeat_bit_pos) - 1,
+		.end	= PA_LED,
 		.flags	= IORESOURCE_MEM,
 	},
 };
@@ -102,15 +107,64 @@ static struct platform_device heartbeat_device = {
 	.name		= "heartbeat",
 	.id		= -1,
 	.dev	= {
-		.platform_data	= heartbeat_bit_pos,
+		.platform_data	= &heartbeat_data,
 	},
 	.num_resources	= ARRAY_SIZE(heartbeat_resources),
 	.resource	= heartbeat_resources,
 };
 
+/* SH771X Ethernet driver */
+static struct resource sh_eth0_resources[] = {
+	[0] = {
+		.start = SH_ETH0_BASE,
+		.end = SH_ETH0_BASE + 0x1B8,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = SH_ETH0_IRQ,
+		.end = SH_ETH0_IRQ,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device sh_eth0_device = {
+	.name = "sh-eth",
+	.id	= 0,
+	.dev = {
+		.platform_data = PHY_ID,
+	},
+	.num_resources = ARRAY_SIZE(sh_eth0_resources),
+	.resource = sh_eth0_resources,
+};
+
+static struct resource sh_eth1_resources[] = {
+	[0] = {
+		.start = SH_ETH1_BASE,
+		.end = SH_ETH1_BASE + 0x1B8,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = SH_ETH1_IRQ,
+		.end = SH_ETH1_IRQ,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device sh_eth1_device = {
+	.name = "sh-eth",
+	.id	= 1,
+	.dev = {
+		.platform_data = PHY_ID,
+	},
+	.num_resources = ARRAY_SIZE(sh_eth1_resources),
+	.resource = sh_eth1_resources,
+};
+
 static struct platform_device *se_devices[] __initdata = {
 	&heartbeat_device,
 	&cf_ide_device,
+	&sh_eth0_device,
+	&sh_eth1_device,
 };
 
 static int __init se_devices_setup(void)

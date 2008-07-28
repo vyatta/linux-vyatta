@@ -33,6 +33,9 @@
 
  History:
 
+ Version 0.43:
+	Oliver Neukum: avoided DMA coherency issue
+
  Version 0.42:
 	Converted dsbr100 to use video_ioctl2
 	by Douglas Landgraf <dougsland@gmail.com>
@@ -82,6 +85,7 @@
 #include <linux/input.h>
 #include <linux/videodev2.h>
 #include <media/v4l2-common.h>
+#include <media/v4l2-ioctl.h>
 #include <linux/usb.h>
 
 /*
@@ -135,7 +139,7 @@ module_param(radio_nr, int, 0);
 struct dsbr100_device {
 	struct usb_device *usbdev;
 	struct video_device *videodev;
-	unsigned char transfer_buffer[TB_LEN];
+	u8 *transfer_buffer;
 	int curfreq;
 	int stereo;
 	int users;
@@ -237,10 +241,7 @@ static void dsbr100_getstat(struct dsbr100_device *radio)
 /* handle unplugging of the device, release data structures
 if nothing keeps us from doing it.  If something is still
 keeping us busy, the release callback of v4l will take care
-of releasing it.  stv680.c does not relase its private
-data, so I don't do this here either.  Checking out the
-code I'd expect I better did that, but if there's a memory
-leak here it's tiny (~50 bytes per disconnect) */
+of releasing it. */
 static void usb_dsbr100_disconnect(struct usb_interface *intf)
 {
 	struct dsbr100_device *radio = usb_get_intfdata(intf);
@@ -250,6 +251,7 @@ static void usb_dsbr100_disconnect(struct usb_interface *intf)
 		video_unregister_device(radio->videodev);
 		radio->videodev = NULL;
 		if (radio->users) {
+			kfree(radio->transfer_buffer);
 			kfree(radio);
 		} else {
 			radio->removed = 1;
@@ -425,6 +427,7 @@ static int usb_dsbr100_close(struct inode *inode, struct file *file)
 		return -ENODEV;
 	radio->users = 0;
 	if (radio->removed) {
+		kfree(radio->transfer_buffer);
 		kfree(radio);
 	}
 	return 0;
@@ -436,18 +439,13 @@ static const struct file_operations usb_dsbr100_fops = {
 	.open		= usb_dsbr100_open,
 	.release	= usb_dsbr100_close,
 	.ioctl		= video_ioctl2,
+#ifdef CONFIG_COMPAT
 	.compat_ioctl	= v4l_compat_ioctl32,
+#endif
 	.llseek		= no_llseek,
 };
 
-/* V4L2 interface */
-static struct video_device dsbr100_videodev_template =
-{
-	.owner		= THIS_MODULE,
-	.name		= "D-Link DSB-R 100",
-	.type		= VID_TYPE_TUNER,
-	.fops		= &usb_dsbr100_fops,
-	.release	= video_device_release,
+static const struct v4l2_ioctl_ops usb_dsbr100_ioctl_ops = {
 	.vidioc_querycap    = vidioc_querycap,
 	.vidioc_g_tuner     = vidioc_g_tuner,
 	.vidioc_s_tuner     = vidioc_s_tuner,
@@ -462,6 +460,14 @@ static struct video_device dsbr100_videodev_template =
 	.vidioc_s_input     = vidioc_s_input,
 };
 
+/* V4L2 interface */
+static struct video_device dsbr100_videodev_template = {
+	.name		= "D-Link DSB-R 100",
+	.fops		= &usb_dsbr100_fops,
+	.ioctl_ops 	= &usb_dsbr100_ioctl_ops,
+	.release	= video_device_release,
+};
+
 /* check if the device is present and register with v4l and
 usb if it is */
 static int usb_dsbr100_probe(struct usb_interface *intf,
@@ -471,7 +477,12 @@ static int usb_dsbr100_probe(struct usb_interface *intf,
 
 	if (!(radio = kmalloc(sizeof(struct dsbr100_device), GFP_KERNEL)))
 		return -ENOMEM;
+	if (!(radio->transfer_buffer = kmalloc(TB_LEN, GFP_KERNEL))) {
+		kfree(radio);
+		return -ENOMEM;
+	}
 	if (!(radio->videodev = video_device_alloc())) {
+		kfree(radio->transfer_buffer);
 		kfree(radio);
 		return -ENOMEM;
 	}
@@ -485,6 +496,7 @@ static int usb_dsbr100_probe(struct usb_interface *intf,
 	if (video_register_device(radio->videodev, VFL_TYPE_RADIO,radio_nr)) {
 		warn("Could not register video device");
 		video_device_release(radio->videodev);
+		kfree(radio->transfer_buffer);
 		kfree(radio);
 		return -EIO;
 	}

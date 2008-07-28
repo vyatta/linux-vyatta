@@ -46,6 +46,7 @@
 #include <linux/videotext.h>
 #include <linux/videodev.h>
 #include <media/v4l2-common.h>
+#include <media/v4l2-ioctl.h>
 #include <linux/mutex.h>
 
 #include "saa5246a.h"
@@ -66,6 +67,7 @@ static struct video_device saa_template;	/* Declared near bottom */
 
 /* Addresses to scan */
 static unsigned short normal_i2c[]	 = { I2C_ADDRESS, I2C_CLIENT_END };
+
 I2C_CLIENT_INSMOD;
 
 static struct i2c_client client_template;
@@ -187,19 +189,21 @@ static int i2c_senddata(struct saa5246a_device *t, ...)
 {
 	unsigned char buf[64];
 	int v;
-	int ct=0;
+	int ct = 0;
 	va_list argp;
-	va_start(argp,t);
+	va_start(argp, t);
 
-	while((v=va_arg(argp,int))!=-1)
-		buf[ct++]=v;
+	while ((v = va_arg(argp, int)) != -1)
+		buf[ct++] = v;
+
+	va_end(argp);
 	return i2c_sendbuf(t, buf[0], ct-1, buf+1);
 }
 
-/* Get count number of bytes from I²C-device at address adr, store them in buf.
+/* Get count number of bytes from IÂ²C-device at address adr, store them in buf.
  * Start & stop handshaking is done by this routine, ack will be sent after the
  * last byte to inhibit further sending of data. If uaccess is 'true', data is
- * written to user-space with put_user. Returns -1 if I²C-device didn't send
+ * written to user-space with put_user. Returns -1 if IÂ²C-device didn't send
  * acknowledge, 0 otherwise
  */
 static int i2c_getdata(struct saa5246a_device *t, int count, u8 *buf)
@@ -826,9 +830,7 @@ static const struct file_operations saa_fops = {
 
 static struct video_device saa_template =
 {
-	.owner	  = THIS_MODULE,
 	.name	  = IF_NAME,
-	.type	  = VID_TYPE_TELETEXT,
 	.fops	  = &saa_fops,
 	.release  = video_device_release,
 	.minor    = -1,

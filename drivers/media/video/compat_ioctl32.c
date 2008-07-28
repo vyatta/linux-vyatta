@@ -17,7 +17,7 @@
 #include <linux/videodev2.h>
 #include <linux/module.h>
 #include <linux/smp_lock.h>
-#include <media/v4l2-common.h>
+#include <media/v4l2-ioctl.h>
 
 #ifdef CONFIG_COMPAT
 
@@ -848,6 +848,8 @@ long v4l_compat_ioctl32(struct file *file, unsigned int cmd, unsigned long arg)
 	case VIDIOCSFREQ32:
 	case VIDIOCGAUDIO:
 	case VIDIOCSAUDIO:
+	case VIDIOCGVBIFMT:
+	case VIDIOCSVBIFMT:
 #endif
 	case VIDIOC_QUERYCAP:
 	case VIDIOC_ENUM_FMT:
@@ -874,11 +876,15 @@ long v4l_compat_ioctl32(struct file *file, unsigned int cmd, unsigned long arg)
 	case VIDIOC_ENUMINPUT:
 	case VIDIOC_ENUMINPUT32:
 	case VIDIOC_G_CTRL:
+	case VIDIOC_S_CTRL:
 	case VIDIOC_S_CTRL32:
+	case VIDIOC_S_FREQUENCY:
+	case VIDIOC_G_FREQUENCY:
 	case VIDIOC_QUERYCTRL:
 	case VIDIOC_G_INPUT32:
 	case VIDIOC_S_INPUT32:
 	case VIDIOC_TRY_FMT32:
+	case VIDIOC_S_HW_FREQ_SEEK:
 		ret = do_video_ioctl(file, cmd, arg);
 		break;
 

@@ -23,6 +23,7 @@
 #include <linux/init.h>
 #include <linux/videodev.h>
 #include <media/v4l2-common.h>
+#include <media/v4l2-ioctl.h>
 #include "oss/aci.h"
 #include "miropcm20-rds-core.h"
 
@@ -221,15 +222,14 @@ static const struct file_operations pcm20_fops = {
 	.open           = video_exclusive_open,
 	.release        = video_exclusive_release,
 	.ioctl		= pcm20_ioctl,
+#ifdef CONFIG_COMPAT
 	.compat_ioctl	= v4l_compat_ioctl32,
+#endif
 	.llseek         = no_llseek,
 };
 
 static struct video_device pcm20_radio = {
-	.owner		= THIS_MODULE,
 	.name		= "Miro PCM 20 radio",
-	.type		= VID_TYPE_TUNER,
-	.hardware	= VID_HARDWARE_RTRACK,
 	.fops           = &pcm20_fops,
 	.priv		= &pcm20_unit
 };

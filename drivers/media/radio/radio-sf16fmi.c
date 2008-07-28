@@ -24,6 +24,7 @@
 #include <linux/delay.h>	/* udelay			*/
 #include <linux/videodev2.h>	/* kernel radio structs		*/
 #include <media/v4l2-common.h>
+#include <media/v4l2-ioctl.h>
 #include <linux/isapnp.h>
 #include <asm/io.h>		/* outb, outb_p			*/
 #include <asm/uaccess.h>	/* copy to/from user		*/
@@ -288,16 +289,13 @@ static const struct file_operations fmi_fops = {
 	.open           = video_exclusive_open,
 	.release        = video_exclusive_release,
 	.ioctl		= video_ioctl2,
+#ifdef CONFIG_COMPAT
 	.compat_ioctl	= v4l_compat_ioctl32,
+#endif
 	.llseek         = no_llseek,
 };
 
-static struct video_device fmi_radio=
-{
-	.owner		= THIS_MODULE,
-	.name		= "SF16FMx radio",
-	.type		= VID_TYPE_TUNER,
-	.fops           = &fmi_fops,
+static const struct v4l2_ioctl_ops fmi_ioctl_ops = {
 	.vidioc_querycap    = vidioc_querycap,
 	.vidioc_g_tuner     = vidioc_g_tuner,
 	.vidioc_s_tuner     = vidioc_s_tuner,
@@ -312,6 +310,12 @@ static struct video_device fmi_radio=
 	.vidioc_s_ctrl      = vidioc_s_ctrl,
 };
 
+static struct video_device fmi_radio = {
+	.name		= "SF16FMx radio",
+	.fops           = &fmi_fops,
+	.ioctl_ops 	= &fmi_ioctl_ops,
+};
+
 /* ladis: this is my card. does any other types exist? */
 static struct isapnp_device_id id_table[] __devinitdata = {
 	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
@@ -321,7 +325,7 @@ static struct isapnp_device_id id_table[] __devinitdata = {
 
 MODULE_DEVICE_TABLE(isapnp, id_table);
 
-static int isapnp_fmi_probe(void)
+static int __init isapnp_fmi_probe(void)
 {
 	int i = 0;
 
@@ -361,6 +365,7 @@ static int __init fmi_init(void)
 	}
 	if (!request_region(io, 2, "radio-sf16fmi")) {
 		printk(KERN_ERR "radio-sf16fmi: port 0x%x already in use\n", io);
+		pnp_device_detach(dev);
 		return -EBUSY;
 	}
 

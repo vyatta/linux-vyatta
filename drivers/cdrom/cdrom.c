@@ -360,10 +360,9 @@ static int cdrom_mrw_exit(struct cdrom_device_info *cdi);
 
 static int cdrom_get_disc_info(struct cdrom_device_info *cdi, disc_information *di);
 
-#ifdef CONFIG_SYSCTL
 static void cdrom_sysctl_register(void);
-#endif /* CONFIG_SYSCTL */ 
-static struct cdrom_device_info *topCdromPtr;
+
+static LIST_HEAD(cdrom_list);
 
 static int cdrom_dummy_generic_packet(struct cdrom_device_info *cdi,
 				      struct packet_command *cgc)
@@ -394,13 +393,11 @@ int register_cdrom(struct cdrom_device_info *cdi)
 	cdinfo(CD_OPEN, "entering register_cdrom\n"); 
 
 	if (cdo->open == NULL || cdo->release == NULL)
-		return -2;
+		return -EINVAL;
 	if (!banner_printed) {
 		printk(KERN_INFO "Uniform CD-ROM driver " REVISION "\n");
 		banner_printed = 1;
-#ifdef CONFIG_SYSCTL
 		cdrom_sysctl_register();
-#endif /* CONFIG_SYSCTL */ 
 	}
 
 	ENSURE(drive_status, CDC_DRIVE_STATUS );
@@ -439,35 +436,18 @@ int register_cdrom(struct cdrom_device_info *cdi)
 
 	cdinfo(CD_REG_UNREG, "drive \"/dev/%s\" registered\n", cdi->name);
 	mutex_lock(&cdrom_mutex);
-	cdi->next = topCdromPtr; 	
-	topCdromPtr = cdi;
+	list_add(&cdi->list, &cdrom_list);
 	mutex_unlock(&cdrom_mutex);
 	return 0;
 }
 #undef ENSURE
 
-int unregister_cdrom(struct cdrom_device_info *unreg)
+void unregister_cdrom(struct cdrom_device_info *cdi)
 {
-	struct cdrom_device_info *cdi, *prev;
 	cdinfo(CD_OPEN, "entering unregister_cdrom\n"); 
 
-	prev = NULL;
 	mutex_lock(&cdrom_mutex);
-	cdi = topCdromPtr;
-	while (cdi && cdi != unreg) {
-		prev = cdi;
-		cdi = cdi->next;
-	}
-
-	if (cdi == NULL) {
-		mutex_unlock(&cdrom_mutex);
-		return -2;
-	}
-	if (prev)
-		prev->next = cdi->next;
-	else
-		topCdromPtr = cdi->next;
-
+	list_del(&cdi->list);
 	mutex_unlock(&cdrom_mutex);
 
 	if (cdi->exit)
@@ -475,7 +455,6 @@ int unregister_cdrom(struct cdrom_device_info *unreg)
 
 	cdi->ops->n_minors--;
 	cdinfo(CD_REG_UNREG, "drive \"/dev/%s\" unregistered\n", cdi->name);
-	return 0;
 }
 
 int cdrom_get_media_event(struct cdrom_device_info *cdi,
@@ -1107,7 +1086,7 @@ int open_for_data(struct cdrom_device_info * cdi)
 		       is the default case! */
 		    cdinfo(CD_OPEN, "bummer. wrong media type.\n"); 
 		    cdinfo(CD_WARNING, "pid %d must open device O_NONBLOCK!\n",
-					(unsigned int)current->pid); 
+					(unsigned int)task_pid_nr(current));
 		    ret=-EMEDIUMTYPE;
 		    goto clean_up_and_return;
 		}
@@ -1152,8 +1131,8 @@ clean_up_and_return:
 /* This code is similar to that in open_for_data. The routine is called
    whenever an audio play operation is requested.
 */
-int check_for_audio_disc(struct cdrom_device_info * cdi,
-			 struct cdrom_device_ops * cdo)
+static int check_for_audio_disc(struct cdrom_device_info * cdi,
+				struct cdrom_device_ops * cdo)
 {
         int ret;
 	tracktype tracks;
@@ -1206,25 +1185,26 @@ int check_for_audio_disc(struct cdrom_device_info * cdi,
 	return 0;
 }
 
-/* Admittedly, the logic below could be performed in a nicer way. */
 int cdrom_release(struct cdrom_device_info *cdi, struct file *fp)
 {
 	struct cdrom_device_ops *cdo = cdi->ops;
 	int opened_for_data;
 
-	cdinfo(CD_CLOSE, "entering cdrom_release\n"); 
+	cdinfo(CD_CLOSE, "entering cdrom_release\n");
 
 	if (cdi->use_count > 0)
 		cdi->use_count--;
-	if (cdi->use_count == 0)
+
+	if (cdi->use_count == 0) {
 		cdinfo(CD_CLOSE, "Use count for \"/dev/%s\" now zero\n", cdi->name);
-	if (cdi->use_count == 0)
 		cdrom_dvd_rw_close_write(cdi);
-	if (cdi->use_count == 0 &&
-	    (cdo->capability & CDC_LOCK) && !keeplocked) {
-		cdinfo(CD_CLOSE, "Unlocking door!\n");
-		cdo->lock_door(cdi, 0);
+
+		if ((cdo->capability & CDC_LOCK) && !keeplocked) {
+			cdinfo(CD_CLOSE, "Unlocking door!\n");
+			cdo->lock_door(cdi, 0);
+		}
 	}
+
 	opened_for_data = !(cdi->options & CDO_USE_FFLAGS) ||
 		!(fp && fp->f_flags & O_NONBLOCK);
 
@@ -2126,7 +2106,6 @@ static int cdrom_read_cdda_bpc(struct cdrom_device_info *cdi, __u8 __user *ubuf,
 		if (ret)
 			break;
 
-		memset(rq->cmd, 0, sizeof(rq->cmd));
 		rq->cmd[0] = GPCMD_READ_CD;
 		rq->cmd[1] = 1 << 2;
 		rq->cmd[2] = (lba >> 24) & 0xff;
@@ -2787,12 +2766,6 @@ int cdrom_ioctl(struct file * file, struct cdrom_device_info *cdi,
 	return -ENOSYS;
 }
 
-static inline
-int msf_to_lba(char m, char s, char f)
-{
-	return (((m * CD_SECS) + s) * CD_FRAMES + f) - CD_MSF_OFFSET;
-}
-
 /*
  * Required when we need to use READ_10 to issue other than 2048 block
  * reads
@@ -3314,7 +3287,7 @@ static int cdrom_print_info(const char *header, int val, char *info,
 
 	*pos += ret;
 
-	for (cdi = topCdromPtr; cdi; cdi = cdi->next) {
+	list_for_each_entry(cdi, &cdrom_list, list) {
 		switch (option) {
 		case CTL_NAME:
 			ret = scnprintf(info + *pos, max_size - *pos,
@@ -3435,7 +3408,8 @@ static void cdrom_update_settings(void)
 {
 	struct cdrom_device_info *cdi;
 
-	for (cdi = topCdromPtr; cdi != NULL; cdi = cdi->next) {
+	mutex_lock(&cdrom_mutex);
+	list_for_each_entry(cdi, &cdrom_list, list) {
 		if (autoclose && CDROM_CAN(CDC_CLOSE_TRAY))
 			cdi->options |= CDO_AUTO_CLOSE;
 		else if (!autoclose)
@@ -3453,52 +3427,25 @@ static void cdrom_update_settings(void)
 		else
 			cdi->options &= ~CDO_CHECK_TYPE;
 	}
+	mutex_unlock(&cdrom_mutex);
 }
 
 static int cdrom_sysctl_handler(ctl_table *ctl, int write, struct file * filp,
 				void __user *buffer, size_t *lenp, loff_t *ppos)
 {
-	int *valp = ctl->data;
-	int val = *valp;
 	int ret;
 	
 	ret = proc_dointvec(ctl, write, filp, buffer, lenp, ppos);
 
-	if (write && *valp != val) {
+	if (write) {
 	
 		/* we only care for 1 or 0. */
-		if (*valp)
-			*valp = 1;
-		else
-			*valp = 0;
+		autoclose        = !!cdrom_sysctl_settings.autoclose;
+		autoeject        = !!cdrom_sysctl_settings.autoeject;
+		debug	         = !!cdrom_sysctl_settings.debug;
+		lockdoor         = !!cdrom_sysctl_settings.lock;
+		check_media_type = !!cdrom_sysctl_settings.check;
 
-		switch (ctl->ctl_name) {
-		case DEV_CDROM_AUTOCLOSE: {
-			if (valp == &cdrom_sysctl_settings.autoclose)
-				autoclose = cdrom_sysctl_settings.autoclose;
-			break;
-			}
-		case DEV_CDROM_AUTOEJECT: {
-			if (valp == &cdrom_sysctl_settings.autoeject)
-				autoeject = cdrom_sysctl_settings.autoeject;
-			break;
-			}
-		case DEV_CDROM_DEBUG: {
-			if (valp == &cdrom_sysctl_settings.debug)
-				debug = cdrom_sysctl_settings.debug;
-			break;
-			}
-		case DEV_CDROM_LOCK: {
-			if (valp == &cdrom_sysctl_settings.lock)
-				lockdoor = cdrom_sysctl_settings.lock;
-			break;
-			}
-		case DEV_CDROM_CHECK_MEDIA: {
-			if (valp == &cdrom_sysctl_settings.check)
-				check_media_type = cdrom_sysctl_settings.check;
-			break;
-			}
-		}
 		/* update the option flags according to the changes. we
 		   don't have per device options through sysctl yet,
 		   but we will have and then this will disappear. */
@@ -3511,7 +3458,6 @@ static int cdrom_sysctl_handler(ctl_table *ctl, int write, struct file * filp,
 /* Place files in /proc/sys/dev/cdrom */
 static ctl_table cdrom_table[] = {
 	{
-		.ctl_name	= DEV_CDROM_INFO,
 		.procname	= "info",
 		.data		= &cdrom_sysctl_settings.info, 
 		.maxlen		= CDROM_STR_SIZE,
@@ -3519,7 +3465,6 @@ static ctl_table cdrom_table[] = {
 		.proc_handler	= &cdrom_sysctl_info,
 	},
 	{
-		.ctl_name	= DEV_CDROM_AUTOCLOSE,
 		.procname	= "autoclose",
 		.data		= &cdrom_sysctl_settings.autoclose,
 		.maxlen		= sizeof(int),
@@ -3527,7 +3472,6 @@ static ctl_table cdrom_table[] = {
 		.proc_handler	= &cdrom_sysctl_handler,
 	},
 	{
-		.ctl_name	= DEV_CDROM_AUTOEJECT,
 		.procname	= "autoeject",
 		.data		= &cdrom_sysctl_settings.autoeject,
 		.maxlen		= sizeof(int),
@@ -3535,7 +3479,6 @@ static ctl_table cdrom_table[] = {
 		.proc_handler	= &cdrom_sysctl_handler,
 	},
 	{
-		.ctl_name	= DEV_CDROM_DEBUG,
 		.procname	= "debug",
 		.data		= &cdrom_sysctl_settings.debug,
 		.maxlen		= sizeof(int),
@@ -3543,7 +3486,6 @@ static ctl_table cdrom_table[] = {
 		.proc_handler	= &cdrom_sysctl_handler,
 	},
 	{
-		.ctl_name	= DEV_CDROM_LOCK,
 		.procname	= "lock",
 		.data		= &cdrom_sysctl_settings.lock,
 		.maxlen		= sizeof(int),
@@ -3551,7 +3493,6 @@ static ctl_table cdrom_table[] = {
 		.proc_handler	= &cdrom_sysctl_handler,
 	},
 	{
-		.ctl_name	= DEV_CDROM_CHECK_MEDIA,
 		.procname	= "check_media",
 		.data		= &cdrom_sysctl_settings.check,
 		.maxlen		= sizeof(int),
@@ -3610,22 +3551,29 @@ static void cdrom_sysctl_unregister(void)
 		unregister_sysctl_table(cdrom_sysctl_header);
 }
 
+#else /* CONFIG_SYSCTL */
+
+static void cdrom_sysctl_register(void)
+{
+}
+
+static void cdrom_sysctl_unregister(void)
+{
+}
+
 #endif /* CONFIG_SYSCTL */
 
 static int __init cdrom_init(void)
 {
-#ifdef CONFIG_SYSCTL
 	cdrom_sysctl_register();
-#endif
+
 	return 0;
 }
 
 static void __exit cdrom_exit(void)
 {
 	printk(KERN_INFO "Uniform CD-ROM driver unloaded\n");
-#ifdef CONFIG_SYSCTL
 	cdrom_sysctl_unregister();
-#endif
 }
 
 module_init(cdrom_init);

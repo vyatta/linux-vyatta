@@ -96,10 +96,9 @@ static inline void sysfs_remove_device_from_node(struct sys_device *dev,
 {
 }
 
+#endif /* CONFIG_NUMA */
 
 #include <asm-generic/topology.h>
-
-#endif /* CONFIG_NUMA */
 
 #ifdef CONFIG_SMP
 #include <asm/cputable.h>
@@ -108,7 +107,9 @@ static inline void sysfs_remove_device_from_node(struct sys_device *dev,
 #ifdef CONFIG_PPC64
 #include <asm/smp.h>
 
-#define topology_thread_siblings(cpu)	(cpu_sibling_map[cpu])
+#define topology_thread_siblings(cpu)	(per_cpu(cpu_sibling_map, cpu))
+#define topology_core_siblings(cpu)	(per_cpu(cpu_core_map, cpu))
+#define topology_core_id(cpu)		(cpu_to_core_id(cpu))
 #endif
 #endif
 
