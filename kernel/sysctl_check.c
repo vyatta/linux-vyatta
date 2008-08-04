@@ -224,7 +224,6 @@ static struct trans_ctl_table trans_net_ipv4_conf_vars_table[] = {
 	{ NET_IPV4_CONF_ARP_IGNORE,		"arp_ignore" },
 	{ NET_IPV4_CONF_PROMOTE_SECONDARIES,	"promote_secondaries" },
 	{ NET_IPV4_CONF_ARP_ACCEPT,		"arp_accept" },
-	{ NET_IPV4_CONF_LINK_DETECT,		"link_detect" },
 	{}
 };
 
