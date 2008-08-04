@@ -176,7 +176,6 @@ struct ipv6_devconf ipv6_devconf __read_mostly = {
 #endif
 	.proxy_ndp		= 0,
 	.accept_source_route	= 0,	/* we do not accept RH0 by default. */
-	.link_detect		= 0,
 };
 
 static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
@@ -209,7 +208,6 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 #endif
 	.proxy_ndp		= 0,
 	.accept_source_route	= 0,	/* we do not accept RH0 by default. */
-	.link_detect		= 0,
 };
 
 /* IPv6 Wildcard Address and Loopback Address defined by RFC2553 */
@@ -2280,11 +2278,8 @@ static int addrconf_notify(struct notifier_block *this, unsigned long event,
 				return notifier_from_errno(-ENOMEM);
 		}
 		break;
-
-	case NETDEV_CHANGE:
-		if (!netif_running(dev))
-			break;
 	case NETDEV_UP:
+	case NETDEV_CHANGE:
 		if (dev->flags & IFF_SLAVE)
 			break;
 
@@ -2303,15 +2298,12 @@ static int addrconf_notify(struct notifier_block *this, unsigned long event,
 
 			if (idev)
 				idev->if_flags |= IF_READY;
-		} else if (!netif_carrier_ok(dev)) {
-			/* device is offline */
-			if (idev && idev->cnf.link_detect)
-				addrconf_ifdown(dev, 1);
-			break;
-		} else if (!addrconf_qdisc_ok(dev)) {
-			/* device is still not ready. */
-			break;
 		} else {
+			if (!addrconf_qdisc_ok(dev)) {
+				/* device is still not ready. */
+				break;
+			}
+
 			if (idev) {
 				if (idev->if_flags & IF_READY) {
 					/* device is already configured. */
@@ -3472,7 +3464,6 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 #ifdef CONFIG_IPV6_OPTIMISTIC_DAD
 	array[DEVCONF_OPTIMISTIC_DAD] = cnf->optimistic_dad;
 #endif
-	array[DEVCONF_LINK_DETECT] = cnf->link_detect;
 }
 
 static inline size_t inet6_if_nlmsg_size(void)
@@ -3972,14 +3963,6 @@ static struct addrconf_sysctl_table
 			.proc_handler	=	&proc_dointvec,
 		},
 #endif
-		{
-			.ctl_name	=	NET_IPV6_LINK_DETECT,
-			.procname	=	"link_detect",
-			.data		=	&ipv6_devconf.link_detect,
-			.maxlen		=	sizeof(int),
-			.mode		=	0644,
-			.proc_handler	=	&proc_dointvec,
-		},
 		{
 			.ctl_name	=	NET_IPV6_MAX_ADDRESSES,
 			.procname	=	"max_addresses",

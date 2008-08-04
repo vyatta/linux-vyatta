@@ -936,10 +936,6 @@ hop_limit - INTEGER
 	Default Hop Limit to set.
 	Default: 64
 
-link_detect - BOOLEAN
-	Remove addresses when link (carrier) is lost on interface.
-	Default: FALSE
-
 mtu - INTEGER
 	Default Maximum Transfer Unit
 	Default: 1280 (IPv6 required minimum)

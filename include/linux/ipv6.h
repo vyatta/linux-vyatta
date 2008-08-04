@@ -134,7 +134,6 @@ struct ipv6_devconf {
 	__s32		accept_redirects;
 	__s32		autoconf;
 	__s32		dad_transmits;
-	__s32		link_detect;
 	__s32		rtr_solicits;
 	__s32		rtr_solicit_interval;
 	__s32		rtr_solicit_delay;
@@ -191,7 +190,6 @@ enum {
 	DEVCONF_PROXY_NDP,
 	DEVCONF_OPTIMISTIC_DAD,
 	DEVCONF_ACCEPT_SOURCE_ROUTE,
-	DEVCONF_LINK_DETECT,
 	DEVCONF_MAX
 };
 
