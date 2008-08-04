@@ -97,7 +97,6 @@ static inline void ipv4_devconf_setall(struct in_device *in_dev)
 #define IN_DEV_PROMOTE_SECONDARIES(in_dev) \
 					IN_DEV_ORCONF((in_dev), \
 						      PROMOTE_SECONDARIES)
-#define IN_DEV_LINK_DETECT(in_dev)	IN_DEV_ORCONF((in_dev), LINK_DETECT)
 
 #define IN_DEV_RX_REDIRECTS(in_dev) \
 	((IN_DEV_FORWARD(in_dev) && \

@@ -761,10 +761,7 @@ disable_policy - BOOLEAN
 disable_xfrm - BOOLEAN
 	Disable IPSEC encryption on this interface, whatever the policy
 
-link_detect - BOOLEAN
-	Causes loss of carrier remove interface addresses the same as
-	setting device down. When carrier is restored, the addresses
-	are restored.
+
 
 tag - INTEGER
 	Allows you to write a number, which can be used as required.
