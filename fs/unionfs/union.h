@@ -88,10 +88,6 @@ extern struct vm_operations_struct unionfs_vm_ops;
 # define unionfs_rw_semaphore	rw_semaphore
 #endif /* not CONFIG_PREEMPT_RT */
 
-#ifndef noinline_for_stack
-# define noinline_for_stack noinline
-#endif /* not noinline_for_stack */
-
 /* file private data. */
 struct unionfs_file_info {
 	int bstart;
@@ -379,6 +375,7 @@ extern int unionfs_fsync(struct file *file, struct dentry *dentry,
 extern int unionfs_fasync(int fd, struct file *file, int flag);
 
 /* Inode operations */
+extern struct inode *unionfs_iget(struct super_block *sb, unsigned long ino);
 extern int unionfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			  struct inode *new_dir, struct dentry *new_dentry);
 extern int unionfs_unlink(struct inode *dir, struct dentry *dentry);

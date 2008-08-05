@@ -601,6 +601,8 @@ static int sixpack_open(struct tty_struct *tty)
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
+	if (!tty->driver->write)
+		return -EOPNOTSUPP;
 
 	dev = alloc_netdev(sizeof(struct sixpack), "sp%d", sp_setup);
 	if (!dev) {
@@ -701,7 +703,7 @@ static void sixpack_close(struct tty_struct *tty)
 	sp = tty->disc_data;
 	tty->disc_data = NULL;
 	write_unlock(&disc_data_lock);
-	if (sp == 0)
+	if (!sp)
 		return;
 
 	/*

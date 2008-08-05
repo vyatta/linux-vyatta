@@ -1,6 +1,4 @@
 /*
- *  linux/drivers/ide/pci/opti621.c		Version 0.9	Sep 24, 2007
- *
  *  Copyright (C) 1996-1998  Linus Torvalds & authors (see below)
  */
 
@@ -89,11 +87,6 @@
 #include <linux/types.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/delay.h>
-#include <linux/timer.h>
-#include <linux/mm.h>
-#include <linux/ioport.h>
-#include <linux/blkdev.h>
 #include <linux/pci.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
@@ -109,18 +102,6 @@
  * on 20MHz PCI bus (pulse 50 ns):
  *  address: 50 ns, data: 50 ns, recovery: 100 ns.
  */
-
-/* #define READ_PREFETCH 0 */
-/* Uncomment for disable read prefetch.
- * There is some readprefetch capatibility in hdparm,
- * but when I type hdparm -P 1 /dev/hda, I got errors
- * and till reset drive is inaccessible.
- * This (hw) read prefetch is safe on my drive.
- */
-
-#ifndef READ_PREFETCH
-#define READ_PREFETCH 0x40 /* read prefetch is enabled */
-#endif /* else read prefetch is disabled */
 
 #define READ_REG 0	/* index of Read cycle timing register */
 #define WRITE_REG 1	/* index of Write cycle timing register */
@@ -267,7 +248,8 @@ static void opti621_set_pio_mode(ide_drive_t *drive, const u8 pio)
 
 	cycle1 = ((first.data_time-1)<<4)  | (first.recovery_time-2);
 	cycle2 = ((second.data_time-1)<<4) | (second.recovery_time-2);
-	misc = READ_PREFETCH | ((ax-1)<<4) | ((drdy-2)<<1);
+
+	misc = ((ax - 1) << 4) | ((drdy - 2) << 1);
 
 #ifdef OPTI621_DEBUG
 	printk("%s: master: address: %d, data: %d, "
@@ -322,14 +304,18 @@ static void opti621_set_pio_mode(ide_drive_t *drive, const u8 pio)
 	spin_unlock_irqrestore(&opti621_lock, flags);
 }
 
+static void __devinit opti621_port_init_devs(ide_hwif_t *hwif)
+{
+	hwif->drives[0].drive_data = PIO_DONT_KNOW;
+	hwif->drives[1].drive_data = PIO_DONT_KNOW;
+}
+
 /*
  * init_hwif_opti621() is called once for each hwif found at boot.
  */
 static void __devinit init_hwif_opti621 (ide_hwif_t *hwif)
 {
-	hwif->drives[0].drive_data = PIO_DONT_KNOW;
-	hwif->drives[1].drive_data = PIO_DONT_KNOW;
-
+	hwif->port_init_devs = opti621_port_init_devs;
 	hwif->set_pio_mode = &opti621_set_pio_mode;
 }
 
@@ -338,20 +324,16 @@ static const struct ide_port_info opti621_chipsets[] __devinitdata = {
 		.name		= "OPTI621",
 		.init_hwif	= init_hwif_opti621,
 		.enablebits	= {{0x45,0x80,0x00}, {0x40,0x08,0x00}},
-		.host_flags	= IDE_HFLAG_TRUST_BIOS_FOR_DMA |
+		.host_flags	= IDE_HFLAG_NO_DMA |
 				  IDE_HFLAG_BOOTABLE,
 		.pio_mask	= ATA_PIO3,
-		.swdma_mask	= ATA_SWDMA2,
-		.mwdma_mask	= ATA_MWDMA2,
 	},{	/* 1 */
 		.name		= "OPTI621X",
 		.init_hwif	= init_hwif_opti621,
 		.enablebits	= {{0x45,0x80,0x00}, {0x40,0x08,0x00}},
-		.host_flags	= IDE_HFLAG_TRUST_BIOS_FOR_DMA |
+		.host_flags	= IDE_HFLAG_NO_DMA |
 				  IDE_HFLAG_BOOTABLE,
 		.pio_mask	= ATA_PIO3,
-		.swdma_mask	= ATA_SWDMA2,
-		.mwdma_mask	= ATA_MWDMA2,
 	}
 };
 

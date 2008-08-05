@@ -157,20 +157,6 @@ int ecryptfs_write(struct file *ecryptfs_file, char *data, loff_t offset,
 			       ecryptfs_page_idx, rc);
 			goto out;
 		}
-		if (start_offset_in_page) {
-			/* Read in the page from the lower
-			 * into the eCryptfs inode page cache,
-			 * decrypting */
-			rc = ecryptfs_decrypt_page(ecryptfs_page);
-			if (rc) {
-				printk(KERN_ERR "%s: Error decrypting "
-				       "page; rc = [%d]\n",
-				       __FUNCTION__, rc);
-				ClearPageUptodate(ecryptfs_page);
-				page_cache_release(ecryptfs_page);
-				goto out;
-			}
-		}
 		ecryptfs_page_virt = kmap_atomic(ecryptfs_page, KM_USER0);
 
 		/*
@@ -293,6 +279,7 @@ int ecryptfs_read_lower_page_segment(struct page *page_for_ecryptfs,
 	return rc;
 }
 
+#if 0
 /**
  * ecryptfs_read
  * @data: The virtual address into which to write the data read (and
@@ -348,14 +335,6 @@ int ecryptfs_read(char *data, loff_t offset, size_t size,
 			       ecryptfs_page_idx, rc);
 			goto out;
 		}
-		rc = ecryptfs_decrypt_page(ecryptfs_page);
-		if (rc) {
-			printk(KERN_ERR "%s: Error decrypting "
-			       "page; rc = [%d]\n", __FUNCTION__, rc);
-			ClearPageUptodate(ecryptfs_page);
-			page_cache_release(ecryptfs_page);
-			goto out;
-		}
 		ecryptfs_page_virt = kmap_atomic(ecryptfs_page, KM_USER0);
 		memcpy((data + data_offset),
 		       ((char *)ecryptfs_page_virt + start_offset_in_page),
@@ -371,3 +350,4 @@ int ecryptfs_read(char *data, loff_t offset, size_t size,
 out:
 	return rc;
 }
+#endif  /*  0  */

@@ -37,15 +37,9 @@ static struct dentry *lock_parent(struct dentry *dentry)
 {
 	struct dentry *dir;
 
-	dir = dget(dentry->d_parent);
+	dir = dget_parent(dentry);
 	mutex_lock_nested(&(dir->d_inode->i_mutex), I_MUTEX_PARENT);
 	return dir;
-}
-
-static void unlock_parent(struct dentry *dentry)
-{
-	mutex_unlock(&(dentry->d_parent->d_inode->i_mutex));
-	dput(dentry->d_parent);
 }
 
 static void unlock_dir(struct dentry *dir)
@@ -77,13 +71,13 @@ ecryptfs_create_underlying_file(struct inode *lower_dir_inode,
 	struct vfsmount *vfsmount_save;
 	int rc;
 
-	dentry_save = nd->dentry;
-	vfsmount_save = nd->mnt;
-	nd->dentry = lower_dentry;
-	nd->mnt = lower_mnt;
+	dentry_save = nd->path.dentry;
+	vfsmount_save = nd->path.mnt;
+	nd->path.dentry = lower_dentry;
+	nd->path.mnt = lower_mnt;
 	rc = vfs_create(lower_dir_inode, lower_dentry, mode, nd);
-	nd->dentry = dentry_save;
-	nd->mnt = vfsmount_save;
+	nd->path.dentry = dentry_save;
+	nd->path.mnt = vfsmount_save;
 	return rc;
 }
 
@@ -365,8 +359,7 @@ static struct dentry *ecryptfs_lookup(struct inode *dir, struct dentry *dentry,
 		dentry->d_sb)->mount_crypt_stat;
 	if (mount_crypt_stat->flags & ECRYPTFS_ENCRYPTED_VIEW_ENABLED) {
 		if (crypt_stat->flags & ECRYPTFS_METADATA_IN_XATTR)
-			file_size = ((crypt_stat->extent_size
-				      * crypt_stat->num_header_extents_at_front)
+			file_size = (crypt_stat->num_header_bytes_at_front
 				     + i_size_read(lower_dentry->d_inode));
 		else
 			file_size = i_size_read(lower_dentry->d_inode);
@@ -427,8 +420,9 @@ static int ecryptfs_unlink(struct inode *dir, struct dentry *dentry)
 	int rc = 0;
 	struct dentry *lower_dentry = ecryptfs_dentry_to_lower(dentry);
 	struct inode *lower_dir_inode = ecryptfs_inode_to_lower(dir);
+	struct dentry *lower_dir_dentry;
 
-	lock_parent(lower_dentry);
+	lower_dir_dentry = lock_parent(lower_dentry);
 	rc = vfs_unlink(lower_dir_inode, lower_dentry);
 	if (rc) {
 		printk(KERN_ERR "Error in vfs_unlink; rc = [%d]\n", rc);
@@ -440,7 +434,7 @@ static int ecryptfs_unlink(struct inode *dir, struct dentry *dentry)
 	dentry->d_inode->i_ctime = dir->i_ctime;
 	d_drop(dentry);
 out_unlock:
-	unlock_parent(lower_dentry);
+	unlock_dir(lower_dir_dentry);
 	return rc;
 }
 
@@ -685,7 +679,7 @@ ecryptfs_put_link(struct dentry *dentry, struct nameidata *nd, void *ptr)
  * @crypt_stat: Crypt_stat associated with file
  * @upper_size: Size of the upper file
  *
- * Calculate the requried size of the lower file based on the
+ * Calculate the required size of the lower file based on the
  * specified size of the upper file. This calculation is based on the
  * number of headers in the underlying file and the extent size.
  *
@@ -697,8 +691,7 @@ upper_size_to_lower_size(struct ecryptfs_crypt_stat *crypt_stat,
 {
 	loff_t lower_size;
 
-	lower_size = (crypt_stat->extent_size
-		      * crypt_stat->num_header_extents_at_front);
+	lower_size = crypt_stat->num_header_bytes_at_front;
 	if (upper_size != 0) {
 		loff_t num_extents;
 
@@ -821,14 +814,14 @@ ecryptfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 	int rc;
 
         if (nd) {
-		struct vfsmount *vfsmnt_save = nd->mnt;
-		struct dentry *dentry_save = nd->dentry;
+		struct vfsmount *vfsmnt_save = nd->path.mnt;
+		struct dentry *dentry_save = nd->path.dentry;
 
-		nd->mnt = ecryptfs_dentry_to_lower_mnt(nd->dentry);
-		nd->dentry = ecryptfs_dentry_to_lower(nd->dentry);
+		nd->path.mnt = ecryptfs_dentry_to_lower_mnt(nd->path.dentry);
+		nd->path.dentry = ecryptfs_dentry_to_lower(nd->path.dentry);
 		rc = permission(ecryptfs_inode_to_lower(inode), mask, nd);
-		nd->mnt = vfsmnt_save;
-		nd->dentry = dentry_save;
+		nd->path.mnt = vfsmnt_save;
+		nd->path.dentry = dentry_save;
         } else
 		rc = permission(ecryptfs_inode_to_lower(inode), mask, NULL);
         return rc;
@@ -875,11 +868,11 @@ static int ecryptfs_setattr(struct dentry *dentry, struct iattr *ia)
 			if (!(mount_crypt_stat->flags
 			      & ECRYPTFS_PLAINTEXT_PASSTHROUGH_ENABLED)) {
 				rc = -EIO;
-				printk(KERN_WARNING "Attempt to read file that "
+				printk(KERN_WARNING "Either the lower file "
 				       "is not in a valid eCryptfs format, "
-				       "and plaintext passthrough mode is not "
+				       "or the key could not be retrieved. "
+				       "Plaintext passthrough mode is not "
 				       "enabled; returning -EIO\n");
-
 				mutex_unlock(&crypt_stat->cs_mutex);
 				goto out;
 			}
@@ -910,7 +903,9 @@ static int ecryptfs_setattr(struct dentry *dentry, struct iattr *ia)
 	if (ia->ia_valid & (ATTR_KILL_SUID | ATTR_KILL_SGID))
 		ia->ia_valid &= ~ATTR_MODE;
 
+	mutex_lock(&lower_dentry->d_inode->i_mutex);
 	rc = notify_change(lower_dentry, ia);
+	mutex_unlock(&lower_dentry->d_inode->i_mutex);
 out:
 	fsstack_copy_attr_all(inode, lower_inode);
 	return rc;
@@ -954,7 +949,7 @@ out:
 	return rc;
 }
 
-ssize_t
+static ssize_t
 ecryptfs_getxattr(struct dentry *dentry, const char *name, void *value,
 		  size_t size)
 {

@@ -194,7 +194,13 @@ static int ipoib_mcast_join_finish(struct ipoib_mcast *mcast,
 	/* Set the cached Q_Key before we attach if it's the broadcast group */
 	if (!memcmp(mcast->mcmember.mgid.raw, priv->dev->broadcast + 4,
 		    sizeof (union ib_gid))) {
+		spin_lock_irq(&priv->lock);
+		if (!priv->broadcast) {
+			spin_unlock_irq(&priv->lock);
+			return -EAGAIN;
+		}
 		priv->qkey = be32_to_cpu(priv->broadcast->mcmember.qkey);
+		spin_unlock_irq(&priv->lock);
 		priv->tx_wr.wr.ud.remote_qkey = priv->qkey;
 	}
 
@@ -650,7 +656,7 @@ void ipoib_mcast_send(struct net_device *dev, void *mgid, struct sk_buff *skb)
 	 */
 	spin_lock(&priv->lock);
 
-	if (!test_bit(IPOIB_MCAST_STARTED, &priv->flags)	||
+	if (!test_bit(IPOIB_FLAG_OPER_UP, &priv->flags)		||
 	    !priv->broadcast					||
 	    !test_bit(IPOIB_MCAST_FLAG_ATTACHED, &priv->broadcast->flags)) {
 		++dev->stats.tx_dropped;
@@ -702,7 +708,7 @@ void ipoib_mcast_send(struct net_device *dev, void *mgid, struct sk_buff *skb)
 
 out:
 	if (mcast && mcast->ah) {
-		if (skb->dst            &&
+		if (skb->dst		&&
 		    skb->dst->neighbour &&
 		    !*to_ipoib_neigh(skb->dst->neighbour)) {
 			struct ipoib_neigh *neigh = ipoib_neigh_alloc(skb->dst->neighbour,
@@ -710,7 +716,7 @@ out:
 
 			if (neigh) {
 				kref_get(&mcast->ah->ref);
-				neigh->ah  	= mcast->ah;
+				neigh->ah	= mcast->ah;
 				list_add_tail(&neigh->list, &mcast->neigh_list);
 			}
 		}
@@ -787,10 +793,6 @@ void ipoib_mcast_restart_task(struct work_struct *work)
 		union ib_gid mgid;
 
 		memcpy(mgid.raw, mclist->dmi_addr + 4, sizeof mgid);
-
-		/* Add in the P_Key */
-		mgid.raw[4] = (priv->pkey >> 8) & 0xff;
-		mgid.raw[5] = priv->pkey & 0xff;
 
 		mcast = __ipoib_mcast_find(dev, &mgid);
 		if (!mcast || test_bit(IPOIB_MCAST_FLAG_SENDONLY, &mcast->flags)) {

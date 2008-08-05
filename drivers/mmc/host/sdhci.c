@@ -30,6 +30,10 @@
 
 static unsigned int debug_quirks = 0;
 
+/* For multi controllers in one platform case */
+static u16 chip_index = 0;
+static spinlock_t index_lock;
+
 /*
  * Different quirks to handle when the hardware deviates from a strict
  * interpretation of the SDHCI specification.
@@ -105,7 +109,8 @@ static const struct pci_device_id pci_ids[] __devinitdata = {
 		.subvendor      = PCI_ANY_ID,
 		.subdevice      = PCI_ANY_ID,
 		.driver_data    = SDHCI_QUIRK_SINGLE_POWER_WRITE |
-				  SDHCI_QUIRK_RESET_CMD_DATA_ON_IOS,
+				  SDHCI_QUIRK_RESET_CMD_DATA_ON_IOS |
+				  SDHCI_QUIRK_BROKEN_DMA,
 	},
 
 	{
@@ -114,7 +119,8 @@ static const struct pci_device_id pci_ids[] __devinitdata = {
 		.subvendor      = PCI_ANY_ID,
 		.subdevice      = PCI_ANY_ID,
 		.driver_data    = SDHCI_QUIRK_SINGLE_POWER_WRITE |
-				  SDHCI_QUIRK_RESET_CMD_DATA_ON_IOS,
+				  SDHCI_QUIRK_RESET_CMD_DATA_ON_IOS |
+				  SDHCI_QUIRK_BROKEN_DMA,
 	},
 
 	{
@@ -1320,7 +1326,7 @@ static int __devinit sdhci_probe_slot(struct pci_dev *pdev, int slot)
 
 	DBG("slot %d at 0x%08lx, irq %d\n", slot, host->addr, host->irq);
 
-	snprintf(host->slot_descr, 20, "sdhci:slot%d", slot);
+	snprintf(host->slot_descr, 20, "sdhc%d:slot%d", chip->index, slot);
 
 	ret = pci_request_region(pdev, host->bar, host->slot_descr);
 	if (ret)
@@ -1585,6 +1591,11 @@ static int __devinit sdhci_probe(struct pci_dev *pdev,
 	chip->num_slots = slots;
 	pci_set_drvdata(pdev, chip);
 
+	/* Add for multi controller case */
+	spin_lock(&index_lock);
+	chip->index = chip_index++;
+	spin_unlock(&index_lock);
+
 	for (i = 0;i < slots;i++) {
 		ret = sdhci_probe_slot(pdev, i);
 		if (ret) {
@@ -1644,6 +1655,8 @@ static int __init sdhci_drv_init(void)
 	printk(KERN_INFO DRIVER_NAME
 		": Secure Digital Host Controller Interface driver\n");
 	printk(KERN_INFO DRIVER_NAME ": Copyright(c) Pierre Ossman\n");
+
+	spin_lock_init(&index_lock);
 
 	return pci_register_driver(&sdhci_driver);
 }

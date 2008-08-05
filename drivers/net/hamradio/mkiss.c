@@ -289,7 +289,6 @@ static void ax_bump(struct mkiss *ax)
 			*ax->rbuff &= ~0x20;
 		}
  	}
-	spin_unlock_bh(&ax->buflock);
 
 	count = ax->rcount;
 
@@ -297,17 +296,17 @@ static void ax_bump(struct mkiss *ax)
 		printk(KERN_ERR "mkiss: %s: memory squeeze, dropping packet.\n",
 		       ax->dev->name);
 		ax->stats.rx_dropped++;
+		spin_unlock_bh(&ax->buflock);
 		return;
 	}
 
-	spin_lock_bh(&ax->buflock);
 	memcpy(skb_put(skb,count), ax->rbuff, count);
-	spin_unlock_bh(&ax->buflock);
 	skb->protocol = ax25_type_trans(skb, ax->dev);
 	netif_rx(skb);
 	ax->dev->last_rx = jiffies;
 	ax->stats.rx_packets++;
 	ax->stats.rx_bytes += count;
+	spin_unlock_bh(&ax->buflock);
 }
 
 static void kiss_unesc(struct mkiss *ax, unsigned char s)
@@ -530,6 +529,7 @@ static void ax_encaps(struct net_device *dev, unsigned char *icp, int len)
 static int ax_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct mkiss *ax = netdev_priv(dev);
+	int cib = 0;
 
 	if (!netif_running(dev))  {
 		printk(KERN_ERR "mkiss: %s: xmit call when iface is down\n", dev->name);
@@ -545,10 +545,11 @@ static int ax_xmit(struct sk_buff *skb, struct net_device *dev)
 			/* 20 sec timeout not reached */
 			return 1;
 		}
+		if (ax->tty->driver->chars_in_buffer)
+			cib = ax->tty->driver->chars_in_buffer(ax->tty);
 
 		printk(KERN_ERR "mkiss: %s: transmit timed out, %s?\n", dev->name,
-		       (ax->tty->driver->chars_in_buffer(ax->tty) || ax->xleft) ?
-		       "bad line quality" : "driver error");
+		     cib || ax->xleft ? "bad line quality" : "driver error");
 
 		ax->xleft = 0;
 		clear_bit(TTY_DO_WRITE_WAKEUP, &ax->tty->flags);
@@ -737,6 +738,8 @@ static int mkiss_open(struct tty_struct *tty)
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
+	if (!tty->driver->write)
+		return -EOPNOTSUPP;
 
 	dev = alloc_netdev(sizeof(struct mkiss), "ax%d", ax_setup);
 	if (!dev) {
@@ -821,7 +824,7 @@ static void mkiss_close(struct tty_struct *tty)
 	tty->disc_data = NULL;
 	write_unlock(&disc_data_lock);
 
-	if (ax == 0)
+	if (!ax)
 		return;
 
 	/*

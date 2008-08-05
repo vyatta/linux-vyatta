@@ -50,6 +50,10 @@ ACPI_MODULE_NAME("processor_perflib");
 
 static DEFINE_MUTEX(performance_mutex);
 
+/* Use cpufreq debug layer for _PPC changes. */
+#define cpufreq_printk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_CORE, \
+						"cpufreq-core", msg)
+
 /*
  * _PPC support is implemented as a CPUfreq policy notifier:
  * This means each time a CPUfreq driver registered also with
@@ -60,10 +64,21 @@ static DEFINE_MUTEX(performance_mutex);
  * policy is adjusted accordingly.
  */
 
+/* ignore_ppc:
+ * -1 -> cpufreq low level drivers not initialized -> _PSS, etc. not called yet
+ *       ignore _PPC
+ *  0 -> cpufreq low level drivers initialized -> consider _PPC values
+ *  1 -> ignore _PPC totally -> forced by user through boot param
+ */
+static unsigned int ignore_ppc = -1;
+module_param(ignore_ppc, uint, 0644);
+MODULE_PARM_DESC(ignore_ppc, "If the frequency of your machine gets wrongly" \
+		 "limited by BIOS, this should help");
+
 #define PPC_REGISTERED   1
 #define PPC_IN_USE       2
 
-static int acpi_processor_ppc_status = 0;
+static int acpi_processor_ppc_status;
 
 static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 				       unsigned long event, void *data)
@@ -71,6 +86,14 @@ static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 	struct cpufreq_policy *policy = data;
 	struct acpi_processor *pr;
 	unsigned int ppc = 0;
+
+	if (event == CPUFREQ_START && ignore_ppc <= 0) {
+		ignore_ppc = 0;
+		return 0;
+	}
+
+	if (ignore_ppc)
+		return 0;
 
 	mutex_lock(&performance_mutex);
 
@@ -123,6 +146,9 @@ static int acpi_processor_get_platform_limit(struct acpi_processor *pr)
 		return -ENODEV;
 	}
 
+	cpufreq_printk("CPU %d: _PPC is %d - frequency %s limited\n", pr->id,
+		       (int)ppc, ppc ? "" : "not");
+
 	pr->performance_platform_limit = (int)ppc;
 
 	return 0;
@@ -130,7 +156,13 @@ static int acpi_processor_get_platform_limit(struct acpi_processor *pr)
 
 int acpi_processor_ppc_has_changed(struct acpi_processor *pr)
 {
-	int ret = acpi_processor_get_platform_limit(pr);
+	int ret;
+
+	if (ignore_ppc)
+		return 0;
+
+	ret = acpi_processor_get_platform_limit(pr);
+
 	if (ret < 0)
 		return (ret);
 	else

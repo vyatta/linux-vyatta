@@ -186,8 +186,8 @@ static struct dentry *unionfs_lookup(struct inode *parent,
 
 	/* save the dentry & vfsmnt from namei */
 	if (nd) {
-		path_save.dentry = nd->dentry;
-		path_save.mnt = nd->mnt;
+		path_save.dentry = nd->path.dentry;
+		path_save.mnt = nd->path.mnt;
 	}
 
 	/*
@@ -205,8 +205,8 @@ static struct dentry *unionfs_lookup(struct inode *parent,
 
 	/* restore the dentry & vfsmnt in namei */
 	if (nd) {
-		nd->dentry = path_save.dentry;
-		nd->mnt = path_save.mnt;
+		nd->path.dentry = path_save.dentry;
+		nd->path.mnt = path_save.mnt;
 	}
 	if (!IS_ERR(ret)) {
 		if (ret)
@@ -761,7 +761,7 @@ static int unionfs_permission(struct inode *inode, int mask,
 	const int write_mask = (mask & MAY_WRITE) && !(mask & MAY_READ);
 
 	if (nd)
-		unionfs_lock_dentry(nd->dentry, UNIONFS_DMUTEX_CHILD);
+		unionfs_lock_dentry(nd->path.dentry, UNIONFS_DMUTEX_CHILD);
 
 	if (!UNIONFS_I(inode)->lower_inodes) {
 		if (is_file)	/* dirs can be unlinked but chdir'ed to */
@@ -836,7 +836,7 @@ out:
 	unionfs_check_inode(inode);
 	unionfs_check_nd(nd);
 	if (nd)
-		unionfs_unlock_dentry(nd->dentry);
+		unionfs_unlock_dentry(nd->path.dentry);
 	return err;
 }
 
