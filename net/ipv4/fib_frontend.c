@@ -876,22 +876,12 @@ static int fib_netdev_event(struct notifier_block *this, unsigned long event, vo
 	if (!in_dev)
 		return NOTIFY_DONE;
 
-	switch (event) {
-	case NETDEV_CHANGE:
-		if (!netif_running(dev))
-			break;
+	/* Link detect causes changes in carrier to add/remove addresses from FIB */
+	if (event == NETDEV_CHANGE && netif_running(dev)
+	    && IN_DEV_LINK_DETECT(in_dev))
+		event = netif_carrier_ok(dev) ? NETDEV_UP : NETDEV_DOWN;
 
-		if (!IN_DEV_LINK_DETECT(in_dev)) {
-			rt_cache_flush(0);
-			break;
-		}
-		else if (!netif_carrier_ok(dev)) {
-			if (fib_sync_down(0, dev, 0))
-				fib_flush();
-			rt_cache_flush(0);
-			break;
-		}
-		/* else fallthrough to up */
+	switch (event) {
 	case NETDEV_UP:
 		for_ifa(in_dev) {
 			fib_add_ifaddr(ifa);
@@ -905,6 +895,7 @@ static int fib_netdev_event(struct notifier_block *this, unsigned long event, vo
 		fib_disable_ip(dev, 0);
 		break;
 	case NETDEV_CHANGEMTU:
+	case NETDEV_CHANGE:
 		rt_cache_flush(0);
 		break;
 	}
