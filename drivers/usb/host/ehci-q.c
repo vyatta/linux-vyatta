@@ -319,7 +319,6 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 			}
 			ehci_qtd_free (ehci, last);
 			last = NULL;
-			last_status = -EINPROGRESS;
 		}
 
 		/* ignore urbs submitted during completions we reported */
