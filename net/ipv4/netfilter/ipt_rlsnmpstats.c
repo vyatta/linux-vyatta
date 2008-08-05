@@ -2,11 +2,11 @@
  *  Copyright 2006, Vyatta, Inc.
  *
  *  GNU General Public License
- * 
+ *
  *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License, version 2, 
+ *  it under the terms of the GNU General Public License, version 2,
  *  as published by the Free Software Foundation.
- * 
+ *
  *  This program is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -24,26 +24,27 @@
  * Date: 2005
  */
 
-#include <linux/proc_fs.h>/* Necessary because we use the proc fs */
+#include <linux/proc_fs.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <asm/uaccess.h>/* for copy_from_user */
+#include <asm/uaccess.h>
 #include <net/checksum.h>
 #include <linux/netfilter_ipv4/ipt_rlsnmpstats.h>
 #include <linux/netfilter/x_tables.h>
-#include <linux/ip.h>       
+#include <linux/ip.h>
 #include <linux/types.h>
-#include <linux/types.h>   
-#include <linux/netdevice.h>     
-#include <linux/netfilter.h> 
-#include <linux/netfilter_ipv4.h>   
-#include <linux/skbuff.h>       
-#include <linux/udp.h>  
+#include <linux/types.h>
+#include <linux/netdevice.h>
+#include <linux/netfilter.h>
+#include <linux/netfilter_ipv4.h>
+#include <linux/netfilter_ipv4/ip_tables.h>
+#include <linux/skbuff.h>
+#include <linux/udp.h>
 
-void cleanup_proc(void);
-int init_proc(void);
+static void cleanup_proc(void);
+static void init_proc(void);
 
-struct rl_data {
+static struct rl_data {
   unsigned long in_snmp_packet;
   unsigned long in_bad_ver;
   unsigned long in_bad_comm_name;
@@ -79,8 +80,8 @@ struct rl_data {
 } g_rl_data;
 
 
-/* Functin Prototypes */
-void rl_reset_values();
+/* Function Prototypes */
+static void rl_reset_values(void);
 
 
 /*
@@ -88,8 +89,8 @@ void rl_reset_values();
  * More snmp stuff here--probably should go in a header
  *
  */
-/* 
- * Application layer address mapping mimics the NAT mapping, but 
+/*
+ * Application layer address mapping mimics the NAT mapping, but
  * only for the first octet in this case (a more flexible system
  * can be implemented if needed).
  */
@@ -113,135 +114,85 @@ static int snmp_parse_mangle(unsigned char *msg,
  */
 
 
-static int match(const struct sk_buff *skb,
-                 const struct net_device *in,
-                 const struct net_device *out,
-                 const void *matchinfo,
-                 int offset,
-                 const void *hdr,
-                 u_int16_t datalen,
-                 int *hotdrop)
+static bool match(const struct sk_buff *skb,
+		  const struct net_device *in,
+		  const struct net_device *out,
+		  const struct xt_match *match,
+		  const void *matchinfo,
+		  int offset,
+		  unsigned int protoff,
+		  bool *hotdrop)
 {
-   struct iphdr *iph = ip_hdr(skb);
-   struct udphdr *udph = (struct udphdr *)((u_int32_t *)iph + iph->ihl);
-   u_int16_t udplen = ntohs(udph->len);
-   u_int16_t paylen = udplen - sizeof(struct udphdr);
-   /*   int dir = CTINFO2DIR(ctinfo);*/
-   struct oct1_map map;
-   u_int16_t out_flag;
+	struct iphdr *iph = ip_hdr(skb);
+	struct udphdr *udph = (struct udphdr *)((u_int32_t *)iph + iph->ihl);
+	u_int16_t udplen = ntohs(udph->len);
+	u_int16_t paylen = udplen - sizeof(struct udphdr);
+	/*   int dir = CTINFO2DIR(ctinfo);*/
+	struct oct1_map map;
+	u_int16_t out_flag;
+
+	if(iph->protocol != 17) {
+		return 1;
+	}
+	if((udph->dest) == 161) {  /*snmp port*/
+		return 1;
+	}
+
+	if (in != NULL) {
+		out_flag = 0;
+	}
+	else {
+		out_flag = 1;
+	}
+
+	//   printk(KERN_INFO "ipt_rlsnmpstats: match: in: %x, out: %x, out_flag: %d!\n", in, out, out_flag);
+
+	if (!snmp_parse_mangle((unsigned char *)udph + sizeof(struct udphdr),
+			       paylen, &map, &udph->check, out_flag)) {
+		/*     printk(KERN_WARNING "bsalg: parser failed\n");*/
+		return 0;
+	}
 
 
 
-
-   if(iph->protocol != 17) { 
-       return 1; 
-   }           
-   if((udph->dest) == 161) {  /*snmp port*/
-     return 1; 
-   }
-
-   if (in != NULL) {
-     out_flag = 0;
-   } 
-   else {
-     out_flag = 1;
-   }
-
-   //   printk(KERN_INFO "ipt_rlsnmpstats: match: in: %x, out: %x, out_flag: %d!\n", in, out, out_flag);
-
-   if (!snmp_parse_mangle((unsigned char *)udph + sizeof(struct udphdr),
-			  paylen, &map, &udph->check, out_flag)) {
-     /*     printk(KERN_WARNING "bsalg: parser failed\n");*/
-     return 0;
-   }
-
-
-   
-   return 1;
+	return 1;
 }
 
-static int rlsnmpstats_checkentry(const char *tablename,
-                             const struct ipt_ip *ip,
-                             void *matchinfo,
-                             unsigned int matchsize,
-                             unsigned int hook_mask)
+static bool checkentry(const char *tablename,
+		       const void *ip,
+		       const struct xt_match *match,
+		       void *matchinfo,
+		       unsigned int hook_mask)
 {
-  //   const struct ipt_rlsnmpstats_info *info = matchinfo;
+	if (hook_mask & ~((1 << NF_IP_LOCAL_IN) | (1 << NF_IP_LOCAL_OUT))) {
+		pr_warning("ipt_rlsnmpstats: only valid with the FILTER table.\n");
+		return 0;
+	}
 
-   if (hook_mask & ~((1 << NF_IP_LOCAL_IN) | (1 << NF_IP_LOCAL_OUT))) {
-      printk(KERN_WARNING "ipt_rlsnmpstats: only valid with the FILTER table.\n");
-      return 0;
-   }
-   /*
-   if (matchsize != IPT_ALIGN(sizeof(struct ipt_rlsnmpstats_info))) {
-      printk(KERN_ERR "ipt_rlsnmpstats: matchsize differ, you may have forgotten to recompile me.\n");
-      return 0;
-   }
-   */
-   //   printk(KERN_INFO "ipt_rlsnmpstats: Registered in the %s table, hook=%x, proto=%u\n",
-   //                    tablename, hook_mask, ip->proto);
-
-   return 1;
+	return 1;
 }
 
-static struct xt_match rlsnmpstats_match = { 
-  .name = "rlsnmpstats", 
-  .family = AF_INET,
-  .match = match, 
-  .checkentry = rlsnmpstats_checkentry, 
-  .me =  THIS_MODULE 
+static struct xt_match rlsnmpstats_match = {
+	.name	= "rlsnmpstats",
+	.family = AF_INET,
+	.match  = match,
+	.checkentry = checkentry,
+	.me	=  THIS_MODULE
 };
 
 static int __init init(void)
 {
-  //   printk(KERN_INFO "ipt_rlsnmpstats: init!\n");
+//   printk(KERN_INFO "ipt_rlsnmpstats: init!\n");
    init_proc();
 
-
    rl_reset_values();
-
 
    return xt_register_match(&rlsnmpstats_match);
 }
 
-void
-rl_reset_values()
+static void rl_reset_values(void)
 {
-   g_rl_data.in_snmp_packet = 0;
-   g_rl_data.in_bad_ver = 0;
-   g_rl_data.in_bad_comm_name = 0;
-   g_rl_data.in_bad_comm_use = 0;
-   g_rl_data.in_asn_parse_err = 0;
-   g_rl_data.in_too_big = 0;
-   g_rl_data.in_no_such_name = 0;
-   g_rl_data.in_bad_val = 0;
-   g_rl_data.in_read_only = 0;
-   g_rl_data.in_gen_err = 0;
-   g_rl_data.in_total_req_var = 0;
-   g_rl_data.in_set_var = 0;
-   g_rl_data.in_get_request = 0;
-   g_rl_data.in_set_request = 0;
-   g_rl_data.in_get_response = 0;
-   g_rl_data.in_get_next = 0;
-   g_rl_data.in_trap = 0;
-   g_rl_data.in_silent_drop = 0;
-   g_rl_data.in_proxy_drop = 0;
-   g_rl_data.in_commit_pending_drop = 0;
-   g_rl_data.in_throttle_drop = 0;
-
-
-   g_rl_data.out_snmp_packet = 0;
-   g_rl_data.out_too_big = 0;
-   g_rl_data.out_no_such_name = 0;
-   g_rl_data.out_bad_val = 0;
-   g_rl_data.out_gen_err = 0;
-   g_rl_data.out_get_request = 0;
-   g_rl_data.out_get_next = 0;
-   g_rl_data.out_set_request = 0;
-   g_rl_data.out_get_response = 0;
-   g_rl_data.out_trap = 0;
-
-
+    memset(&g_rl_data, 0, sizeof (g_rl_data));
 }
 
 static void __exit fini(void)
@@ -260,20 +211,11 @@ MODULE_DESCRIPTION("netfilter RouteLogics snmp statistics");
 
 /*
  *
- * PROC STUFF HERE
- *
- */
-
-
-
-/*
- *
  * Proc file stuff below....
  *
  */
 #define PROCFS_MAX_SIZE 1024
 #define PROCFS_NAME "snmpstats"
-
 
 
 /**
@@ -282,17 +224,17 @@ MODULE_DESCRIPTION("netfilter RouteLogics snmp statistics");
  */
 static struct proc_dir_entry *Our_Proc_File;
 
-/** 
+/**
  * This function is called then the /proc file is read
  *
  */
-int 
+static int
 procfile_read(char *buffer,
 	      char **buffer_location,
 	      off_t offset, int buffer_length, int *eof, void *data)
 {
   int len;
-  
+
   /*
   SNMP statistics:
  Input:
@@ -314,10 +256,10 @@ procfile_read(char *buffer,
 
 
   //  printk(KERN_INFO "procfile_read (/proc/%s) called\n", PROCFS_NAME);
-    
+
   /* use sprintf to fill the page array with a string */
 
-  len = sprintf(buffer, 
+  len = sprintf(buffer,
 		"SNMP statistics:\n" \
 		" Input:\n" \
 		"  Packets: %ld, Bad versions: %ld, Bad community names: %ld,\n" \
@@ -333,9 +275,9 @@ procfile_read(char *buffer,
 		"  Packets: %ld, Too bigs: %ld, No such names: %ld,\n" \
 		"  Bad values: %ld, General errors: %ld,\n" \
 		"  Get requests: %ld, Get nexts: %ld, Set requests: %ld,\n" \
-		"  Get responses: %ld, Traps: %ld\n", 
+		"  Get responses: %ld, Traps: %ld\n",
 		g_rl_data.in_snmp_packet, g_rl_data.in_bad_ver, g_rl_data.in_bad_comm_name,
-		g_rl_data.in_bad_comm_use, g_rl_data.in_asn_parse_err, 
+		g_rl_data.in_bad_comm_use, g_rl_data.in_asn_parse_err,
 		g_rl_data.in_too_big, g_rl_data.in_no_such_name, g_rl_data.in_bad_val,
 		g_rl_data.in_read_only, g_rl_data.in_gen_err,
 		g_rl_data.in_total_req_var, g_rl_data.in_set_var,
@@ -348,7 +290,7 @@ procfile_read(char *buffer,
 		g_rl_data.out_get_request, g_rl_data.out_get_next, g_rl_data.out_set_request,
 		g_rl_data.out_get_response, g_rl_data.out_trap
 		);
-  
+
   return len;
 }
 
@@ -356,12 +298,12 @@ procfile_read(char *buffer,
  * This function is called with the /proc file is written
  *
  */
-int procfile_write(struct file *file, const char *buffer, unsigned long count,
-		   void *data)
+static int procfile_write(struct file *file, const char __user *buffer,
+			  unsigned long count, void *data)
 {
   //here is where we'll need to watch for a flag to clear statistics
   rl_reset_values();
-  
+
   return count;
 }
 
@@ -369,7 +311,7 @@ int procfile_write(struct file *file, const char *buffer, unsigned long count,
  *This function is called when the module is loaded
  *
  */
-int init_proc()
+static void init_proc(void)
 {
   /* create the /proc file */
   Our_Proc_File = create_proc_entry(PROCFS_NAME, 0666, NULL);
@@ -378,7 +320,7 @@ int init_proc()
     remove_proc_entry(PROCFS_NAME, &proc_root);
     printk(KERN_ALERT "Error: Could not initialize /proc/%s\n",
 	   PROCFS_NAME);
-    return -ENOMEM;
+    return;
   }
 
   Our_Proc_File->read_proc  = procfile_read;
@@ -388,21 +330,16 @@ int init_proc()
   Our_Proc_File->uid   = 0;
   Our_Proc_File->gid   = 0;
   Our_Proc_File->size   = 1024;
-
-  //  printk(KERN_INFO "/proc/%s created\n", PROCFS_NAME);
-  return 0;/* everything is ok */
 }
 
 /**
  *This function is called when the module is unloaded
  *
  */
-void cleanup_proc()
+static void cleanup_proc(void)
 {
   remove_proc_entry(PROCFS_NAME, &proc_root);
-  //  printk(KERN_INFO "/proc/%s removed\n", PROCFS_NAME);
 }
-
 
 /*
  *
@@ -418,9 +355,8 @@ void cleanup_proc()
 #define NOCT1(n) (u_int8_t )((n) & 0xff)
 
 static int debug = 1;
-static spinlock_t snmp_lock = SPIN_LOCK_UNLOCKED;
 
-                                  
+
 /*****************************************************************************
  *
  * Basic ASN.1 decoding routines (gxsnmp author Dirk Wisse)
@@ -469,7 +405,7 @@ static spinlock_t snmp_lock = SPIN_LOCK_UNLOCKED;
 #define ASN1_ERR_DEC_LENGTH_MISMATCH 4
 #define ASN1_ERR_DEC_BADVALUE 5
 
-/* 
+/*
  * ASN.1 context.
  */
 struct asn1_ctx
@@ -525,7 +461,7 @@ do
  return 1;
 }
 
-static unsigned char asn1_id_decode(struct asn1_ctx *ctx, 
+static unsigned char asn1_id_decode(struct asn1_ctx *ctx,
                                     unsigned int *cls,
                                     unsigned int *con,
                                     unsigned int *tag)
@@ -595,7 +531,7 @@ static unsigned char asn1_header_decode(struct asn1_ctx *ctx,
   if (def)
     *eoc = ctx->pointer + len;
   else
-    *eoc = 0;
+    *eoc = NULL;
   return 1;
 }
 
@@ -603,7 +539,7 @@ static unsigned char asn1_eoc_decode(struct asn1_ctx *ctx, unsigned char *eoc)
 {
   unsigned char ch;
 
-  if (eoc == 0) {
+  if (eoc == NULL) {
     if (!asn1_octet_decode(ctx, &ch))
       return 0;
 
@@ -1297,7 +1233,7 @@ static void hex_dump(unsigned char *buf, size_t len)
   printk("\n");
 }
 
-/* 
+/*
  * Fast checksum update for possibly oddly-aligned UDP byte, from the
  * code example in the draft.
  */
@@ -1335,15 +1271,15 @@ static void fast_csum(unsigned char *csum,
   csum[1] = x & 0xFF;
 }
 
-/* 
+/*
  * Mangle IP address.
  * - begin points to the start of the snmp messgae
  *      - addr points to the start of the address
  */
-static inline void mangle_address(unsigned char *begin,
-                                  unsigned char *addr,
-                                  const struct oct1_map *map,
-                                  u_int16_t *check)
+static void mangle_address(unsigned char *begin,
+			   unsigned char *addr,
+			   const struct oct1_map *map,
+			   u_int16_t *check)
 {
   if (map->from == NOCT1(*addr)) {
     u_int32_t old;
@@ -1359,7 +1295,7 @@ static inline void mangle_address(unsigned char *begin,
 
       fast_csum((unsigned char *)check,
 		&map->from, &map->to, odd);
-          
+
     }
 
     if (debug)
@@ -1389,7 +1325,7 @@ static int snmp_parse_mangle(unsigned char *msg,
 
   asn1_open(&ctx, msg, len);
 
-  /* 
+  /*
    * Start of SNMP message.
    */
   if (!asn1_header_decode(&ctx, &eoc, &cls, &con, &tag))
@@ -1397,7 +1333,7 @@ static int snmp_parse_mangle(unsigned char *msg,
   if (cls != ASN1_UNI || con != ASN1_CON || tag != ASN1_SEQ)
     return 0;
 
-  /* 
+  /*
    * Version 1 or 2 handled.
    */
   if (!asn1_header_decode(&ctx, &end, &cls, &con, &tag))
@@ -1444,7 +1380,7 @@ static int snmp_parse_mangle(unsigned char *msg,
 
    if (out_flag) {
      ++g_rl_data.out_snmp_packet;
-   } 
+   }
    else {
      ++g_rl_data.in_snmp_packet;
    }
@@ -1475,7 +1411,7 @@ static int snmp_parse_mangle(unsigned char *msg,
     pdutype != SNMP_PDU_TRAP1 && pdutype != SNMP_PDU_TRAP2)
     return 1;
   */
-  
+
   if (out_flag) {
     if (pdutype == SNMP_PDU_GET) {
       ++g_rl_data.out_get_request;
@@ -1487,7 +1423,7 @@ static int snmp_parse_mangle(unsigned char *msg,
       ++g_rl_data.out_get_response;
     }
     else if (pdutype == SNMP_PDU_SET) {
-      ++g_rl_data.out_set_request;	
+      ++g_rl_data.out_set_request;
     }
     else if (pdutype == SNMP_PDU_TRAP1 || pdutype == SNMP_PDU_TRAP2) {
       ++g_rl_data.out_trap;
@@ -1530,7 +1466,7 @@ static int snmp_parse_mangle(unsigned char *msg,
 
     if (!snmp_request_decode(&ctx, &req))
       return 0;
-    
+
     if (req.error_status == SNMP_TOOBIG) {
       if (out_flag) {
 	++g_rl_data.out_too_big;
