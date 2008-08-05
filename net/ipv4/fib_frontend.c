@@ -876,11 +876,6 @@ static int fib_netdev_event(struct notifier_block *this, unsigned long event, vo
 	if (!in_dev)
 		return NOTIFY_DONE;
 
-	/* Link detect causes changes in carrier to add/remove addresses from FIB */
-	if (event == NETDEV_CHANGE && netif_running(dev)
-	    && IN_DEV_LINK_DETECT(in_dev))
-		event = netif_carrier_ok(dev) ? NETDEV_UP : NETDEV_DOWN;
-
 	switch (event) {
 	case NETDEV_UP:
 		for_ifa(in_dev) {
