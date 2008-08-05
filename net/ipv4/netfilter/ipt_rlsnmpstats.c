@@ -1,4 +1,4 @@
-/**
+/*
  *  Copyright 2006, Vyatta, Inc.
  *
  *  GNU General Public License
@@ -41,9 +41,6 @@
 #include <linux/skbuff.h>
 #include <linux/udp.h>
 
-static void cleanup_proc(void);
-static void init_proc(void);
-
 static struct rl_data {
 	unsigned long in_snmp_packet;
 	unsigned long in_bad_ver;
@@ -79,14 +76,6 @@ static struct rl_data {
 	unsigned long out_trap;
 } g_rl_data;
 
-/* Function Prototypes */
-static void rl_reset_values(void);
-
-/*
- *
- * More snmp stuff here--probably should go in a header
- *
- */
 /*
  * Application layer address mapping mimics the NAT mapping, but
  * only for the first octet in this case (a more flexible system
@@ -158,23 +147,82 @@ static struct xt_match rlsnmpstats_match = {
 	.me = THIS_MODULE
 };
 
+/*
+ * This function is called then the /proc file is read
+ *
+ */
+static int snmpstat_proc_show(struct seq_file *seq, void *offset)
+{
+	seq_printf(seq, "SNMP statistics:\n"
+		   " Input:\n"
+		   "  Packets: %ld, Bad versions: %ld, Bad community names: %ld,\n"
+		   "  Bad community uses: %ld, ASN parse errors: %ld,\n"
+		   "  Too bigs: %ld, No such names: %ld, Bad values: %ld,\n"
+		   "  Read onlys: %ld, General errors: %ld,\n"
+		   "  Total request varbinds: %ld, Total set varbinds: %ld,\n"
+		   "  Get requests: %ld, Get nexts: %ld, Set requests: %ld,\n"
+		   "  Get responses: %ld, Traps: %ld\n",
+		   g_rl_data.in_snmp_packet, g_rl_data.in_bad_ver,
+		   g_rl_data.in_bad_comm_name, g_rl_data.in_bad_comm_use,
+		   g_rl_data.in_asn_parse_err, g_rl_data.in_too_big,
+		   g_rl_data.in_no_such_name, g_rl_data.in_bad_val,
+		   g_rl_data.in_read_only, g_rl_data.in_gen_err,
+		   g_rl_data.in_total_req_var, g_rl_data.in_set_var,
+		   g_rl_data.in_get_request, g_rl_data.in_get_next,
+		   g_rl_data.in_set_request, g_rl_data.in_get_response,
+		   g_rl_data.in_trap);
+#if 0
+	seq_printf(seq, "  Silent drops: %ld, Proxy drops: %ld, "
+		   "Commit pending drops: %ld,\n"
+		   "  Throttle drops: %ld,\n"
+		   g_rl_data.in_silent_drop, g_rl_data.in_proxy_drop,
+		   g_rl_data.in_commit_pending_drop,
+		   g_rl_data.in_throttle_drop);
+#endif
+	seq_printf(seq,
+		   " Output:\n"
+		   "  Packets: %ld, Too bigs: %ld, No such names: %ld,\n"
+		   "  Bad values: %ld, General errors: %ld,\n"
+		   "  Get requests: %ld, Get nexts: %ld, Set requests: %ld,\n"
+		   "  Get responses: %ld, Traps: %ld\n",
+		   g_rl_data.out_snmp_packet, g_rl_data.out_too_big,
+		   g_rl_data.out_no_such_name, g_rl_data.out_bad_val,
+		   g_rl_data.out_gen_err, g_rl_data.out_get_request,
+		   g_rl_data.out_get_next, g_rl_data.out_set_request,
+		   g_rl_data.out_get_response, g_rl_data.out_trap);
+	return 0;
+}
+
+static ssize_t snmpstat_write(struct file *file, const char __user *buf,
+			      size_t buflen, loff_t *offset)
+{
+	memset(&g_rl_data, 0, sizeof(g_rl_data));
+	return 0;
+}
+
+static int snmpstat_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, snmpstat_proc_show, NULL);
+}
+
+static const struct file_operations snmpstats_fops = {
+	.owner	 = THIS_MODULE,
+	.open    = snmpstat_open,
+	.read    = seq_read,
+	.write	 = snmpstat_write,
+	.llseek  = seq_lseek,
+	.release = single_release,
+};
+
 static int __init init(void)
 {
-	init_proc();
-
-	rl_reset_values();
+	proc_net_fops_create(&init_net, "snmpstats", 0, &snmpstats_fops);
 
 	return xt_register_match(&rlsnmpstats_match);
 }
-
-static void rl_reset_values(void)
-{
-	memset(&g_rl_data, 0, sizeof(g_rl_data));
-}
-
 static void __exit fini(void)
 {
-	cleanup_proc();
+	proc_net_remove(&init_net, "snmpstats");
 	xt_unregister_match(&rlsnmpstats_match);
 }
 
@@ -184,114 +232,6 @@ module_exit(fini);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Michael Larson");
 MODULE_DESCRIPTION("netfilter RouteLogics snmp statistics");
-
-/*
- *
- * Proc file stuff below....
- *
- */
-#define PROCFS_MAX_SIZE 1024
-#define PROCFS_NAME "snmpstats"
-
-/**
- * This structure hold information about the /proc file
- *
- */
-static struct proc_dir_entry *Our_Proc_File;
-
-/**
- * This function is called then the /proc file is read
- *
- */
-static int
-procfile_read(char *buffer,
-	      char **buffer_location,
-	      off_t offset, int buffer_length, int *eof, void *data)
-{
-	int len;
-
-	len = snprintf(buffer, buffer_length,
-		      "SNMP statistics:\n"
-		      " Input:\n"
-		      "  Packets: %ld, Bad versions: %ld, Bad community names: %ld,\n"
-		      "  Bad community uses: %ld, ASN parse errors: %ld,\n"
-		      "  Too bigs: %ld, No such names: %ld, Bad values: %ld,\n"
-		      "  Read onlys: %ld, General errors: %ld,\n"
-		      "  Total request varbinds: %ld, Total set varbinds: %ld,\n"
-		      "  Get requests: %ld, Get nexts: %ld, Set requests: %ld,\n"
-		      "  Get responses: %ld, Traps: %ld\n"
-/*              "  Silent drops: %ld, Proxy drops: %ld, Commit pending drops: %ld,\n" \
-		"  Throttle drops: %ld,\n" \ */
-		      " Output:\n"
-		      "  Packets: %ld, Too bigs: %ld, No such names: %ld,\n"
-		      "  Bad values: %ld, General errors: %ld,\n"
-		      "  Get requests: %ld, Get nexts: %ld, Set requests: %ld,\n"
-		      "  Get responses: %ld, Traps: %ld\n",
-		      g_rl_data.in_snmp_packet, g_rl_data.in_bad_ver,
-		      g_rl_data.in_bad_comm_name, g_rl_data.in_bad_comm_use,
-		      g_rl_data.in_asn_parse_err, g_rl_data.in_too_big,
-		      g_rl_data.in_no_such_name, g_rl_data.in_bad_val,
-		      g_rl_data.in_read_only, g_rl_data.in_gen_err,
-		      g_rl_data.in_total_req_var, g_rl_data.in_set_var,
-		      g_rl_data.in_get_request, g_rl_data.in_get_next,
-		      g_rl_data.in_set_request, g_rl_data.in_get_response,
-		      g_rl_data.in_trap,
-/*              g_rl_data.in_silent_drop, g_rl_data.in_proxy_drop, g_rl_data.in_commit_pending_drop,
-		g_rl_data.in_throttle_drop, */
-		      g_rl_data.out_snmp_packet, g_rl_data.out_too_big,
-		      g_rl_data.out_no_such_name, g_rl_data.out_bad_val,
-		      g_rl_data.out_gen_err, g_rl_data.out_get_request,
-		      g_rl_data.out_get_next, g_rl_data.out_set_request,
-		      g_rl_data.out_get_response, g_rl_data.out_trap);
-
-	return len;
-}
-
-/**
- * This function is called with the /proc file is written
- *
- */
-static int procfile_write(struct file *file, const char __user * buffer,
-			  unsigned long count, void *data)
-{
-	rl_reset_values();
-
-	return count;
-}
-
-/**
- *This function is called when the module is loaded
- *
- */
-static void init_proc(void)
-{
-	/* create the /proc file */
-	Our_Proc_File = create_proc_entry(PROCFS_NAME, 0666, NULL);
-
-	if (Our_Proc_File == NULL) {
-		remove_proc_entry(PROCFS_NAME, &proc_root);
-		printk(KERN_ALERT "Error: Could not initialize /proc/%s\n",
-		       PROCFS_NAME);
-		return;
-	}
-
-	Our_Proc_File->read_proc = procfile_read;
-	Our_Proc_File->write_proc = procfile_write;
-	Our_Proc_File->owner = THIS_MODULE;
-	Our_Proc_File->mode = S_IFREG | S_IRUGO;
-	Our_Proc_File->uid = 0;
-	Our_Proc_File->gid = 0;
-	Our_Proc_File->size = 1024;
-}
-
-/**
- *This function is called when the module is unloaded
- *
- */
-static void cleanup_proc(void)
-{
-	remove_proc_entry(PROCFS_NAME, &proc_root);
-}
 
 /*
  *
