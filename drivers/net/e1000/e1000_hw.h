@@ -62,7 +62,6 @@ typedef enum {
     e1000_82573,
     e1000_80003es2lan,
     e1000_ich8lan,
-    e1000_ich9lan,
     e1000_num_macs
 } e1000_mac_type;
 
@@ -504,11 +503,6 @@ int32_t e1000_check_phy_reset_block(struct e1000_hw *hw);
 #define E1000_DEV_ID_ICH8_IFE_G          0x10C5
 #define E1000_DEV_ID_ICH8_IGP_M          0x104D
 
-#define E1000_DEV_ID_ICH9_IGP_AMT        0x10BD
-#define E1000_DEV_ID_ICH9_IGP_C          0x294C
-#define E1000_DEV_ID_ICH9_IFE            0x10C0
-#define E1000_DEV_ID_ICH9_IFE_GT         0x10C3
-#define E1000_DEV_ID_ICH9_IFE_G          0x10C2
 
 #define NODE_ADDRESS_SIZE 6
 #define ETH_LENGTH_OF_ADDRESS 6
@@ -595,7 +589,6 @@ int32_t e1000_check_phy_reset_block(struct e1000_hw *hw);
 #define E1000_RAR_ENTRIES 15
 
 #define E1000_RAR_ENTRIES_ICH8LAN  6
-#define E1000_RAR_ENTRIES_ICH9LAN  7
 
 #define MIN_NUMBER_OF_DESCRIPTORS  8
 #define MAX_NUMBER_OF_DESCRIPTORS  0xFFF8
@@ -3287,7 +3280,6 @@ struct e1000_host_command_info {
 #define ICH_FLASH_CYCLE_REPEAT_COUNT         10      /* 10 cycles */
 #define ICH_FLASH_SEG_SIZE_256               256
 #define ICH_FLASH_SEG_SIZE_4K                4096
-#define ICH_FLASH_SEG_SIZE_8K                8192
 #define ICH_FLASH_SEG_SIZE_64K               65536
 
 #define ICH_CYCLE_READ                       0x0
