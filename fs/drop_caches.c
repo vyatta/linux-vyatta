@@ -3,7 +3,6 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/fs.h>
 #include <linux/writeback.h>
@@ -13,7 +12,7 @@
 /* A global variable is a bit ugly, but it keeps the code simple */
 int sysctl_drop_caches;
 
-void drop_pagecache_sb(struct super_block *sb)
+static void drop_pagecache_sb(struct super_block *sb)
 {
 	struct inode *inode;
 
@@ -25,7 +24,6 @@ void drop_pagecache_sb(struct super_block *sb)
 	}
 	spin_unlock(&inode_lock);
 }
-EXPORT_SYMBOL(drop_pagecache_sb);
 
 void drop_pagecache(void)
 {

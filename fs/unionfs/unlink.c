@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2007 Erez Zadok
+ * Copyright (c) 2003-2008 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005-2006 Junjiro Okajima
@@ -8,8 +8,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2007 Stony Brook University
- * Copyright (c) 2003-2007 The Research Foundation of SUNY
+ * Copyright (c) 2003-2008 Stony Brook University
+ * Copyright (c) 2003-2008 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -146,12 +146,8 @@ int unionfs_unlink(struct inode *dir, struct dentry *dentry)
 	/* call d_drop so the system "forgets" about us */
 	if (!err) {
 		unionfs_postcopyup_release(dentry);
-		if (inode->i_nlink == 0) {
-			/* drop lower inodes */
-			iput(unionfs_lower_inode(inode));
-			unionfs_set_lower_inode(inode, NULL);
-			ibstart(inode) = ibend(inode) = -1;
-		}
+		if (inode->i_nlink == 0) /* drop lower inodes */
+			iput_lowers_all(inode, false);
 		d_drop(dentry);
 		/*
 		 * if unlink/whiteout succeeded, parent dir mtime has
@@ -264,21 +260,9 @@ out:
 	 * about us.
 	 */
 	if (!err) {
-		struct inode *inode = dentry->d_inode;
-		BUG_ON(!inode);
-		iput(unionfs_lower_inode_idx(inode, dstart));
-		unionfs_set_lower_inode_idx(inode, dstart, NULL);
+		iput_lowers_all(dentry->d_inode, false);
 		dput(unionfs_lower_dentry_idx(dentry, dstart));
 		unionfs_set_lower_dentry_idx(dentry, dstart, NULL);
-		/*
-		 * If the last directory is unlinked, then mark istart/end
-		 * as -1, (to maintain the invariant that if there are no
-		 * lower objects, then branch index start and end are set to
-		 * -1).
-		 */
-		if (!unionfs_lower_inode_idx(inode, dstart) &&
-		    !unionfs_lower_inode_idx(inode, dend))
-			ibstart(inode) = ibend(inode) = -1;
 		d_drop(dentry);
 		/* update our lower vfsmnts, in case a copyup took place */
 		unionfs_postcopyup_setmnt(dentry);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2007 Erez Zadok
+ * Copyright (c) 2003-2008 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005-2006 Junjiro Okajima
@@ -8,8 +8,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2007 Stony Brook University
- * Copyright (c) 2003-2007 The Research Foundation of SUNY
+ * Copyright (c) 2003-2008 Stony Brook University
+ * Copyright (c) 2003-2008 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -83,25 +83,10 @@ struct dentry *unionfs_interpose(struct dentry *dentry, struct super_block *sb,
 {
 	int err = 0;
 	struct inode *inode;
-	int is_negative_dentry = 1;
-	int bindex, bstart, bend;
 	int need_fill_inode = 1;
 	struct dentry *spliced = NULL;
 
 	verify_locked(dentry);
-
-	bstart = dbstart(dentry);
-	bend = dbend(dentry);
-
-	/* Make sure that we didn't get a negative dentry. */
-	for (bindex = bstart; bindex <= bend; bindex++) {
-		if (unionfs_lower_dentry_idx(dentry, bindex) &&
-		    unionfs_lower_dentry_idx(dentry, bindex)->d_inode) {
-			is_negative_dentry = 0;
-			break;
-		}
-	}
-	BUG_ON(is_negative_dentry);
 
 	/*
 	 * We allocate our new inode below, by calling iget.
@@ -144,6 +129,9 @@ skip:
 	/* only (our) lookup wants to do a d_add */
 	switch (flag) {
 	case INTERPOSE_DEFAULT:
+		/* for operations which create new inodes */
+		d_add(dentry, inode);
+		break;
 	case INTERPOSE_REVAL_NEG:
 		d_instantiate(dentry, inode);
 		break;
@@ -475,8 +463,6 @@ static struct unionfs_dentry_info *unionfs_parse_options(
 
 	while ((optname = strsep(&options, ",")) != NULL) {
 		char *optarg;
-		char *endptr;
-		int intval;
 
 		if (!optname || !*optname)
 			continue;
@@ -507,16 +493,6 @@ static struct unionfs_dentry_info *unionfs_parse_options(
 			if (err)
 				goto out_error;
 			continue;
-		}
-
-		/* All of these options require an integer argument. */
-		intval = simple_strtoul(optarg, &endptr, 0);
-		if (*endptr) {
-			printk(KERN_ERR
-			       "unionfs: invalid %s option '%s'\n",
-			       optname, optarg);
-			err = -EINVAL;
-			goto out_error;
 		}
 
 		err = -EINVAL;
@@ -676,8 +652,8 @@ static int unionfs_read_super(struct super_block *sb, void *raw_data,
 		unionfs_set_lower_dentry_idx(sb->s_root, bindex, d);
 		unionfs_set_lower_mnt_idx(sb->s_root, bindex, m);
 	}
-	set_dbstart(sb->s_root, bstart);
-	set_dbend(sb->s_root, bend);
+	dbstart(sb->s_root) = bstart;
+	dbend(sb->s_root) = bend;
 
 	/* Set the generation number to one, since this is for the mount. */
 	atomic_set(&UNIONFS_D(sb->s_root)->generation, 1);
