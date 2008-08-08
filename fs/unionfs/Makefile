@@ -1,4 +1,4 @@
-UNIONFS_VERSION="2.4 (for 2.6.24.7)"
+UNIONFS_VERSION="2.3.3 (for 2.6.24.5)"
 
 EXTRA_CFLAGS += -DUNIONFS_VERSION=\"$(UNIONFS_VERSION)\"
 
@@ -6,7 +6,7 @@ obj-$(CONFIG_UNION_FS) += unionfs.o
 
 unionfs-y := subr.o dentry.o file.o inode.o main.o super.o \
 	rdstate.o copyup.o dirhelper.o rename.o unlink.o \
-	lookup.o commonfops.o dirfops.o sioq.o mmap.o whiteout.o
+	lookup.o commonfops.o dirfops.o sioq.o mmap.o
 
 unionfs-$(CONFIG_UNION_FS_XATTR) += xattr.o
 

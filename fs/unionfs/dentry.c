@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2008 Erez Zadok
+ * Copyright (c) 2003-2007 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005-2006 Junjiro Okajima
@@ -8,8 +8,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2008 Stony Brook University
- * Copyright (c) 2003-2008 The Research Foundation of SUNY
+ * Copyright (c) 2003-2007 Stony Brook University
+ * Copyright (c) 2003-2007 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,25 +18,6 @@
 
 #include "union.h"
 
-bool is_negative_lower(const struct dentry *dentry)
-{
-	int bindex;
-	struct dentry *lower_dentry;
-
-	BUG_ON(!dentry);
-	/* cache coherency: check if file was deleted on lower branch */
-	if (dbstart(dentry) < 0)
-		return true;
-	for (bindex = dbstart(dentry); bindex <= dbend(dentry); bindex++) {
-		lower_dentry = unionfs_lower_dentry_idx(dentry, bindex);
-		/* unhashed (i.e., unlinked) lower dentries don't count */
-		if (lower_dentry && lower_dentry->d_inode &&
-		    !d_deleted(lower_dentry) &&
-		    !(lower_dentry->d_flags & DCACHE_NFSFS_RENAMED))
-			return false;
-	}
-	return true;
-}
 
 static inline void __dput_lowers(struct dentry *dentry, int start, int end)
 {
@@ -51,6 +32,22 @@ static inline void __dput_lowers(struct dentry *dentry, int start, int end)
 			continue;
 		unionfs_set_lower_dentry_idx(dentry, bindex, NULL);
 		dput(lower_dentry);
+	}
+}
+
+static inline void __iput_lowers(struct inode *inode, int start, int end)
+{
+	struct inode *lower_inode;
+	int bindex;
+
+	if (start < 0)
+		return;
+	for (bindex = start; bindex <= end; bindex++) {
+		lower_inode = unionfs_lower_inode_idx(inode, bindex);
+		if (!lower_inode)
+			continue;
+		unionfs_set_lower_inode_idx(inode, bindex, NULL);
+		iput(lower_inode);
 	}
 }
 
@@ -80,7 +77,6 @@ static bool __unionfs_d_revalidate_one(struct dentry *dentry,
 	verify_locked(dentry);
 	verify_locked(dentry->d_parent);
 
-	sbgen = atomic_read(&UNIONFS_SB(dentry->d_sb)->generation);
 	/* if the dentry is unhashed, do NOT revalidate */
 	if (d_deleted(dentry))
 		goto out;
@@ -89,6 +85,7 @@ static bool __unionfs_d_revalidate_one(struct dentry *dentry,
 	if (dentry->d_inode)
 		positive = 1;
 	dgen = atomic_read(&UNIONFS_D(dentry)->generation);
+	sbgen = atomic_read(&UNIONFS_SB(dentry->d_sb)->generation);
 	/*
 	 * If we are working on an unconnected dentry, then there is no
 	 * revalidation to be done, because this file does not exist within
@@ -108,36 +105,25 @@ static bool __unionfs_d_revalidate_one(struct dentry *dentry,
 		/* Free the pointers for our inodes and this dentry. */
 		bstart = dbstart(dentry);
 		bend = dbend(dentry);
-
-		/*
-		 * mntput unhashed lower dentries, because those files got
-		 * deleted or rmdir'ed.
-		 */
-		for (bindex = bstart; bindex <= bend; bindex++) {
-			lower_dentry = unionfs_lower_dentry_idx(dentry, bindex);
-			if (!lower_dentry)
-				continue;
-			if (!d_deleted(lower_dentry) &&
-			    !(lower_dentry->d_flags & DCACHE_NFSFS_RENAMED))
-			    continue;
-			unionfs_mntput(dentry, bindex);
-		}
-
 		__dput_lowers(dentry, bstart, bend);
-		dbstart(dentry) = dbend(dentry) = -1;
+		set_dbstart(dentry, -1);
+		set_dbend(dentry, -1);
 
 		interpose_flag = INTERPOSE_REVAL_NEG;
 		if (positive) {
 			interpose_flag = INTERPOSE_REVAL;
-			iput_lowers_all(dentry->d_inode, true);
+
+			bstart = ibstart(dentry->d_inode);
+			bend = ibend(dentry->d_inode);
+			__iput_lowers(dentry->d_inode, bstart, bend);
+			kfree(UNIONFS_I(dentry->d_inode)->lower_inodes);
+			UNIONFS_I(dentry->d_inode)->lower_inodes = NULL;
+			ibstart(dentry->d_inode) = -1;
+			ibend(dentry->d_inode) = -1;
 		}
 
-		if (realloc_dentry_private_data(dentry) != 0) {
-			valid = false;
-			goto out;
-		}
-
-		result = unionfs_lookup_full(dentry, &lowernd, interpose_flag);
+		result = unionfs_lookup_backend(dentry, &lowernd,
+						interpose_flag);
 		if (result) {
 			if (IS_ERR(result)) {
 				valid = false;
@@ -151,7 +137,7 @@ static bool __unionfs_d_revalidate_one(struct dentry *dentry,
 			dentry = result;
 		}
 
-		if (unlikely(positive && is_negative_lower(dentry))) {
+		if (unlikely(positive && UNIONFS_I(dentry->d_inode)->stale)) {
 			make_bad_inode(dentry->d_inode);
 			d_drop(dentry);
 			valid = false;
@@ -203,9 +189,6 @@ static bool __unionfs_d_revalidate_one(struct dentry *dentry,
 	}
 
 out:
-	if (valid)
-		atomic_set(&UNIONFS_D(dentry)->generation, sbgen);
-
 	return valid;
 }
 
@@ -268,16 +251,6 @@ bool is_newer_lower(const struct dentry *dentry)
 			return true;
 		}
 	}
-
-	/*
-	 * Last check: if this is a positive dentry, but somehow all lower
-	 * dentries are negative or unhashed, then this dentry needs to be
-	 * revalidated, because someone probably deleted the objects from
-	 * the lower branches directly.
-	 */
-	if (is_negative_lower(dentry))
-		return true;
-
 	return false;		/* default: lower is not newer */
 }
 
@@ -506,6 +479,8 @@ static int unionfs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 
 static void unionfs_d_release(struct dentry *dentry)
 {
+	int bindex, bstart, bend;
+
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
 	if (unlikely(!UNIONFS_D(dentry)))
 		goto out;	/* skip if no lower branches */
@@ -520,7 +495,20 @@ static void unionfs_d_release(struct dentry *dentry)
 	}
 
 	/* Release all the lower dentries */
-	path_put_lowers_all(dentry, true);
+	bstart = dbstart(dentry);
+	bend = dbend(dentry);
+	for (bindex = bstart; bindex <= bend; bindex++) {
+		dput(unionfs_lower_dentry_idx(dentry, bindex));
+		unionfs_set_lower_dentry_idx(dentry, bindex, NULL);
+		/* NULL lower mnt is ok if this is a negative dentry */
+		if (!dentry->d_inode && !unionfs_lower_mnt_idx(dentry, bindex))
+			continue;
+		unionfs_mntput(dentry, bindex);
+		unionfs_set_lower_mnt_idx(dentry, bindex, NULL);
+	}
+	/* free private data (unionfs_dentry_info) here */
+	kfree(UNIONFS_D(dentry)->lower_paths);
+	UNIONFS_D(dentry)->lower_paths = NULL;
 
 	unionfs_unlock_dentry(dentry);
 
@@ -536,7 +524,7 @@ out:
  */
 static void unionfs_d_iput(struct dentry *dentry, struct inode *inode)
 {
-	int rc;
+	int bindex, rc;
 
 	BUG_ON(!dentry);
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
@@ -544,7 +532,18 @@ static void unionfs_d_iput(struct dentry *dentry, struct inode *inode)
 
 	if (!UNIONFS_D(dentry) || dbstart(dentry) < 0)
 		goto drop_lower_inodes;
-	path_put_lowers_all(dentry, false);
+	for (bindex = dbstart(dentry); bindex <= dbend(dentry); bindex++) {
+		if (unionfs_lower_mnt_idx(dentry, bindex)) {
+			unionfs_mntput(dentry, bindex);
+			unionfs_set_lower_mnt_idx(dentry, bindex, NULL);
+		}
+		if (unionfs_lower_dentry_idx(dentry, bindex)) {
+			dput(unionfs_lower_dentry_idx(dentry, bindex));
+			unionfs_set_lower_dentry_idx(dentry, bindex, NULL);
+		}
+	}
+	set_dbstart(dentry, -1);
+	set_dbend(dentry, -1);
 
 drop_lower_inodes:
 	rc = atomic_read(&inode->i_count);
