@@ -1420,7 +1420,7 @@ static int fn_trie_lookup(struct fib_table *tb, const struct flowi *flp,
 		if (IS_LEAF(n)) {
 			ret = check_leaf(t, (struct leaf *)n, key, flp, res);
 			if (ret > 0)
-				goto baacktrace;
+				goto backtrace;
 			goto found;
 		}
 
