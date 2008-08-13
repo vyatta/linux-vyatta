@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2003-2008 Erez Zadok
+ * Copyright (c) 2003-2007 Erez Zadok
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
- * Copyright (c) 2003-2008 Stony Brook University
- * Copyright (c) 2003-2008 The Research Foundation of SUNY
+ * Copyright (c) 2003-2007 Stony Brook University
+ * Copyright (c) 2003-2007 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -313,7 +313,7 @@ check_inode:
 			}
 		}
 	/* check if lower inode is newer than upper one (it shouldn't) */
-	if (unlikely(is_newer_lower(dentry) && !is_negative_lower(dentry))) {
+	if (unlikely(is_newer_lower(dentry))) {
 		PRINT_CALLER(fname, fxn, line);
 		for (bindex = ibstart(inode); bindex <= ibend(inode);
 		     bindex++) {

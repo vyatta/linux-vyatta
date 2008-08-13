@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2008 Erez Zadok
+ * Copyright (c) 2003-2007 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005      Arun M. Krishnakumar
@@ -7,8 +7,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2008 Stony Brook University
- * Copyright (c) 2003-2008 The Research Foundation of SUNY
+ * Copyright (c) 2003-2007 Stony Brook University
+ * Copyright (c) 2003-2007 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -32,12 +32,6 @@ static inline struct unionfs_inode_info *UNIONFS_I(const struct inode *inode)
 
 #define ibstart(ino) (UNIONFS_I(ino)->bstart)
 #define ibend(ino) (UNIONFS_I(ino)->bend)
-
-/* Dentry to private data */
-#define UNIONFS_D(dent) ((struct unionfs_dentry_info *)(dent)->d_fsdata)
-#define dbstart(dent) (UNIONFS_D(dent)->bstart)
-#define dbend(dent) (UNIONFS_D(dent)->bend)
-#define dbopaque(dent) (UNIONFS_D(dent)->bopaque)
 
 /* Superblock to private data */
 #define UNIONFS_SB(super) ((struct unionfs_sb_info *)(super)->s_fs_info)
@@ -205,6 +199,48 @@ static inline void branchput(struct super_block *sb, int index)
 }
 
 /* Dentry macros */
+static inline struct unionfs_dentry_info *UNIONFS_D(const struct dentry *dent)
+{
+	BUG_ON(!dent);
+	return dent->d_fsdata;
+}
+
+static inline int dbstart(const struct dentry *dent)
+{
+	BUG_ON(!dent);
+	return UNIONFS_D(dent)->bstart;
+}
+
+static inline void set_dbstart(struct dentry *dent, int val)
+{
+	BUG_ON(!dent);
+	UNIONFS_D(dent)->bstart = val;
+}
+
+static inline int dbend(const struct dentry *dent)
+{
+	BUG_ON(!dent);
+	return UNIONFS_D(dent)->bend;
+}
+
+static inline void set_dbend(struct dentry *dent, int val)
+{
+	BUG_ON(!dent);
+	UNIONFS_D(dent)->bend = val;
+}
+
+static inline int dbopaque(const struct dentry *dent)
+{
+	BUG_ON(!dent);
+	return UNIONFS_D(dent)->bopaque;
+}
+
+static inline void set_dbopaque(struct dentry *dent, int val)
+{
+	BUG_ON(!dent);
+	UNIONFS_D(dent)->bopaque = val;
+}
+
 static inline void unionfs_set_lower_dentry_idx(struct dentry *dent, int index,
 						struct dentry *val)
 {
@@ -275,110 +311,6 @@ static inline void verify_locked(struct dentry *d)
 {
 	BUG_ON(!d);
 	BUG_ON(!mutex_is_locked(&UNIONFS_D(d)->lock));
-}
-
-/* macros to put lower objects */
-
-/*
- * iput lower inodes of an unionfs dentry, from bstart to bend.  If
- * @free_lower is true, then also kfree the memory used to hold the lower
- * object pointers.
- */
-static inline void iput_lowers(struct inode *inode,
-			       int bstart, int bend, bool free_lower)
-{
-	struct inode *lower_inode;
-	int bindex;
-
-	BUG_ON(!inode);
-	BUG_ON(!UNIONFS_I(inode));
-	BUG_ON(bstart < 0);
-
-	for (bindex = bstart; bindex <= bend; bindex++) {
-		lower_inode = unionfs_lower_inode_idx(inode, bindex);
-		if (lower_inode) {
-			unionfs_set_lower_inode_idx(inode, bindex, NULL);
-			/* see Documentation/filesystems/unionfs/issues.txt */
-			lockdep_off();
-			iput(lower_inode);
-			lockdep_on();
-		}
-	}
-
-	if (free_lower) {
-		kfree(UNIONFS_I(inode)->lower_inodes);
-		UNIONFS_I(inode)->lower_inodes = NULL;
-	}
-}
-
-/* iput all lower inodes, and reset start/end branch indices to -1 */
-static inline void iput_lowers_all(struct inode *inode, bool free_lower)
-{
-	int bstart, bend;
-
-	BUG_ON(!inode);
-	BUG_ON(!UNIONFS_I(inode));
-	bstart = ibstart(inode);
-	bend = ibend(inode);
-	BUG_ON(bstart < 0);
-
-	iput_lowers(inode, bstart, bend, free_lower);
-	ibstart(inode) = ibend(inode) = -1;
-}
-
-/*
- * dput/mntput all lower dentries and vfsmounts of an unionfs dentry, from
- * bstart to bend.  If @free_lower is true, then also kfree the memory used
- * to hold the lower object pointers.
- *
- * XXX: implement using path_put VFS macros
- */
-static inline void path_put_lowers(struct dentry *dentry,
-				   int bstart, int bend, bool free_lower)
-{
-	struct dentry *lower_dentry;
-	struct vfsmount *lower_mnt;
-	int bindex;
-
-	BUG_ON(!dentry);
-	BUG_ON(!UNIONFS_D(dentry));
-	BUG_ON(bstart < 0);
-
-	for (bindex = bstart; bindex <= bend; bindex++) {
-		lower_dentry = unionfs_lower_dentry_idx(dentry, bindex);
-		if (lower_dentry) {
-			unionfs_set_lower_dentry_idx(dentry, bindex, NULL);
-			dput(lower_dentry);
-		}
-		lower_mnt = unionfs_lower_mnt_idx(dentry, bindex);
-		if (lower_mnt) {
-			unionfs_set_lower_mnt_idx(dentry, bindex, NULL);
-			mntput(lower_mnt);
-		}
-	}
-
-	if (free_lower) {
-		kfree(UNIONFS_D(dentry)->lower_paths);
-		UNIONFS_D(dentry)->lower_paths = NULL;
-	}
-}
-
-/*
- * dput/mntput all lower dentries and vfsmounts, and reset start/end branch
- * indices to -1.
- */
-static inline void path_put_lowers_all(struct dentry *dentry, bool free_lower)
-{
-	int bstart, bend;
-
-	BUG_ON(!dentry);
-	BUG_ON(!UNIONFS_D(dentry));
-	bstart = dbstart(dentry);
-	bend = dbend(dentry);
-	BUG_ON(bstart < 0);
-
-	path_put_lowers(dentry, bstart, bend, free_lower);
-	dbstart(dentry) = dbend(dentry) = -1;
 }
 
 #endif	/* not _FANOUT_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2008 Erez Zadok
+ * Copyright (c) 2003-2007 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005-2006 Junjiro Okajima
@@ -8,8 +8,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2008 Stony Brook University
- * Copyright (c) 2003-2008 The Research Foundation of SUNY
+ * Copyright (c) 2003-2007 Stony Brook University
+ * Copyright (c) 2003-2007 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -33,8 +33,8 @@ struct inode *unionfs_iget(struct super_block *sb, unsigned long ino)
 	inode = iget_locked(sb, ino);
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
-	if (!(inode->i_state & I_NEW))
-		return inode;
+ 	if (!(inode->i_state & I_NEW))
+ 		return inode;
 
 	info = UNIONFS_I(inode);
 	memset(info, 0, offsetof(struct unionfs_inode_info, vfs_inode));
@@ -173,7 +173,7 @@ static int unionfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	 *
 	 * XXX: this restriction goes away with ODF.
 	 */
-	unionfs_set_max_namelen(&buf->f_namelen);
+	buf->f_namelen -= UNIONFS_WHLEN;
 
 	/*
 	 * reset two fields to avoid confusing user-land.
@@ -771,7 +771,7 @@ out_no_change:
 	/* update our unionfs_sb_info and root dentry index of last branch */
 	i = sbmax(sb);		/* save no. of branches to release at end */
 	sbend(sb) = new_branches - 1;
-	dbend(sb->s_root) = new_branches - 1;
+	set_dbend(sb->s_root, new_branches - 1);
 	old_ibstart = ibstart(sb->s_root->d_inode);
 	old_ibend = ibend(sb->s_root->d_inode);
 	ibend(sb->s_root->d_inode) = new_branches - 1;
@@ -789,7 +789,11 @@ out_no_change:
 		new_lower_inodes[i] = lower_dentry->d_inode;
 	}
 	/* 2. release reference on all older lower inodes */
-	iput_lowers(sb->s_root->d_inode, old_ibstart, old_ibend, true);
+	for (i = old_ibstart; i <= old_ibend; i++) {
+		iput(unionfs_lower_inode_idx(sb->s_root->d_inode, i));
+		unionfs_set_lower_inode_idx(sb->s_root->d_inode, i, NULL);
+	}
+	kfree(UNIONFS_I(sb->s_root->d_inode)->lower_inodes);
 	/* 3. update root dentry's inode to new lower_inodes array */
 	UNIONFS_I(sb->s_root->d_inode)->lower_inodes = new_lower_inodes;
 	new_lower_inodes = NULL;

@@ -19,6 +19,7 @@
 *.symtypes
 *.pyc
 *.order
+*.lds
 
 #
 # Top-level generic files
@@ -30,6 +31,7 @@ vmlinux*
 System.map
 Module.symvers
 !.gitignore
+modules.order
 
 #
 # Generated include files
@@ -54,6 +56,7 @@ cscope.*
 
 *.orig
 *.rej
+*~
 
 /debian/build
 /debian/stamps
