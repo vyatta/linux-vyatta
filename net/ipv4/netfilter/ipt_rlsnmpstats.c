@@ -130,9 +130,8 @@ static bool checkentry(const char *tablename,
 		       const struct xt_match *match,
 		       void *matchinfo, unsigned int hook_mask)
 {
-	if (hook_mask & ~((1 << NF_IP_LOCAL_IN) | (1 << NF_IP_LOCAL_OUT))) {
-		pr_warning
-		    ("ipt_rlsnmpstats: only valid with the FILTER table.\n");
+	if (hook_mask & ~(1 << NF_INET_LOCAL_IN | 1 << NF_INET_LOCAL_OUT)) {
+		pr_warning("ipt_rlsnmpstats: only valid with the FILTER table.\n");
 		return 0;
 	}
 
@@ -144,7 +143,7 @@ static struct xt_match rlsnmpstats_match = {
 	.family = AF_INET,
 	.match = match,
 	.checkentry = checkentry,
-	.me = THIS_MODULE
+	.me = THIS_MODULE,
 };
 
 /*
