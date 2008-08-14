@@ -1,4 +1,4 @@
-linux-2.6 (2.6.24-1+vyatta+1) unstable; urgency=low
+linux-2.6 (2.6.25-1+vyatta+1) unstable; urgency=low
 
   * Upgrade to 2.6.25
 
