@@ -60,3 +60,7 @@ cscope.*
 /debian/stamps
 /debian/files
 /debian/linux-*
+/debian/control
+/debian/control.md5sum
+/debian/rules.gen
+

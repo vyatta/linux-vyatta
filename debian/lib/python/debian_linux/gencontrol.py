@@ -30,7 +30,7 @@ class Gencontrol(object):
 
     def __call__(self):
         packages = PackagesList()
-        makefile = [('.NOTPARALLEL:', ())]
+        makefile = [('', ())]
 
         self.do_source(packages)
         self.do_main(packages, makefile)
