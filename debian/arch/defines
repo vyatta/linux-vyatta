@@ -4,7 +4,7 @@ abiname: 1
 [base]
 arches:
  i386 amd64
-compiler: gcc-4.3
+compiler: gcc-4.2
 
 [image]
 initramfs-generators: initramfs-tools yaird initramfs-fallback
@@ -24,7 +24,6 @@ gcc-3.3: gcc-3.3
 gcc-4.0: gcc-4.0
 gcc-4.1: gcc-4.1
 gcc-4.2: gcc-4.2
-gcc-4.3: gcc-4.3
 initramfs-fallback: linux-initramfs-tool
 initramfs-tools: initramfs-tools (>= 0.55)
 util-vserver: util-vserver (>= 0.30.210)
