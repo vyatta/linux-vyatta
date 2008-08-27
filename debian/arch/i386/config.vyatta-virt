@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.24
-# Thu Jun  5 20:51:59 2008
+# Tue Aug 26 15:17:53 2008
 #
 # CONFIG_64BIT is not set
 CONFIG_X86_32=y
@@ -639,6 +639,7 @@ CONFIG_IP_NF_ARPTABLES=m
 CONFIG_IP_NF_ARPFILTER=m
 CONFIG_IP_NF_ARP_MANGLE=m
 # CONFIG_IP_NF_MATCH_RLSNMPSTATS is not set
+CONFIG_IP_NF_MATCH_IPP2P=m
 
 #
 # IPv6: Netfilter Configuration (EXPERIMENTAL)
