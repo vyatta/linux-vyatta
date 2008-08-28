@@ -469,6 +469,7 @@ int security_inode_permission(struct inode *inode, int mask, struct nameidata *n
 		return 0;
 	return security_ops->inode_permission(inode, mask, nd);
 }
+EXPORT_SYMBOL_GPL(security_inode_permission);
 
 int security_inode_setattr(struct dentry *dentry, struct iattr *attr)
 {
