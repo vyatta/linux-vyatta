@@ -35,6 +35,9 @@ config LOGO_BLACKFIN_VGA16
 config LOGO_BLACKFIN_CLUT224
 	bool "224-colour Blackfin Processor Linux logo"
 	depends on BLACKFIN
+
+config LOGO_VYATTA
+	bool "Standard 224-color Vyatta logo"
 	default y
 
 config LOGO_DEC_CLUT224

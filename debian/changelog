@@ -1,0 +1,868 @@
+linux-2.6 (2.6.26-1+vyatta+1) unstable; urgency=low
+
+   * Update kernel to 2.6.26.3
+   * Replace unionfs with aufs
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Thu, 28 Aug 2008 13:57:59 -0700
+
+linux-2.6 (2.6.24-1+vyatta+5) unstable; urgency=low
+
+	  3.1.3
+
+  * 3.1.2
+
+ -- Mark O'Brien <mobrien@firebolt.vyatta.com>  Tue, 19 Aug 2008 17:48:16 -0700
+
+linux-2.6 (2.6.24-1+vyatta+4) unstable; urgency=low
+
+	  3.1.2
+  [ Mark O'Brien ]
+
+
+  [ James Chapman ]
+  * l2tp: Fix potential memory corruption in pppol2tp_recvmsg()
+
+  [ Stephen Hemminger ]
+  * Disable SCTP and DCCP
+  * Enable TIPC, SCTP and DCCP protocols
+  * Enable Power Management on old VIA longhaul
+  * Enable deprecated ACPI interfaces
+
+  [ Mark O'Brien ]
+  * 3.1.1
+
+ -- Mark O'Brien <mobrien@firebolt.vyatta.com>  Wed, 23 Jul 2008 21:35:37 -0700
+
+linux-2.6 (2.6.24-1+vyatta+3) unstable; urgency=low
+
+	  3.1.1
+  [ Mark O'Brien ]
+
+
+  [ Stephen Hemminger ]
+  * Disable scatter-gather if MD5 is used.
+  * Don't flush arp on link down
+
+  [ Bob Gilligan ]
+  * Bugfix: 1292
+  * Bugfix: 3201
+
+  [ Stephen Hemminger ]
+  * Merge in unionfs 2.3.3
+
+  [ Mark O'Brien ]
+
+ -- Mark O'Brien <mobrien@firebolt.vyatta.com>  Sat, 28 Jun 2008 11:22:00 -0700
+
+linux-2.6 (2.6.24-1+vyatta+2) unstable; urgency=low
+
+	  3.1.0
+  [ Mark O'Brien ]
+
+
+  [ Stephen Hemminger ]
+  * Make frame-buffer console a module
+  * Add vyatta logo to boot
+  * Turn device not found into an notice not an error.
+
+  [ An-Cheng Huang ]
+  * Allow parallel kernel builds (this is a generated file, so we should
+    change
+  * don't build virt kernel for now.
+
+  [ Stephen Hemminger ]
+  * Align the virt config with current non-virt config
+  * Allow parallel kernel builds
+  * Re-enable tickless kernel
+  * Remove duplicate entries for link_detect
+  * Revert "Go back to last known good kernel config."
+  * Go back to last known good kernel config.
+  * Revert "Enable tick-less (no hz)"
+  * Enable tick-less (no hz)
+  * Don't force gcc to inline
+  * Drop support for ancient IBM microchannel
+  * Enable SUSPEND to RAM
+  * link detect configuration for ipv6
+  * Drop support for obsolete filesystems
+  * Do permission checks for sysctl based on capablity, not uid.
+  * Fix off-by-one added in linkdetect changes
+  * Add new ipv4 link-detect configuration
+  * Add new ipv4 link-detect configuration
+  * Build intel IGB as module
+  * Run vyatta-virt config through oldconfig
+
+  [ An-Cheng Huang ]
+  * add "vyatta-virt" kernel flavor
+
+  [ Mark O'Brien ]
+
+ -- Mark O'Brien <mobrien@firebolt.vyatta.com>  Tue, 17 Jun 2008 09:25:39 -0700
+
+linux-2.6 (2.6.24-1+vyatta+1) unstable; urgency=low
+
+  Merge in 2.6.24 kernel changes
+
+
+ -- Rick Balocca <rbalocca@vyatta.com>  Thu, 1 May 2008 10:31:01 -0700
+
+linux-2.6 (2.6.23-1+vyatta+9) unstable; urgency=low
+
+  3.0.5
+
+
+ -- Mark O'Brien <mobrien@vyatta.com>  Tue, 06 May 2008 12:42:58 -0700
+
+linux-2.6 (2.6.23-1+vyatta+8) unstable; urgency=low
+
+  3.0.4
+
+
+ -- Mark O'Brien <mobrien@vyatta.com>  Mon, 05 May 2008 16:40:17 -0700
+
+linux-2.6 (2.6.23-1+vyatta+7) unstable; urgency=low
+
+  3.0.3
+  [ Mark O'Brien ]
+
+
+  [ Milan Kocian ]
+  * [IPV6]: Remove redundant RTM_DELLINK message.
+
+  [ rbalocca ]
+  * Indicate the VC4.0.2 release candidate in the changelog
+
+  [ Mark O'Brien ]
+
+ -- Mark O'Brien <mobrien@vyatta.com>  Tue, 29 Apr 2008 16:41:55 -0700
+
+linux-2.6 (2.6.23-1+vyatta+6) unstable; urgency=low
+
+  VC4.0.2
+
+
+ -- Mark O'Brien <mobrien@vyatta.com>  Sat, 19 Apr 2008 11:55:44 -0700
+
+linux-2.6 (2.6.23-1+vyatta+5) unstable; urgency=low
+
+  VC4.0.2 release candidate
+
+
+ -- Mark O'Brien <mobrien@vyatta.com>  Wed, 16 Apr 2008 09:49:39 -0700
+
+linux-2.6 (2.6.23-1+vyatta+4) unstable; urgency=low
+
+  3.0.2
+  [ Mark O'Brien ]
+
+  * 3.0.1
+
+  [ Robert Bays ]
+  * add ifb module to kernel
+
+  [ Stephen Hemminger ]
+  * make socket filters work for AF_NETLINK
+
+  [ rbalocca ]
+  * Fix linux-image pre-install to run without interaction
+
+  [ Mark O'Brien ]
+
+ -- Mark O'Brien <mobrien@vyatta.com>  Fri, 04 Apr 2008 18:00:02 -0700
+
+linux-2.6 (2.6.23-1+vyatta+3) unstable; urgency=low
+
+  VC4.0.1
+  [ Mark O'Brien ]
+
+
+  [ Benjamin Herrenschmidt ]
+  * Disable G5 NAP mode during SMU commands on U3
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.23.17
+
+  [ Ingo Molnar ]
+  * x86_64: CPA, fix cache attribute inconsistency bug
+
+  [ James Bottomley ]
+  * SCSI: sd: handle bad lba in sense information
+
+  [ Jonathan Corbet ]
+  * Be more robust about bad arguments in get_user_pages()
+
+  [ Jozsef Kadlecsik ]
+  * NETFILTER: nf_conntrack_tcp: conntrack reopening fix
+
+  [ Stephen Hemminger ]
+  * allow non-root to query iptables
+  * allow any user to query ethernet status
+  * block non-root from querying iptables
+  * block non-root from doing ethtool -p
+
+  [ Thomas Gleixner ]
+  * hrtimer: check relative timeouts for overflow
+  * genirq: do not leave interupts enabled on free_irq
+
+  [ Trond Myklebust ]
+  * NFS: Fix a potential file corruption issue when writing
+
+  [ Mark O'Brien ]
+
+ -- Mark O'Brien <mobrien@vyatta.com>  Tue, 18 Mar 2008 19:03:12 -0700
+
+linux-2.6 (2.6.23-1+vyatta+2) unstable; urgency=low
+
+  vc4.0.0
+  [ Mark O'Brien ]
+
+
+  [ Adrian Bunk ]
+  * IPV4: Remove bogus ifdef mess in arp_process
+
+  [ Al Viro ]
+  * libertas: more endianness breakage
+  * libertas: fix endianness breakage
+  * CASSINI: Fix endianness bug.
+
+  [ Alan Cox ]
+  * ACPI: Not register gsi for PCI IDE controller in legacy mode
+
+  [ Alan Stern ]
+  * USB: remove USB_QUIRK_NO_AUTOSUSPEND
+  * USB: mutual exclusion for EHCI init and port resets
+
+  [ Alexey Starikovskiy ]
+  * ACPI: sleep: Fix GPE suspend cleanup
+  * ACPI: suspend: Wrong order of GPE restore.
+  * ACPI: VIDEO: Adjust current level to closest available one.
+
+  [ Amit Shah ]
+  * KVM: x86 emulator: Use emulator_write_emulated and not
+    emulator_write_std
+  * KVM: SVM: Fix FPU leak while emulating clts
+
+  [ Andrew Hastings ]
+  * x86: fix off-by-one in find_next_zero_string
+
+  [ Andrew Morton ]
+  * writeback: don't propagate AOP_WRITEPAGE_ACTIVATE
+  * x86: disable preemption in delay_tsc()
+  * revert "dpt_i2o: convert to SCSI hotplug model"
+  * BRIDGE: Section fix.
+
+  [ Andrey Mirkin ]
+  * x86: return correct error code from child_rip in x86_64 entry.S
+
+  [ Andy Green ]
+  * mac80211: Improve sanity checks on injected packets
+  * Add get_unaligned to ieee80211_get_radiotap_len
+
+  [ Aurelien Jarno ]
+  * KVM: x86 emulator: fix access registers for instructions with ModR/M
+    byte and Mod = 3
+
+  [ Avi Kivity ]
+  * KVM: x86 emulator: invd instruction
+  * KVM: SVM: Intercept the 'invd' and 'wbinvd' instructions
+  * KVM: Skip pio instruction when it is emulated, not executed
+  * KVM: VMX: Force vm86 mode if setting flags during real mode
+
+  [ Ayaz Abdulla ]
+  * forcedeth: add MCP77 device IDs
+  * forcedeth: new mcp79 pci ids
+  * forcedeth boot delay fix
+  * forcedeth: mac address mcp77/79
+
+  [ Bastian Blank ]
+  * splice: fix user pointer access in get_iovec_page_array()
+
+  [ Benedikt Spranger ]
+  * usb-gadget-ether: prevent oops caused by error interrupt race
+
+  [ Benjamin Herrenschmidt ]
+  * POWERPC: Fix platinumfb framebuffer
+  * ide: Add ide_get_paired_drive() helper
+  * ide: Fix siimage driver accessing beyond array boundary
+  * ide: Fix cs5535 driver accessing beyond array boundary
+
+  [ Bill Moss ]
+  * mac80211: honor IW_SCAN_THIS_ESSID in siwscan ioctl
+
+  [ Björn Steinbrink ]
+  * Fix dirty page accounting leak with ext3 data=journal
+
+  [ Bob Moore ]
+  * ACPICA: fix acpi-cpufreq boot crash due to _PSD return-by-reference
+  * ACPICA: fix acpi_serialize hang regression
+
+  [ Charles Hardin ]
+  * PFKEY: Sending an SADB_GET responds with an SADB_GET
+
+  [ Chas Williams ]
+  * ATM: [nicstar] delay irq setup until card is configured
+
+  [ Chris Wright ]
+  * Fix sparc64 MAP_FIXED handling of framebuffer mmaps
+
+  [ Christian Borntraeger ]
+  * Future of Linux 2.6.22.y series
+
+  [ Christoph Lameter ]
+  * SLUB: Fix memory leak by not reusing cpu_slab
+  * quicklists: do not release off node pages early
+  * quicklists: Only consider memory that can be used with GFP_KERNEL
+
+  [ Chuck Ebbert ]
+  * Fix divide-by-zero in the 2.6.23 scheduler code
+
+  [ Cory T. Tusar ]
+  * tty: fix logic change introduced by
+    wait_event_interruptible_timeout()
+
+  [ Dan Williams ]
+  * ipw2100: send WEXT scan events
+  * md: raid5: fix clearing of biofill operations
+  * raid5: fix unending write sequence
+  * ipw2200: batch non-user-requested scan result notifications
+  * md: fix data corruption when a degraded raid5 array is reshaped
+
+  [ Daniel Drake ]
+  * create /sys/.../power when CONFIG_PM is set
+
+  [ Dave Airlie ]
+  * i915: fix vbl swap allocation size.
+  * radeon: set the address to access the GART table on the CPU side
+    correctly
+
+  [ Dave Johnson ]
+  * x86: fix TSC clock source calibration error
+
+  [ Dave Young ]
+  * param_sysfs_builtin memchr argument fix
+
+  [ David Brownell ]
+  * USB: fix up EHCI startup synchronization
+
+  [ David Howells ]
+  * RXRPC: Add missing select on CRYPTO
+
+  [ David Miller ]
+  * Fix compat futex hangs.
+  * Fix sparc64 niagara optimized RAID xor asm
+  * Fix error returns in sys_socketpair()
+  * SPARC64: Fix sparc64 cpu cross call hangs.
+  * SPARC64: Fix memory controller register access when non-SMP.
+  * SPARC64: Fix two kernel linear mapping setup bugs.
+  * NET: Correct two mistaken skb_reset_mac_header() conversions.
+  * CASSINI: Revert 'dont touch page_count'.
+  * CASSINI: Set skb->truesize properly on receive packets.
+  * SPARC64: Fix OOPS in dma_sync_*_for_device()
+  * SPARC64: Implement pci_resource_to_user()
+
+  [ David P. Reed ]
+  * ntp: fix typo that makes sync_cmos_clock erratic
+  * x86: fix freeze in x86_64 RTC update code in time_64.c
+
+  [ Denis V. Lunev ]
+  * [IPV4]: Formatting fix for /proc/net/fib_trie.
+
+  [ Divy Le Ray ]
+  * chelsio: Fix skb->dev setting
+  * cxgb: fix T2 GSO
+  * cxgb: fix stats
+
+  [ Dmitry Torokhov ]
+  * Input: implement proper locking in input core
+  * Input: evdev - implement proper locking
+  * Input: mousedev - implement proper locking
+  * Input: joydev - implement proper locking
+  * Input: tsdev - implement proper locking
+
+  [ Eddie Dong ]
+  * KVM: VMX: Reset mmu context when entering real mode
+
+  [ Eric Dumazet ]
+  * NET: random : secure_tcp_sequence_number should not assume
+    CONFIG_KTIME_SCALAR
+  * NET: Corrects a bug in ip_rt_acct_read()
+  * IPV4 ROUTE: ip_rt_dump() is unecessary slow
+
+  [ Eric Paris ]
+  * VM/Security: add security hook to do_brk (CVE-2007-6434)
+  * security: protect from stack expantion into low vm addresses
+
+  [ Eric Sandeen ]
+  * minixfs: limit minixfs printks on corrupted dir i_size (CVE-2006-
+    6058)
+
+  [ Evgeniy Polyakov ]
+  * Fix TEQL oops.
+  * NETFILTER: Fix NULL pointer dereference in nf_nat_move_storage()
+  * netfilter: Fix kernel panic with REDIRECT target.
+  * IPV6: Restore IPv6 when MTU is big enough
+
+  [ Fengguang Wu ]
+  * reiserfs: don't drop PG_dirty when releasing sub-page-sized dirty
+    file
+
+  [ Florian Zumbiehl ]
+  * UNIX: EOF on non-blocking SOCK_SEQPACKET
+
+  [ Frans Pop ]
+  * sched: keep utime/stime monotonic
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.23.2
+  * Linux 2.6.23.3
+  * Linux 2.6.23.4
+  * Linux 2.6.23.5
+  * Linux 2.6.23.6
+  * Linux 2.6.23.7
+  * Linux 2.6.23.8
+  * Linux 2.6.23.9
+  * Linux 2.6.23.10
+  * Revert "Freezer: Fix APM emulation breakage"
+  * Linux 2.6.23.11
+  * Revert "PNP: increase the maximum number of resources"
+  * Linux 2.6.23.12
+  * Linux 2.6.23.13
+  * Linux 2.6.23.14
+  * USB: update sierra.c with latest device ids that are in 2.6.24-rc7
+  * Linux 2.6.23.15
+  * Linux 2.6.23.16
+
+  [ Gregory Haskins ]
+  * lockdep: fix mismatched lockdep_depth/curr_chain_hash
+
+  [ H. Peter Anvin ]
+  * x86 setup: handle boot loaders which set up the stack incorrectly
+  * x86 setup: sizeof() is unsigned, unbreak comparisons
+  * x86 setup: add a near jump to serialize %cr0 on 386/486
+
+  [ Haavard Skinnemoen ]
+  * dmaengine: fix broken device refcounting
+
+  [ Henrique de Moraes Holschuh ]
+  * ACPI: thinkpad-acpi: fix lenovo keymap for brightness
+
+  [ Herbert Xu ]
+  * Fix SKB_WITH_OVERHEAD calculations.
+  * TCP: Fix size calculation in sk_stream_alloc_pskb
+  * Fix crypto_alloc_comp() error checking.
+  * libcrc32c: keep intermediate crc state in cpu order
+  * Fix synchronize_irq races with IRQ handler
+  * CRYPTO api: Fix potential race in crypto_remove_spawn
+  * TCP: Fix TCP header misalignment
+  * IPSEC: Fix potential dst leak in xfrm_lookup
+  * IPV4 raw: Strengthen check on validity of iph->ihl
+  * ATM: Check IP header validity in mpc_send_packet
+  * IPSEC: Avoid undefined shift operation when testing algorithm ID
+  * CRYPTO: padlock: Fix spurious ECB page fault
+
+  [ HighPoint Linux Team ]
+  * hptiop: avoid buffer overflow when returning sense data
+
+  [ Huang, Ying ]
+  * x86: NX bit handling in change_page_attr()
+
+  [ Hugh Dickins ]
+  * fix tmpfs BUG and AOP_WRITEPAGE_ACTIVATE
+  * tmpfs: restore missing clear_highpage
+
+  [ Ian Abbott ]
+  * PCI: Fix fakephp deadlock
+
+  [ Ilpo Järvinen ]
+  * TCP: Make sure write_queue_from does not begin with NULL ptr (CVE-
+    2007-5501)
+  * TCP: MTUprobe: fix potential sk_send_head corruption
+
+  [ Ingo Molnar ]
+  * fix the softlockup watchdog to actually work
+  * x86: fix global_flush_tlb() bug
+  * Fix 9P protocol build
+  * softlockup watchdog fixes and cleanups
+  * softlockup: use cpu_clock() instead of sched_clock()
+  * vfs: coredumping fix (CVE-2007-6206)
+
+  [ J. Bruce Fields ]
+  * locks: fix possible infinite loop in posix deadlock detection
+  * knfsd: fix spurious EINVAL errors on first access of new filesystem
+  * nfsd4: recheck for secure ports in fh_verify
+
+  [ James Chapman ]
+  * Fix L2TP oopses.
+
+  [ Jan Beulich ]
+  * i386: avoid temporarily inconsistent pte-s
+
+  [ Jan Engelhardt ]
+  * NETFILTER: fix forgotten module release in xt_CONNMARK and
+    xt_CONNSECMARK
+
+  [ Jan Kiszka ]
+  * fix param_sysfs_builtin name length check
+
+  [ Jan-Bernd Themann ]
+  * ehea: 64K page kernel support fix
+
+  [ Jay Cliburn ]
+  * atl1: fix frame length bug
+
+  [ Jean Delvare ]
+  * hwmon/w83627hf: Fix setting fan min right after driver load
+  * hwmon/w83627hf: Don't assume bank 0
+  * hwmon/lm87: Fix a division by zero
+  * hwmon/lm87: Disable VID when it should be
+  * i2c-pasemi: Fix NACK detection
+  * i2c/eeprom: Recognize VGN as a valid Sony Vaio name prefix
+  * i2c/eeprom: Hide Sony Vaio serial numbers
+  * fb_ddc: fix DDC lines quirk
+  * hwmon: (w83627ehf) Be more careful when changing VID input level
+
+  [ Jeff Dike ]
+  * UML - Stop using libc asm/page.h
+  * UML - Fix kernel vs libc symbols clash
+  * UML - stop using libc asm/user.h
+
+  [ Jeff Garzik ]
+  * libata: sata_sis: use correct S/G table size
+
+  [ Jens Axboe ]
+  * splice: fix double kunmap() in vmsplice copy path
+  * BLOCK: Fix bad sharing of tag busy list on queues with shared tag
+    maps
+  * splice: missing user pointer access verification (CVE-2008-0009/10)
+
+  [ Jeremy Fitzhardinge ]
+  * xen: add batch completion callbacks
+  * xen: deal with stale cr3 values when unpinning pagetables
+  * xen: fix incorrect vcpu_register_vcpu_info hypercall argument
+  * xfs: eagerly remove vmap mappings to avoid upsetting Xen
+
+  [ Jiri Kosina ]
+  * USB: usbserial - fix potential deadlock between write() and IRQ
+
+  [ Jiri Slaby ]
+  * Char: rocket, fix dynamic_dev tty
+  * Char: moxa, fix and optimise empty timer
+
+  [ Johannes Berg ]
+  * softmac: fix wext MLME request reason code endianness
+  * ieee80211: fix TKIP QoS bug
+  * mac80211: reorder association debug output
+
+  [ John W. Linville ]
+  * mac80211: filter locally-originated multicast frames
+  * mac80211: store channel info in sta_bss_list
+  * mac80211: store SSID in sta_bss_list
+  * mac80211: only honor IW_SCAN_THIS_ESSID in STA, IBSS, and AP modes
+  * mac80211: make ieee802_11_parse_elems return void
+  * zd1201: avoid null ptr access of skb->dev
+
+  [ Joonwoo Park ]
+  * VLAN: Fix nested VLAN transmit bug
+
+  [ Jozsef Kadlecsik ]
+  * NETFILTER: nf_conntrack_tcp: fix connection reopening
+
+  [ Julia Lawall ]
+  * X25: Add missing x25_neigh_put
+
+  [ Jun'ichi Nomura ]
+  * dm: fix thaw_bdev
+  * dm: table detect io beyond device
+
+  [ Kalle Valo ]
+  * spi: omap2_mcspi PIO RX fix
+
+  [ Karsten Keil ]
+  * i4l: Fix random hard freeze with AVM c4 card
+  * i4l: fix random freezes with AVM B1 drivers
+  * I4L: fix isdn_ioctl memory overrun vulnerability
+  * isdn: avoid copying overly-long strings
+  * fix oops on rmmod capidrv
+
+  [ Kirill Korotaev ]
+  * x86: mark read_crX() asm code as volatile
+
+  [ Kumar Gala ]
+  * POWERPC: Fix handling of stfiwx math emulation
+
+  [ Len Brown ]
+  * PM: ACPI and APM must not be enabled at the same time
+  * ACPI: sync blacklist w/ latest
+
+  [ Lepton Wu ]
+  * UML - kill subprocesses on exit
+
+  [ Li Zefan ]
+  * drivers/video/ps3fb: fix memset size error
+  * nf_nat: fix memset error
+  * CONNECTOR: Don't touch queue dev after decrement of ref count.
+
+  [ Linus Torvalds ]
+  * Remove broken ptrace() special-case code from file mapping
+  * revert "x86_64: allocate sparsemem memmap above 4G"
+  * Use access mode instead of open flags to determine needed
+    permissions (CVE-2008-0001)
+
+  [ Maciej W. Rozycki ]
+  * esp_scsi: fix reset cleanup spinlock recursion
+
+  [ Manfred Spraul ]
+  * forcedeth msi bugfix
+
+  [ Marc Pignat ]
+  * zd1211rw, fix oops when ejecting install media
+
+  [ Marcelo Tosatti ]
+  * libertas: properly account for queue commands
+
+  [ Mark Fasheh ]
+  * ocfs2: fix write() performance regression
+
+  [ Mark McLoughlin ]
+  * INET: Fix netdev renaming and inet address labels
+
+  [ Marko Kohtala ]
+  * KVM: Fix hang on uniprocessor
+
+  [ Matthew Wilcox ]
+  * m68k: Export cachectl.h
+
+  [ Michael Chan ]
+  * TG3: Fix performance regression on 5705.
+
+  [ Michael Ellerman ]
+  * POWERPC: Make sure to of_node_get() the result of
+    pci_device_to_OF_node()
+
+  [ Michael Wu ]
+  * rtl8187: Fix more frag bit checking, rts duration calc
+
+  [ Mikael Pettersson ]
+  * sata_promise: ASIC PRD table bug workaround
+
+  [ Milan Broz ]
+  * dm delay: fix status
+  * dm crypt: fix write endio
+  * dm crypt: use bio_add_page
+
+  [ NeilBrown ]
+  * md: fix an unsigned compare to allow creation of bitmaps with v1.0
+    metadata
+  * knfsd: Allow NFSv2/3 WRITE calls to succeed when krb5i etc is used.
+
+  [ Nick Piggin ]
+  * vm audit: add VM_DONTEXPAND to mmap for drivers that need it (CVE-
+    2008-0007)
+
+  [ Nigel Cunningham ]
+  * Fix unbalanced helper_lock in kernel/kmod.c
+
+  [ Oliver Neukum ]
+  * USB: add URB_FREE_BUFFER to permissible flags
+  * USB: make the microtek driver and HAL cooperate
+  * Input: fix open count handling in input interfaces
+
+  [ Ortwin Glück ]
+  * USB: Nikon D40X unusual_devs entry
+
+  [ Pablo Neira Ayuso ]
+  * TEXTSEARCH: Do not allow zero length patterns in the textsearch
+    infrastructure
+
+  [ Patrick Mansfield ]
+  * POWERPC: Change fallocate to match unistd.h on powerpc
+
+  [ Patrick McHardy ]
+  * Fix advertised packet scheduler timer resolution
+  * Fix VLAN address syncing.
+  * Fix SET_VLAN_INGRESS_PRIORITY_CMD error return.
+  * Fix netlink timeouts.
+  * XFRM: Fix leak of expired xfrm_states
+  * NETFILTER: xt_TCPMSS: remove network triggerable WARN_ON
+  * Netfilter: bridge: fix double POST_ROUTING invocation
+  * Netfilter: bridge-netfilter: fix net_device refcnt leaks
+  * [NET]: Messed multicast lists after dev_mc_sync/unsync
+
+  [ Pavel Emelyanov ]
+  * BRIDGE: Lost call to br_fdb_fini() in br_init() error path
+  * DECNET: dn_nl_deladdr() almost always returns no error
+  * BRIDGE: Properly dereference the br_should_route_hook
+  * VLAN: Lost rtnl_unlock() in vlan_ioctl()
+
+  [ Peter P Waskiewicz Jr ]
+  * PKT_SCHED: Check subqueue status before calling hard_start_xmit
+
+  [ Phil Dibowitz ]
+  * USB: unusual_devs modification for Nikon D200
+
+  [ Philippe Elie ]
+  * oProfile: oops when profile_pc() returns ~0LU
+
+  [ Radu Rendec ]
+  * Fix endianness bug in U32 classifier.
+
+  [ Rafael J. Wysocki ]
+  * Freezer: Fix APM emulation breakage
+  * XFS: Make xfsbufd threads freezable
+  * Freezer: Fix APM emulation breakage
+
+  [ Ralf Baechle ]
+  * MIPS: MT: Fix bug in multithreaded kernels.
+  * MIPS: R1: Fix hazard barriers to make kernels work on R2 also.
+
+  [ Rick Balocca ]
+  * Reformat the version to make debuild happy
+  * Apparently '~'s are not allowed in git tags, so reformat the version
+    string again
+  * These derived files must be checked in for automated builds
+  * Don't bother with reportoldconfig target
+
+  [ Roland Dreier ]
+  * IB/uverbs: Fix checking of userspace object ownership
+  * IB/mthca: Use mmiowb() to avoid firmware commands getting jumbled up
+  * MSI: Use correct data offset for 32-bit MSI in read_msi_msg()
+
+  [ Roland McGrath ]
+  * wait_task_stopped: Check p->exit_state instead of TASK_TRACED (CVE-
+    2007-5500)
+
+  [ Russ Cox ]
+  * ALSA: fix selector unit bug affecting some USB speakerphones
+
+  [ Russ Dill ]
+  * NET: mcs7830 passes msecs instead of jiffies to usb_control_msg
+  * NET: kaweth was forgotten in msec switchover of usb_start_wait_urb
+
+  [ Sam Jansen ]
+  * TCP: Problem bug with sysctl_tcp_congestion_control function
+
+  [ Scott James Remnant ]
+  * wait_task_stopped(): pass correct exit_code to wait_noreap_copyout()
+
+  [ Sebastian Siewior ]
+  * geode: Fix not inplace encryption
+
+  [ Sheng Yang ]
+  * KVM: x86 emulator: implement 'movnti mem, reg'
+
+  [ Stephen Hemminger ]
+  * skge: XM PHY handling fixes
+  * sky2: status ring race fix
+  * sky2: ethtool register reserved area blackout
+  * sky2: fix power settings on Yukon XL
+  * TCP: illinois: Incorrect beta usage
+  * Enable FIB Trie
+  * enable multiqueue hardware support
+  * network device configuration update
+  * Revert "Revert "Enable FIB_TRIE""
+  * set multi-part flag in fib trie dumps
+  * fib_trie: use hash list rather than trying every prefix
+  * FIB trie firstleaf/nextleaf iterator
+  * FIB trie: dump performance improvement
+  * [IPV4] fib_trie: dump doesn't use RCU
+  * tc: oops in em_meta
+  * [NET] dev_change_name: ignore changes to same name
+  * reset kernel version to 2.6.23
+  * turn off CONFIG_SYSFS_DEPRECATED
+  * [PKT_SCHED]: vlan tag match
+  * [PKT_SCHED] initialize tree before use
+  * sky2: disable rx checksum on Yukon XL
+  * sky2: RX lockup fix
+  * Revert "[IPV4] fib_trie: dump doesn't use RCU"
+  * [IPV4] fib_trie: rescan if key is lost during dump
+  * fib_trie: handle empty tree
+  * fib_trie: /proc/net/route performance improvement
+  * fix null pointer dereference in /proc/net/route
+  * Add support for latest Intel ICH9 version of E1000
+  * Disable support of NTFS
+  * Turn on all netfilter modules
+  * fix null pointer dereference from /proc/net/route
+  * fix backtrace during boot
+  * sky2: fix LED management
+  * ethtool: allow non-root user to read all settings
+  * allow non-root to query iptables
+  * erase wake-on-lan password for non-root
+  * Revert "erase wake-on-lan password for non-root"
+  * Revert "ethtool: allow non-root user to read all settings"
+  * Revert "allow non-root to query iptables"
+
+  [ Steve French ]
+  * CIFS: Respect umask when using POSIX mkdir
+
+  [ Steven Rostedt ]
+  * futex: fix for futex_wait signal stack corruption
+
+  [ Takashi Iwai ]
+  * ALSA: hda-codec - Avoid zero NID in line_out_pins[] of STAC codecs
+  * ALSA: Fix build error without CONFIG_HAS_DMA
+  * ALSA: emu10k1 - Fix memory corruption
+  * ALSA: hdsp - Fix zero division
+  * ALSA: hda-codec - Add array terminator for dmic in STAC codec
+
+  [ Tejun Heo ]
+  * libata: sync NCQ blacklist with upstream
+  * libata: add HTS542525K9SA00 to NCQ blacklist
+  * libata: backport ATA_FLAG_NO_SRST and ATA_FLAG_ASSUME_ATA
+  * libata: backport ATA_FLAG_NO_SRST and ATA_FLAG_ASSUME_ATA, part 2
+  * sata_sis: fix SCR read breakage
+  * libata: kill spurious NCQ completion detection
+  * libata: port and host should be stopped before hardware resources
+    are released
+
+  [ Thomas Gleixner ]
+  * hrtimers: avoid overflow for large relative timeouts (CVE-2007-5966)
+  * clockevents: fix reprogramming decision in oneshot broadcast
+
+  [ Timo Teras ]
+  * IPV4: ip_gre: set mac_header correctly in receive path
+
+  [ Tony Battersby ]
+  * Fix kernel_accept() return handling.
+  * ide: fix serverworks.c UDMA regression
+
+  [ Tony Luck ]
+  * ia64: Fix unaligned handler for floating point instructions with
+    base update
+
+  [ Trond Myklebust ]
+  * NFS: Fix a writeback race...
+
+  [ Tsugikazu Shibata ]
+  * HOWTO: update ja_JP/HOWTO with latest changes
+
+  [ William Lee Irwin III ]
+  * ACPI: video_device_list corruption
+
+  [ William Pettersson ]
+  * Input: ALPS - add support for model found in Dell Vostro 1400
+
+  [ Zhao Yakui ]
+  * PNP: increase the maximum number of resources
+  * ACPI: apply quirk_ich6_lpc_acpi to more ICH8 and ICH9
+
+  [ Zou Nan hai ]
+  * sched: some proc entries are missed in sched_domain sys_ctl debug
+    code
+
+  [ chas williams ]
+  * ATM: [he] initialize lock and tasklet earlier
+
+  [ maximilian attems ]
+  * IRDA: irda_create() nuke user triggable printk
+
+  [ rbalocca ]
+  * Set the version number to indicate that this is a vyatta version
+
+  [ Mark O'Brien ]
+
+ -- Mark O'Brien <mobrien@vyatta.com>  Mon, 25 Feb 2008 17:37:46 -0800
+
+linux-2.6 (2.6.23-1+vyatta+1) unstable; urgency=low
+
+  * Initial debianization: 2.6.23.1 + vyatta changes.
+
+ -- An-Cheng Huang <ancheng@vyatta.com>  Fri, 26 Oct 2007 15:20:14 -0700
