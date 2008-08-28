@@ -67,3 +67,6 @@ ncscope.*
 *.orig
 *.rej
 *~
+stamp-*
+conf.vars
+config.precious
