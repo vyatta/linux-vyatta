@@ -215,12 +215,12 @@ config AUFS_COMPAT
 
 config AUFS_UNIONFS22_PATCH
 	bool 
-	default y if UNIONFS
+	default y if UNION_FS
 	default n
 
 config AUFS_UNIONFS23_PATCH
 	bool
-	default y if UNIONFS
+	default y if UNION_FS
 	default n
 	select AUFS_SPLICE_PATCH
 	select AUFS_UNIONFS22_PATCH
