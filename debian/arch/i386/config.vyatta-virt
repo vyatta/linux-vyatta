@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.26
-# Thu Sep 11 08:01:40 2008
+# Thu Sep 11 15:16:17 2008
 #
 # CONFIG_64BIT is not set
 CONFIG_X86_32=y
@@ -3539,8 +3539,8 @@ CONFIG_AUFS_DENY_WRITE_ACCESS_PATCH=y
 CONFIG_AUFS_HIN_OR_FUSE=y
 # CONFIG_AUFS_DEBUG is not set
 CONFIG_AUFS_COMPAT=y
-# CONFIG_AUFS_UNIONFS22_PATCH is not set
-# CONFIG_AUFS_UNIONFS23_PATCH is not set
+CONFIG_AUFS_UNIONFS22_PATCH=y
+CONFIG_AUFS_UNIONFS23_PATCH=y
 # CONFIG_ECRYPT_FS is not set
 
 #
