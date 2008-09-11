@@ -19,7 +19,7 @@
 /*
  * copy-up/down functions
  *
- * $Id: cpup.h,v 1.4 2008/08/25 01:49:49 sfjro Exp $
+ * $Id: cpup.h,v 1.5 2008/09/01 02:54:48 sfjro Exp $
  */
 
 #ifndef __AUFS_CPUP_H__
@@ -39,7 +39,9 @@ void au_cpup_attr_all(struct inode *inode);
 /* ---------------------------------------------------------------------- */
 
 /* cpup flags */
-#define AuCpup_DTIME	1	/* do dtime_store/revert */
+#define AuCpup_DTIME	1		/* do dtime_store/revert */
+#define AuCpup_KEEPLINO	(1 << 1)	/* do not clear the lower xino,
+					   for link(2) */
 #define au_ftest_cpup(flags, name)	((flags) & AuCpup_##name)
 #define au_fset_cpup(flags, name)	{ (flags) |= AuCpup_##name; }
 #define au_fclr_cpup(flags, name)	{ (flags) &= ~AuCpup_##name; }
@@ -49,8 +51,6 @@ int au_sio_cpup_single(struct dentry *dentry, aufs_bindex_t bdst,
 		       struct dentry *dst_parent);
 int au_sio_cpup_simple(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
 		       unsigned int flags);
-int au_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
-	       struct file *file);
 int au_sio_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
 		   struct file *file);
 

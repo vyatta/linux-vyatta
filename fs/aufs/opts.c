@@ -19,7 +19,7 @@
 /*
  * mount options/flags
  *
- * $Id: opts.c,v 1.14 2008/08/17 23:03:27 sfjro Exp $
+ * $Id: opts.c,v 1.15 2008/09/01 02:55:31 sfjro Exp $
  */
 
 #include <linux/types.h> /* a distribution requires */
@@ -195,16 +195,16 @@ static const char *au_parser_pattern(int val, struct match_token *token)
 #define NoLinkWH	"nolwh"
 
 static match_table_t brperms = {
-	{AuBr_RR, RR},
-	{AuBr_RO, RO},
-	{AuBr_RW, RW},
+	{AuBrPerm_RR, RR},
+	{AuBrPerm_RO, RO},
+	{AuBrPerm_RW, RW},
 
-	{AuBr_RRWH, RR "+" WH},
-	{AuBr_ROWH, RO "+" WH},
-	{AuBr_RWNoLinkWH, RW "+" NoLinkWH},
+	{AuBrPerm_RRWH, RR "+" WH},
+	{AuBrPerm_ROWH, RO "+" WH},
+	{AuBrPerm_RWNoLinkWH, RW "+" NoLinkWH},
 
-	{AuBr_ROWH, "nfsro"},
-	{AuBr_RO, NULL}
+	{AuBrPerm_ROWH, "nfsro"},
+	{AuBrPerm_RO, NULL}
 };
 
 static noinline_for_stack int br_perm_val(char *perm)
@@ -634,7 +634,7 @@ static int opt_add(struct au_opt *opt, char *opt_str, struct super_block *sb,
 	LKTRTrace("%s, b%d\n", opt_str, bindex);
 
 	add->bindex = bindex;
-	add->perm = AuBr_Last;
+	add->perm = AuBrPerm_Last;
 	add->path = opt_str;
 	p = strchr(opt_str, '=');
 	if (unlikely(p)) {
@@ -647,14 +647,14 @@ static int opt_add(struct au_opt *opt, char *opt_str, struct super_block *sb,
 	/* do not superio. */
 	err = vfsub_path_lookup(add->path, lkup_dirflags, &add->nd);
 	if (!err) {
-		if (!p /* && add->perm == AuBr_Last */) {
-			add->perm = AuBr_RO;
+		if (!p /* && add->perm == AuBrPerm_Last */) {
+			add->perm = AuBrPerm_RO;
 			if (au_test_def_rr(add->nd.path.dentry->d_sb))
-				add->perm = AuBr_RR;
+				add->perm = AuBrPerm_RR;
 			if (!bindex && !(sb->s_flags & MS_RDONLY))
-				add->perm = AuBr_RW;
+				add->perm = AuBrPerm_RW;
 #ifdef CONFIG_AUFS_COMPAT
-			add->perm = AuBr_RW;
+			add->perm = AuBrPerm_RW;
 #endif
 		}
 		opt->type = Opt_add;
@@ -1304,8 +1304,9 @@ static int verify_opts(struct super_block *sb, unsigned int pending,
 {
 	int err;
 	aufs_bindex_t bindex, bend;
-	unsigned char do_plink, skip;
+	unsigned char do_plink, skip, do_free;
 	struct au_branch *br;
+	struct au_wbr *wbr;
 	struct dentry *root;
 	struct inode *dir, *h_dir;
 	unsigned int mnt_flags;
@@ -1335,49 +1336,66 @@ static int verify_opts(struct super_block *sb, unsigned int pending,
 		skip = 0;
 		h_dir = au_h_iptr(dir, bindex);
 		br = au_sbr(sb, bindex);
-		br_wh_read_lock(br);
+		do_free = 0;
+		wbr = br->br_wbr;
+		if (wbr)
+			wbr_wh_read_lock(wbr);
 		switch (br->br_perm) {
-		case AuBr_RR:
-		case AuBr_RO:
-		case AuBr_RRWH:
-		case AuBr_ROWH:
-			skip = (!br->br_wh && !br->br_plink);
+		case AuBrPerm_RR:
+		case AuBrPerm_RO:
+		case AuBrPerm_RRWH:
+		case AuBrPerm_ROWH:
+			do_free = !!wbr;
+			skip = (!wbr
+				|| (!wbr->wbr_whbase
+				    && !wbr->wbr_plink
+				    && !wbr->wbr_tmp));
 			break;
 
-		case AuBr_RWNoLinkWH:
-			skip = !br->br_wh;
-			if (skip) {
+		case AuBrPerm_RWNoLinkWH:
+			/* skip = (!br->br_whbase && !br->br_tmp); */
+			skip = (!wbr || !wbr->wbr_whbase);
+			if (skip && wbr) {
 				if (do_plink)
-					skip = !!br->br_plink;
+					skip = !!wbr->wbr_plink;
 				else
-					skip = !br->br_plink;
+					skip = !wbr->wbr_plink;
 			}
 			break;
 
-		case AuBr_RW:
-			skip = !!br->br_wh;
+		case AuBrPerm_RW:
+			/* skip = (br->br_whbase && br->br_tmp); */
+			skip = (wbr && wbr->wbr_whbase);
 			if (skip) {
 				if (do_plink)
-					skip = !!br->br_plink;
+					skip = !!wbr->wbr_plink;
 				else
-					skip = !br->br_plink;
+					skip = !wbr->wbr_plink;
 			}
 			break;
 
 		default:
 			BUG();
 		}
-		br_wh_read_unlock(br);
+		if (wbr)
+			wbr_wh_read_unlock(wbr);
 
 		if (skip)
 			continue;
 
 		mutex_lock_nested(&h_dir->i_mutex, AuLsc_I_PARENT);
-		br_wh_write_lock(br);
+		if (wbr)
+			wbr_wh_write_lock(wbr);
 		err = au_wh_init(au_h_dptr(root, bindex), br,
 				 au_nfsmnt(sb, bindex), sb, bindex);
-		br_wh_write_unlock(br);
+		if (wbr)
+			wbr_wh_write_unlock(wbr);
 		mutex_unlock(&h_dir->i_mutex);
+
+		if (!err && do_free) {
+			kfree(wbr);
+			br->br_wbr = NULL;
+		}
 	}
 
 	AuTraceErr(err);

@@ -19,7 +19,7 @@
 /*
  * lookup and dentry operations
  *
- * $Id: dentry.h,v 1.6 2008/06/30 03:52:42 sfjro Exp $
+ * $Id: dentry.h,v 1.7 2008/09/01 02:54:54 sfjro Exp $
  */
 
 #ifndef __AUFS_DENTRY_H__
@@ -248,6 +248,16 @@ static inline au_gen_t au_digen(struct dentry *d)
 static inline au_gen_t au_digen_dec(struct dentry *d)
 {
 	return atomic_dec_return(&au_di(d)->di_generation);
+}
+
+static inline void au_hin_di_reinit(struct dentry *d)
+{
+	d->d_fsdata = NULL;
+}
+#else
+static inline void au_hin_di_reinit(struct dentry *d)
+{
+	/* empty */
 }
 #endif /* CONFIG_AUFS_HINOTIFY */
 

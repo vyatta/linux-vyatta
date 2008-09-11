@@ -19,7 +19,7 @@
 /*
  * inode operations
  *
- * $Id: inode.h,v 1.10 2008/08/25 01:50:28 sfjro Exp $
+ * $Id: inode.h,v 1.12 2008/09/08 02:40:00 sfjro Exp $
  */
 
 #ifndef __AUFS_INODE_H__
@@ -56,6 +56,8 @@ struct au_pin1 {
 	/* input */
 	struct dentry *dentry;
 	unsigned char di_locked, lsc_di, lsc_hi;
+	/* auto */
+	unsigned char do_verify;
 
 	/* output */
 	struct dentry *parent;
@@ -65,9 +67,9 @@ struct au_pin1 {
 enum {AuPin_PARENT, AuPin_GPARENT};
 struct au_pin {
 #ifdef CONFIG_AUFS_HINOTIFY
-	struct au_pin1 pin[2]; /* no grand parent */
+	struct au_pin1 pin[2];
 #else
-	struct au_pin1 pin[1];
+	struct au_pin1 pin[1]; /* no grand parent */
 #endif
 };
 
@@ -282,8 +284,10 @@ AuSimpleUnlockRwsemFuncs(ii, struct inode *i, au_ii(i)->ii_rwsem);
 
 static inline struct inode *au_igrab(struct inode *inode)
 {
-	AuDebugOn(!atomic_read(&inode->i_count));
-	atomic_inc_return(&inode->i_count);
+	if (inode) {
+		AuDebugOn(!atomic_read(&inode->i_count));
+		atomic_inc_return(&inode->i_count);
+	}
 	return inode;
 }
 
@@ -422,14 +426,18 @@ static inline struct inode *au_do_pinned_h_dir(struct au_pin1 *pin)
 static inline
 void au_pin_do_set_parent(struct au_pin1 *pin, struct dentry *parent)
 {
-	if (pin)
-		pin->parent = parent;
+	if (pin) {
+		dput(pin->parent);
+		pin->parent = dget(parent);
+	}
 }
 
 static inline void au_pin_do_set_h_dir(struct au_pin1 *pin, struct inode *h_dir)
 {
-	if (pin)
-		pin->h_dir = h_dir;
+	if (pin) {
+		iput(pin->h_dir);
+		pin->h_dir = au_igrab(h_dir);
+	}
 }
 
 static inline

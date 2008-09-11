@@ -19,7 +19,7 @@
 /*
  * policies for selecting one among multiple writable branches
  *
- * $Id: wbr_policy.c,v 1.11 2008/08/25 01:50:42 sfjro Exp $
+ * $Id: wbr_policy.c,v 1.12 2008/09/01 02:55:35 sfjro Exp $
  */
 
 #include <linux/statfs.h>
@@ -390,6 +390,7 @@ static void au_mfs(struct dentry *dentry)
 		br = au_sbr(sb, bindex);
 		if (au_br_rdonly(br))
 			continue;
+		AuDebugOn(!br->br_wbr);
 		arg = au_wbr_statfs_arg(br, sb, bindex);
 		if (!arg)
 			continue;
@@ -404,7 +405,7 @@ static void au_mfs(struct dentry *dentry)
 
 		/* when the available size is equal, select lower one */
 		b = st.f_bavail * st.f_bsize;
-		br->br_bytes = b;
+		br->br_wbr->wbr_bytes = b;
 		if (b >= bavail) {
 			bavail = b;
 			mfs->mfs_bindex = bindex;
@@ -530,8 +531,9 @@ static int au_wbr_create_pmfs(struct dentry *dentry, int isdir)
 	/* when the available size is equal, select upper one */
 	sb = dentry->d_sb;
 	br = au_sbr(sb, err);
+	AuDebugOn(!br->br_wbr);
 	dirperm1 = !!au_test_dirperm1(au_mntflags(sb));
-	b = br->br_bytes;
+	b = br->br_wbr->wbr_bytes;
 	LKTRTrace("b%d, %llu\n", err, b);
 
 	if (unlikely(dirperm1)) {
@@ -547,8 +549,8 @@ static int au_wbr_create_pmfs(struct dentry *dentry, int isdir)
 			if (!au_br_rdonly(br)
 			    && au_test_h_perm(h_dir, MAY_WRITE | MAY_EXEC,
 					      /*dlgt*/0)
-			    && br->br_bytes > b) {
-				b = br->br_bytes;
+			    && br->br_wbr->wbr_bytes > b) {
+				b = br->br_wbr->wbr_bytes;
 				err = bindex;
 				LKTRTrace("b%d, %llu\n", err, b);
 			}
@@ -562,8 +564,8 @@ static int au_wbr_create_pmfs(struct dentry *dentry, int isdir)
 			continue;
 
 		br = au_sbr(sb, bindex);
-		if (!au_br_rdonly(br) && br->br_bytes > b) {
-			b = br->br_bytes;
+		if (!au_br_rdonly(br) && br->br_wbr->wbr_bytes > b) {
+			b = br->br_wbr->wbr_bytes;
 			err = bindex;
 			LKTRTrace("b%d, %llu\n", err, b);
 		}

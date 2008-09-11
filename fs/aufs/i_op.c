@@ -19,7 +19,7 @@
 /*
  * inode operations (except add/del/rename)
  *
- * $Id: i_op.c,v 1.17 2008/08/25 01:50:51 sfjro Exp $
+ * $Id: i_op.c,v 1.19 2008/09/08 02:39:57 sfjro Exp $
  */
 
 #include <linux/fs_stack.h>
@@ -532,6 +532,7 @@ void au_do_unpin(struct au_pin1 *p, struct au_pin1 *gp)
 		au_do_unpin(gp, NULL);
 	if (!p->di_locked)
 		di_read_unlock(p->parent, AuLock_IR);
+	iput(p->h_dir);
 	dput(p->parent);
 	p->parent = NULL;
 	p->h_dir = NULL;
@@ -562,8 +563,17 @@ int au_do_pin(struct au_pin1 *p, struct au_pin1 *gp, const aufs_bindex_t bindex,
 	else
 		DiMustAnyLock(p->parent);
 	AuDebugOn(!p->parent->d_inode);
-	p->h_dir = au_h_iptr(p->parent->d_inode, bindex);
-	AuDebugOn(!p->h_dir);
+	p->h_dir = au_igrab(au_h_iptr(p->parent->d_inode, bindex));
+	/* udba case */
+	if (unlikely(p->do_verify && !p->h_dir)) {
+		err = -EIO;
+		if (!p->di_locked)
+			di_read_unlock(p->parent, AuLock_IR);
+		dput(p->parent);
+		p->parent = NULL;
+		goto out;
+	}
+
 	if (unlikely(do_gp)) {
 		gp->dentry = p->parent;
 		err = au_do_pin(gp, NULL, bindex, 0);
@@ -573,8 +583,10 @@ int au_do_pin(struct au_pin1 *p, struct au_pin1 *gp, const aufs_bindex_t bindex,
 	mutex_lock_nested(&p->h_dir->i_mutex, p->lsc_hi);
 	if (!err) {
 		/* todo: call d_revalidate() here? */
-		if (!h_dentry || !au_verify_parent(h_dentry, p->h_dir))
-			goto out;
+		if (!h_dentry
+		    || !p->do_verify
+		    || !au_verify_parent(h_dentry, p->h_dir))
+			goto out; /* success */
 		else {
 			AuWarn1("bypassed %.*s/%.*s?\n",
 				AuDLNPair(p->parent), AuDLNPair(p->dentry));
@@ -592,6 +604,7 @@ int au_do_pin(struct au_pin1 *p, struct au_pin1 *gp, const aufs_bindex_t bindex,
 	au_do_unpin(p, gp);
 	if (unlikely(do_gp))
 		gp->dentry = NULL;
+
  out:
 	AuTraceErr(err);
 	return err;
@@ -601,6 +614,7 @@ void au_pin_init(struct au_pin *args, struct dentry *dentry, int di_locked,
 		 int lsc_di, int lsc_hi, int do_gp)
 {
 	struct au_pin1 *p;
+	unsigned char do_verify;
 
 	AuTraceEnter();
 
@@ -610,13 +624,16 @@ void au_pin_init(struct au_pin *args, struct dentry *dentry, int di_locked,
 	p->di_locked = di_locked;
 	p->lsc_di = lsc_di;
 	p->lsc_hi = lsc_hi;
+	p->do_verify = !au_opt_test(au_mntflags(dentry->d_sb), UDBA_NONE);
 	if (!do_gp)
 		return;
 
+	do_verify = p->do_verify;
 	p = au_pin_gp(args);
 	if (unlikely(p)) {
 		p->lsc_di = lsc_di + 1; /* child first */
 		p->lsc_hi = lsc_hi - 1; /* parent first */
+		p->do_verify = do_verify;
 	}
 }
 
@@ -643,13 +660,14 @@ struct au_icpup_args {
 	struct vfsub_args vargs;
 };
 
+/* todo: refine it */
 static int au_lock_and_icpup(struct dentry *dentry, loff_t sz,
 			     struct au_icpup_args *a)
 {
 	int err;
 	aufs_bindex_t bstart;
 	struct super_block *sb;
-	struct dentry *hi_wh;
+	struct dentry *hi_wh, *parent;
 	struct inode *inode;
 	struct au_wr_dir_args wr_dir_args = {
 		.force_btgt	= -1,
@@ -677,21 +695,41 @@ static int au_lock_and_icpup(struct dentry *dentry, loff_t sz,
 
 	/* crazy udba locks */
 	a->hinotify = !!au_opt_test(au_mntflags(sb), UDBA_INOTIFY);
-	err = au_pin(&a->pin, dentry, a->btgt, /*di_locked*/0,
+	parent = NULL;
+	if (!IS_ROOT(dentry)) {
+		parent = dget_parent(dentry);
+		di_write_lock_parent(parent);
+	}
+	err = au_pin(&a->pin, dentry, a->btgt, /*di_locked*/!!parent,
 		     /*dp_gp*/a->hinotify);
-	if (unlikely(err))
+	if (unlikely(err)) {
+		if (parent) {
+			di_write_unlock(parent);
+			dput(parent);
+		}
 		goto out_dentry;
+	}
 	a->h_dentry = au_h_dptr(dentry, bstart);
 	a->h_inode = a->h_dentry->d_inode;
 	AuDebugOn(!a->h_inode);
 	mutex_lock_nested(&a->h_inode->i_mutex, AuLsc_I_CHILD);
 	if (!a->did_cpup) {
 		au_unpin_gp(&a->pin);
+		if (parent) {
+			au_pin_set_parent_lflag(&a->pin, /*lflag*/0);
+			di_downgrade_lock(parent, AuLock_IR);
+			dput(parent);
+		}
 		goto out; /* success */
 	}
 
 	hi_wh = NULL;
 	if (!d_unhashed(dentry)) {
+		if (parent) {
+			au_pin_set_parent_lflag(&a->pin, /*lflag*/0);
+			di_downgrade_lock(parent, AuLock_IR);
+			dput(parent);
+		}
 		err = au_sio_cpup_simple(dentry, a->btgt, sz, AuCpup_DTIME);
 		if (!err)
 			a->h_dentry = au_h_dptr(dentry, a->btgt);
@@ -703,6 +741,11 @@ static int au_lock_and_icpup(struct dentry *dentry, loff_t sz,
 			if (!err)
 				hi_wh = au_hi_wh(inode, a->btgt);
 			/* todo: revalidate hi_wh? */
+		}
+		if (parent) {
+			au_pin_set_parent_lflag(&a->pin, /*lflag*/0);
+			di_downgrade_lock(parent, AuLock_IR);
+			dput(parent);
 		}
 		if (!hi_wh)
 			a->h_dentry = au_h_dptr(dentry, a->btgt);

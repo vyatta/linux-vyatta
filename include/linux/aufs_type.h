@@ -16,14 +16,14 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-/* $Id: aufs_type.h,v 1.120 2008/08/25 01:51:04 sfjro Exp $ */
+/* $Id: aufs_type.h,v 1.122 2008/09/08 02:40:24 sfjro Exp $ */
 
 #include <linux/ioctl.h>
 
 #ifndef __AUFS_TYPE_H__
 #define __AUFS_TYPE_H__
 
-#define AUFS_VERSION	"20080825"
+#define AUFS_VERSION	"20080908"
 
 /* move this to linux-2.6.19/include/magic.h */
 #define AUFS_SUPER_MAGIC	('a' << 24 | 'u' << 16 | 'f' << 8 | 's')
@@ -75,7 +75,8 @@ typedef short aufs_bindex_t;
 
 /* will be whiteouted doubly */
 #define AUFS_WH_BASENAME	AUFS_WH_PFX AUFS_NAME
-#define AUFS_WH_PLINKDIR	AUFS_WH_PFX "plink"
+#define AUFS_WH_PLINKDIR	AUFS_WH_PFX "plnk"
+#define AUFS_WH_TMPDIR		AUFS_WH_PFX ".tmp"
 
 /* ---------------------------------------------------------------------- */
 

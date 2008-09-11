@@ -19,7 +19,7 @@
 /*
  * handling file/dir, and address_space operation
  *
- * $Id: file.c,v 1.13 2008/08/25 01:49:56 sfjro Exp $
+ * $Id: file.c,v 1.14 2008/09/01 02:55:00 sfjro Exp $
  */
 
 #include <linux/pagemap.h>
@@ -355,22 +355,22 @@ int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin)
 		if (unlikely(err))
 			goto out_dgrade;
 	}
-	/* todo: the parent dir might be rmdir'ed */
 
-	di_downgrade_lock(parent, AuLock_IR);
 	err = au_pin(pin, dentry, bcpup, /*di_locked*/1,
 		     /*dp_gp*/au_opt_test(au_mntflags(sb), UDBA_INOTIFY));
 	if (unlikely(err))
-		goto out_unlock;
+		goto out_dgrade;
 
 	AuDebugOn(au_fbstart(file) != bstart);
 	h_dentry = au_h_fptr(file, bstart)->f_dentry;
 	h_inode = h_dentry->d_inode;
 	mutex_lock_nested(&h_inode->i_mutex, AuLsc_I_CHILD);
 	if (d_unhashed(dentry) /* || d_unhashed(h_dentry) */
-	    /* || !h_inode->i_nlink */)
+	    /* || !h_inode->i_nlink */) {
 		err = au_ready_to_write_wh(file, len, bcpup);
-	else {
+		di_downgrade_lock(parent, AuLock_IR);
+	} else {
+		di_downgrade_lock(parent, AuLock_IR);
 		if (!au_h_dptr(dentry, bcpup))
 			err = au_sio_cpup_simple(dentry, bcpup, len,
 						 AuCpup_DTIME);
@@ -402,16 +402,17 @@ int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin)
 
 /* ---------------------------------------------------------------------- */
 
-static int refresh_file_by_inode(struct file *file, int *need_reopen)
+static int au_file_refresh_by_inode(struct file *file, int *need_reopen)
 {
 	int err;
 	struct au_finfo *finfo;
 	struct dentry *dentry, *parent, *old_h_dentry, *hi_wh;
-	struct inode *inode, *dir, *h_dir;
+	struct inode *inode, *dir;
 	aufs_bindex_t bstart, new_bstart, old_bstart;
 	struct super_block *sb;
 	struct au_dinfo *dinfo;
 	unsigned int mnt_flags;
+	struct au_pin pin;
 
 	dentry = file->f_dentry;
 	LKTRTrace("%.*s\n", AuDLNPair(dentry));
@@ -436,7 +437,7 @@ static int refresh_file_by_inode(struct file *file, int *need_reopen)
 		new_bstart = err;
 		di_read_unlock(parent, !AuLock_IR);
 		if (unlikely(err < 0))
-			goto out_put;
+			goto out_dput;
 		err = 0;
 	}
 	/* someone else might change our inode while we were sleeping */
@@ -454,13 +455,16 @@ static int refresh_file_by_inode(struct file *file, int *need_reopen)
 	    && au_plink_test(sb, inode)
 	    && !d_unhashed(dentry)) {
 		err = au_test_and_cpup_dirs(dentry, bstart);
+		if (unlikely(err))
+			goto out_unlock;
 
 		/* always superio. */
 #if 1
-		h_dir = au_h_dptr(parent, bstart)->d_inode;
-		mutex_lock_nested(&h_dir->i_mutex, AuLsc_I_PARENT);
-		err = au_sio_cpup_simple(dentry, bstart, -1, AuCpup_DTIME);
-		mutex_unlock(&h_dir->i_mutex);
+		err = au_pin(&pin, dentry, bstart, /*di_locked*/1,
+			     /*do_gp*/au_opt_test(mnt_flags, UDBA_INOTIFY));
+		if (!err)
+			err = au_sio_cpup_simple(dentry, bstart, -1, AuCpup_DTIME);
+		au_unpin(&pin);
 #else /* reserved for future use */
 		if (!au_test_wkq(current)) {
 			int wkq_err;
@@ -488,9 +492,10 @@ static int refresh_file_by_inode(struct file *file, int *need_reopen)
 		dinfo->di_bstart = old_bstart;
 		*need_reopen = 0;
 	}
-	di_read_unlock(parent, AuLock_IR);
 
- out_put:
+ out_unlock:
+	di_read_unlock(parent, AuLock_IR);
+ out_dput:
 	dput(parent);
  out:
 	AuTraceErr(err);
@@ -599,7 +604,7 @@ static int refresh_file(struct file *file, int (*reopen)(struct file *file))
 	err = 0;
 	need_reopen = 1;
 	if (!au_test_mmapped(file))
-		err = refresh_file_by_inode(file, &need_reopen);
+		err = au_file_refresh_by_inode(file, &need_reopen);
 	if (!err && need_reopen && !d_unhashed(dentry))
 		err = reopen(file);
 	if (!err) {

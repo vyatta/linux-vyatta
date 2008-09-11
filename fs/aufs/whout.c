@@ -19,7 +19,7 @@
 /*
  * whiteout for logical deletion and opaque directory
  *
- * $Id: whout.c,v 1.11 2008/08/25 01:49:43 sfjro Exp $
+ * $Id: whout.c,v 1.13 2008/09/08 02:40:12 sfjro Exp $
  */
 
 #include <linux/fs.h>
@@ -346,20 +346,20 @@ static void clean_wh(struct inode *h_dir, struct dentry *wh,
 	}
 }
 
-static void clean_plink(struct inode *h_dir, struct dentry *plink,
-			struct au_hinode *hdir, struct vfsub_args *vargs)
+static void au_whdir_clean(struct inode *h_dir, struct dentry *dentry,
+			   struct au_hinode *hdir, struct vfsub_args *vargs)
 {
 	int err;
 
 	AuTraceEnter();
 
-	if (plink->d_inode) {
+	if (dentry->d_inode) {
 		vfsub_args_reinit(vargs);
 		vfsub_ign_hinode(vargs, IN_DELETE, hdir);
-		err = vfsub_rmdir(h_dir, plink, vargs);
+		err = vfsub_rmdir(h_dir, dentry, vargs);
 		if (unlikely(err))
 			AuWarn("failed rmdir %.*s (%d), ignored.\n",
-			       AuDLNPair(plink), err);
+			       AuDLNPair(dentry), err);
 	}
 }
 
@@ -371,23 +371,23 @@ static int test_linkable(struct inode *h_dir)
 }
 
 /* todo: should this mkdir be done in /sbin/mount.aufs script? */
-static int plink_dir(struct inode *h_dir, struct dentry *plink,
-		     struct au_hinode *hdir, struct vfsub_args *vargs)
+static int au_whdir(struct inode *h_dir, struct dentry *dentry,
+		    struct au_hinode *hdir, struct vfsub_args *vargs)
 {
 	int err;
 
 	err = -EEXIST;
-	if (!plink->d_inode) {
+	if (!dentry->d_inode) {
 		int mode = S_IRWXU;
-		if (unlikely(au_test_nfs(plink->d_sb)))
+		if (unlikely(au_test_nfs(dentry->d_sb)))
 			mode |= S_IXUGO;
 		vfsub_args_reinit(vargs);
 		vfsub_ign_hinode(vargs, IN_CREATE, hdir);
-		err = vfsub_mkdir(h_dir, plink, mode, vargs);
-	} else if (S_ISDIR(plink->d_inode->i_mode))
+		err = vfsub_mkdir(h_dir, dentry, mode, vargs);
+	} else if (S_ISDIR(dentry->d_inode->i_mode))
 		err = 0;
 	else
-		AuErr("unknown %.*s exists\n", AuDLNPair(plink));
+		AuErr("unknown %.*s exists\n", AuDLNPair(dentry));
 
 	return err;
 }
@@ -399,20 +399,41 @@ int au_wh_init(struct dentry *h_root, struct au_branch *br,
 	       struct vfsmount *nfsmnt, struct super_block *sb,
 	       aufs_bindex_t bindex)
 {
-	int err;
-	struct dentry *wh, *plink;
+	int err, i;
 	struct inode *h_dir;
 	struct au_hin_ignore ign;
 	struct vfsub_args vargs;
 	struct au_hinode *hdir;
-	static struct qstr base_name[] = {
-		{
+	struct au_wbr *wbr = br->br_wbr;
+	static const struct qstr base_name[] = {
+		[AuBrWh_BASE] = {
 			.name	= AUFS_WH_BASENAME,
 			.len	= sizeof(AUFS_WH_BASENAME) - 1
 		},
-		{
+		[AuBrWh_PLINK] = {
 			.name	= AUFS_WH_PLINKDIR,
 			.len	= sizeof(AUFS_WH_PLINKDIR) - 1
+		},
+		[AuBrWh_TMP] = {
+			.name	= AUFS_WH_TMPDIR,
+			.len	= sizeof(AUFS_WH_TMPDIR) - 1
+		}
+	};
+	struct {
+		const struct qstr *name;
+		struct dentry *dentry;
+	} base[] = {
+		[AuBrWh_BASE] = {
+			.name	= base_name + AuBrWh_BASE,
+			.dentry	= NULL
+		},
+		[AuBrWh_PLINK] = {
+			.name	= base_name + AuBrWh_PLINK,
+			.dentry	= NULL
+		},
+		[AuBrWh_TMP] = {
+			.name	= base_name + AuBrWh_TMP,
+			.dentry	= NULL
 		}
 	};
 	struct au_ndx ndx = {
@@ -426,27 +447,26 @@ int au_wh_init(struct dentry *h_root, struct au_branch *br,
 	const int do_hinotify = au_opt_test(mnt_flags, UDBA_INOTIFY);
 
 	LKTRTrace("nfsmnt %p\n", nfsmnt);
-	BrWhMustWriteLock(br);
+	WbrWhMustWriteLock(wbr);
 	SiMustWriteLock(sb);
 	h_dir = h_root->d_inode;
 
-	/* doubly whiteouted */
-	wh = au_wh_lkup(h_root, base_name + 0, &ndx);
-	err = PTR_ERR(wh);
-	if (IS_ERR(wh))
-		goto out;
-	AuDebugOn(br->br_wh && br->br_wh != wh);
+	for (i = 0; i < AuBrWh_Last; i++) {
+		/* doubly whiteouted */
+		base[i].dentry = au_wh_lkup(h_root, (void *)base[i].name, &ndx);
+		err = PTR_ERR(base[i].dentry);
+		if (IS_ERR(base[i].dentry))
+			goto out;
+		AuDebugOn(wbr
+			  && wbr->wbr_wh[i]
+			  && wbr->wbr_wh[i] != base[i].dentry);
+	}
 
-	plink = au_wh_lkup(h_root, base_name + 1, &ndx);
-	err = PTR_ERR(plink);
-	if (IS_ERR(plink))
-		goto out_dput_wh;
-	AuDebugOn(br->br_plink && br->br_plink != plink);
-
-	dput(br->br_wh);
-	dput(br->br_plink);
-	br->br_wh = NULL;
-	br->br_plink = NULL;
+	if (wbr)
+		for (i = 0; i < AuBrWh_Last; i++) {
+			dput(wbr->wbr_wh[i]);
+			wbr->wbr_wh[i] = NULL;
+		}
 
 	err = 0;
 	hdir = NULL;
@@ -455,30 +475,37 @@ int au_wh_init(struct dentry *h_root, struct au_branch *br,
 	vfsub_args_init(&vargs, &ign, au_test_dlgt(mnt_flags), 0);
 
 	switch (br->br_perm) {
-	case AuBr_RR:
-	case AuBr_RO:
-	case AuBr_RRWH:
-	case AuBr_ROWH:
-		clean_wh(h_dir, wh, hdir, &vargs);
-		clean_plink(h_dir, plink, hdir, &vargs);
+	case AuBrPerm_RR:
+	case AuBrPerm_RO:
+	case AuBrPerm_RRWH:
+	case AuBrPerm_ROWH:
+		clean_wh(h_dir, base[AuBrWh_BASE].dentry, hdir, &vargs);
+		au_whdir_clean(h_dir, base[AuBrWh_PLINK].dentry, hdir, &vargs);
+		au_whdir_clean(h_dir, base[AuBrWh_TMP].dentry, hdir, &vargs);
 		break;
 
-	case AuBr_RWNoLinkWH:
-		clean_wh(h_dir, wh, hdir, &vargs);
+	case AuBrPerm_RWNoLinkWH:
+		clean_wh(h_dir, base[AuBrWh_BASE].dentry, hdir, &vargs);
 		if (do_plink) {
 			err = test_linkable(h_dir);
 			if (unlikely(err))
 				goto out_nolink;
 
-			err = plink_dir(h_dir, plink, hdir, &vargs);
+			err = au_whdir(h_dir, base[AuBrWh_PLINK].dentry, hdir,
+				       &vargs);
 			if (unlikely(err))
 				goto out_err;
-			br->br_plink = dget(plink);
+			wbr->wbr_plink = dget(base[AuBrWh_PLINK].dentry);
 		} else
-			clean_plink(h_dir, plink, hdir, &vargs);
+			au_whdir_clean(h_dir, base[AuBrWh_PLINK].dentry, hdir,
+				       &vargs);
+		err = au_whdir(h_dir, base[AuBrWh_TMP].dentry, hdir, &vargs);
+		if (unlikely(err))
+			goto out_err;
+		wbr->wbr_tmp = dget(base[AuBrWh_TMP].dentry);
 		break;
 
-	case AuBr_RW:
+	case AuBrPerm_RW:
 		/*
 		 * for the moment, aufs supports the branch filesystem
 		 * which does not support link(2).
@@ -493,52 +520,58 @@ int au_wh_init(struct dentry *h_root, struct au_branch *br,
 
 		err = -EEXIST;
 		/*
-		 * todo: should this create be done in
-		 * /sbin/mount.aufs script?
+		 * todo: should this create be done
+		 * in /sbin/mount.aufs script?
 		 */
-		if (!wh->d_inode) {
+		if (!base[AuBrWh_BASE].dentry->d_inode) {
 			vfsub_args_reinit(&vargs);
 			vfsub_ign_hinode(&vargs, IN_CREATE, hdir);
-			err = au_h_create(h_dir, wh, WH_MASK, &vargs,
-					  /*nd*/NULL, nfsmnt);
+			err = au_h_create(h_dir, base[AuBrWh_BASE].dentry,
+					  WH_MASK, &vargs, /*nd*/NULL, nfsmnt);
 		}
-		else if (S_ISREG(wh->d_inode->i_mode))
+		else if (S_ISREG(base[AuBrWh_BASE].dentry->d_inode->i_mode))
 			err = 0;
 		else
 			AuErr("unknown %.*s/%.*s exists\n",
-			      AuDLNPair(h_root), AuDLNPair(wh));
+			      AuDLNPair(h_root),
+			      AuDLNPair(base[AuBrWh_BASE].dentry));
 		if (unlikely(err))
 			goto out_err;
 
 		if (do_plink) {
-			err = plink_dir(h_dir, plink, hdir, &vargs);
+			err = au_whdir(h_dir, base[AuBrWh_PLINK].dentry, hdir,
+				       &vargs);
 			if (unlikely(err))
 				goto out_err;
-			br->br_plink = dget(plink);
+			wbr->wbr_plink = dget(base[AuBrWh_PLINK].dentry);
 		} else
-			clean_plink(h_dir, plink, hdir, &vargs);
-		br->br_wh = dget(wh);
+			au_whdir_clean(h_dir, base[AuBrWh_PLINK].dentry, hdir,
+				       &vargs);
+		wbr->wbr_whbase = dget(base[AuBrWh_BASE].dentry);
+
+		err = au_whdir(h_dir, base[AuBrWh_TMP].dentry, hdir, &vargs);
+		if (unlikely(err))
+			goto out_err;
+		wbr->wbr_tmp = dget(base[AuBrWh_TMP].dentry);
 		break;
 
 	default:
 		BUG();
 	}
 
- out_dput:
-	dput(plink);
- out_dput_wh:
-	dput(wh);
  out:
+	for (i = 0; i < AuBrWh_Last; i++)
+		dput(base[i].dentry);
 	AuTraceErr(err);
 	return err;
  out_nolink:
 	AuErr("%.*s doesn't support link(2), use noplink and rw+nolwh\n",
 	      AuDLNPair(h_root));
-	goto out_dput;
+	goto out;
  out_err:
 	AuErr("an error(%d) on the writable branch %.*s(%s)\n",
 	      err, AuDLNPair(h_root), au_sbtype(h_root->d_sb));
-	goto out_dput;
+	goto out;
 }
 
 struct reinit_br_wh {
@@ -550,6 +583,7 @@ static void reinit_br_wh(void *arg)
 {
 	int err;
 	struct reinit_br_wh *a = arg;
+	struct au_wbr *wbr;
 	struct inode *h_dir, *dir;
 	struct dentry *h_root;
 	aufs_bindex_t bindex;
@@ -557,45 +591,51 @@ static void reinit_br_wh(void *arg)
 	struct vfsub_args vargs;
 
 	AuTraceEnter();
-	AuDebugOn(!a->br->br_wh || !a->br->br_wh->d_inode || current->fsuid);
+	AuDebugOn(current->fsuid);
 
 	err = 0;
+	wbr = a->br->br_wbr;
 	/* big aufs lock */
-	si_write_lock(a->sb);
+	si_noflush_write_lock(a->sb);
 	if (unlikely(!au_br_writable(a->br->br_perm)))
 		goto out;
 	bindex = au_br_index(a->sb, a->br->br_id);
 	if (unlikely(bindex < 0))
 		goto out;
 
+	AuDebugOn(!wbr);
+	AuDebugOn(!wbr->wbr_whbase || !wbr->wbr_whbase->d_inode);
+
 	dir = a->sb->s_root->d_inode;
 	ii_read_lock_parent(dir);
-	h_root = dget_parent(a->br->br_wh);
+	h_root = dget_parent(wbr->wbr_whbase);
 	h_dir = h_root->d_inode;
 	AuDebugOn(!h_dir->i_op || !h_dir->i_op->link);
 	mutex_lock_nested(&h_dir->i_mutex, AuLsc_I_PARENT);
-	br_wh_write_lock(a->br);
-	if (!au_verify_parent(a->br->br_wh, h_dir)) {
+	wbr_wh_write_lock(wbr);
+	if (!au_verify_parent(wbr->wbr_whbase, h_dir)) {
 		vfsub_args_init(&vargs, &ign, /*dlgt*/0, 0);
 		vfsub_ign_hinode(&vargs, IN_DELETE, au_hi(dir, bindex));
-		err = vfsub_unlink(h_dir, a->br->br_wh, &vargs);
+		err = vfsub_unlink(h_dir, wbr->wbr_whbase, &vargs);
 	} else {
-		AuWarn("%.*s is moved, ignored\n", AuDLNPair(a->br->br_wh));
+		AuWarn("%.*s is moved, ignored\n", AuDLNPair(wbr->wbr_whbase));
 		err = 0;
 	}
-	dput(a->br->br_wh);
-	a->br->br_wh = NULL;
+	dput(wbr->wbr_whbase);
+	wbr->wbr_whbase = NULL;
 	if (!err)
 		err = au_wh_init(h_root, a->br, au_do_nfsmnt(a->br->br_mnt),
 				 a->sb, bindex);
-	br_wh_write_unlock(a->br);
+	wbr_wh_write_unlock(wbr);
 	mutex_unlock(&h_dir->i_mutex);
 	dput(h_root);
 	ii_read_unlock(dir);
 
  out:
-	atomic_dec_return(&a->br->br_wh_running);
+	if (wbr)
+		atomic_dec_return(&wbr->wbr_wh_running);
 	au_br_put(a->br);
+	au_nwt_done(&au_sbi(a->sb)->si_nowait);
 	si_write_unlock(a->sb);
 	kfree(arg);
 	if (unlikely(err))
@@ -607,8 +647,11 @@ static void kick_reinit_br_wh(struct super_block *sb, struct au_branch *br)
 	int do_dec, wkq_err;
 	struct reinit_br_wh *arg;
 
+	AuTraceEnter();
+	AuDebugOn(!br->br_wbr);
+
 	do_dec = 1;
-	if (atomic_inc_return(&br->br_wh_running) != 1)
+	if (atomic_inc_return(&br->br_wbr->wbr_wh_running) != 1)
 		goto out;
 
 	/* ignore ENOMEM */
@@ -623,7 +666,7 @@ static void kick_reinit_br_wh(struct super_block *sb, struct au_branch *br)
 		au_br_get(br);
 		wkq_err = au_wkq_nowait(reinit_br_wh, arg, sb, /*dlgt*/0);
 		if (unlikely(wkq_err)) {
-			atomic_dec_return(&br->br_wh_running);
+			atomic_dec_return(&br->br_wbr->wbr_wh_running);
 			au_br_put(br);
 			kfree(arg);
 		}
@@ -632,7 +675,7 @@ static void kick_reinit_br_wh(struct super_block *sb, struct au_branch *br)
 
  out:
 	if (do_dec)
-		atomic_dec_return(&br->br_wh_running);
+		atomic_dec_return(&br->br_wbr->wbr_wh_running);
 }
 
 /*
@@ -643,6 +686,7 @@ static int link_or_create_wh(struct super_block *sb, aufs_bindex_t bindex,
 {
 	int err, dlgt;
 	struct au_branch *br;
+	struct au_wbr *wbr;
 	struct dentry *h_parent;
 	struct inode *h_dir;
 	struct au_hin_ignore ign;
@@ -652,19 +696,21 @@ static int link_or_create_wh(struct super_block *sb, aufs_bindex_t bindex,
 	h_parent = wh->d_parent; /* dir inode is locked */
 	h_dir = h_parent->d_inode;
 	IMustLock(h_dir);
+	br = au_sbr(sb, bindex);
+	wbr = br->br_wbr;
+	AuDebugOn(!wbr);
 
 	dlgt = !!au_test_dlgt(au_mntflags(sb));
-	br = au_sbr(sb, bindex);
-	br_wh_read_lock(br);
-	if (br->br_wh) {
+	wbr_wh_read_lock(wbr);
+	if (wbr->wbr_whbase) {
 		vfsub_args_init(&vargs, &ign, dlgt, 0);
 		if (unlikely(dir))
 			vfsub_ign_hinode(&vargs, IN_CREATE, au_hi(dir, bindex));
-		err = vfsub_link(br->br_wh, h_dir, wh, &vargs);
+		err = vfsub_link(wbr->wbr_whbase, h_dir, wh, &vargs);
 		if (!err || err != -EMLINK)
 			goto out;
 
-		/* link count full. re-initialize br_wh. */
+		/* link count full. re-initialize br_whbase. */
 		kick_reinit_br_wh(sb, br);
 	}
 
@@ -676,7 +722,7 @@ static int link_or_create_wh(struct super_block *sb, aufs_bindex_t bindex,
 			  au_do_nfsmnt(br->br_mnt));
 
  out:
-	br_wh_read_unlock(br);
+	wbr_wh_read_unlock(wbr);
 	AuTraceErr(err);
 	return err;
 }
@@ -939,7 +985,7 @@ int au_whtmp_rmdir(struct inode *dir, aufs_bindex_t bindex,
 
 	LKTRTrace("i%lu, %.*s, b%d\n",
 		  dir->i_ino, AuDLNPair(wh_dentry), bindex);
-	IMustLock(dir);
+	/* IMustLock(dir); */
 	IiMustAnyLock(dir);
 	h_dir = wh_dentry->d_parent->d_inode; /* dir inode is locked */
 	IMustLock(h_dir);
@@ -1013,36 +1059,35 @@ static void call_rmdir_whtmp(void *args)
 	int err;
 	struct au_whtmp_rmdir_args *a = args;
 	struct super_block *sb;
+	struct dentry *h_parent;
+	struct inode *h_dir;
 
 	LKTRTrace("%.*s, b%d, dir i%lu\n",
 		  AuDLNPair(a->wh_dentry), a->bindex, a->dir->i_ino);
 
-	mutex_lock(&a->dir->i_mutex);
+	/* rmdir by nfsd may cause deadlock with this i_mutex */
+	/* mutex_lock(&a->dir->i_mutex); */
 	sb = a->dir->i_sb;
 	si_noflush_read_lock(sb);
 	err = au_test_ro(sb, a->bindex, NULL);
-	if (!err) {
-		int done = 0;
+	if (unlikely(err))
+		goto out;
 
-		ii_write_lock_parent(a->dir);
-		do {
-			struct dentry *h_parent;
-			struct inode *h_dir;
+	err = -EIO;
+	ii_write_lock_parent(a->dir);
+	h_parent = dget_parent(a->wh_dentry);
+	h_dir = h_parent->d_inode;
+	mutex_lock_nested(&h_dir->i_mutex, AuLsc_I_PARENT);
+	if (!au_verify_parent(a->wh_dentry, h_dir))
+		err = au_whtmp_rmdir(a->dir, a->bindex, a->wh_dentry,
+				     &a->whlist);
+	mutex_unlock(&h_dir->i_mutex);
+	dput(h_parent);
+	ii_write_unlock(a->dir);
 
-			h_parent = dget_parent(a->wh_dentry);
-			h_dir = h_parent->d_inode;
-			mutex_lock_nested(&h_dir->i_mutex, AuLsc_I_PARENT);
-			if (!au_verify_parent(a->wh_dentry, h_dir)) {
-				done = 1;
-				err = au_whtmp_rmdir(a->dir, a->bindex,
-						     a->wh_dentry, &a->whlist);
-			}
-			mutex_unlock(&h_dir->i_mutex);
-			dput(h_parent);
-		} while (!done);
-		ii_write_unlock(a->dir);
-	}
-	mutex_unlock(&a->dir->i_mutex);
+ out:
+	/* mutex_unlock(&a->dir->i_mutex); */
+	au_nwt_done(&au_sbi(sb)->si_nowait);
 	si_read_unlock(sb);
 	au_whtmp_rmdir_free_args(a);
 	if (unlikely(err))

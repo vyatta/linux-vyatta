@@ -19,7 +19,7 @@
 /*
  * copy-up functions, see wbr_policy.c for copy-down
  *
- * $Id: cpup.c,v 1.14 2008/08/25 01:49:47 sfjro Exp $
+ * $Id: cpup.c,v 1.15 2008/09/01 02:54:45 sfjro Exp $
  */
 
 #include <linux/fs_stack.h>
@@ -460,7 +460,8 @@ int cpup_entry(struct dentry *dentry, aufs_bindex_t bdst, aufs_bindex_t bsrc,
 		     && !isdir
 		     && au_opt_test_xino(mnt_flags)
 		     && h_inode->i_nlink == 1
-		     && bdst < bsrc))
+		     && bdst < bsrc
+		     && !au_ftest_cpup(flags, KEEPLINO)))
 		au_xino_write0(sb, bsrc, h_inode->i_ino, /*ino*/0);
 		/* ignore this error */
 
@@ -799,8 +800,8 @@ static int au_do_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst,
 	if (file)
 		dinfo->di_hdentry[0 + bstart].hd_dentry
 			= au_h_fptr(file, au_fbstart(file))->f_dentry;
-	err = au_cpup_single(dentry, bdst, bstart, len, !AuCpup_DTIME, NULL,
-			     vargs);
+	err = au_cpup_single(dentry, bdst, bstart, len, !AuCpup_DTIME,
+			     /*h_parent*/NULL, vargs);
 	if (!err && file) {
 		err = au_reopen_nondir(file);
 		dinfo->di_hdentry[0 + bstart].hd_dentry = h_d_bstart;
@@ -815,10 +816,11 @@ static int au_do_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst,
 /*
  * copyup the deleted file for writing.
  */
-int au_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
-	       struct file *file)
+static int au_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
+		      struct file *file)
 {
-	int err, dlgt;
+	int err;
+	unsigned char dlgt;
 	struct dentry *parent, *h_parent, *wh_dentry;
 	struct super_block *sb;
 	unsigned int mnt_flags;
@@ -912,17 +914,36 @@ int au_sio_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
 		   struct file *file)
 {
 	int err, wkq_err;
-	struct dentry *parent;
-	struct inode *dir, *h_dir;
+	struct dentry *parent, *h_tmp, *h_parent;
+	struct inode *dir, *h_dir, *h_tmpdir;
+	struct au_wbr *wbr;
 
 	AuTraceEnter();
 	parent = dget_parent(dentry);
 	dir = parent->d_inode;
 	IiMustAnyLock(dir);
-	h_dir = au_h_iptr(dir, bdst);
+
+	h_tmp = NULL;
+	h_parent = NULL;
+	h_dir = au_igrab(au_h_iptr(dir, bdst));
+	h_tmpdir = h_dir;
+	if (unlikely(!h_dir->i_nlink)) {
+		DiMustWriteLock(parent);
+		wbr = au_sbr(dentry->d_sb, bdst)->br_wbr;
+		AuDebugOn(!wbr);
+		h_tmp = wbr->wbr_tmp;
+
+		h_parent = dget(au_h_dptr(parent, bdst));
+		au_set_h_dptr(parent, bdst, NULL);
+		au_set_h_dptr(parent, bdst, dget(h_tmp));
+		h_tmpdir = h_tmp->d_inode;
+		au_set_h_iptr(dir, bdst, NULL, 0);
+		au_set_h_iptr(dir, bdst, au_igrab(h_tmpdir), /*flags*/0);
+		mutex_lock_nested(&h_tmpdir->i_mutex, AuLsc_I_PARENT3);
+	}
 
 	if (!au_test_h_perm_sio
-	    (h_dir, MAY_EXEC | MAY_WRITE,
+	    (h_tmpdir, MAY_EXEC | MAY_WRITE,
 	     au_test_dlgt(au_mntflags(dentry->d_sb))))
 		err = au_cpup_wh(dentry, bdst, len, file);
 	else {
@@ -937,6 +958,16 @@ int au_sio_cpup_wh(struct dentry *dentry, aufs_bindex_t bdst, loff_t len,
 		if (unlikely(wkq_err))
 			err = wkq_err;
 	}
+
+	/* todo: is this restore safe? */
+	if (unlikely(h_tmp)) {
+		mutex_unlock(&h_tmpdir->i_mutex);
+		au_set_h_iptr(dir, bdst, NULL, 0);
+		au_set_h_iptr(dir, bdst, au_igrab(h_dir), /*flags*/0);
+		au_set_h_dptr(parent, bdst, NULL);
+		au_set_h_dptr(parent, bdst, h_parent);
+	}
+	iput(h_dir);
 	dput(parent);
 
 	AuTraceErr(err);

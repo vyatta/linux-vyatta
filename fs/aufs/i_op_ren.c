@@ -20,7 +20,7 @@
  * inode operation (rename entry)
  * todo: this is crazy monster
  *
- * $Id: i_op_ren.c,v 1.11 2008/08/25 01:50:25 sfjro Exp $
+ * $Id: i_op_ren.c,v 1.12 2008/09/01 02:55:15 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -623,20 +623,28 @@ static void au_ren_fake_pin(struct au_ren_args *a)
 {
 	int i;
 	struct au_pin1 *p;
+	struct inode *h_i;
 
+	AuTraceEnter();
+
+	/* they increment the ref counter */
 	for (i = 0; i < 2; i++) {
 		p = a->pin[i].pin + AuPin_PARENT;
 		au_pin_set_parent(a->pin + i, a->parent[i]);
-		au_pin_set_h_dir(a->pin + i, a->h_parent[i]->d_inode);
+		dput(a->parent[i]);
+		h_i = a->h_parent[i]->d_inode;
+		au_pin_set_h_dir(a->pin + i, h_i);
+		iput(h_i);
 
 		if (!a->gparent[i]) {
 			au_pin_set_gparent(a->pin + i, NULL);
 			au_pin_set_h_gdir(a->pin + i, NULL);
 		} else {
 			au_pin_set_gparent(a->pin + i, a->gparent[i]);
-			au_pin_set_h_gdir(a->pin + i,
-					  au_h_iptr(a->gparent[i]->d_inode,
-						    a->btgt));
+			dput(a->gparent[i]);
+			h_i = au_h_iptr(a->gparent[i]->d_inode, a->btgt);
+			au_pin_set_h_gdir(a->pin + i, h_i);
+			iput(h_i);
 		}
 	}
 }
@@ -648,6 +656,7 @@ static int au_ren_pin4(int higher, int lower, struct au_ren_args *a)
 	int err, i, lsc;
 	struct au_pin *p;
 	struct au_pin1 *p4[4];
+	struct inode *h_dir;
 
 	LKTRTrace("%d, %d\n", higher, lower);
 
@@ -659,11 +668,11 @@ static int au_ren_pin4(int higher, int lower, struct au_ren_args *a)
 	p4[3] = p->pin + AuPin_PARENT;
 
 	if (a->gparent[higher])
-		p4[0]->parent = dget(a->gparent[higher]);
-	p4[1]->parent = dget(a->parent[higher]);
+		au_pin_do_set_parent(p4[0], a->gparent[higher]);
+	au_pin_do_set_parent(p4[1], a->parent[higher]);
 	if (a->gparent[lower])
-		p4[2]->parent = dget(a->gparent[lower]);
-	p4[3]->parent = dget(a->parent[lower]);
+		au_pin_do_set_parent(p4[2], a->gparent[lower]);
+	au_pin_do_set_parent(p4[3], a->parent[lower]);
 
 	DiMustWriteLock(p4[3]->parent);
 	di_write_unlock(p4[1]->parent);
@@ -676,9 +685,9 @@ static int au_ren_pin4(int higher, int lower, struct au_ren_args *a)
 	lsc = AuLsc_I_PARENT;
 	for (i = 0; i < 4; i++, lsc++) {
 		if (p4[i]->parent) {
-			p4[i]->h_dir = au_h_iptr(p4[i]->parent->d_inode,
-						 a->btgt);
-			mutex_lock_nested(&p4[i]->h_dir->i_mutex, lsc);
+			h_dir = au_h_iptr(p4[i]->parent->d_inode, a->btgt);
+			au_pin_do_set_h_dir(p4[i], h_dir);
+			mutex_lock_nested(&h_dir->i_mutex, lsc);
 		}
 	}
 
@@ -696,7 +705,8 @@ static struct dentry *au_ren_pin3(int higher, int lower, struct au_ren_args *a)
 	LKTRTrace("%d, %d\n", higher, lower);
 
 	p = a->pin + higher;
-	err = au_do_pin(p->pin + AuPin_PARENT, au_pin_gp(p), a->btgt, /*do_gp*/1);
+	err = au_do_pin(p->pin + AuPin_PARENT, au_pin_gp(p), a->btgt,
+			/*do_gp*/1);
 	h_trap = ERR_PTR(err);
 	if (unlikely(err))
 		goto out;
@@ -815,6 +825,7 @@ static struct dentry *au_ren_pin(struct au_ren_args *a)
 
 	dput(a->gparent[SRC]);
 	dput(a->gparent[DST]);
+	/* memset(a->gparent, 0, sizeof(a->gparent)); */
 	AuTraceErrPtr(h_trap);
 	return h_trap;
 }

@@ -19,62 +19,90 @@
 /*
  * inode attributes on FUSE branch or HINOTIFY
  *
- * $Id: hin_or_fuse.c,v 1.3 2008/08/25 01:49:59 sfjro Exp $
+ * $Id: hin_or_fuse.c,v 1.5 2008/09/08 02:39:51 sfjro Exp $
  */
 
 #include "aufs.h"
 
+static struct dentry *
+au_h_dget_any(struct dentry *dentry, aufs_bindex_t *bindex)
+{
+	struct dentry *h_dentry;
+	struct inode *inode, *h_inode;
+	struct super_block *sb;
+	aufs_bindex_t ib, db;
+
+	/* must be positive dentry */
+	inode = dentry->d_inode;
+	LKTRTrace("%.*s, i%lu\n", AuDLNPair(dentry), inode->i_ino);
+
+	sb = dentry->d_sb;
+	db = au_dbstart(dentry);
+	ib = au_ibstart(inode);
+	if (db == ib) {
+		*bindex = db;
+		h_dentry = dget(au_h_dptr(dentry, db));
+		if (h_dentry)
+			goto out; /* success */
+	}
+
+	*bindex = ib;
+	h_inode = au_h_iptr(inode, ib);
+	h_dentry = d_find_alias(h_inode);
+	if (h_dentry)
+		goto out; /* success */
+
+#if 0
+	if (au_opt_test(au_mntflags(sb), PLINK)
+	    && au_plink_test(sb, inode)) {
+		h_dentry = au_plink_lkup(sb, ib, inode);
+		if (IS_ERR(h_dentry))
+			goto out;
+		AuDebugOn(!h_dentry->d_inode);
+		goto out; /* success */
+	}
+#endif
+
+	h_dentry = dget(au_hi_wh(inode, ib));
+
+ out:
+	AuTraceErrPtr(h_dentry);
+	return h_dentry;
+}
+
 int aufs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *st)
 {
 	int err;
-	struct inode *inode, *h_inode;
+	aufs_bindex_t bindex;
+	struct inode *inode;
 	struct dentry *h_dentry;
-	aufs_bindex_t ib, db, bindex;
 	struct super_block *sb;
+	unsigned int mnt_flags;
 
 	LKTRTrace("%.*s\n", AuDLNPair(dentry));
 
-	h_dentry = NULL;
 	inode = dentry->d_inode;
 	sb = dentry->d_sb;
 	aufs_read_lock(dentry, AuLock_FLUSH | AuLock_IR);
-#if 0
-	err = -EIO;
-	if (!au_hin_verify_gen(dentry))
+
+	/* todo: refine it */
+	mnt_flags = au_mntflags(sb);
+	if (au_opt_test(mnt_flags, PLINK) && au_plink_test(sb, inode))
+		goto plinked;
+
+	h_dentry = au_h_dget_any(dentry, &bindex);
+	err = PTR_ERR(h_dentry);
+	if (IS_ERR(h_dentry))
 		goto out;
-#endif
 
-	ib = au_ibstart(inode);
-	db = au_dbstart(dentry);
-	if (ib == db) {
-		bindex = db;
-		h_dentry = dget(au_h_dptr(dentry, db));
-	} else {
-		bindex = ib;
-		h_inode = au_h_iptr(inode, ib);
-		h_dentry = d_find_alias(h_inode);
-	}
-
-	if (unlikely(!h_dentry)) {
-		h_dentry = au_hi_wh(inode, ib);
-		if (h_dentry) {
-			dget(h_dentry);
-			if (unlikely(!h_dentry->d_inode)) {
-				dput(h_dentry);
-				err = -ENOENT;
-				goto out;
-			}
-		}
-	}
-
-	err = -EIO;
-	if (h_dentry) {
+	err = -ENOENT;
+	if (h_dentry->d_inode)
 		err = vfsub_getattr(au_sbr_mnt(sb, bindex), h_dentry, st,
-				    au_test_dlgt(au_mntflags(sb)));
-		dput(h_dentry);
-	}
+				    au_test_dlgt(mnt_flags));
+	dput(h_dentry);
 	if (!err) {
 		au_cpup_attr_all(inode);
+	plinked:
 		generic_fillattr(inode, st);
 	}
 

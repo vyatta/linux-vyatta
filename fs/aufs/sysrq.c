@@ -19,7 +19,7 @@
 /*
  * magic sysrq hanlder
  *
- * $Id: sysrq.c,v 1.9 2008/07/21 02:54:22 sfjro Exp $
+ * $Id: sysrq.c,v 1.10 2008/09/08 02:40:48 sfjro Exp $
  */
 
 #include <linux/fs.h>
@@ -42,10 +42,8 @@ static void sysrq_sb(struct super_block *sb)
 	au_dpri_sb(sb);
 	pr_warning(AUFS_NAME ": root dentry\n");
 	au_dpri_dentry(sb->s_root);
-#if 0 /* debug */
 	pr_warning(AUFS_NAME ": root inode\n");
 	au_dpri_inode(sb->s_root->d_inode);
-#endif
 	pr_warning(AUFS_NAME ": isolated inode\n");
 	list_for_each_entry(i, &sb->s_inodes, i_sb_list)
 		if (list_empty(&i->i_dentry))
