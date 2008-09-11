@@ -19,7 +19,7 @@
 /*
  * pseudo-link
  *
- * $Id: plink.c,v 1.8 2008/08/25 01:49:43 sfjro Exp $
+ * $Id: plink.c,v 1.9 2008/09/01 02:55:35 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -96,6 +96,7 @@ struct dentry *au_plink_lkup(struct super_block *sb, aufs_bindex_t bindex,
 {
 	struct dentry *h_dentry, *h_parent;
 	struct au_branch *br;
+	struct au_wbr *wbr;
 	struct inode *h_dir;
 	char tgtname[PLINK_NAME_LEN];
 	int len;
@@ -107,7 +108,9 @@ struct dentry *au_plink_lkup(struct super_block *sb, aufs_bindex_t bindex,
 
 	LKTRTrace("b%d, i%lu\n", bindex, inode->i_ino);
 	br = au_sbr(sb, bindex);
-	h_parent = br->br_plink;
+	wbr = br->br_wbr;
+	AuDebugOn(!wbr);
+	h_parent = wbr->wbr_plink;
 	AuDebugOn(!h_parent);
 	h_dir = h_parent->d_inode;
 	AuDebugOn(!h_dir);
@@ -187,13 +190,16 @@ static int whplink(struct dentry *h_dentry, struct inode *inode,
 {
 	int err, len, wkq_err;
 	struct au_branch *br;
+	struct au_wbr *wbr;
 	struct dentry *h_parent;
 	struct inode *h_dir;
 	char tgtname[PLINK_NAME_LEN];
 
 	LKTRTrace("%.*s\n", AuDLNPair(h_dentry));
 	br = au_sbr(inode->i_sb, bindex);
-	h_parent = br->br_plink;
+	wbr = br->br_wbr;
+	AuDebugOn(!wbr);
+	h_parent = wbr->wbr_plink;
 	AuDebugOn(!h_parent);
 	h_dir = h_parent->d_inode;
 	AuDebugOn(!h_dir);

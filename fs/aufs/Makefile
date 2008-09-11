@@ -37,6 +37,17 @@ endif
 # bool
 ccflags-$(CONFIG_SYSFS) += -DSYSFS_MAGIC=0x62656572
 
+ifndef EXTRAVERSION
+EXTRAVERSION = $(shell echo ${KERNELVERSION} | cut -f3- -d. | cut -f2- -d-)
+endif
+# for -mm tree, support the latest version only
+ifneq ($(strip $(shell echo ${EXTRAVERSION} | fgrep -- mm)),)
+ccflags-y += -DCONFIG_AUFS_UNIONFS22_PATCH -DCONFIG_AUFS_UNIONFS23_PATCH
+endif
+
+-include $(dir $(lastword ${MAKEFILE_LIST}))priv.mk
+#$(warning ${ccflags-y})
+
 ########################################
 
 obj-$(CONFIG_AUFS) += aufs.o

@@ -19,7 +19,7 @@
 /*
  * directory operations
  *
- * $Id: dir.c,v 1.11 2008/07/27 22:49:55 sfjro Exp $
+ * $Id: dir.c,v 1.12 2008/09/08 02:39:45 sfjro Exp $
  */
 
 #include <linux/fs_stack.h>
@@ -122,6 +122,8 @@ static int do_open_dir(struct file *file, int flags)
 
 static int aufs_open_dir(struct inode *inode, struct file *file)
 {
+	LKTRTrace("i%lu, %.*s\n", inode->i_ino, AuDLNPair(file->f_dentry));
+
 	return au_do_open(inode, file, do_open_dir);
 }
 
@@ -426,7 +428,7 @@ static int sio_test_empty(struct dentry *dentry, struct test_empty_arg *arg)
 	h_dentry = au_h_dptr(dentry, arg->bindex);
 	AuDebugOn(!h_dentry);
 	h_inode = h_dentry->d_inode;
-	AuDebugOn(!h_inode || !S_ISDIR(h_inode->i_mode));
+	AuDebugOn(!h_inode);
 
 	mutex_lock_nested(&h_inode->i_mutex, AuLsc_I_CHILD);
 	err = au_test_h_perm_sio(h_inode, MAY_EXEC | MAY_READ,
@@ -493,7 +495,6 @@ int au_test_empty_lower(struct dentry *dentry)
 		struct dentry *h_dentry;
 		h_dentry = au_h_dptr(dentry, bindex);
 		if (h_dentry && h_dentry->d_inode) {
-			AuDebugOn(!S_ISDIR(h_dentry->d_inode->i_mode));
 			arg.bindex = bindex;
 			err = do_test_empty(dentry, &arg);
 		}
@@ -527,7 +528,6 @@ int au_test_empty(struct dentry *dentry, struct au_nhash *whlist)
 		struct dentry *h_dentry;
 		h_dentry = au_h_dptr(dentry, bindex);
 		if (h_dentry && h_dentry->d_inode) {
-			AuDebugOn(!S_ISDIR(h_dentry->d_inode->i_mode));
 			arg.bindex = bindex;
 			err = sio_test_empty(dentry, &arg);
 		}

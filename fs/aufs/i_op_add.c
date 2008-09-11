@@ -19,7 +19,7 @@
 /*
  * inode operations (add entry)
  *
- * $Id: i_op_add.c,v 1.11 2008/08/25 01:50:16 sfjro Exp $
+ * $Id: i_op_add.c,v 1.12 2008/09/01 02:55:12 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -428,7 +428,9 @@ static int au_cpup_before_link(struct dentry *src_dentry, struct inode *dir,
 	if (unlikely(err))
 		goto out;
 	mutex_lock_nested(h_mtx, AuLsc_I_CHILD);
-	err = au_sio_cpup_simple(src_dentry, a->bdst, -1, AuCpup_DTIME);
+	/* todo: no KEEPLINO because of noplink? */
+	err = au_sio_cpup_simple(src_dentry, a->bdst, -1,
+				 AuCpup_DTIME /* | AuCpup_KEEPLINO */);
 	mutex_unlock(h_mtx);
 	au_unpin(&a->pin);
 
@@ -459,7 +461,7 @@ static int au_cpup_or_link(struct dentry *src_dentry, struct au_link_args *a)
 		h_inode = au_h_dptr(src_dentry, a->bsrc)->d_inode;
 		mutex_lock_nested(&h_inode->i_mutex, AuLsc_I_CHILD);
 		err = au_sio_cpup_single(src_dentry, a->bdst, a->bsrc, -1,
-					 !AuCpup_DTIME, a->parent);
+					 AuCpup_KEEPLINO, a->parent);
 		mutex_unlock(&h_inode->i_mutex);
 		au_set_h_dptr(src_dentry, a->bdst, NULL);
 		au_set_dbstart(src_dentry, a->bsrc);

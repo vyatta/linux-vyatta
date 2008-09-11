@@ -19,7 +19,7 @@
 /*
  * debug print functions
  *
- * $Id: debug.h,v 1.6 2008/08/17 23:03:39 sfjro Exp $
+ * $Id: debug.h,v 1.7 2008/09/01 02:55:44 sfjro Exp $
  */
 
 #ifndef __AUFS_DEBUG_H__
@@ -29,7 +29,6 @@
 
 #include <linux/fs.h>
 #include <linux/kd.h>
-/* #include <linux/console_struct.h> */
 #include <linux/vt_kern.h>
 #include <linux/sysrq.h>
 

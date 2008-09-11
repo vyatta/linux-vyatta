@@ -19,7 +19,7 @@
 /*
  * workqueue for asynchronous/super-io/delegated operations
  *
- * $Id: wkq.c,v 1.11 2008/07/21 02:54:22 sfjro Exp $
+ * $Id: wkq.c,v 1.12 2008/09/08 02:40:15 sfjro Exp $
  */
 
 #include <linux/module.h>
@@ -287,6 +287,24 @@ int au_wkq_run(au_wkq_func_t func, void *args, struct super_block *sb,
 	}
  out:
 	AuTraceErr(err);
+	return err;
+}
+
+int au_wkq_nowait(au_wkq_func_t func, void *args, struct super_block *sb,
+		  int dlgt)
+{
+	int err;
+	unsigned int flags = !AuWkq_WAIT;
+
+	AuTraceEnter();
+
+	if (unlikely(dlgt))
+		au_fset_wkq(flags, DLGT);
+	atomic_inc_return(&au_sbi(sb)->si_nowait.nw_len);
+	err = au_wkq_run(func, args, sb, flags);
+	if (unlikely(err))
+		atomic_dec_return(&au_sbi(sb)->si_nowait.nw_len);
+
 	return err;
 }
 

@@ -18,8 +18,9 @@
 
 /*
  * export via nfs
+ * todo: support anonymous dentry for hardlink
  *
- * $Id: export.c,v 1.12 2008/08/17 23:03:42 sfjro Exp $
+ * $Id: export.c,v 1.13 2008/09/08 02:39:48 sfjro Exp $
  */
 
 #include <linux/exportfs.h>
@@ -89,6 +90,73 @@ static int au_test_anon(struct dentry *dentry)
 }
 
 /* ---------------------------------------------------------------------- */
+#if 0
+static struct dentry *au_anon(struct inode *inode)
+{
+	struct dentry *dentry;
+	struct super_block *sb;
+	ino_t ino;
+	struct inode *i;
+
+	LKTRTrace("i%lu\n", inode->i_ino);
+	AuDebugOn(S_ISDIR(inode->i_mode));
+
+	dentry = NULL;
+	/* todo: export __d_find_alias() */
+	spin_lock(&dcache_lock);
+	list_for_each_entry(d, &inode->i_dentry, d_alias)
+		if (au_test_anon(d)) {
+			dentry = dget(d);
+			break;
+		}
+	spin_unlock(&dcache_lock);
+	if (dentry)
+		goto out;
+
+	dentry = ERR_PTR(-EIO);
+	sb = inode->i_sb;
+	ino = au_xino_new_ino(sb);
+	if (unlikely(ino))
+		goto out;
+	i = au_iget_locked(sb, ino);
+	dentry = (void *)i;
+	if (IS_ERR(i))
+		goto out;
+	/* todo: necessary? */
+	clear_nlink(i);
+	AuDbgInode(i);
+
+	dentry = d_alloc_anon(i);
+	if (IS_ERR(dentry))
+		goto out_i;
+	else if (unlikely(!dentry)) {
+		dentry = ERR_PTR(-ENOMEM);
+		goto out_i;
+	}
+#if 0
+	int err;
+	err = au_alloc_dinfo(dentry);
+	if (unlikely(err))
+		goto out_d;
+#endif
+
+	spin_lock(&dcache_lock);
+	list_del(&dentry->d_alias);
+	dentry->d_inode = au_igrab(inode);
+	list_add(&d->d_alias, &inode->i_dentry);
+	spin_unlock(&dcache_lock);
+	goto out_i; /* success */
+
+ out_d:
+	dput(dentry);
+	dentry = ERR_PTR(err);
+ out_i:
+	iput(i);
+ out:
+	AuTraceErrPtr(dentry);
+	return dentry;
+}
+#endif
 
 static struct dentry *decode_by_ino(struct super_block *sb, ino_t ino,
 				    ino_t dir_ino)
@@ -268,14 +336,17 @@ struct dentry *decode_by_dir_ino(struct super_block *sb, ino_t ino,
 		/* smp_mb(); */
 		err = vfsub_readdir(file, find_name_by_ino, &arg, /*dlgt*/0);
 	} while (!err && !arg.found && arg.called);
-	dentry = ERR_PTR(err);
-	if (arg.found) {
-		/* do not call au_lkup_one(), nor dlgt */
-		mutex_lock(&dir->i_mutex);
-		dentry = vfsub_lookup_one_len(arg.name, parent, arg.namelen);
-		mutex_unlock(&dir->i_mutex);
-		AuTraceErrPtr(dentry);
-	}
+	if (!err) {
+		if (arg.found) {
+			/* do not call au_lkup_one(), nor dlgt */
+			mutex_lock(&dir->i_mutex);
+			dentry = vfsub_lookup_one_len(arg.name, parent, arg.namelen);
+			mutex_unlock(&dir->i_mutex);
+			AuTraceErrPtr(dentry);
+		} else
+			dentry = ERR_PTR(-ENOENT);
+	} else
+		dentry = ERR_PTR(err);
 	__putname(arg.name);
 
  out_fput:
@@ -307,7 +378,9 @@ static int append_name(void *arg, const char *name, int len, loff_t pos,
 
 	AuDebugOn(len == 1 && *name == '.');
 	AuDebugOn(len == 2 && name[0] == '.' && name[1] == '.');
-	a->len = strlen(a->h_path);
+	if (unlikely(a->len + len + 2 > PATH_MAX))
+		return -ENAMETOOLONG;
+
 	memmove(a->h_path - len - 1, a->h_path, a->len);
 	a->h_path -= len + 1;
 	p = a->h_path + a->len;
@@ -361,6 +434,7 @@ static char *au_build_path(struct super_block *sb, __u32 *fh, char *path,
 	if (IS_ERR(h_file))
 		goto out;
 
+	arg.len = strlen(arg.h_path);
 	arg.found = 0;
 	arg.h_ino = decode_ino(fh + Fh_h_ino);
 	do {
@@ -371,6 +445,9 @@ static char *au_build_path(struct super_block *sb, __u32 *fh, char *path,
 	fput(h_file);
 	ret = ERR_PTR(err);
 	if (unlikely(err))
+		goto out;
+	ret = ERR_PTR(-ENOENT);
+	if (unlikely(!arg.found))
 		goto out;
 
 	dm_path.mnt = au_mnt_get(sb);
@@ -414,7 +491,7 @@ struct dentry *decode_by_path(struct super_block *sb, aufs_bindex_t bindex,
 				      h_acceptable, /*context*/NULL);
 	dentry = h_parent;
 	if (unlikely(!h_parent || IS_ERR(h_parent))) {
-		AuWarn1("%s decode_fh failed\n", au_sbtype(h_sb));
+		//AuWarn1("%s decode_fh failed\n", au_sbtype(h_sb));
 		goto out;
 	}
 	dentry = NULL;
@@ -438,6 +515,7 @@ struct dentry *decode_by_path(struct super_block *sb, aufs_bindex_t bindex,
 	di_read_unlock(root, !AuLock_IR);
 	p = au_build_path(sb, fh, path, h_mnt, h_root, h_parent);
 	dput(h_parent);
+	dentry = (void *)p;
 	if (IS_ERR(p))
 		goto out_putname;
 
@@ -473,9 +551,9 @@ aufs_decode_fh(struct super_block *sb, __u32 *fh, int fh_len, int fh_type,
 	struct inode *inode, *h_inode;
 	au_gen_t sigen;
 
-	LKTRTrace("%d, fh{i%u, br_id %u, sigen %u, hi%u}\n",
-		  fh_type, fh[Fh_ino], fh[Fh_br_id], fh[Fh_sigen],
-		  fh[Fh_h_ino]);
+	LKTRTrace("%d, fh{br_id %u, sigen %u, i%u, diri%u, hi%u}\n",
+		  fh_type, fh[Fh_br_id], fh[Fh_sigen], fh[Fh_ino],
+		  fh[Fh_dir_ino], fh[Fh_h_ino]);
 	AuDebugOn(fh_len < Fh_tail);
 
 	si_read_lock(sb, AuLock_FLUSH);
@@ -486,7 +564,11 @@ aufs_decode_fh(struct super_block *sb, __u32 *fh, int fh_len, int fh_type,
 	br_id = fh[Fh_br_id];
 	sigen = fh[Fh_sigen];
 	bindex = au_br_index(sb, br_id);
-	if (unlikely(bindex < 0 || sigen + AUFS_BRANCH_MAX <= au_sigen(sb)))
+	LKTRTrace("b%d\n", bindex);
+	if (unlikely(bindex < 0
+		     || (0 && sigen != au_sigen(sb))
+		     || (1 && sigen + AUFS_BRANCH_MAX <= au_sigen(sb))
+		    ))
 		goto out;
 
 	/* is this inode still cached? */
@@ -511,25 +593,61 @@ aufs_decode_fh(struct super_block *sb, __u32 *fh, int fh_len, int fh_type,
 		goto out;
 	if (unlikely(!dentry))
 		goto out_stale;
-	if (unlikely(dentry->d_inode->i_ino != ino))
+	if (unlikely(dentry->d_inode->i_ino != ino)) {
+		LKTRTrace("ino %lu\n", ino);
+		AuDbgDentry(dentry);
+		AuDbgInode(dentry->d_inode);
 		goto out_dput;
+	}
 
  accept:
+	LKTRLabel(accept);
 	inode = dentry->d_inode;
+#if 0
+	/* support branch manupilation and udba on nfs server */
+	sigen = au_sigen(sb);
+	if (unlikely(au_digen(dentry) != sigen
+		     || au_iigen(inode) != sigen)) {
+		int err;
+
+		//lktr_set_pid(current->pid, LktrArrayPid);
+		//au_fset_si(au_sbi(dentry->d_sb), FAILED_REFRESH_DIRS);
+		di_write_lock_child(dentry);
+		err = au_reval_dpath(dentry, sigen);
+		di_write_unlock(dentry);
+		//lktr_clear_pid(current->pid, LktrArrayPid);
+		if (unlikely(err < 0))
+			goto out_dput;
+	}
+#endif
+
 	h_inode = NULL;
 	ii_read_lock_child(inode);
 	if (au_ibstart(inode) <= bindex && bindex <= au_ibend(inode))
 		h_inode = au_h_iptr(inode, bindex);
 	ii_read_unlock(inode);
+#if 0
+	/* support silly-rename */
+	if (h_inode
+	    && h_inode->i_generation != fh[Fh_h_igen])
+		goto out_dput;
+	if (acceptable(context, dentry))
+		goto out; /* success */
+#else
 	if (h_inode
 	    && h_inode->i_generation == fh[Fh_h_igen]
 	    && acceptable(context, dentry))
 		goto out; /* success */
+#endif
+
  out_dput:
+	LKTRLabel(out_dput);
 	dput(dentry);
  out_stale:
+	LKTRLabel(out_stale);
 	dentry = ERR_PTR(-ESTALE);
  out:
+	LKTRLabel(out);
 	lockdep_on();
 	si_read_unlock(sb);
 	AuTraceErrPtr(dentry);

@@ -19,7 +19,7 @@
 /*
  * internal/hidden inotify handler
  *
- * $Id: hinotify.c,v 1.14 2008/08/25 01:50:03 sfjro Exp $
+ * $Id: hinotify.c,v 1.16 2008/09/08 02:39:54 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -157,7 +157,10 @@ void au_unpin_gp(struct au_pin *args)
 
 	gp = au_pin_gp(args);
 	AuDebugOn(!gp);
-	LKTRTrace("%.*s\n", AuDLNPair(gp->dentry));
+	if (gp->dentry)
+		LKTRTrace("%.*s\n", AuDLNPair(gp->dentry));
+	else
+		AuTraceEnter();
 
 	au_do_unpin(gp, NULL);
 }
@@ -884,8 +887,8 @@ static void postproc(void *_args)
 	ii_write_unlock(a->dir);
 
  out:
+	au_nwt_done(&sbinfo->si_nowait);
 	si_write_unlock(sb);
-	au_nwt_dec(&sbinfo->si_nowait);
 
 	iput(a->h_child_inode);
 	iput(a->h_dir);
@@ -904,7 +907,6 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd, u32 mask,
 	char *p;
 	struct inode *dir;
 	unsigned int flags[2];
-	struct super_block *sb;
 
 	LKTRTrace("i%lu, wd %d, mask 0x%x %s, cookie 0x%x, hcname %s, hi%lu\n",
 		  watch->inode->i_ino, wd, mask, in_name(mask), cookie,
@@ -1080,15 +1082,11 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd, u32 mask,
 		memcpy(p, h_child_name, len + 1);
 	}
 
-	sb = dir->i_sb;
-	au_nwt_inc(&au_sbi(sb)->si_nowait);
 	lockdep_off();
-	wkq_err = au_wkq_nowait(postproc, args, sb, /*dlgt*/0);
+	wkq_err = au_wkq_nowait(postproc, args, dir->i_sb, /*dlgt*/0);
 	lockdep_on();
-	if (unlikely(wkq_err)) {
+	if (unlikely(wkq_err))
 		AuErr("wkq %d\n", wkq_err);
-		au_nwt_dec(&au_sbi(sb)->si_nowait);
-	}
 }
 
 static void aufs_inotify_destroy(struct inotify_watch *watch)

@@ -19,7 +19,7 @@
 /*
  * file and vm operations
  *
- * $Id: f_op.c,v 1.10 2008/07/21 02:53:48 sfjro Exp $
+ * $Id: f_op.c,v 1.11 2008/09/01 02:55:44 sfjro Exp $
  */
 
 #include <linux/fs_stack.h>
@@ -107,6 +107,8 @@ static int do_open_nondir(struct file *file, int flags)
 
 static int aufs_open_nondir(struct inode *inode, struct file *file)
 {
+	LKTRTrace("i%lu, %.*s\n", inode->i_ino, AuDLNPair(file->f_dentry));
+
 	return au_do_open(inode, file, do_open_nondir);
 }
 

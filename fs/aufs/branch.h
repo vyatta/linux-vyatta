@@ -19,7 +19,7 @@
 /*
  * branch filesystems and xino for them
  *
- * $Id: branch.h,v 1.10 2008/08/17 23:03:27 sfjro Exp $
+ * $Id: branch.h,v 1.11 2008/09/01 02:54:41 sfjro Exp $
  */
 
 #ifndef __AUFS_BRANCH_H__
@@ -68,6 +68,20 @@ struct au_xino_file {
 #endif
 };
 
+/* members for writable branch only */
+enum {AuBrWh_BASE, AuBrWh_PLINK, AuBrWh_TMP, AuBrWh_Last};
+struct au_wbr {
+	struct au_rwsem		wbr_wh_rwsem;
+	struct dentry		*wbr_wh[AuBrWh_Last];
+	atomic_t 		wbr_wh_running;
+#define wbr_whbase		wbr_wh[AuBrWh_BASE]	/* whiteout base */
+#define wbr_plink		wbr_wh[AuBrWh_PLINK]	/* pseudo-link dir */
+#define wbr_tmp			wbr_wh[AuBrWh_TMP]	/* temporary dir */
+
+	/* mfs mode */
+	unsigned long long	wbr_bytes;
+};
+
 /* protected by superblock rwsem */
 struct au_branch {
 	struct au_xino_file	br_xino;
@@ -78,22 +92,13 @@ struct au_branch {
 	struct vfsmount		*br_mnt;
 	atomic_t		br_count;
 
-	/* whiteout base */
-	struct au_rwsem		br_wh_rwsem;
-	struct dentry		*br_wh;
-	atomic_t 		br_wh_running;
-
-	/* pseudo-link dir */
-	struct dentry		*br_plink;
+	struct au_wbr		*br_wbr;
 
 #if 1 /* reserved for future use */
 	/* xino truncation */
 	blkcnt_t		br_xino_upper;	/* watermark in blocks */
 	atomic_t		br_xino_running;
 #endif
-
-	/* mfs mode */
-	unsigned long long	br_bytes;
 
 #ifdef CONFIG_SYSFS
 	/* an entry under sysfs per mount-point */
@@ -108,41 +113,41 @@ struct au_branch {
 
 /* branch permission and attribute */
 enum {
-	AuBr_RW,		/* writable, linkable wh */
-	AuBr_RO,		/* readonly, no wh */
-	AuBr_RR,		/* natively readonly, no wh */
+	AuBrPerm_RW,		/* writable, linkable wh */
+	AuBrPerm_RO,		/* readonly, no wh */
+	AuBrPerm_RR,		/* natively readonly, no wh */
 
-	AuBr_RWNoLinkWH,	/* un-linkable whiteouts */
+	AuBrPerm_RWNoLinkWH,	/* un-linkable whiteouts */
 
-	AuBr_ROWH,
-	AuBr_RRWH,		/* whiteout-able */
+	AuBrPerm_ROWH,
+	AuBrPerm_RRWH,		/* whiteout-able */
 
-	AuBr_Last
+	AuBrPerm_Last
 };
 
 static inline int au_br_writable(int brperm)
 {
-	return (brperm == AuBr_RW || brperm == AuBr_RWNoLinkWH);
+	return (brperm == AuBrPerm_RW || brperm == AuBrPerm_RWNoLinkWH);
 }
 
 static inline int au_br_whable(int brperm)
 {
-	return (brperm == AuBr_RW
-		|| brperm == AuBr_ROWH
-		|| brperm == AuBr_RRWH);
+	return (brperm == AuBrPerm_RW
+		|| brperm == AuBrPerm_ROWH
+		|| brperm == AuBrPerm_RRWH);
 }
 
 #if 0 /* reserved for future use */
 static inline int au_br_linkable_wh(int brperm)
 {
-	return (brperm == AuBr_RW);
+	return (brperm == AuBrPerm_RW);
 }
 #endif
 
 static inline int au_br_hinotifyable(int brperm)
 {
 #ifdef CONFIG_AUFS_HINOTIFY
-	return (brperm != AuBr_RR && brperm != AuBr_RRWH);
+	return (brperm != AuBrPerm_RR && brperm != AuBrPerm_RRWH);
 #else
 	return 0;
 #endif
@@ -360,22 +365,22 @@ struct vfsmount *au_nfsmnt(struct super_block *sb, aufs_bindex_t bindex)
  * br_wh_read_lock, br_wh_write_lock
  * br_wh_read_unlock, br_wh_write_unlock, br_wh_downgrade_lock
  */
-AuSimpleRwsemFuncs(br_wh, struct au_branch *br, br->br_wh_rwsem);
+AuSimpleRwsemFuncs(wbr_wh, struct au_wbr *wbr, wbr->wbr_wh_rwsem);
 
 /* to debug easier, do not make them inlined functions */
-#define BrWhMustReadLock(br) do { \
+#define WbrWhMustReadLock(wbr) do { \
 	/* SiMustAnyLock(sb); */ \
-	AuRwMustReadLock(&(br)->br_wh_rwsem); \
+	AuRwMustReadLock(&(wbr)->wbr_wh_rwsem); \
 } while (0)
 
-#define BrWhMustWriteLock(br) do { \
+#define WbrWhMustWriteLock(wbr) do { \
 	/* SiMustAnyLock(sb); */ \
-	AuRwMustWriteLock(&(br)->br_wh_rwsem); \
+	AuRwMustWriteLock(&(wbr)->wbr_wh_rwsem); \
 } while (0)
 
-#define BrWhMustAnyLock(br) do { \
+#define WbrWhMustAnyLock(br) do { \
 	/* SiMustAnyLock(sb); */ \
-	AuRwMustAnyLock(&(br)->br_wh_rwsem); \
+	AuRwMustAnyLock(&(wbr)->wbr_wh_rwsem); \
 } while (0)
 
 #endif /* __KERNEL__ */

@@ -19,7 +19,7 @@
 /*
  * external inode number translation table and bitmap
  *
- * $Id: xino.c,v 1.14 2008/08/17 23:04:19 sfjro Exp $
+ * $Id: xino.c,v 1.15 2008/09/08 02:40:21 sfjro Exp $
  */
 
 #include <linux/uaccess.h>
@@ -147,6 +147,8 @@ static void xino_do_trunc(void *_args)
 	int err;
 	struct file *file;
 	struct inode *dir;
+	struct au_sbinfo *sbinfo;
+	struct kobject *kobj;
 
 	err = 0;
 	sb = args->sb;
@@ -166,13 +168,15 @@ static void xino_do_trunc(void *_args)
 
  out:
 	ii_read_unlock(dir);
-	si_write_unlock(sb);
 	if (unlikely(err))
 		AuWarn("err b%d, (%d)\n", bindex, err);
-	au_nwt_dec(&au_sbi(sb)->si_nowait);
 	atomic_dec_return(&args->br->br_xino_running);
 	au_br_put(args->br);
-	kobject_put(&au_sbi(sb)->si_kobj);
+	sbinfo = au_sbi(sb);
+	kobj = &sbinfo->si_kobj;
+	au_nwt_done(&sbinfo->si_nowait);
+	si_write_unlock(sb);
+	kobject_put(kobj);
 	kfree(args);
 }
 
@@ -201,13 +205,11 @@ static void xino_try_trunc(struct super_block *sb, struct au_branch *br)
 	au_br_get(br);
 	args->sb = sb;
 	args->br = br;
-	au_nwt_inc(&sbinfo->si_nowait);
 	wkq_err = au_wkq_nowait(xino_do_trunc, args, sb, /*dlgt*/0);
 	if (!wkq_err)
 		return; /* success */
 
 	AuErr("wkq %d\n", wkq_err);
-	au_nwt_dec(&sbinfo->si_nowait);
 	au_br_put(br);
 	kobject_put(&sbinfo->si_kobj);
 

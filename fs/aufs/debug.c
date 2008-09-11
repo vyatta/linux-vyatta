@@ -19,7 +19,7 @@
 /*
  * debug print functions
  *
- * $Id: debug.c,v 1.11 2008/08/17 23:03:36 sfjro Exp $
+ * $Id: debug.c,v 1.13 2008/09/08 02:40:48 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -241,10 +241,12 @@ static int do_pri_br(aufs_bindex_t bindex, struct au_branch *br)
 		return -1;
 	}
 
-	dpri("s%d: {perm 0x%x, cnt %d}, "
-	     "%s, flags 0x%lx, cnt(BIAS) %d, active %d, xino %d\n",
-	     bindex, br->br_perm, au_br_count(br),
-	     au_sbtype(sb), sb->s_flags, sb->s_count - S_BIAS,
+	dpri("s%d: {perm 0x%x, cnt %d, wbr %p}, "
+	     "%s, dev 0x%02x%02x, flags 0x%lx, cnt(BIAS) %d, active %d, "
+	     "xino %d\n",
+	     bindex, br->br_perm, au_br_count(br), br->br_wbr,
+	     au_sbtype(sb), MAJOR(sb->s_dev), MINOR(sb->s_dev),
+	     sb->s_flags, sb->s_count - S_BIAS,
 	     atomic_read(&sb->s_active), !!br->br_xino.xi_file);
 	return 0;
 }
@@ -282,6 +284,7 @@ void au_dpri_sb(struct super_block *sb)
 	sbinfo = au_sbi(sb);
 	if (!sbinfo)
 		return;
+	dpri("gen %u\n", sbinfo->si_generation);
 	for (bindex = 0; bindex <= sbinfo->si_bend; bindex++)
 		do_pri_br(bindex, sbinfo->si_branch[0 + bindex]);
 }
@@ -379,9 +382,8 @@ int __init au_debug_init(void)
 		pr_info("br{"
 			"xino %d, "
 			"id %d, perm %d, mnt %d, count %d, "
-			"wh_sem %d, wh %d, run %d, plink %d, "
+			"wbr %d, "
 			"xup %d, xrun %d, "
-			"by %d, "
 			"gen %d, "
 			"sa %d} %d\n",
 			offsetof(typeof(*u.br), br_xino),
@@ -389,13 +391,9 @@ int __init au_debug_init(void)
 			offsetof(typeof(*u.br), br_perm),
 			offsetof(typeof(*u.br), br_mnt),
 			offsetof(typeof(*u.br), br_count),
-			offsetof(typeof(*u.br), br_wh_rwsem),
-			offsetof(typeof(*u.br), br_wh),
-			offsetof(typeof(*u.br), br_wh_running),
-			offsetof(typeof(*u.br), br_plink),
+			offsetof(typeof(*u.br), wbr),
 			offsetof(typeof(*u.br), br_xino_upper),
 			offsetof(typeof(*u.br), br_xino_running),
-			offsetof(typeof(*u.br), br_bytes),
 			offsetof(typeof(*u.br), br_generation),
 			offsetof(typeof(*u.br), br_sabr),
 			sizeof(*u.br));

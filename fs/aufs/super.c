@@ -19,7 +19,7 @@
 /*
  * mount and super_block operations
  *
- * $Id: super.c,v 1.14 2008/08/25 01:50:37 sfjro Exp $
+ * $Id: super.c,v 1.15 2008/09/01 02:54:41 sfjro Exp $
  */
 
 #include <linux/module.h>
@@ -294,7 +294,7 @@ static void au_fsync_br(struct super_block *sb)
 	bend = au_sbend(sb);
 	for (bindex = 0; bindex < bend; bindex++) {
 		brperm = au_sbr_perm(sb, bindex);
-		if (brperm == AuBr_RR || brperm == AuBr_RRWH)
+		if (brperm == AuBrPerm_RR || brperm == AuBrPerm_RRWH)
 			continue;
 		h_sb = au_sbr_sb(sb, bindex);
 		if (bdev_read_only(h_sb->s_bdev))

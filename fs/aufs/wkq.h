@@ -19,7 +19,7 @@
 /*
  * workqueue for asynchronous/super-io/delegated operations
  *
- * $Id: wkq.h,v 1.5 2008/06/16 00:13:22 sfjro Exp $
+ * $Id: wkq.h,v 1.6 2008/09/08 02:40:18 sfjro Exp $
  */
 
 #ifndef __AUFS_WKQ_H__
@@ -51,14 +51,8 @@ struct au_wkq {
  * in the next operation, wait for the 'nowait' tasks in system-wide workqueue
  */
 struct au_nowait_tasks {
-#ifdef CONFIG_AUFS_HINOTIFY
-	/*
-	 * currently, the 'nowait' task which should be waited in the next
-	 * operation is only hinotify.
-	 */
 	atomic_t		nw_len;
 	wait_queue_head_t	nw_wq;
-#endif
 };
 
 /* ---------------------------------------------------------------------- */
@@ -79,6 +73,8 @@ typedef void (*au_wkq_func_t)(void *args);
 
 int au_wkq_run(au_wkq_func_t func, void *args, struct super_block *sb,
 	       unsigned int flags);
+int au_wkq_nowait(au_wkq_func_t func, void *args, struct super_block *sb,
+		  int dlgt);
 int __init au_wkq_init(void);
 void au_wkq_fin(void);
 
@@ -102,15 +98,6 @@ static inline int au_wkq_wait(au_wkq_func_t func, void *args, int dlgt)
 	return au_wkq_run(func, args, /*sb*/NULL, flags);
 }
 
-static inline int au_wkq_nowait(au_wkq_func_t func, void *args,
-				struct super_block *sb, int dlgt)
-{
-	unsigned int flags = !AuWkq_WAIT;
-	if (unlikely(dlgt))
-		au_fset_wkq(flags, DLGT);
-	return au_wkq_run(func, args, sb, flags);
-}
-
 static inline void au_wkq_max_busy_init(struct au_wkq *wkq)
 {
 #ifdef CONFIG_AUFS_STAT
@@ -118,7 +105,6 @@ static inline void au_wkq_max_busy_init(struct au_wkq *wkq)
 #endif
 }
 
-#ifdef CONFIG_AUFS_HINOTIFY
 /* todo: memory barrier? */
 static inline void au_nwt_init(struct au_nowait_tasks *nwt)
 {
@@ -127,14 +113,13 @@ static inline void au_nwt_init(struct au_nowait_tasks *nwt)
 	init_waitqueue_head(&nwt->nw_wq);
 }
 
-static inline int au_nwt_inc(struct au_nowait_tasks *nwt)
+static inline int au_nwt_done(struct au_nowait_tasks *nwt)
 {
-	return atomic_inc_return(&nwt->nw_len);
-}
+	int ret;
 
-static inline int au_nwt_dec(struct au_nowait_tasks *nwt)
-{
-	int ret = atomic_dec_return(&nwt->nw_len);
+	AuTraceEnter();
+
+	ret = atomic_dec_return(&nwt->nw_len);
 	if (!ret)
 		wake_up_all(&nwt->nw_wq);
 	return ret;
@@ -145,27 +130,6 @@ static inline int au_nwt_flush(struct au_nowait_tasks *nwt)
 	wait_event(nwt->nw_wq, !atomic_read(&nwt->nw_len));
 	return 0;
 }
-#else
-static inline void au_nwt_init(struct au_nowait_tasks *nwt)
-{
-	/* nothing */
-}
-
-static inline int au_nwt_inc(struct au_nowait_tasks *nwt)
-{
-	return 0;
-}
-
-static inline int au_nwt_dec(struct au_nowait_tasks *nwt)
-{
-	return 0;
-}
-
-static inline int au_nwt_flush(struct au_nowait_tasks *nwt)
-{
-	return 0;
-}
-#endif /* CONFIG_AUFS_HINOTIFY */
 
 #endif /* __KERNEL__ */
 #endif /* __AUFS_WKQ_H__ */

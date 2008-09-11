@@ -19,7 +19,7 @@
 /*
  * lookup and dentry operations
  *
- * $Id: dentry.c,v 1.12 2008/08/25 01:50:45 sfjro Exp $
+ * $Id: dentry.c,v 1.13 2008/09/01 02:54:54 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -956,8 +956,7 @@ static void aufs_d_release(struct dentry *dentry)
 	}
 	kfree(dinfo->di_hdentry);
 	au_cache_free_dinfo(dinfo);
-	/* todo: hinootify case only */
-	dentry->d_fsdata = NULL;
+	au_hin_di_reinit(dentry);
 }
 
 struct dentry_operations aufs_dop = {
