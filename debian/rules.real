@@ -114,7 +114,7 @@ setup-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-all: DIR=$(BUILD_DIR)/build-$(ARCH)-$(SUBARC
 setup-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-all: $(BUILD_DIR)/config.$(ARCH)-$(SUBARCH)-$(FLAVOUR)
 	rm -rf '$(DIR)'
 	cp -al '$(SOURCE_DIR)' '$(DIR)'
-	cp '$(CONFIG)' '$(DIR)/.config'
+	cp -p '$(CONFIG)' '$(DIR)/.config'
 	echo '$(ABINAME)$(LOCALVERSION)' > '$(DIR)/localversion'
 	echo 'override ARCH = $(KERNEL_ARCH)' >> '$(DIR)/.kernelvariables'
 	echo 'CCACHE = ccache' >> '$(DIR)/.kernelvariables'
@@ -136,7 +136,7 @@ $(STAMPS_DIR)/setup-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-$(TYPE): $(STAMPS_DIR)/source-
 $(STAMPS_DIR)/setup-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-kernel-package:
 	$(MAKE) -f debian/rules.real setup-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-all
 	mkdir -p '$(DIR)/debian'
-	cp debian/{changelog,control,copyright} '$(DIR)/debian'
+	cp -p debian/{changelog,control,copyright} '$(DIR)/debian'
 	touch '$(DIR)/debian/official'
 	cd '$(DIR)'; $(setup_env) $(kpkg_image) configure
 	touch '$@'
@@ -399,8 +399,8 @@ install-image-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-plain:
 	  DIR='$(DIR)' PACKAGE_DIR='$(PACKAGE_DIR)' INSTALL_DIR='$(INSTALL_DIR)' REAL_VERSION='$(REAL_VERSION)'
 ifeq ($(MODULES),True)
 	cd $(DIR); $(setup_env) make modules_install INSTALL_MOD_PATH=$(PACKAGE_DIR)
-	cp $(DIR)/.config $(PACKAGE_DIR)/boot/config-$(REAL_VERSION)
-	cp $(DIR)/System.map $(PACKAGE_DIR)/boot/System.map-$(REAL_VERSION)
+	cp -p $(DIR)/.config $(PACKAGE_DIR)/boot/config-$(REAL_VERSION)
+	cp -p $(DIR)/System.map $(PACKAGE_DIR)/boot/System.map-$(REAL_VERSION)
 	rm $(PACKAGE_DIR)/lib/modules/$(REAL_VERSION)/{build,source,modules.*}
 endif
 	$(MAKE) -f debian/rules.real \
@@ -413,7 +413,7 @@ endif
 
 install-image-amd64-$(SUBARCH)-$(FLAVOUR)-plain_image \
 install-image-i386-$(SUBARCH)-$(FLAVOUR)-plain_image:
-	cp '$(DIR)/arch/$(KERNEL_ARCH)/boot/bzImage' $(INSTALL_DIR)/vmlinuz-$(REAL_VERSION)
+	cp -p '$(DIR)/arch/$(KERNEL_ARCH)/boot/bzImage' $(INSTALL_DIR)/vmlinuz-$(REAL_VERSION)
 
 install-image-m68k-$(SUBARCH)-$(FLAVOUR)-plain_image:
 	install -m644 '$(DIR)/vmlinux.gz' $(INSTALL_DIR)/vmlinuz-$(REAL_VERSION)
@@ -430,7 +430,7 @@ else
 endif
 
 install-image-s390-$(SUBARCH)-$(FLAVOUR)-plain_image:
-	cp '$(DIR)/arch/s390/boot/image' $(INSTALL_DIR)/vmlinuz-$(REAL_VERSION)
+	cp -p '$(DIR)/arch/s390/boot/image' $(INSTALL_DIR)/vmlinuz-$(REAL_VERSION)
 
 ifneq ($(INITRAMFS),False)
 install-image-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-plain_templates: ARG_INITRD = YES
@@ -475,7 +475,7 @@ install-image-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-plain-s390-tape:
 	dh_testroot
 	dh_clean -d -k
 	dh_installdirs 'boot'
-	cp '$(DIR)/arch/s390/boot/image' $(PACKAGE_DIR)/boot/vmlinuz-$(REAL_VERSION)
+	cp -p '$(DIR)/arch/s390/boot/image' $(PACKAGE_DIR)/boot/vmlinuz-$(REAL_VERSION)
 	$(MAKE) -f debian/rules.real install-base
 
 install-image-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-plain-xen: MODULES_PACKAGE_NAME = linux-modules-$(REAL_VERSION)
@@ -487,10 +487,10 @@ install-image-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-plain-xen:
 	dh_clean -d -k
 	DH_OPTIONS= dh_installdirs -p$(PACKAGE_NAME) 'boot' 'var/lib/$(PACKAGE_NAME)'
 	DH_OPTIONS= dh_installdirs -p$(MODULES_PACKAGE_NAME) 'boot'
-	cp $(DIR)/vmlinuz $(INSTALL_DIR)/vmlinuz-$(REAL_VERSION)
-	cd $(DIR); $(setup_env) make modules_install INSTALL_MOD_PATH=$(MODULES_PACKAGE_DIR)
-	cp $(DIR)/.config $(MODULES_PACKAGE_DIR)/boot/config-$(REAL_VERSION)
-	cp $(DIR)/System.map $(MODULES_PACKAGE_DIR)/boot/System.map-$(REAL_VERSION)
+	cp -p $(DIR)/vmlinuz $(INSTALL_DIR)/vmlinuz-$(REAL_VERSION)
+	cd -p $(DIR); $(setup_env) make modules_install INSTALL_MOD_PATH=$(MODULES_PACKAGE_DIR)
+	cp -p $(DIR)/.config $(MODULES_PACKAGE_DIR)/boot/config-$(REAL_VERSION)
+	cp -p $(DIR)/System.map $(MODULES_PACKAGE_DIR)/boot/System.map-$(REAL_VERSION)
 	rm $(MODULES_PACKAGE_DIR)/lib/modules/$(REAL_VERSION)/{build,source}
 	DH_OPTIONS= dh_installmodules -p$(MODULES_PACKAGE_NAME)
 	for i in $(XEN_VERSIONS); do echo $$i >> $(PACKAGE_DIR)/var/lib/$(PACKAGE_NAME)/xen-versions; done
