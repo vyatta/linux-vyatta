@@ -146,6 +146,7 @@ int unionfs_unlink(struct inode *dir, struct dentry *dentry)
 	/* call d_drop so the system "forgets" about us */
 	if (!err) {
 		unionfs_postcopyup_release(dentry);
+		unionfs_postcopyup_setmnt(dentry->d_parent);
 		if (inode->i_nlink == 0) /* drop lower inodes */
 			iput_lowers_all(inode, false);
 		d_drop(dentry);
