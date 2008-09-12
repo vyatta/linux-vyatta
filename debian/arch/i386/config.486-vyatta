@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.26
-# Thu Sep 11 14:15:01 2008
+# Fri Sep 12 13:37:44 2008
 #
 # CONFIG_64BIT is not set
 CONFIG_X86_32=y
@@ -3516,6 +3516,7 @@ CONFIG_CONFIGFS_FS=m
 #
 # Layered filesystems
 #
+CONFIG_ECRYPT_FS=m
 CONFIG_AUFS=m
 
 #
@@ -3547,11 +3548,6 @@ CONFIG_AUFS_HIN_OR_FUSE=y
 CONFIG_AUFS_COMPAT=y
 CONFIG_AUFS_UNIONFS22_PATCH=y
 CONFIG_AUFS_UNIONFS23_PATCH=y
-# CONFIG_ECRYPT_FS is not set
-
-#
-# Layered filesystems
-#
 CONFIG_UNION_FS=m
 # CONFIG_UNION_FS_XATTR is not set
 # CONFIG_UNION_FS_DEBUG is not set
