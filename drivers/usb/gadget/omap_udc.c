@@ -4,6 +4,8 @@
  * Copyright (C) 2004 Texas Instruments, Inc.
  * Copyright (C) 2004-2005 David Brownell
  *
+ * OMAP2 & DMA support by Kyungmin Park <kyungmin.park@samsung.com>
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -60,11 +62,6 @@
 /* bulk DMA seems to be behaving for both IN and OUT */
 #define	USE_DMA
 
-/* FIXME: OMAP2 currently has some problem in DMA mode */
-#ifdef CONFIG_ARCH_OMAP2
-#undef USE_DMA
-#endif
-
 /* ISO too */
 #define	USE_ISO
 
@@ -73,6 +70,8 @@
 
 #define	DMA_ADDR_INVALID	(~(dma_addr_t)0)
 
+#define OMAP2_DMA_CH(ch)	(((ch) - 1) << 1)
+#define OMAP24XX_DMA(name, ch)	(OMAP24XX_DMA_##name + OMAP2_DMA_CH(ch))
 
 /*
  * The OMAP UDC needs _very_ early endpoint setup:  before enabling the
@@ -164,7 +163,7 @@ static int omap_ep_enable(struct usb_ep *_ep,
 			|| ep->bEndpointAddress != desc->bEndpointAddress
 			|| ep->maxpacket < le16_to_cpu
 						(desc->wMaxPacketSize)) {
-		DBG("%s, bad ep or descriptor\n", __FUNCTION__);
+		DBG("%s, bad ep or descriptor\n", __func__);
 		return -EINVAL;
 	}
 	maxp = le16_to_cpu (desc->wMaxPacketSize);
@@ -172,7 +171,7 @@ static int omap_ep_enable(struct usb_ep *_ep,
 				&& maxp != ep->maxpacket)
 			|| le16_to_cpu(desc->wMaxPacketSize) > ep->maxpacket
 			|| !desc->wMaxPacketSize) {
-		DBG("%s, bad %s maxpacket\n", __FUNCTION__, _ep->name);
+		DBG("%s, bad %s maxpacket\n", __func__, _ep->name);
 		return -ERANGE;
 	}
 
@@ -195,13 +194,13 @@ static int omap_ep_enable(struct usb_ep *_ep,
 	if (ep->bmAttributes != desc->bmAttributes
 			&& ep->bmAttributes != USB_ENDPOINT_XFER_BULK
 			&& desc->bmAttributes != USB_ENDPOINT_XFER_INT) {
-		DBG("%s, %s type mismatch\n", __FUNCTION__, _ep->name);
+		DBG("%s, %s type mismatch\n", __func__, _ep->name);
 		return -EINVAL;
 	}
 
 	udc = ep->udc;
 	if (!udc->driver || udc->gadget.speed == USB_SPEED_UNKNOWN) {
-		DBG("%s, bogus device state\n", __FUNCTION__);
+		DBG("%s, bogus device state\n", __func__);
 		return -ESHUTDOWN;
 	}
 
@@ -250,7 +249,7 @@ static int omap_ep_disable(struct usb_ep *_ep)
 	unsigned long	flags;
 
 	if (!_ep || !ep->desc) {
-		DBG("%s, %s not enabled\n", __FUNCTION__,
+		DBG("%s, %s not enabled\n", __func__,
 			_ep ? ep->ep.name : NULL);
 		return -EINVAL;
 	}
@@ -571,20 +570,25 @@ static void next_in_dma(struct omap_ep *ep, struct omap_req *req)
 	const int	sync_mode = cpu_is_omap15xx()
 				? OMAP_DMA_SYNC_FRAME
 				: OMAP_DMA_SYNC_ELEMENT;
+	int		dma_trigger = 0;
+
+	if (cpu_is_omap24xx())
+		dma_trigger = OMAP24XX_DMA(USB_W2FC_TX0, ep->dma_channel);
 
 	/* measure length in either bytes or packets */
 	if ((cpu_is_omap16xx() && length <= UDC_TXN_TSC)
+			|| (cpu_is_omap24xx() && length < ep->maxpacket)
 			|| (cpu_is_omap15xx() && length < ep->maxpacket)) {
 		txdma_ctrl = UDC_TXN_EOT | length;
 		omap_set_dma_transfer_params(ep->lch, OMAP_DMA_DATA_TYPE_S8,
-				length, 1, sync_mode, 0, 0);
+				length, 1, sync_mode, dma_trigger, 0);
 	} else {
 		length = min(length / ep->maxpacket,
 				(unsigned) UDC_TXN_TSC + 1);
 		txdma_ctrl = length;
 		omap_set_dma_transfer_params(ep->lch, OMAP_DMA_DATA_TYPE_S16,
 				ep->ep.maxpacket >> 1, length, sync_mode,
-				0, 0);
+				dma_trigger, 0);
 		length *= ep->maxpacket;
 	}
 	omap_set_dma_src_params(ep->lch, OMAP_DMA_PORT_EMIFF,
@@ -622,20 +626,31 @@ static void finish_in_dma(struct omap_ep *ep, struct omap_req *req, int status)
 
 static void next_out_dma(struct omap_ep *ep, struct omap_req *req)
 {
-	unsigned packets;
+	unsigned packets = req->req.length - req->req.actual;
+	int dma_trigger = 0;
+
+	if (cpu_is_omap24xx())
+		dma_trigger = OMAP24XX_DMA(USB_W2FC_RX0, ep->dma_channel);
 
 	/* NOTE:  we filtered out "short reads" before, so we know
 	 * the buffer has only whole numbers of packets.
+	 * except MODE SELECT(6) sent the 24 bytes data in OMAP24XX DMA mode
 	 */
-
-	/* set up this DMA transfer, enable the fifo, start */
-	packets = (req->req.length - req->req.actual) / ep->ep.maxpacket;
-	packets = min(packets, (unsigned)UDC_RXN_TC + 1);
-	req->dma_bytes = packets * ep->ep.maxpacket;
-	omap_set_dma_transfer_params(ep->lch, OMAP_DMA_DATA_TYPE_S16,
-			ep->ep.maxpacket >> 1, packets,
-			OMAP_DMA_SYNC_ELEMENT,
-			0, 0);
+	if (cpu_is_omap24xx() && packets < ep->maxpacket) {
+		omap_set_dma_transfer_params(ep->lch, OMAP_DMA_DATA_TYPE_S8,
+				packets, 1, OMAP_DMA_SYNC_ELEMENT,
+				dma_trigger, 0);
+		req->dma_bytes = packets;
+	} else {
+		/* set up this DMA transfer, enable the fifo, start */
+		packets /= ep->ep.maxpacket;
+		packets = min(packets, (unsigned)UDC_RXN_TC + 1);
+		req->dma_bytes = packets * ep->ep.maxpacket;
+		omap_set_dma_transfer_params(ep->lch, OMAP_DMA_DATA_TYPE_S16,
+				ep->ep.maxpacket >> 1, packets,
+				OMAP_DMA_SYNC_ELEMENT,
+				dma_trigger, 0);
+	}
 	omap_set_dma_dest_params(ep->lch, OMAP_DMA_PORT_EMIFF,
 		OMAP_DMA_AMODE_POST_INC, req->req.dma + req->req.actual,
 		0, 0);
@@ -743,6 +758,7 @@ static void dma_channel_claim(struct omap_ep *ep, unsigned channel)
 {
 	u16	reg;
 	int	status, restart, is_in;
+	int	dma_channel;
 
 	is_in = ep->bEndpointAddress & USB_DIR_IN;
 	if (is_in)
@@ -769,11 +785,15 @@ static void dma_channel_claim(struct omap_ep *ep, unsigned channel)
 	ep->dma_channel = channel;
 
 	if (is_in) {
-		status = omap_request_dma(OMAP_DMA_USB_W2FC_TX0 - 1 + channel,
+		if (cpu_is_omap24xx())
+			dma_channel = OMAP24XX_DMA(USB_W2FC_TX0, channel);
+		else
+			dma_channel = OMAP_DMA_USB_W2FC_TX0 - 1 + channel;
+		status = omap_request_dma(dma_channel,
 			ep->ep.name, dma_error, ep, &ep->lch);
 		if (status == 0) {
 			UDC_TXDMA_CFG_REG = reg;
-			/* EMIFF */
+			/* EMIFF or SDRC */
 			omap_set_dma_src_burst_mode(ep->lch,
 						OMAP_DMA_DATA_BURST_4);
 			omap_set_dma_src_data_pack(ep->lch, 1);
@@ -785,7 +805,12 @@ static void dma_channel_claim(struct omap_ep *ep, unsigned channel)
 				0, 0);
 		}
 	} else {
-		status = omap_request_dma(OMAP_DMA_USB_W2FC_RX0 - 1 + channel,
+		if (cpu_is_omap24xx())
+			dma_channel = OMAP24XX_DMA(USB_W2FC_RX0, channel);
+		else
+			dma_channel = OMAP_DMA_USB_W2FC_RX0 - 1 + channel;
+
+		status = omap_request_dma(dma_channel,
 			ep->ep.name, dma_error, ep, &ep->lch);
 		if (status == 0) {
 			UDC_RXDMA_CFG_REG = reg;
@@ -795,7 +820,7 @@ static void dma_channel_claim(struct omap_ep *ep, unsigned channel)
 				OMAP_DMA_AMODE_CONSTANT,
 				(unsigned long) io_v2p((u32)&UDC_DATA_DMA_REG),
 				0, 0);
-			/* EMIFF */
+			/* EMIFF or SDRC */
 			omap_set_dma_dest_burst_mode(ep->lch,
 						OMAP_DMA_DATA_BURST_4);
 			omap_set_dma_dest_data_pack(ep->lch, 1);
@@ -808,7 +833,7 @@ static void dma_channel_claim(struct omap_ep *ep, unsigned channel)
 		omap_disable_dma_irq(ep->lch, OMAP_DMA_BLOCK_IRQ);
 
 		/* channel type P: hw synch (fifo) */
-		if (!cpu_is_omap15xx())
+		if (cpu_class_is_omap1() && !cpu_is_omap15xx())
 			OMAP1_DMA_LCH_CTRL_REG(ep->lch) = 2;
 	}
 
@@ -911,11 +936,11 @@ omap_ep_queue(struct usb_ep *_ep, struct usb_request *_req, gfp_t gfp_flags)
 	/* catch various bogus parameters */
 	if (!_req || !req->req.complete || !req->req.buf
 			|| !list_empty(&req->queue)) {
-		DBG("%s, bad params\n", __FUNCTION__);
+		DBG("%s, bad params\n", __func__);
 		return -EINVAL;
 	}
 	if (!_ep || (!ep->desc && ep->bEndpointAddress)) {
-		DBG("%s, bad ep\n", __FUNCTION__);
+		DBG("%s, bad ep\n", __func__);
 		return -EINVAL;
 	}
 	if (ep->bmAttributes == USB_ENDPOINT_XFER_ISOC) {
@@ -926,13 +951,15 @@ omap_ep_queue(struct usb_ep *_ep, struct usb_request *_req, gfp_t gfp_flags)
 
 	/* this isn't bogus, but OMAP DMA isn't the only hardware to
 	 * have a hard time with partial packet reads...  reject it.
+	 * Except OMAP2 can handle the small packets.
 	 */
 	if (use_dma
 			&& ep->has_dma
 			&& ep->bEndpointAddress != 0
 			&& (ep->bEndpointAddress & USB_DIR_IN) == 0
+			&& !cpu_class_is_omap2()
 			&& (req->req.length % ep->ep.maxpacket) != 0) {
-		DBG("%s, no partial packet OUT reads\n", __FUNCTION__);
+		DBG("%s, no partial packet OUT reads\n", __func__);
 		return -EMSGSIZE;
 	}
 
@@ -1001,7 +1028,7 @@ omap_ep_queue(struct usb_ep *_ep, struct usb_request *_req, gfp_t gfp_flags)
 
 				/* STATUS for zero length DATA stages is
 				 * always an IN ... even for IN transfers,
-				 * a wierd case which seem to stall OMAP.
+				 * a weird case which seem to stall OMAP.
 				 */
 				UDC_EP_NUM_REG = (UDC_EP_SEL|UDC_EP_DIR);
 				UDC_CTRL_REG = UDC_CLR_EP;
@@ -1238,8 +1265,6 @@ static int can_pullup(struct omap_udc *udc)
 
 static void pullup_enable(struct omap_udc *udc)
 {
-	udc->gadget.dev.parent->power.power_state = PMSG_ON;
-	udc->gadget.dev.power.power_state = PMSG_ON;
 	UDC_SYSCON1_REG |= UDC_PULLUP_EN;
 	if (!gadget_is_otg(&udc->gadget) && !cpu_is_omap15xx())
 		OTG_CTRL_REG |= OTG_BSESSVLD;
@@ -2479,6 +2504,7 @@ static int proc_udc_open(struct inode *inode, struct file *file)
 }
 
 static const struct file_operations proc_ops = {
+	.owner		= THIS_MODULE,
 	.open		= proc_udc_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
@@ -2487,11 +2513,7 @@ static const struct file_operations proc_ops = {
 
 static void create_proc_file(void)
 {
-	struct proc_dir_entry *pde;
-
-	pde = create_proc_entry (proc_filename, 0, NULL);
-	if (pde)
-		pde->proc_fops = &proc_ops;
+	proc_create(proc_filename, 0, NULL, &proc_ops);
 }
 
 static void remove_proc_file(void)
@@ -3034,8 +3056,6 @@ static int omap_udc_suspend(struct platform_device *dev, pm_message_t message)
 		omap_pullup(&udc->gadget, 0);
 	}
 
-	udc->gadget.dev.power.power_state = PMSG_SUSPEND;
-	udc->gadget.dev.parent->power.power_state = PMSG_SUSPEND;
 	return 0;
 }
 
@@ -3082,4 +3102,4 @@ module_exit(udc_exit);
 
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
-
+MODULE_ALIAS("platform:omap_udc");

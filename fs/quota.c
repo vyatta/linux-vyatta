@@ -69,7 +69,6 @@ static int generic_quotactl_valid(struct super_block *sb, int type, int cmd, qid
 	switch (cmd) {
 		case Q_GETFMT:
 		case Q_GETINFO:
-		case Q_QUOTAOFF:
 		case Q_SETINFO:
 		case Q_SETQUOTA:
 		case Q_GETQUOTA:
@@ -229,12 +228,12 @@ static int do_quotactl(struct super_block *sb, int type, int cmd, qid_t id, void
 
 			if (IS_ERR(pathname = getname(addr)))
 				return PTR_ERR(pathname);
-			ret = sb->s_qcop->quota_on(sb, type, id, pathname);
+			ret = sb->s_qcop->quota_on(sb, type, id, pathname, 0);
 			putname(pathname);
 			return ret;
 		}
 		case Q_QUOTAOFF:
-			return sb->s_qcop->quota_off(sb, type);
+			return sb->s_qcop->quota_off(sb, type, 0);
 
 		case Q_GETFMT: {
 			__u32 fmt;
@@ -341,11 +340,11 @@ static inline struct super_block *quotactl_block(const char __user *special)
 	char *tmp = getname(special);
 
 	if (IS_ERR(tmp))
-		return ERR_PTR(PTR_ERR(tmp));
+		return ERR_CAST(tmp);
 	bdev = lookup_bdev(tmp);
 	putname(tmp);
 	if (IS_ERR(bdev))
-		return ERR_PTR(PTR_ERR(bdev));
+		return ERR_CAST(bdev);
 	sb = get_super(bdev);
 	bdput(bdev);
 	if (!sb)

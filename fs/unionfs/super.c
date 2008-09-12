@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2007 Erez Zadok
+ * Copyright (c) 2003-2008 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005-2006 Junjiro Okajima
@@ -8,8 +8,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2007 Stony Brook University
- * Copyright (c) 2003-2007 The Research Foundation of SUNY
+ * Copyright (c) 2003-2008 Stony Brook University
+ * Copyright (c) 2003-2008 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -24,11 +24,19 @@
  */
 static struct kmem_cache *unionfs_inode_cachep;
 
-static void unionfs_read_inode(struct inode *inode)
+struct inode *unionfs_iget(struct super_block *sb, unsigned long ino)
 {
 	int size;
-	struct unionfs_inode_info *info = UNIONFS_I(inode);
+	struct unionfs_inode_info *info;
+	struct inode *inode;
 
+	inode = iget_locked(sb, ino);
+	if (!inode)
+		return ERR_PTR(-ENOMEM);
+	if (!(inode->i_state & I_NEW))
+		return inode;
+
+	info = UNIONFS_I(inode);
 	memset(info, 0, offsetof(struct unionfs_inode_info, vfs_inode));
 	info->bstart = -1;
 	info->bend = -1;
@@ -44,7 +52,8 @@ static void unionfs_read_inode(struct inode *inode)
 	if (unlikely(!info->lower_inodes)) {
 		printk(KERN_CRIT "unionfs: no kernel memory when allocating "
 		       "lower-pointer array!\n");
-		BUG();
+		iget_failed(inode);
+		return ERR_PTR(-ENOMEM);
 	}
 
 	inode->i_version++;
@@ -60,7 +69,8 @@ static void unionfs_read_inode(struct inode *inode)
 	inode->i_atime.tv_sec = inode->i_atime.tv_nsec = 0;
 	inode->i_mtime.tv_sec = inode->i_mtime.tv_nsec = 0;
 	inode->i_ctime.tv_sec = inode->i_ctime.tv_nsec = 0;
-
+	unlock_new_inode(inode);
+	return inode;
 }
 
 /*
@@ -163,7 +173,7 @@ static int unionfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	 *
 	 * XXX: this restriction goes away with ODF.
 	 */
-	buf->f_namelen -= UNIONFS_WHLEN;
+	unionfs_set_max_namelen(&buf->f_namelen);
 
 	/*
 	 * reset two fields to avoid confusing user-land.
@@ -224,10 +234,10 @@ static noinline_for_stack int do_remount_mode_option(
 		goto out;
 	}
 	for (idx = 0; idx < cur_branches; idx++)
-		if (nd.mnt == new_lower_paths[idx].mnt &&
-		    nd.dentry == new_lower_paths[idx].dentry)
+		if (nd.path.mnt == new_lower_paths[idx].mnt &&
+		    nd.path.dentry == new_lower_paths[idx].dentry)
 			break;
-	path_release(&nd);	/* no longer needed */
+	path_put(&nd.path);	/* no longer needed */
 	if (idx == cur_branches) {
 		err = -ENOENT;	/* err may have been reset above */
 		printk(KERN_ERR "unionfs: branch \"%s\" "
@@ -268,10 +278,10 @@ static noinline_for_stack int do_remount_del_option(
 		goto out;
 	}
 	for (idx = 0; idx < cur_branches; idx++)
-		if (nd.mnt == new_lower_paths[idx].mnt &&
-		    nd.dentry == new_lower_paths[idx].dentry)
+		if (nd.path.mnt == new_lower_paths[idx].mnt &&
+		    nd.path.dentry == new_lower_paths[idx].dentry)
 			break;
-	path_release(&nd);	/* no longer needed */
+	path_put(&nd.path);	/* no longer needed */
 	if (idx == cur_branches) {
 		printk(KERN_ERR "unionfs: branch \"%s\" "
 		       "not found\n", optarg);
@@ -290,7 +300,7 @@ static noinline_for_stack int do_remount_del_option(
 	 * new_data and new_lower_paths one to the left.  Finally, adjust
 	 * cur_branches.
 	 */
-	pathput(&new_lower_paths[idx]);
+	path_put(&new_lower_paths[idx]);
 
 	if (idx < cur_branches - 1) {
 		/* if idx==cur_branches-1, we delete last branch: easy */
@@ -353,10 +363,10 @@ static noinline_for_stack int do_remount_add_option(
 		goto out;
 	}
 	for (idx = 0; idx < cur_branches; idx++)
-		if (nd.mnt == new_lower_paths[idx].mnt &&
-		    nd.dentry == new_lower_paths[idx].dentry)
+		if (nd.path.mnt == new_lower_paths[idx].mnt &&
+		    nd.path.dentry == new_lower_paths[idx].dentry)
 			break;
-	path_release(&nd);	/* no longer needed */
+	path_put(&nd.path);	/* no longer needed */
 	if (idx == cur_branches) {
 		printk(KERN_ERR "unionfs: branch \"%s\" "
 		       "not found\n", optarg);
@@ -403,7 +413,7 @@ found_insertion_point:
 	if (err) {
 		printk(KERN_ERR "unionfs: lower directory "
 		       "\"%s\" is not a valid branch\n", optarg);
-		path_release(&nd);
+		path_put(&nd.path);
 		goto out;
 	}
 
@@ -420,10 +430,10 @@ found_insertion_point:
 		memmove(&new_lower_paths[idx+1], &new_lower_paths[idx],
 			(cur_branches - idx) * sizeof(struct path));
 	}
-	new_lower_paths[idx].dentry = nd.dentry;
-	new_lower_paths[idx].mnt = nd.mnt;
+	new_lower_paths[idx].dentry = nd.path.dentry;
+	new_lower_paths[idx].mnt = nd.path.mnt;
 
-	new_data[idx].sb = nd.dentry->d_sb;
+	new_data[idx].sb = nd.path.dentry->d_sb;
 	atomic_set(&new_data[idx].open_files, 0);
 	new_data[idx].branchperms = perms;
 	new_data[idx].branch_id = ++*high_branch_id; /* assign new branch ID */
@@ -572,7 +582,7 @@ static int unionfs_remount_fs(struct super_block *sb, int *flags,
 	memcpy(tmp_lower_paths, UNIONFS_D(sb->s_root)->lower_paths,
 	       cur_branches * sizeof(struct path));
 	for (i = 0; i < cur_branches; i++)
-		pathget(&tmp_lower_paths[i]); /* drop refs at end of fxn */
+		path_get(&tmp_lower_paths[i]); /* drop refs at end of fxn */
 
 	/*******************************************************************
 	 * For each branch command, do path_lookup on the requested branch,
@@ -761,7 +771,7 @@ out_no_change:
 	/* update our unionfs_sb_info and root dentry index of last branch */
 	i = sbmax(sb);		/* save no. of branches to release at end */
 	sbend(sb) = new_branches - 1;
-	set_dbend(sb->s_root, new_branches - 1);
+	dbend(sb->s_root) = new_branches - 1;
 	old_ibstart = ibstart(sb->s_root->d_inode);
 	old_ibend = ibend(sb->s_root->d_inode);
 	ibend(sb->s_root->d_inode) = new_branches - 1;
@@ -779,11 +789,7 @@ out_no_change:
 		new_lower_inodes[i] = lower_dentry->d_inode;
 	}
 	/* 2. release reference on all older lower inodes */
-	for (i = old_ibstart; i <= old_ibend; i++) {
-		iput(unionfs_lower_inode_idx(sb->s_root->d_inode, i));
-		unionfs_set_lower_inode_idx(sb->s_root->d_inode, i, NULL);
-	}
-	kfree(UNIONFS_I(sb->s_root->d_inode)->lower_inodes);
+	iput_lowers(sb->s_root->d_inode, old_ibstart, old_ibend, true);
 	/* 3. update root dentry's inode to new lower_inodes array */
 	UNIONFS_I(sb->s_root->d_inode)->lower_inodes = new_lower_inodes;
 	new_lower_inodes = NULL;
@@ -816,7 +822,7 @@ out_release:
 	/* no need to cleanup/release anything in tmp_data */
 	if (tmp_lower_paths)
 		for (i = 0; i < new_branches; i++)
-			pathput(&tmp_lower_paths[i]);
+			path_put(&tmp_lower_paths[i]);
 out_free:
 	kfree(tmp_lower_paths);
 	kfree(tmp_data);
@@ -951,32 +957,21 @@ static int unionfs_write_inode(struct inode *inode, int sync)
  * Used only in nfs, to kill any pending RPC tasks, so that subsequent
  * code can actually succeed and won't leave tasks that need handling.
  */
-static void unionfs_umount_begin(struct vfsmount *mnt, int flags)
+static void unionfs_umount_begin(struct super_block *sb)
 {
-	struct super_block *sb, *lower_sb;
-	struct vfsmount *lower_mnt;
+	struct super_block *lower_sb;
 	int bindex, bstart, bend;
-
-	if (!(flags & MNT_FORCE))
-		/*
-		 * we are not being MNT_FORCE'd, therefore we should emulate
-		 * old behavior
-		 */
-		return;
-
-	sb = mnt->mnt_sb;
 
 	unionfs_read_lock(sb, UNIONFS_SMUTEX_CHILD);
 
 	bstart = sbstart(sb);
 	bend = sbend(sb);
 	for (bindex = bstart; bindex <= bend; bindex++) {
-		lower_mnt = unionfs_lower_mnt_idx(sb->s_root, bindex);
 		lower_sb = unionfs_lower_super_idx(sb, bindex);
 
-		if (lower_mnt && lower_sb && lower_sb->s_op &&
+		if (lower_sb && lower_sb->s_op &&
 		    lower_sb->s_op->umount_begin)
-			lower_sb->s_op->umount_begin(lower_mnt, flags);
+			lower_sb->s_op->umount_begin(lower_sb);
 	}
 
 	unionfs_read_unlock(sb);
@@ -1006,9 +1001,10 @@ static int unionfs_show_options(struct seq_file *m, struct vfsmount *mnt)
 
 	seq_printf(m, ",dirs=");
 	for (bindex = bstart; bindex <= bend; bindex++) {
-		path = d_path(unionfs_lower_dentry_idx(sb->s_root, bindex),
-			      unionfs_lower_mnt_idx(sb->s_root, bindex),
-			      tmp_page, PAGE_SIZE);
+		struct path p;
+		p.dentry = unionfs_lower_dentry_idx(sb->s_root, bindex);
+		p.mnt = unionfs_lower_mnt_idx(sb->s_root, bindex);
+		path = d_path(&p, tmp_page, PAGE_SIZE);
 		if (IS_ERR(path)) {
 			ret = PTR_ERR(path);
 			goto out;
@@ -1033,7 +1029,6 @@ out:
 }
 
 struct super_operations unionfs_sops = {
-	.read_inode	= unionfs_read_inode,
 	.delete_inode	= unionfs_delete_inode,
 	.put_super	= unionfs_put_super,
 	.statfs		= unionfs_statfs,

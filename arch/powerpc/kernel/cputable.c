@@ -33,7 +33,10 @@ EXPORT_SYMBOL(cur_cpu_spec);
 #ifdef CONFIG_PPC32
 extern void __setup_cpu_440ep(unsigned long offset, struct cpu_spec* spec);
 extern void __setup_cpu_440epx(unsigned long offset, struct cpu_spec* spec);
+extern void __setup_cpu_440gx(unsigned long offset, struct cpu_spec* spec);
 extern void __setup_cpu_440grx(unsigned long offset, struct cpu_spec* spec);
+extern void __setup_cpu_440spe(unsigned long offset, struct cpu_spec* spec);
+extern void __setup_cpu_460ex(unsigned long offset, struct cpu_spec* spec);
 extern void __setup_cpu_603(unsigned long offset, struct cpu_spec* spec);
 extern void __setup_cpu_604(unsigned long offset, struct cpu_spec* spec);
 extern void __setup_cpu_750(unsigned long offset, struct cpu_spec* spec);
@@ -85,6 +88,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.pmc_type		= PPC_PMC_IBM,
 		.oprofile_cpu_type	= "ppc64/power3",
 		.oprofile_type		= PPC_OPROFILE_RS64,
+		.machine_check		= machine_check_generic,
 		.platform		= "power3",
 	},
 	{	/* Power3+ */
@@ -99,6 +103,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.pmc_type		= PPC_PMC_IBM,
 		.oprofile_cpu_type	= "ppc64/power3",
 		.oprofile_type		= PPC_OPROFILE_RS64,
+		.machine_check		= machine_check_generic,
 		.platform		= "power3",
 	},
 	{	/* Northstar */
@@ -113,6 +118,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.pmc_type		= PPC_PMC_IBM,
 		.oprofile_cpu_type	= "ppc64/rs64",
 		.oprofile_type		= PPC_OPROFILE_RS64,
+		.machine_check		= machine_check_generic,
 		.platform		= "rs64",
 	},
 	{	/* Pulsar */
@@ -127,6 +133,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.pmc_type		= PPC_PMC_IBM,
 		.oprofile_cpu_type	= "ppc64/rs64",
 		.oprofile_type		= PPC_OPROFILE_RS64,
+		.machine_check		= machine_check_generic,
 		.platform		= "rs64",
 	},
 	{	/* I-star */
@@ -141,6 +148,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.pmc_type		= PPC_PMC_IBM,
 		.oprofile_cpu_type	= "ppc64/rs64",
 		.oprofile_type		= PPC_OPROFILE_RS64,
+		.machine_check		= machine_check_generic,
 		.platform		= "rs64",
 	},
 	{	/* S-star */
@@ -155,6 +163,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.pmc_type		= PPC_PMC_IBM,
 		.oprofile_cpu_type	= "ppc64/rs64",
 		.oprofile_type		= PPC_OPROFILE_RS64,
+		.machine_check		= machine_check_generic,
 		.platform		= "rs64",
 	},
 	{	/* Power4 */
@@ -169,6 +178,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.pmc_type		= PPC_PMC_IBM,
 		.oprofile_cpu_type	= "ppc64/power4",
 		.oprofile_type		= PPC_OPROFILE_POWER4,
+		.machine_check		= machine_check_generic,
 		.platform		= "power4",
 	},
 	{	/* Power4+ */
@@ -183,6 +193,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.pmc_type		= PPC_PMC_IBM,
 		.oprofile_cpu_type	= "ppc64/power4",
 		.oprofile_type		= PPC_OPROFILE_POWER4,
+		.machine_check		= machine_check_generic,
 		.platform		= "power4",
 	},
 	{	/* PPC970 */
@@ -200,6 +211,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_restore		= __restore_cpu_ppc970,
 		.oprofile_cpu_type	= "ppc64/970",
 		.oprofile_type		= PPC_OPROFILE_POWER4,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc970",
 	},
 	{	/* PPC970FX */
@@ -217,6 +229,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_restore		= __restore_cpu_ppc970,
 		.oprofile_cpu_type	= "ppc64/970",
 		.oprofile_type		= PPC_OPROFILE_POWER4,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc970",
 	},
 	{	/* PPC970MP DD1.0 - no DEEPNAP, use regular 970 init */
@@ -234,6 +247,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_restore		= __restore_cpu_ppc970,
 		.oprofile_cpu_type	= "ppc64/970MP",
 		.oprofile_type		= PPC_OPROFILE_POWER4,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc970",
 	},
 	{	/* PPC970MP */
@@ -251,6 +265,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_restore		= __restore_cpu_ppc970,
 		.oprofile_cpu_type	= "ppc64/970MP",
 		.oprofile_type		= PPC_OPROFILE_POWER4,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc970",
 	},
 	{	/* PPC970GX */
@@ -267,6 +282,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_setup		= __setup_cpu_ppc970,
 		.oprofile_cpu_type	= "ppc64/970",
 		.oprofile_type		= PPC_OPROFILE_POWER4,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc970",
 	},
 	{	/* Power5 GR */
@@ -286,6 +302,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		 */
 		.oprofile_mmcra_sihv	= MMCRA_SIHV,
 		.oprofile_mmcra_sipr	= MMCRA_SIPR,
+		.machine_check		= machine_check_generic,
 		.platform		= "power5",
 	},
 	{	/* Power5++ */
@@ -301,6 +318,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.oprofile_type		= PPC_OPROFILE_POWER4,
 		.oprofile_mmcra_sihv	= MMCRA_SIHV,
 		.oprofile_mmcra_sipr	= MMCRA_SIPR,
+		.machine_check		= machine_check_generic,
 		.platform		= "power5+",
 	},
 	{	/* Power5 GS */
@@ -317,6 +335,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.oprofile_type		= PPC_OPROFILE_POWER4,
 		.oprofile_mmcra_sihv	= MMCRA_SIHV,
 		.oprofile_mmcra_sipr	= MMCRA_SIPR,
+		.machine_check		= machine_check_generic,
 		.platform		= "power5+",
 	},
 	{	/* POWER6 in P5+ mode; 2.04-compliant processor */
@@ -327,6 +346,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features	= COMMON_USER_POWER5_PLUS,
 		.icache_bsize		= 128,
 		.dcache_bsize		= 128,
+		.machine_check		= machine_check_generic,
 		.platform		= "power5+",
 	},
 	{	/* Power6 */
@@ -346,6 +366,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.oprofile_mmcra_sipr	= POWER6_MMCRA_SIPR,
 		.oprofile_mmcra_clear	= POWER6_MMCRA_THRM |
 			POWER6_MMCRA_OTHER,
+		.machine_check		= machine_check_generic,
 		.platform		= "power6x",
 	},
 	{	/* 2.05-compliant processor, i.e. Power6 "architected" mode */
@@ -356,6 +377,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features	= COMMON_USER_POWER6,
 		.icache_bsize		= 128,
 		.dcache_bsize		= 128,
+		.machine_check		= machine_check_generic,
 		.platform		= "power6",
 	},
 	{	/* Cell Broadband Engine */
@@ -372,6 +394,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.pmc_type		= PPC_PMC_IBM,
 		.oprofile_cpu_type	= "ppc64/cell-be",
 		.oprofile_type		= PPC_OPROFILE_CELL,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc-cell-be",
 	},
 	{	/* PA Semi PA6T */
@@ -388,6 +411,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_restore		= __restore_cpu_pa6t,
 		.oprofile_cpu_type	= "ppc64/pa6t",
 		.oprofile_type		= PPC_OPROFILE_PA6T,
+		.machine_check		= machine_check_generic,
 		.platform		= "pa6t",
 	},
 	{	/* default match */
@@ -400,6 +424,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 128,
 		.num_pmcs		= 6,
 		.pmc_type		= PPC_PMC_IBM,
+		.machine_check		= machine_check_generic,
 		.platform		= "power4",
 	}
 #endif	/* CONFIG_PPC64 */
@@ -414,6 +439,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 			PPC_FEATURE_UNIFIED_CACHE | PPC_FEATURE_NO_TB,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc601",
 	},
 	{	/* 603 */
@@ -425,6 +451,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
 		.cpu_setup		= __setup_cpu_603,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc603",
 	},
 	{	/* 603e */
@@ -436,6 +463,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
 		.cpu_setup		= __setup_cpu_603,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc603",
 	},
 	{	/* 603ev */
@@ -447,6 +475,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
 		.cpu_setup		= __setup_cpu_603,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc603",
 	},
 	{	/* 604 */
@@ -459,6 +488,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 2,
 		.cpu_setup		= __setup_cpu_604,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc604",
 	},
 	{	/* 604e */
@@ -471,6 +501,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_604,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc604",
 	},
 	{	/* 604r */
@@ -483,6 +514,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_604,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc604",
 	},
 	{	/* 604ev */
@@ -495,6 +527,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_604,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc604",
 	},
 	{	/* 740/750 (0x4202, don't support TAU ?) */
@@ -507,6 +540,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_750,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc750",
 	},
 	{	/* 750CX (80100 and 8010x?) */
@@ -519,6 +553,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_750cx,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc750",
 	},
 	{	/* 750CX (82201 and 82202) */
@@ -531,6 +566,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_750cx,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc750",
 	},
 	{	/* 750CXe (82214) */
@@ -543,6 +579,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_750cx,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc750",
 	},
 	{	/* 750CXe "Gekko" (83214) */
@@ -555,6 +592,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_750cx,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc750",
 	},
 	{	/* 750CL */
@@ -567,6 +605,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_750,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc750",
 	},
 	{	/* 745/755 */
@@ -579,6 +618,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_750,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc750",
 	},
 	{	/* 750FX rev 1.x */
@@ -591,6 +631,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_750,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc750",
 	},
 	{	/* 750FX rev 2.0 must disable HID0[DPM] */
@@ -603,6 +644,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_750,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc750",
 	},
 	{	/* 750FX (All revs except 2.0) */
@@ -615,6 +657,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_750fx,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc750",
 	},
 	{	/* 750GX */
@@ -627,6 +670,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_750fx,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc750",
 	},
 	{	/* 740/750 (L2CR bit need fixup for 740) */
@@ -639,6 +683,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_750,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc750",
 	},
 	{	/* 7400 rev 1.1 ? (no TAU) */
@@ -652,6 +697,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_7400,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc7400",
 	},
 	{	/* 7400 */
@@ -665,6 +711,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_7400,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc7400",
 	},
 	{	/* 7410 */
@@ -678,6 +725,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.cpu_setup		= __setup_cpu_7410,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc7400",
 	},
 	{	/* 7450 2.0 - no doze/nap */
@@ -693,6 +741,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_setup		= __setup_cpu_745x,
 		.oprofile_cpu_type      = "ppc/7450",
 		.oprofile_type		= PPC_OPROFILE_G4,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc7450",
 	},
 	{	/* 7450 2.1 */
@@ -708,6 +757,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_setup		= __setup_cpu_745x,
 		.oprofile_cpu_type      = "ppc/7450",
 		.oprofile_type		= PPC_OPROFILE_G4,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc7450",
 	},
 	{	/* 7450 2.3 and newer */
@@ -723,6 +773,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_setup		= __setup_cpu_745x,
 		.oprofile_cpu_type      = "ppc/7450",
 		.oprofile_type		= PPC_OPROFILE_G4,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc7450",
 	},
 	{	/* 7455 rev 1.x */
@@ -738,6 +789,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_setup		= __setup_cpu_745x,
 		.oprofile_cpu_type      = "ppc/7450",
 		.oprofile_type		= PPC_OPROFILE_G4,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc7450",
 	},
 	{	/* 7455 rev 2.0 */
@@ -753,6 +805,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_setup		= __setup_cpu_745x,
 		.oprofile_cpu_type      = "ppc/7450",
 		.oprofile_type		= PPC_OPROFILE_G4,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc7450",
 	},
 	{	/* 7455 others */
@@ -768,6 +821,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_setup		= __setup_cpu_745x,
 		.oprofile_cpu_type      = "ppc/7450",
 		.oprofile_type		= PPC_OPROFILE_G4,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc7450",
 	},
 	{	/* 7447/7457 Rev 1.0 */
@@ -783,6 +837,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_setup		= __setup_cpu_745x,
 		.oprofile_cpu_type      = "ppc/7450",
 		.oprofile_type		= PPC_OPROFILE_G4,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc7450",
 	},
 	{	/* 7447/7457 Rev 1.1 */
@@ -798,6 +853,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_setup		= __setup_cpu_745x,
 		.oprofile_cpu_type      = "ppc/7450",
 		.oprofile_type		= PPC_OPROFILE_G4,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc7450",
 	},
 	{	/* 7447/7457 Rev 1.2 and later */
@@ -812,6 +868,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_setup		= __setup_cpu_745x,
 		.oprofile_cpu_type      = "ppc/7450",
 		.oprofile_type		= PPC_OPROFILE_G4,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc7450",
 	},
 	{	/* 7447A */
@@ -827,6 +884,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_setup		= __setup_cpu_745x,
 		.oprofile_cpu_type      = "ppc/7450",
 		.oprofile_type		= PPC_OPROFILE_G4,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc7450",
 	},
 	{	/* 7448 */
@@ -842,6 +900,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_setup		= __setup_cpu_745x,
 		.oprofile_cpu_type      = "ppc/7450",
 		.oprofile_type		= PPC_OPROFILE_G4,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc7450",
 	},
 	{	/* 82xx (8240, 8245, 8260 are all 603e cores) */
@@ -853,6 +912,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
 		.cpu_setup		= __setup_cpu_603,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc603",
 	},
 	{	/* All G2_LE (603e core, plus some) have the same pvr */
@@ -864,6 +924,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
 		.cpu_setup		= __setup_cpu_603,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc603",
 	},
 	{	/* e300c1 (a 603e core, plus some) on 83xx */
@@ -875,6 +936,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
 		.cpu_setup		= __setup_cpu_603,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc603",
 	},
 	{	/* e300c2 (an e300c1 core, plus some, minus FPU) on 83xx */
@@ -886,9 +948,10 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
 		.cpu_setup		= __setup_cpu_603,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc603",
 	},
-	{	/* e300c3 on 83xx  */
+	{	/* e300c3 (e300c1, plus one IU, half cache size) on 83xx */
 		.pvr_mask		= 0x7fff0000,
 		.pvr_value		= 0x00850000,
 		.cpu_name		= "e300c3",
@@ -897,6 +960,24 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
 		.cpu_setup		= __setup_cpu_603,
+		.num_pmcs		= 4,
+		.oprofile_cpu_type	= "ppc/e300",
+		.oprofile_type		= PPC_OPROFILE_FSL_EMB,
+		.platform		= "ppc603",
+	},
+	{	/* e300c4 (e300c1, plus one IU) */
+		.pvr_mask		= 0x7fff0000,
+		.pvr_value		= 0x00860000,
+		.cpu_name		= "e300c4",
+		.cpu_features		= CPU_FTRS_E300,
+		.cpu_user_features	= COMMON_USER,
+		.icache_bsize		= 32,
+		.dcache_bsize		= 32,
+		.cpu_setup		= __setup_cpu_603,
+		.machine_check		= machine_check_generic,
+		.num_pmcs		= 4,
+		.oprofile_cpu_type	= "ppc/e300",
+		.oprofile_type		= PPC_OPROFILE_FSL_EMB,
 		.platform		= "ppc603",
 	},
 	{	/* default match, we assume split I/D cache & TB (non-601)... */
@@ -907,6 +988,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features	= COMMON_USER,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_generic,
 		.platform		= "ppc603",
 	},
 #endif /* CLASSIC_PPC */
@@ -933,6 +1015,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features	= PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU,
 		.icache_bsize		= 16,
 		.dcache_bsize		= 16,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc403",
 	},
 	{	/* 403GCX */
@@ -944,6 +1027,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		 	PPC_FEATURE_HAS_MMU | PPC_FEATURE_NO_TB,
 		.icache_bsize		= 16,
 		.dcache_bsize		= 16,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc403",
 	},
 	{	/* 403G ?? */
@@ -954,6 +1038,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features	= PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU,
 		.icache_bsize		= 16,
 		.dcache_bsize		= 16,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc403",
 	},
 	{	/* 405GP */
@@ -965,6 +1050,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 			PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc405",
 	},
 	{	/* STB 03xxx */
@@ -976,6 +1062,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 			PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc405",
 	},
 	{	/* STB 04xxx */
@@ -987,6 +1074,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 			PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc405",
 	},
 	{	/* NP405L */
@@ -998,6 +1086,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 			PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc405",
 	},
 	{	/* NP4GS3 */
@@ -1009,6 +1098,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 			PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc405",
 	},
 	{   /* NP405H */
@@ -1020,6 +1110,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 			PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc405",
 	},
 	{	/* 405GPr */
@@ -1031,6 +1122,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 			PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc405",
 	},
 	{   /* STBx25xx */
@@ -1042,6 +1134,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 			PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc405",
 	},
 	{	/* 405LP */
@@ -1052,6 +1145,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features	= PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc405",
 	},
 	{	/* Xilinx Virtex-II Pro  */
@@ -1063,6 +1157,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 			PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc405",
 	},
 	{	/* Xilinx Virtex-4 FX */
@@ -1074,6 +1169,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 			PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc405",
 	},
 	{	/* 405EP */
@@ -1085,19 +1181,45 @@ static struct cpu_spec __initdata cpu_specs[] = {
 			PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc405",
 	},
 	{	/* 405EX */
-		.pvr_mask		= 0xffff0000,
-		.pvr_value		= 0x12910000,
+		.pvr_mask		= 0xffff0004,
+		.pvr_value		= 0x12910004,
 		.cpu_name		= "405EX",
 		.cpu_features		= CPU_FTRS_40X,
 		.cpu_user_features	= PPC_FEATURE_32 |
 			PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc405",
 	},
+	{	/* 405EXr */
+		.pvr_mask		= 0xffff0004,
+		.pvr_value		= 0x12910000,
+		.cpu_name		= "405EXr",
+		.cpu_features		= CPU_FTRS_40X,
+		.cpu_user_features	= PPC_FEATURE_32 |
+			PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
+		.icache_bsize		= 32,
+		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
+		.platform		= "ppc405",
+	},
+	{	/* default match */
+		.pvr_mask		= 0x00000000,
+		.pvr_value		= 0x00000000,
+		.cpu_name		= "(generic 40x PPC)",
+		.cpu_features		= CPU_FTRS_40X,
+		.cpu_user_features	= PPC_FEATURE_32 |
+			PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
+		.icache_bsize		= 32,
+		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
+		.platform		= "ppc405",
+	}
 
 #endif /* CONFIG_40x */
 #ifdef CONFIG_44x
@@ -1109,6 +1231,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features	= COMMON_USER_BOOKE,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc440",
 	},
 	{ /* Use logical PVR for 440EP (logical pvr = pvr | 0x8) */
@@ -1120,6 +1243,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
 		.cpu_setup		= __setup_cpu_440ep,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc440",
 	},
 	{
@@ -1130,6 +1254,19 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features	= COMMON_USER_BOOKE | PPC_FEATURE_HAS_FPU,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
+		.platform		= "ppc440",
+	},
+	{ /* Matches both physical and logical PVR for 440EP (logical pvr = pvr | 0x8) */
+		.pvr_mask		= 0xf0000ff7,
+		.pvr_value		= 0x400008d4,
+		.cpu_name		= "440EP Rev. C",
+		.cpu_features		= CPU_FTRS_44X,
+		.cpu_user_features	= COMMON_USER_BOOKE | PPC_FEATURE_HAS_FPU,
+		.icache_bsize		= 32,
+		.dcache_bsize		= 32,
+		.cpu_setup		= __setup_cpu_440ep,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc440",
 	},
 	{ /* Use logical PVR for 440EP (logical pvr = pvr | 0x8) */
@@ -1141,6 +1278,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
 		.cpu_setup		= __setup_cpu_440ep,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc440",
 	},
 	{ /* 440GRX */
@@ -1152,6 +1290,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
 		.cpu_setup		= __setup_cpu_440grx,
+		.machine_check		= machine_check_440A,
 		.platform		= "ppc440",
 	},
 	{ /* Use logical PVR for 440EPx (logical pvr = pvr | 0x8) */
@@ -1163,6 +1302,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
 		.cpu_setup		= __setup_cpu_440epx,
+		.machine_check		= machine_check_440A,
 		.platform		= "ppc440",
 	},
 	{	/* 440GP Rev. B */
@@ -1173,6 +1313,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features	= COMMON_USER_BOOKE,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc440gp",
 	},
 	{	/* 440GP Rev. C */
@@ -1183,6 +1324,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features	= COMMON_USER_BOOKE,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc440gp",
 	},
 	{ /* 440GX Rev. A */
@@ -1193,6 +1335,8 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features	= COMMON_USER_BOOKE,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.cpu_setup		= __setup_cpu_440gx,
+		.machine_check		= machine_check_440A,
 		.platform		= "ppc440",
 	},
 	{ /* 440GX Rev. B */
@@ -1203,6 +1347,8 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features	= COMMON_USER_BOOKE,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.cpu_setup		= __setup_cpu_440gx,
+		.machine_check		= machine_check_440A,
 		.platform		= "ppc440",
 	},
 	{ /* 440GX Rev. C */
@@ -1213,6 +1359,8 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features	= COMMON_USER_BOOKE,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.cpu_setup		= __setup_cpu_440gx,
+		.machine_check		= machine_check_440A,
 		.platform		= "ppc440",
 	},
 	{ /* 440GX Rev. F */
@@ -1223,6 +1371,8 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features	= COMMON_USER_BOOKE,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.cpu_setup		= __setup_cpu_440gx,
+		.machine_check		= machine_check_440A,
 		.platform		= "ppc440",
 	},
 	{ /* 440SP Rev. A */
@@ -1233,6 +1383,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features	= COMMON_USER_BOOKE,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
 		.platform		= "ppc440",
 	},
 	{ /* 440SPe Rev. A */
@@ -1243,6 +1394,8 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features      = COMMON_USER_BOOKE,
 		.icache_bsize           = 32,
 		.dcache_bsize           = 32,
+		.cpu_setup		= __setup_cpu_440spe,
+		.machine_check		= machine_check_440A,
 		.platform               = "ppc440",
 	},
 	{ /* 440SPe Rev. B */
@@ -1253,10 +1406,46 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_user_features	= COMMON_USER_BOOKE,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.cpu_setup		= __setup_cpu_440spe,
+		.machine_check		= machine_check_440A,
 		.platform		= "ppc440",
 	},
+	{ /* 460EX */
+		.pvr_mask		= 0xffff0002,
+		.pvr_value		= 0x13020002,
+		.cpu_name		= "460EX",
+		.cpu_features		= CPU_FTRS_44X,
+		.cpu_user_features	= COMMON_USER_BOOKE | PPC_FEATURE_HAS_FPU,
+		.icache_bsize		= 32,
+		.dcache_bsize		= 32,
+		.cpu_setup		= __setup_cpu_460ex,
+		.machine_check		= machine_check_440A,
+		.platform		= "ppc440",
+	},
+	{ /* 460GT */
+		.pvr_mask		= 0xffff0002,
+		.pvr_value		= 0x13020000,
+		.cpu_name		= "460GT",
+		.cpu_features		= CPU_FTRS_44X,
+		.cpu_user_features	= COMMON_USER_BOOKE,
+		.icache_bsize		= 32,
+		.dcache_bsize		= 32,
+		.machine_check		= machine_check_440A,
+		.platform		= "ppc440",
+	},
+	{	/* default match */
+		.pvr_mask		= 0x00000000,
+		.pvr_value		= 0x00000000,
+		.cpu_name		= "(generic 44x PPC)",
+		.cpu_features		= CPU_FTRS_44X,
+		.cpu_user_features	= COMMON_USER_BOOKE,
+		.icache_bsize		= 32,
+		.dcache_bsize		= 32,
+		.machine_check		= machine_check_4xx,
+		.platform		= "ppc440",
+	}
 #endif /* CONFIG_44x */
-#ifdef CONFIG_FSL_BOOKE
+#ifdef CONFIG_E200
 	{	/* e200z5 */
 		.pvr_mask		= 0xfff00000,
 		.pvr_value		= 0x81000000,
@@ -1267,6 +1456,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 			PPC_FEATURE_HAS_EFP_SINGLE |
 			PPC_FEATURE_UNIFIED_CACHE,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_e200,
 		.platform		= "ppc5554",
 	},
 	{	/* e200z6 */
@@ -1280,8 +1470,23 @@ static struct cpu_spec __initdata cpu_specs[] = {
 			PPC_FEATURE_HAS_EFP_SINGLE_COMP |
 			PPC_FEATURE_UNIFIED_CACHE,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_e200,
 		.platform		= "ppc5554",
 	},
+	{	/* default match */
+		.pvr_mask		= 0x00000000,
+		.pvr_value		= 0x00000000,
+		.cpu_name		= "(generic E200 PPC)",
+		.cpu_features		= CPU_FTRS_E200,
+		.cpu_user_features	= COMMON_USER_BOOKE |
+			PPC_FEATURE_HAS_EFP_SINGLE |
+			PPC_FEATURE_UNIFIED_CACHE,
+		.dcache_bsize		= 32,
+		.machine_check		= machine_check_e200,
+		.platform		= "ppc5554",
+	}
+#endif /* CONFIG_E200 */
+#ifdef CONFIG_E500
 	{	/* e500 */
 		.pvr_mask		= 0xffff0000,
 		.pvr_value		= 0x80200000,
@@ -1295,7 +1500,8 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.oprofile_cpu_type	= "ppc/e500",
-		.oprofile_type		= PPC_OPROFILE_BOOKE,
+		.oprofile_type		= PPC_OPROFILE_FSL_EMB,
+		.machine_check		= machine_check_e500,
 		.platform		= "ppc8540",
 	},
 	{	/* e500v2 */
@@ -1312,22 +1518,24 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
 		.oprofile_cpu_type	= "ppc/e500",
-		.oprofile_type		= PPC_OPROFILE_BOOKE,
+		.oprofile_type		= PPC_OPROFILE_FSL_EMB,
+		.machine_check		= machine_check_e500,
 		.platform		= "ppc8548",
 	},
-#endif
-#if !CLASSIC_PPC
 	{	/* default match */
 		.pvr_mask		= 0x00000000,
 		.pvr_value		= 0x00000000,
-		.cpu_name		= "(generic PPC)",
-		.cpu_features		= CPU_FTRS_GENERIC_32,
-		.cpu_user_features	= PPC_FEATURE_32,
+		.cpu_name		= "(generic E500 PPC)",
+		.cpu_features		= CPU_FTRS_E500,
+		.cpu_user_features	= COMMON_USER_BOOKE |
+			PPC_FEATURE_HAS_SPE_COMP |
+			PPC_FEATURE_HAS_EFP_SINGLE_COMP,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
+		.machine_check		= machine_check_e500,
 		.platform		= "powerpc",
 	}
-#endif /* !CLASSIC_PPC */
+#endif /* CONFIG_E500 */
 #endif /* CONFIG_PPC32 */
 };
 
@@ -1363,7 +1571,7 @@ struct cpu_spec * __init identify_cpu(unsigned long offset, unsigned int pvr)
 				*t = *s;
 			*PTRRELOC(&cur_cpu_spec) = &the_cpu_spec;
 #if defined(CONFIG_PPC64) || defined(CONFIG_BOOKE)
-			/* ppc64 and booke expect identify_cpu to also call 
+			/* ppc64 and booke expect identify_cpu to also call
 			 * setup_cpu for that processor. I will consolidate
 			 * that at a later time, for now, just use #ifdef.
 			 * we also don't need to PTRRELOC the function pointer

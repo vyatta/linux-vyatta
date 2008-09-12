@@ -1,22 +1,23 @@
 /* Functions local to drivers/usb/core/ */
 
-extern int usb_create_sysfs_dev_files (struct usb_device *dev);
-extern void usb_remove_sysfs_dev_files (struct usb_device *dev);
-extern int usb_create_sysfs_intf_files (struct usb_interface *intf);
-extern void usb_remove_sysfs_intf_files (struct usb_interface *intf);
-extern int usb_create_ep_files(struct device *parent, struct usb_host_endpoint *endpoint,
+extern int usb_create_sysfs_dev_files(struct usb_device *dev);
+extern void usb_remove_sysfs_dev_files(struct usb_device *dev);
+extern int usb_create_sysfs_intf_files(struct usb_interface *intf);
+extern void usb_remove_sysfs_intf_files(struct usb_interface *intf);
+extern int usb_create_ep_files(struct device *parent,
+				struct usb_host_endpoint *endpoint,
 				struct usb_device *udev);
 extern void usb_remove_ep_files(struct usb_host_endpoint *endpoint);
 
 extern void usb_enable_endpoint(struct usb_device *dev,
 		struct usb_host_endpoint *ep);
-extern void usb_disable_endpoint (struct usb_device *dev, unsigned int epaddr);
-extern void usb_disable_interface (struct usb_device *dev,
+extern void usb_disable_endpoint(struct usb_device *dev, unsigned int epaddr);
+extern void usb_disable_interface(struct usb_device *dev,
 		struct usb_interface *intf);
 extern void usb_release_interface_cache(struct kref *ref);
-extern void usb_disable_device (struct usb_device *dev, int skip_ep0);
-extern int usb_deauthorize_device (struct usb_device *);
-extern int usb_authorize_device (struct usb_device *);
+extern void usb_disable_device(struct usb_device *dev, int skip_ep0);
+extern int usb_deauthorize_device(struct usb_device *);
+extern int usb_authorize_device(struct usb_device *);
 extern void usb_detect_quirks(struct usb_device *udev);
 
 extern int usb_get_device_descriptor(struct usb_device *dev,
@@ -113,13 +114,11 @@ static inline int is_usb_device_driver(struct device_driver *drv)
 static inline void mark_active(struct usb_interface *f)
 {
 	f->is_active = 1;
-	f->dev.power.power_state.event = PM_EVENT_ON;
 }
 
 static inline void mark_quiesced(struct usb_interface *f)
 {
 	f->is_active = 0;
-	f->dev.power.power_state.event = PM_EVENT_SUSPEND;
 }
 
 static inline int is_active(const struct usb_interface *f)
@@ -130,6 +129,10 @@ static inline int is_active(const struct usb_interface *f)
 
 /* for labeling diagnostics */
 extern const char *usbcore_name;
+
+/* sysfs stuff */
+extern struct attribute_group *usb_device_groups[];
+extern struct attribute_group *usb_interface_groups[];
 
 /* usbfs stuff */
 extern struct mutex usbfs_mutex;

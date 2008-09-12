@@ -283,7 +283,7 @@ static int sa1100irq_resume(struct sys_device *dev)
 }
 
 static struct sysdev_class sa1100irq_sysclass = {
-	set_kset_name("sa11x0-irq"),
+	.name		= "sa11x0-irq",
 	.suspend	= sa1100irq_suspend,
 	.resume		= sa1100irq_resume,
 };
@@ -347,4 +347,6 @@ void __init sa1100_init_irq(void)
 	 */
 	set_irq_chip(IRQ_GPIO11_27, &sa1100_normal_chip);
 	set_irq_chained_handler(IRQ_GPIO11_27, sa1100_high_gpio_handler);
+
+	sa1100_init_gpio();
 }

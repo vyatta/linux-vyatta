@@ -6,14 +6,6 @@ be removed from this file.
 
 ---------------------------
 
-What:	MXSER
-When:	December 2007
-Why:	Old mxser driver is obsoleted by the mxser_new. Give it some time yet
-	and remove it.
-Who:	Jiri Slaby <jirislaby@gmail.com>
-
----------------------------
-
 What:	dev->power.power_state
 When:	July 2007
 Why:	Broken design for runtime control over driver power states, confusing
@@ -107,17 +99,6 @@ Who:	Eric Biederman <ebiederm@xmission.com>
 
 ---------------------------
 
-What:  a.out interpreter support for ELF executables
-When:  2.6.25
-Files: fs/binfmt_elf.c
-Why:   Using a.out interpreters for ELF executables was a feature for
-       transition from a.out to ELF. But now it is unlikely to be still
-       needed anymore and removing it would simplify the hairy ELF
-       loader code.
-Who:   Andi Kleen <ak@suse.de>
-
----------------------------
-
 What:	remove EXPORT_SYMBOL(kernel_thread)
 When:	August 2006
 Files:	arch/*/kernel/*_ksyms.c
@@ -127,15 +108,6 @@ Why:	kernel_thread is a low-level implementation detail.  Drivers should
 	implementation details and provides a higherlevel interface that
 	prevents bugs and code duplication
 Who:	Christoph Hellwig <hch@lst.de>
-
----------------------------
-
-What:	CONFIG_FORCED_INLINING
-When:	June 2006
-Why:	Config option is there to see if gcc is good enough. (in january
-        2006). If it is, the behavior should just be the default. If it's not,
-	the option should just go away entirely.
-Who:    Arjan van de Ven
 
 ---------------------------
 
@@ -156,31 +128,6 @@ Who:	Arjan van de Ven <arjan@linux.intel.com>
 
 ---------------------------
 
-What:	USB driver API moves to EXPORT_SYMBOL_GPL
-When:	February 2008
-Files:	include/linux/usb.h, drivers/usb/core/driver.c
-Why:	The USB subsystem has changed a lot over time, and it has been
-	possible to create userspace USB drivers using usbfs/libusb/gadgetfs
-	that operate as fast as the USB bus allows.  Because of this, the USB
-	subsystem will not be allowing closed source kernel drivers to
-	register with it, after this grace period is over.  If anyone needs
-	any help in converting their closed source drivers over to use the
-	userspace filesystems, please contact the
-	linux-usb-devel@lists.sourceforge.net mailing list, and the developers
-	there will be glad to help you out.
-Who:	Greg Kroah-Hartman <gregkh@suse.de>
-
----------------------------
-
-What:	vm_ops.nopage
-When:	Soon, provided in-kernel callers have been converted
-Why:	This interface is replaced by vm_ops.fault, but it has been around
-	forever, is used by a lot of drivers, and doesn't cost much to
-	maintain.
-Who:	Nick Piggin <npiggin@suse.de>
-
----------------------------
-
 What:	PHYSDEVPATH, PHYSDEVBUS, PHYSDEVDRIVER in the uevent environment
 When:	October 2008
 Why:	The stacking of class devices makes these values misleading and
@@ -191,12 +138,21 @@ Who:	Kay Sievers <kay.sievers@suse.de>
 
 ---------------------------
 
-What:	i2c_adapter.list
-When:	July 2007
-Why:	Superfluous, this list duplicates the one maintained by the driver
-	core.
-Who:	Jean Delvare <khali@linux-fr.org>,
-	David Brownell <dbrownell@users.sourceforge.net>
+What:	find_task_by_pid
+When:	2.6.26
+Why:	With pid namespaces, calling this funciton will return the
+	wrong task when called from inside a namespace.
+
+	The best way to save a task pid and find a task by this
+	pid later, is to find this task's struct pid pointer (or get
+	it directly from the task) and call pid_task() later.
+
+	If someone really needs to get a task by its pid_t, then
+	he most likely needs the find_task_by_vpid() to get the
+	task from the same namespace as the current task is in, but
+	this may be not so in general.
+
+Who:	Pavel Emelyanov <xemul@openvz.org>
 
 ---------------------------
 
@@ -225,29 +181,6 @@ Who:	Len Brown <len.brown@intel.com>
 
 ---------------------------
 
-What:	i2c-ixp2000, i2c-ixp4xx and scx200_i2c drivers
-When:	September 2007
-Why:	Obsolete. The new i2c-gpio driver replaces all hardware-specific
-	I2C-over-GPIO drivers.
-Who:	Jean Delvare <khali@linux-fr.org>
-
----------------------------
-
-What:	'time' kernel boot parameter
-When:	January 2008
-Why:	replaced by 'printk.time=<value>' so that printk timestamps can be
-	enabled or disabled as needed
-Who:	Randy Dunlap <randy.dunlap@oracle.com>
-
----------------------------
-
-What:  drivers depending on OSS_OBSOLETE
-When:  options in 2.6.23, code in 2.6.25
-Why:   obsolete OSS drivers
-Who:   Adrian Bunk <bunk@stusta.de>
-
----------------------------
-
 What: libata spindown skipping and warning
 When: Dec 2008
 Why:  Some halt(8) implementations synchronize caches for and spin
@@ -266,22 +199,6 @@ Who:  Tejun Heo <htejun@gmail.com>
 
 ---------------------------
 
-What:	Legacy RTC drivers (under drivers/i2c/chips)
-When:	November 2007
-Why:	Obsolete. We have a RTC subsystem with better drivers.
-Who:	Jean Delvare <khali@linux-fr.org>
-
----------------------------
-
-What:	iptables SAME target
-When:	1.1. 2008
-Files:	net/ipv4/netfilter/ipt_SAME.c, include/linux/netfilter_ipv4/ipt_SAME.h
-Why:	Obsolete for multiple years now, NAT core provides the same behaviour.
-	Unfixable broken wrt. 32/64 bit cleanness.
-Who:	Patrick McHardy <kaber@trash.net>
-
----------------------------
-
 What: The arch/ppc and include/asm-ppc directories
 When: Jun 2008
 Why:  The arch/powerpc tree is the merged architecture for ppc32 and ppc64
@@ -295,26 +212,8 @@ Who:  linuxppc-dev@ozlabs.org
 
 ---------------------------
 
-What:	mthca driver's MSI support
-When:	January 2008
-Files:	drivers/infiniband/hw/mthca/*.[ch]
-Why:	All mthca hardware also supports MSI-X, which provides
-	strictly more functionality than MSI.  So there is no point in
-	having both MSI-X and MSI support in the driver.
-Who:	Roland Dreier <rolandd@cisco.com>
-
----------------------------
-
-What:   sk98lin network driver
-When:   Feburary 2008
-Why:    In kernel tree version of driver is unmaintained. Sk98lin driver
-	replaced by the skge driver. 
-Who:    Stephen Hemminger <shemminger@linux-foundation.org>
-
----------------------------
-
 What:	i386/x86_64 bzImage symlinks
-When:	April 2008
+When:	April 2010
 
 Why:	The i386/x86_64 merge provides a symlink to the old bzImage
 	location so not yet updated user space tools, e.g. package
@@ -323,13 +222,102 @@ Who:	Thomas Gleixner <tglx@linutronix.de>
 
 ---------------------------
 
-What:	shaper network driver
-When:	January 2008
-Files:	drivers/net/shaper.c, include/linux/if_shaper.h
-Why:	This driver has been marked obsolete for many years.
-	It was only designed to work on lower speed links and has design
-	flaws that lead to machine crashes. The qdisc infrastructure in
-	2.4 or later kernels, provides richer features and is more robust.
-Who:	Stephen Hemminger <shemminger@linux-foundation.org>
+What:	i2c-i810, i2c-prosavage and i2c-savage4
+When:	May 2008
+Why:	These drivers are superseded by i810fb, intelfb and savagefb.
+Who:	Jean Delvare <khali@linux-fr.org>
 
 ---------------------------
+
+What (Why):
+	- include/linux/netfilter_ipv4/ipt_TOS.h ipt_tos.h header files
+	  (superseded by xt_TOS/xt_tos target & match)
+
+	- "forwarding" header files like ipt_mac.h in
+	  include/linux/netfilter_ipv4/ and include/linux/netfilter_ipv6/
+
+	- xt_CONNMARK match revision 0
+	  (superseded by xt_CONNMARK match revision 1)
+
+	- xt_MARK target revisions 0 and 1
+	  (superseded by xt_MARK match revision 2)
+
+	- xt_connmark match revision 0
+	  (superseded by xt_connmark match revision 1)
+
+	- xt_conntrack match revision 0
+	  (superseded by xt_conntrack match revision 1)
+
+	- xt_iprange match revision 0,
+	  include/linux/netfilter_ipv4/ipt_iprange.h
+	  (superseded by xt_iprange match revision 1)
+
+	- xt_mark match revision 0
+	  (superseded by xt_mark match revision 1)
+
+When:	January 2009 or Linux 2.7.0, whichever comes first
+Why:	Superseded by newer revisions or modules
+Who:	Jan Engelhardt <jengelh@computergmbh.de>
+
+---------------------------
+
+What:	b43 support for firmware revision < 410
+When:	July 2008
+Why:	The support code for the old firmware hurts code readability/maintainability
+	and slightly hurts runtime performance. Bugfixes for the old firmware
+	are not provided by Broadcom anymore.
+Who:	Michael Buesch <mb@bu3sch.de>
+
+---------------------------
+
+What:	init_mm export
+When:	2.6.26
+Why:	Not used in-tree. The current out-of-tree users used it to
+	work around problems in the CPA code which should be resolved
+	by now. One usecase was described to provide verification code
+	of the CPA operation. That's a good idea in general, but such
+	code / infrastructure should be in the kernel and not in some
+	out-of-tree driver.
+Who:	Thomas Gleixner <tglx@linutronix.de>
+
+----------------------------
+
+What:	usedac i386 kernel parameter
+When:	2.6.27
+Why:	replaced by allowdac and no dac combination
+Who:	Glauber Costa <gcosta@redhat.com>
+
+---------------------------
+
+What:	old style serial driver for ColdFire (CONFIG_SERIAL_COLDFIRE)
+When:	2.6.28
+Why:	This driver still uses the old interface and has been replaced
+	by CONFIG_SERIAL_MCF.
+Who:	Sebastian Siewior <sebastian@breakpoint.cc>
+
+---------------------------
+
+What:	/sys/o2cb symlink
+When:	January 2010
+Why:	/sys/fs/o2cb is the proper location for this information - /sys/o2cb
+	exists as a symlink for backwards compatibility for old versions of
+	ocfs2-tools. 2 years should be sufficient time to phase in new versions
+	which know to look in /sys/fs/o2cb.
+Who:	ocfs2-devel@oss.oracle.com
+
+---------------------------
+
+What:	asm/semaphore.h
+When:	2.6.26
+Why:	Implementation became generic; users should now include
+	linux/semaphore.h instead.
+Who:	Matthew Wilcox <willy@linux.intel.com>
+
+---------------------------
+
+What:	CONFIG_THERMAL_HWMON
+When:	January 2009
+Why:	This option was introduced just to allow older lm-sensors userspace
+	to keep working over the upgrade to 2.6.26. At the scheduled time of
+	removal fixed lm-sensors (2.x or 3.x) should be readily available.
+Who:	Rene Herman <rene.herman@gmail.com>

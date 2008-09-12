@@ -177,10 +177,9 @@ static inline void atalk_destroy_socket(struct sock *sk)
 
 	if (atomic_read(&sk->sk_wmem_alloc) ||
 	    atomic_read(&sk->sk_rmem_alloc)) {
-		init_timer(&sk->sk_timer);
+		setup_timer(&sk->sk_timer, atalk_destroy_timer,
+				(unsigned long)sk);
 		sk->sk_timer.expires	= jiffies + SOCK_DESTROY_TIME;
-		sk->sk_timer.function	= atalk_destroy_timer;
-		sk->sk_timer.data	= (unsigned long)sk;
 		add_timer(&sk->sk_timer);
 	} else
 		sock_put(sk);
@@ -649,7 +648,7 @@ static int ddp_device_event(struct notifier_block *this, unsigned long event,
 {
 	struct net_device *dev = ptr;
 
-	if (dev->nd_net != &init_net)
+	if (dev_net(dev) != &init_net)
 		return NOTIFY_DONE;
 
 	if (event == NETDEV_DOWN)
@@ -1406,7 +1405,7 @@ static int atalk_rcv(struct sk_buff *skb, struct net_device *dev,
 	int origlen;
 	__u16 len_hops;
 
-	if (dev->nd_net != &init_net)
+	if (dev_net(dev) != &init_net)
 		goto freeit;
 
 	/* Don't mangle buffer if shared */
@@ -1494,7 +1493,7 @@ freeit:
 static int ltalk_rcv(struct sk_buff *skb, struct net_device *dev,
 		     struct packet_type *pt, struct net_device *orig_dev)
 {
-	if (dev->nd_net != &init_net)
+	if (dev_net(dev) != &init_net)
 		goto freeit;
 
 	/* Expand any short form frames */

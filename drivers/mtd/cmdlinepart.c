@@ -9,7 +9,7 @@
  *
  * mtdparts=<mtddef>[;<mtddef]
  * <mtddef>  := <mtd-id>:<partdef>[,<partdef>]
- * <partdef> := <size>[@offset][<name>][ro]
+ * <partdef> := <size>[@offset][<name>][ro][lk]
  * <mtd-id>  := unique name used in mapping driver/device (mtd->name)
  * <size>    := standard linux memsize OR "-" to denote all remaining space
  * <name>    := '(' NAME ')'
@@ -119,7 +119,8 @@ static struct mtd_partition * newpart(char *s,
 		char *p;
 
 	    	name = ++s;
-		if ((p = strchr(name, delim)) == 0)
+		p = strchr(name, delim);
+		if (!p)
 		{
 			printk(KERN_ERR ERRP "no closing %c found in partition name\n", delim);
 			return NULL;
@@ -143,6 +144,13 @@ static struct mtd_partition * newpart(char *s,
 		s += 2;
         }
 
+        /* if lk is found do NOT unlock the MTD partition*/
+        if (strncmp(s, "lk", 2) == 0)
+	{
+		mask_flags |= MTD_POWERUP_LOCK;
+		s += 2;
+        }
+
 	/* test if more partitions are following */
 	if (*s == ',')
 	{
@@ -152,9 +160,10 @@ static struct mtd_partition * newpart(char *s,
 			return NULL;
 		}
 		/* more partitions follow, parse them */
-		if ((parts = newpart(s + 1, &s, num_parts,
-		                     this_part + 1, &extra_mem, extra_mem_size)) == 0)
-		  return NULL;
+		parts = newpart(s + 1, &s, num_parts, this_part + 1,
+				&extra_mem, extra_mem_size);
+		if (!parts)
+			return NULL;
 	}
 	else
 	{	/* this is the last partition: allocate space for all */
@@ -301,9 +310,6 @@ static int parse_cmdline_partitions(struct mtd_info *master,
 	struct cmdline_mtd_partition *part;
 	char *mtd_id = master->name;
 
-	if(!cmdline)
-		return -EINVAL;
-
 	/* parse command line */
 	if (!cmdline_parsed)
 		mtdpart_setup_real(cmdline);
@@ -334,7 +340,7 @@ static int parse_cmdline_partitions(struct mtd_info *master,
 			return part->num_parts;
 		}
 	}
-	return -EINVAL;
+	return 0;
 }
 
 

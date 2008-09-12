@@ -1,10 +1,10 @@
 /* linux/drivers/mtd/nand/bf5xx_nand.c
  *
- * Copyright 2006-2007 Analog Devices Inc.
+ * Copyright 2006-2008 Analog Devices Inc.
  *	http://blackfin.uclinux.org/
  *	Bryan Wu <bryan.wu@analog.com>
  *
- * Blackfin BF5xx on-chip NAND flash controler driver
+ * Blackfin BF5xx on-chip NAND flash controller driver
  *
  * Derived from drivers/mtd/nand/s3c2410.c
  * Copyright (c) 2007 Ben Dooks <ben@simtec.co.uk>
@@ -74,7 +74,22 @@ static int hardware_ecc = 1;
 static int hardware_ecc;
 #endif
 
-static unsigned short bfin_nfc_pin_req[] = {P_NAND_CE, P_NAND_RB, 0};
+static const unsigned short bfin_nfc_pin_req[] =
+	{P_NAND_CE,
+	 P_NAND_RB,
+	 P_NAND_D0,
+	 P_NAND_D1,
+	 P_NAND_D2,
+	 P_NAND_D3,
+	 P_NAND_D4,
+	 P_NAND_D5,
+	 P_NAND_D6,
+	 P_NAND_D7,
+	 P_NAND_WE,
+	 P_NAND_RE,
+	 P_NAND_CLE,
+	 P_NAND_ALE,
+	 0};
 
 /*
  * Data structures for bf5xx nand flash controller driver
@@ -278,7 +293,6 @@ static int bf5xx_nand_calculate_ecc(struct mtd_info *mtd,
 	u16 ecc0, ecc1;
 	u32 code[2];
 	u8 *p;
-	int bytes = 3, i;
 
 	/* first 4 bytes ECC code for 256 page size */
 	ecc0 = bfin_read_NFC_ECC0();
@@ -288,18 +302,23 @@ static int bf5xx_nand_calculate_ecc(struct mtd_info *mtd,
 
 	dev_dbg(info->device, "returning ecc 0x%08x\n", code[0]);
 
+	/* first 3 bytes in ecc_code for 256 page size */
+	p = (u8 *) code;
+	memcpy(ecc_code, p, 3);
+
 	/* second 4 bytes ECC code for 512 page size */
 	if (page_size == 512) {
 		ecc0 = bfin_read_NFC_ECC2();
 		ecc1 = bfin_read_NFC_ECC3();
 		code[1] = (ecc0 & 0x3FF) | ((ecc1 & 0x3FF) << 11);
-		bytes = 6;
+
+		/* second 3 bytes in ecc_code for second 256
+		 * bytes of 512 page size
+		 */
+		p = (u8 *) (code + 1);
+		memcpy((ecc_code + 3), p, 3);
 		dev_dbg(info->device, "returning ecc 0x%08x\n", code[1]);
 	}
-
-	p = (u8 *)code;
-	for (i = 0; i < bytes; i++)
-		ecc_code[i] = p[i];
 
 	return 0;
 }
@@ -507,12 +526,13 @@ static int bf5xx_nand_dma_init(struct bf5xx_nand_info *info)
 
 	init_completion(&info->dma_completion);
 
+#ifdef CONFIG_BF54x
 	/* Setup DMAC1 channel mux for NFC which shared with SDH */
 	val = bfin_read_DMAC1_PERIMUX();
 	val &= 0xFFFE;
 	bfin_write_DMAC1_PERIMUX(val);
 	SSYNC();
-
+#endif
 	/* Request NFC DMA channel */
 	ret = request_dma(CH_NFC, "BF5XX NFC driver");
 	if (ret < 0) {
@@ -560,12 +580,6 @@ static int bf5xx_nand_hw_init(struct bf5xx_nand_info *info)
 	val = bfin_read_NFC_IRQSTAT();
 	bfin_write_NFC_IRQSTAT(val);
 	SSYNC();
-
-	if (peripheral_request_list(bfin_nfc_pin_req, DRV_NAME)) {
-		printk(KERN_ERR DRV_NAME
-		": Requesting Peripherals failed\n");
-		return -EFAULT;
-	}
 
 	/* DMA initialization  */
 	if (bf5xx_nand_dma_init(info))
@@ -633,6 +647,12 @@ static int bf5xx_nand_probe(struct platform_device *pdev)
 	int err = 0;
 
 	dev_dbg(&pdev->dev, "(%p)\n", pdev);
+
+	if (peripheral_request_list(bfin_nfc_pin_req, DRV_NAME)) {
+		printk(KERN_ERR DRV_NAME
+		": Requesting Peripherals failed\n");
+		return -EFAULT;
+	}
 
 	if (!plat) {
 		dev_err(&pdev->dev, "no platform specific information\n");
@@ -744,9 +764,6 @@ static int bf5xx_nand_resume(struct platform_device *dev)
 {
 	struct bf5xx_nand_info *info = platform_get_drvdata(dev);
 
-	if (info)
-		bf5xx_nand_hw_init(info);
-
 	return 0;
 }
 
@@ -786,3 +803,4 @@ module_exit(bf5xx_nand_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR(DRV_AUTHOR);
 MODULE_DESCRIPTION(DRV_DESC);
+MODULE_ALIAS("platform:" DRV_NAME);

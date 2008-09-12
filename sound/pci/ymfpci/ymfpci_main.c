@@ -18,7 +18,6 @@
  *
  */
 
-#include <sound/driver.h>
 #include <linux/delay.h>
 #include <linux/firmware.h>
 #include <linux/init.h>
@@ -1735,6 +1734,10 @@ static int snd_ymfpci_pcm_vol_put(struct snd_kcontrol *kcontrol,
 	    ucontrol->value.integer.value[1] != chip->pcm_mixer[subs].right) {
 		chip->pcm_mixer[subs].left = ucontrol->value.integer.value[0];
 		chip->pcm_mixer[subs].right = ucontrol->value.integer.value[1];
+		if (chip->pcm_mixer[subs].left > 0x8000)
+			chip->pcm_mixer[subs].left = 0x8000;
+		if (chip->pcm_mixer[subs].right > 0x8000)
+			chip->pcm_mixer[subs].right = 0x8000;
 
 		substream = (struct snd_pcm_substream *)kcontrol->private_value;
 		spin_lock_irqsave(&chip->voice_lock, flags);
@@ -2246,6 +2249,8 @@ static int snd_ymfpci_free(struct snd_ymfpci *chip)
 #ifdef CONFIG_PM
 	vfree(chip->saved_regs);
 #endif
+	if (chip->irq >= 0)
+		free_irq(chip->irq, chip);
 	release_and_free_resource(chip->mpu_res);
 	release_and_free_resource(chip->fm_res);
 	snd_ymfpci_free_gameport(chip);
@@ -2254,8 +2259,6 @@ static int snd_ymfpci_free(struct snd_ymfpci *chip)
 	if (chip->work_ptr.area)
 		snd_dma_free_pages(&chip->work_ptr);
 	
-	if (chip->irq >= 0)
-		free_irq(chip->irq, chip);
 	release_and_free_resource(chip->res_reg_area);
 
 	pci_write_config_word(chip->pci, 0x40, chip->old_legacy_ctrl);

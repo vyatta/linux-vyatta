@@ -57,7 +57,7 @@ struct cx88_IR {
 	u32 mask_keyup;
 };
 
-static int ir_debug = 0;
+static int ir_debug;
 module_param(ir_debug, int, 0644);	/* debug level [IR] */
 MODULE_PARM_DESC(ir_debug, "enable debug messages [IR]");
 
@@ -258,6 +258,13 @@ int cx88_ir_init(struct cx88_core *core, struct pci_dev *pci)
 		ir->mask_keyup = 0x80;
 		ir->polling = 1; /* ms */
 		break;
+	case CX88_BOARD_PROLINK_PV_8000GT:
+		ir_codes = ir_codes_pixelview_new;
+		ir->gpio_addr = MO_GP1_IO;
+		ir->mask_keycode = 0x3f;
+		ir->mask_keyup = 0x80;
+		ir->polling = 1; /* ms */
+		break;
 	case CX88_BOARD_KWORLD_LTV883:
 		ir_codes = ir_codes_pixelview;
 		ir->gpio_addr = MO_GP1_IO;
@@ -304,6 +311,17 @@ int cx88_ir_init(struct cx88_core *core, struct pci_dev *pci)
 		ir->gpio_addr = MO_GP0_IO;
 		ir->mask_keycode = 0xfa;
 		ir->polling = 50; /* ms */
+		break;
+	case CX88_BOARD_PINNACLE_PCTV_HD_800i:
+		ir_codes = ir_codes_pinnacle_pctv_hd;
+		ir_type = IR_TYPE_RC5;
+		ir->sampling = 1;
+		break;
+	case CX88_BOARD_POWERCOLOR_REAL_ANGEL:
+		ir_codes = ir_codes_powercolor_real_angel;
+		ir->gpio_addr = MO_GP2_IO;
+		ir->mask_keycode = 0x7e;
+		ir->polling = 100; /* ms */
 		break;
 	}
 
@@ -443,6 +461,7 @@ void cx88_ir_irq(struct cx88_core *core)
 	case CX88_BOARD_HAUPPAUGE_NOVASPLUS_S1:
 	case CX88_BOARD_HAUPPAUGE_HVR1100:
 	case CX88_BOARD_HAUPPAUGE_HVR3000:
+	case CX88_BOARD_PINNACLE_PCTV_HD_800i:
 		ircode = ir_decode_biphase(ir->samples, ir->scount, 5, 7);
 		ir_dprintk("biphase decoded: %x\n", ircode);
 		if ((ircode & 0xfffff000) != 0x3000)

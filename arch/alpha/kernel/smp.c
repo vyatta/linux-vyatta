@@ -77,10 +77,6 @@ int smp_num_probed;		/* Internal processor count */
 int smp_num_cpus = 1;		/* Number that came online.  */
 EXPORT_SYMBOL(smp_num_cpus);
 
-extern void calibrate_delay(void);
-
-
-
 /*
  * Called by both boot and secondaries to move global data into
  *  per-processor storage.
@@ -759,7 +755,7 @@ smp_call_function_on_cpu (void (*func) (void *info), void *info, int retry,
 	if (atomic_read(&data.unstarted_count) > 0) {
 		long start_time = jiffies;
 		printk(KERN_ERR "%s: initial timeout -- trying long wait\n",
-		       __FUNCTION__);
+		       __func__);
 		timeout = jiffies + 30 * HZ;
 		while (atomic_read(&data.unstarted_count) > 0
 		       && time_before(jiffies, timeout))
@@ -768,7 +764,7 @@ smp_call_function_on_cpu (void (*func) (void *info), void *info, int retry,
 			long delta = jiffies - start_time;
 			printk(KERN_ERR 
 			       "%s: response %ld.%ld seconds into long wait\n",
-			       __FUNCTION__, delta / HZ,
+			       __func__, delta / HZ,
 			       (100 * (delta - ((delta / HZ) * HZ))) / HZ);
 		}
 	}

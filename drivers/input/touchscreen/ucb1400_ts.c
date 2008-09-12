@@ -15,7 +15,6 @@
  */
 
 #include <linux/module.h>
-#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
@@ -27,7 +26,6 @@
 #include <linux/kthread.h>
 #include <linux/freezer.h>
 
-#include <sound/driver.h>
 #include <sound/core.h>
 #include <sound/ac97_codec.h>
 
@@ -429,10 +427,6 @@ static int ucb1400_detect_irq(struct ucb1400 *ucb)
 	unsigned long mask, timeout;
 
 	mask = probe_irq_on();
-	if (!mask) {
-		probe_irq_off(mask);
-		return -EBUSY;
-	}
 
 	/* Enable the ADC interrupt. */
 	ucb1400_reg_write(ucb, UCB_IE_RIS, UCB_IE_ADC);

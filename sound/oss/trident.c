@@ -2878,7 +2878,7 @@ trident_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static /*const */ struct file_operations trident_audio_fops = {
+static const struct file_operations trident_audio_fops = {
 	.owner = THIS_MODULE,
 	.llseek = no_llseek,
 	.read = trident_read,
@@ -2935,7 +2935,7 @@ trident_ac97_set(struct ac97_codec *codec, u8 reg, u16 val)
 	do {
 		if ((inw(TRID_REG(card, address)) & busy) == 0)
 			break;
-	} while (count--);
+	} while (--count);
 
 	data |= (mask | (reg & AC97_REG_ADDR));
 
@@ -2996,7 +2996,7 @@ trident_ac97_get(struct ac97_codec *codec, u8 reg)
 		data = inl(TRID_REG(card, address));
 		if ((data & busy) == 0)
 			break;
-	} while (count--);
+	} while (--count);
 	spin_unlock_irqrestore(&card->lock, flags);
 
 	if (count == 0) {
@@ -3076,8 +3076,7 @@ ali_ac97_get(struct trident_card *card, int secondary, u8 reg)
 	u16 wcontrol;
 	unsigned long flags;
 
-	if (!card)
-		BUG();
+	BUG_ON(!card);
 
 	address = ALI_AC97_READ;
 	if (card->revision == ALI_5451_V02) {
@@ -3148,8 +3147,7 @@ ali_ac97_set(struct trident_card *card, int secondary, u8 reg, u16 val)
 
 	data = ((u32) val) << 16;
 
-	if (!card)
-		BUG();
+	BUG_ON(!card);
 
 	address = ALI_AC97_WRITE;
 	mask = ALI_AC97_WRITE_ACTION | ALI_AC97_AUDIO_BUSY;
@@ -3213,8 +3211,7 @@ ali_ac97_read(struct ac97_codec *codec, u8 reg)
 	struct trident_card *card = NULL;
 
 	/* Added by Matt Wu */
-	if (!codec)
-		BUG();
+	BUG_ON(!codec);
 
 	card = (struct trident_card *) codec->private_data;
 
@@ -3240,8 +3237,7 @@ ali_ac97_write(struct ac97_codec *codec, u8 reg, u16 val)
 	struct trident_card *card;
 
 	/*  Added by Matt Wu */
-	if (!codec)
-		BUG();
+	BUG_ON(!codec);
 
 	card = (struct trident_card *) codec->private_data;
 
@@ -4104,7 +4100,7 @@ trident_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int cmd,
 	return codec->mixer_ioctl(codec, cmd, arg);
 }
 
-static /*const */ struct file_operations trident_mixer_fops = {
+static const struct file_operations trident_mixer_fops = {
 	.owner = THIS_MODULE,
 	.llseek = no_llseek,
 	.ioctl = trident_ioctl_mixdev,

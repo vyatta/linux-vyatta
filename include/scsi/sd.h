@@ -34,18 +34,19 @@
 struct scsi_disk {
 	struct scsi_driver *driver;	/* always &sd_template */
 	struct scsi_device *device;
-	struct class_device cdev;
+	struct device	dev;
 	struct gendisk	*disk;
 	unsigned int	openers;	/* protected by BKL for now, yuck */
 	sector_t	capacity;	/* size in 512-byte sectors */
 	u32		index;
 	u8		media_present;
 	u8		write_prot;
+	unsigned	previous_state : 1;
 	unsigned	WCE : 1;	/* state of disk WCE bit */
 	unsigned	RCD : 1;	/* state of disk RCD bit, unused */
 	unsigned	DPOFUA : 1;	/* state of disk DPOFUA bit */
 };
-#define to_scsi_disk(obj) container_of(obj,struct scsi_disk,cdev)
+#define to_scsi_disk(obj) container_of(obj,struct scsi_disk,dev)
 
 #define sd_printk(prefix, sdsk, fmt, a...)				\
         (sdsk)->disk ?							\

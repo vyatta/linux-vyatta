@@ -94,8 +94,17 @@ enum ib_device_cap_flags {
 	IB_DEVICE_SRQ_RESIZE		= (1<<13),
 	IB_DEVICE_N_NOTIFY_CQ		= (1<<14),
 	IB_DEVICE_ZERO_STAG		= (1<<15),
-	IB_DEVICE_SEND_W_INV		= (1<<16),
-	IB_DEVICE_MEM_WINDOW		= (1<<17)
+	IB_DEVICE_RESERVED		= (1<<16), /* old SEND_W_INV */
+	IB_DEVICE_MEM_WINDOW		= (1<<17),
+	/*
+	 * Devices should set IB_DEVICE_UD_IP_SUM if they support
+	 * insertion of UDP and TCP checksum on outgoing UD IPoIB
+	 * messages and can verify the validity of checksum for
+	 * incoming messages.  Setting this flag implies that the
+	 * IPoIB driver may set NETIF_F_IP_CSUM for datagram mode.
+	 */
+	IB_DEVICE_UD_IP_CSUM		= (1<<18),
+	IB_DEVICE_UD_TSO		= (1<<19),
 };
 
 enum ib_atomic_cap {
@@ -403,6 +412,7 @@ enum ib_wc_opcode {
 	IB_WC_COMP_SWAP,
 	IB_WC_FETCH_ADD,
 	IB_WC_BIND_MW,
+	IB_WC_LSO,
 /*
  * Set value of IB_WC_RECV so consumers can test if a completion is a
  * receive by testing (opcode & IB_WC_RECV).
@@ -431,6 +441,7 @@ struct ib_wc {
 	u8			sl;
 	u8			dlid_path_bits;
 	u8			port_num;	/* valid only for DR SMPs on switches */
+	int			csum_ok;
 };
 
 enum ib_cq_notify_flags {
@@ -486,6 +497,10 @@ enum ib_qp_type {
 	IB_QPT_RAW_ETY
 };
 
+enum ib_qp_create_flags {
+	IB_QP_CREATE_IPOIB_UD_LSO	= 1 << 0,
+};
+
 struct ib_qp_init_attr {
 	void                  (*event_handler)(struct ib_event *, void *);
 	void		       *qp_context;
@@ -495,6 +510,7 @@ struct ib_qp_init_attr {
 	struct ib_qp_cap	cap;
 	enum ib_sig_type	sq_sig_type;
 	enum ib_qp_type		qp_type;
+	enum ib_qp_create_flags	create_flags;
 	u8			port_num; /* special QP types only */
 };
 
@@ -608,14 +624,17 @@ enum ib_wr_opcode {
 	IB_WR_SEND_WITH_IMM,
 	IB_WR_RDMA_READ,
 	IB_WR_ATOMIC_CMP_AND_SWP,
-	IB_WR_ATOMIC_FETCH_AND_ADD
+	IB_WR_ATOMIC_FETCH_AND_ADD,
+	IB_WR_LSO,
+	IB_WR_SEND_WITH_INV,
 };
 
 enum ib_send_flags {
 	IB_SEND_FENCE		= 1,
 	IB_SEND_SIGNALED	= (1<<1),
 	IB_SEND_SOLICITED	= (1<<2),
-	IB_SEND_INLINE		= (1<<3)
+	IB_SEND_INLINE		= (1<<3),
+	IB_SEND_IP_CSUM		= (1<<4)
 };
 
 struct ib_sge {
@@ -631,7 +650,10 @@ struct ib_send_wr {
 	int			num_sge;
 	enum ib_wr_opcode	opcode;
 	int			send_flags;
-	__be32			imm_data;
+	union {
+		__be32		imm_data;
+		u32		invalidate_rkey;
+	} ex;
 	union {
 		struct {
 			u64	remote_addr;
@@ -645,6 +667,9 @@ struct ib_send_wr {
 		} atomic;
 		struct {
 			struct ib_ah *ah;
+			void   *header;
+			int     hlen;
+			int     mss;
 			u32	remote_qpn;
 			u32	remote_qkey;
 			u16	pkey_index; /* valid for GSI only */
@@ -720,7 +745,7 @@ struct ib_uobject {
 	struct ib_ucontext     *context;	/* associated user context */
 	void		       *object;		/* containing object */
 	struct list_head	list;		/* link to context's list */
-	u32			id;		/* index into kernel idr */
+	int			id;		/* index into kernel idr */
 	struct kref		ref;
 	struct rw_semaphore	mutex;		/* protects .live */
 	int			live;
@@ -890,8 +915,6 @@ struct ib_device {
 	int                          *pkey_tbl_len;
 	int                          *gid_tbl_len;
 
-	u32                           flags;
-
 	int			      num_comp_vectors;
 
 	struct iw_cm_verbs	     *iwcm;
@@ -963,6 +986,8 @@ struct ib_device {
 						int comp_vector,
 						struct ib_ucontext *context,
 						struct ib_udata *udata);
+	int                        (*modify_cq)(struct ib_cq *cq, u16 cq_count,
+						u16 cq_period);
 	int                        (*destroy_cq)(struct ib_cq *cq);
 	int                        (*resize_cq)(struct ib_cq *cq, int cqe,
 						struct ib_udata *udata);
@@ -1025,8 +1050,8 @@ struct ib_device {
 	struct ib_dma_mapping_ops   *dma_ops;
 
 	struct module               *owner;
-	struct class_device          class_dev;
-	struct kobject               ports_parent;
+	struct device                dev;
+	struct kobject               *ports_parent;
 	struct list_head             port_list;
 
 	enum {
@@ -1368,6 +1393,15 @@ struct ib_cq *ib_create_cq(struct ib_device *device,
 int ib_resize_cq(struct ib_cq *cq, int cqe);
 
 /**
+ * ib_modify_cq - Modifies moderation params of the CQ
+ * @cq: The CQ to modify.
+ * @cq_count: number of CQEs that will trigger an event
+ * @cq_period: max period of time in usec before triggering an event
+ *
+ */
+int ib_modify_cq(struct ib_cq *cq, u16 cq_count, u16 cq_period);
+
+/**
  * ib_destroy_cq - Destroys the specified CQ.
  * @cq: The CQ to destroy.
  */
@@ -1507,6 +1541,24 @@ static inline void ib_dma_unmap_single(struct ib_device *dev,
 		dma_unmap_single(dev->dma_device, addr, size, direction);
 }
 
+static inline u64 ib_dma_map_single_attrs(struct ib_device *dev,
+					  void *cpu_addr, size_t size,
+					  enum dma_data_direction direction,
+					  struct dma_attrs *attrs)
+{
+	return dma_map_single_attrs(dev->dma_device, cpu_addr, size,
+				    direction, attrs);
+}
+
+static inline void ib_dma_unmap_single_attrs(struct ib_device *dev,
+					     u64 addr, size_t size,
+					     enum dma_data_direction direction,
+					     struct dma_attrs *attrs)
+{
+	return dma_unmap_single_attrs(dev->dma_device, addr, size,
+				      direction, attrs);
+}
+
 /**
  * ib_dma_map_page - Map a physical page to DMA address
  * @dev: The device for which the dma_addr is to be created
@@ -1576,6 +1628,21 @@ static inline void ib_dma_unmap_sg(struct ib_device *dev,
 		dma_unmap_sg(dev->dma_device, sg, nents, direction);
 }
 
+static inline int ib_dma_map_sg_attrs(struct ib_device *dev,
+				      struct scatterlist *sg, int nents,
+				      enum dma_data_direction direction,
+				      struct dma_attrs *attrs)
+{
+	return dma_map_sg_attrs(dev->dma_device, sg, nents, direction, attrs);
+}
+
+static inline void ib_dma_unmap_sg_attrs(struct ib_device *dev,
+					 struct scatterlist *sg, int nents,
+					 enum dma_data_direction direction,
+					 struct dma_attrs *attrs)
+{
+	dma_unmap_sg_attrs(dev->dma_device, sg, nents, direction, attrs);
+}
 /**
  * ib_sg_dma_address - Return the DMA address from a scatter/gather entry
  * @dev: The device for which the DMA addresses were created

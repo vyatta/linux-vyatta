@@ -12,8 +12,10 @@
 
 #include <linux/module.h>
 #include <linux/sched.h>
+#include <linux/timex.h>
 #include <linux/preempt.h>
 #include <linux/delay.h>
+#include <linux/init.h>
 
 #include <asm/processor.h>
 #include <asm/delay.h>
@@ -42,13 +44,36 @@ static void delay_loop(unsigned long loops)
 static void delay_tsc(unsigned long loops)
 {
 	unsigned long bclock, now;
+	int cpu;
 
-	preempt_disable();		/* TSC's are per-cpu */
+	preempt_disable();
+	cpu = smp_processor_id();
 	rdtscl(bclock);
-	do {
-		rep_nop();
+	for (;;) {
 		rdtscl(now);
-	} while ((now-bclock) < loops);
+		if ((now - bclock) >= loops)
+			break;
+
+		/* Allow RT tasks to run */
+		preempt_enable();
+		rep_nop();
+		preempt_disable();
+
+		/*
+		 * It is possible that we moved to another CPU, and
+		 * since TSC's are per-cpu we need to calculate
+		 * that. The delay must guarantee that we wait "at
+		 * least" the amount of time. Being moved to another
+		 * CPU could make the wait longer but we just need to
+		 * make sure we waited long enough. Rebalance the
+		 * counter for this CPU.
+		 */
+		if (unlikely(cpu != smp_processor_id())) {
+			loops -= (now - bclock);
+			cpu = smp_processor_id();
+			rdtscl(bclock);
+		}
+	}
 	preempt_enable();
 }
 
@@ -63,7 +88,7 @@ void use_tsc_delay(void)
 	delay_fn = delay_tsc;
 }
 
-int read_current_timer(unsigned long *timer_val)
+int __devinit read_current_timer(unsigned long *timer_val)
 {
 	if (delay_fn == delay_tsc) {
 		rdtscl(*timer_val);

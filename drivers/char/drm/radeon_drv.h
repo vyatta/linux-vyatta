@@ -38,7 +38,7 @@
 
 #define DRIVER_NAME		"radeon"
 #define DRIVER_DESC		"ATI Radeon"
-#define DRIVER_DATE		"20060524"
+#define DRIVER_DATE		"20080528"
 
 /* Interface history:
  *
@@ -98,9 +98,10 @@
  * 1.26- Add support for variable size PCI(E) gart aperture
  * 1.27- Add support for IGP GART
  * 1.28- Add support for VBL on CRTC2
+ * 1.29- R500 3D cmd buffer support
  */
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		28
+#define DRIVER_MINOR		29
 #define DRIVER_PATCHLEVEL	0
 
 /*
@@ -122,7 +123,14 @@ enum radeon_family {
 	CHIP_RV380,
 	CHIP_R420,
 	CHIP_RV410,
-	CHIP_RS400,
+	CHIP_RS480,
+	CHIP_RS690,
+	CHIP_RV515,
+	CHIP_R520,
+	CHIP_RV530,
+	CHIP_RV560,
+	CHIP_RV570,
+	CHIP_R580,
 	CHIP_LAST,
 };
 
@@ -165,6 +173,12 @@ typedef struct drm_radeon_ring_buffer {
 	u32 *end;
 	int size;
 	int size_l2qw;
+
+	int rptr_update; /* Double Words */
+	int rptr_update_l2qw; /* log2 Quad Words */
+
+	int fetch_size; /* Double Words */
+	int fetch_size_l2ow; /* log2 Oct Words */
 
 	u32 tail;
 	u32 tail_mask;
@@ -281,6 +295,7 @@ typedef struct drm_radeon_private {
 	int vblank_crtc;
 	uint32_t irq_enable_reg;
 	int irq_enabled;
+	uint32_t r500_disp_irq_reg;
 
 	struct radeon_surface surfaces[RADEON_MAX_SURFACES];
 	struct radeon_virt_surface virt_surfaces[2 * RADEON_MAX_SURFACES];
@@ -294,6 +309,8 @@ typedef struct drm_radeon_private {
 	/* starting from here on, data is preserved accross an open */
 	uint32_t flags;		/* see radeon_chip_flags */
 	unsigned long fb_aper_offset;
+
+	int num_gb_pipes;
 } drm_radeon_private_t;
 
 typedef struct drm_radeon_buf_priv {
@@ -336,6 +353,7 @@ extern int radeon_cp_resume(struct drm_device *dev, void *data, struct drm_file 
 extern int radeon_engine_reset(struct drm_device *dev, void *data, struct drm_file *file_priv);
 extern int radeon_fullscreen(struct drm_device *dev, void *data, struct drm_file *file_priv);
 extern int radeon_cp_buffers(struct drm_device *dev, void *data, struct drm_file *file_priv);
+extern u32 radeon_read_fb_location(drm_radeon_private_t *dev_priv);
 
 extern void radeon_freelist_reset(struct drm_device * dev);
 extern struct drm_buf *radeon_freelist_get(struct drm_device * dev);
@@ -368,6 +386,7 @@ extern irqreturn_t radeon_driver_irq_handler(DRM_IRQ_ARGS);
 extern void radeon_driver_irq_preinstall(struct drm_device * dev);
 extern void radeon_driver_irq_postinstall(struct drm_device * dev);
 extern void radeon_driver_irq_uninstall(struct drm_device * dev);
+extern void radeon_enable_interrupt(struct drm_device *dev);
 extern int radeon_vblank_crtc_get(struct drm_device *dev);
 extern int radeon_vblank_crtc_set(struct drm_device *dev, int64_t value);
 
@@ -382,7 +401,7 @@ extern long radeon_compat_ioctl(struct file *filp, unsigned int cmd,
 				unsigned long arg);
 
 /* r300_cmdbuf.c */
-extern void r300_init_reg_flags(void);
+extern void r300_init_reg_flags(struct drm_device *dev);
 
 extern int r300_do_cp_cmdbuf(struct drm_device * dev,
 			     struct drm_file *file_priv,
@@ -429,35 +448,116 @@ extern int r300_do_cp_cmdbuf(struct drm_device * dev,
 #define RADEON_PCIE_INDEX               0x0030
 #define RADEON_PCIE_DATA                0x0034
 #define RADEON_PCIE_TX_GART_CNTL	0x10
-#	define RADEON_PCIE_TX_GART_EN   	(1 << 0)
-#	define RADEON_PCIE_TX_GART_UNMAPPED_ACCESS_PASS_THRU (0<<1)
-#	define RADEON_PCIE_TX_GART_UNMAPPED_ACCESS_CLAMP_LO  (1<<1)
-#	define RADEON_PCIE_TX_GART_UNMAPPED_ACCESS_DISCARD   (3<<1)
-#	define RADEON_PCIE_TX_GART_MODE_32_128_CACHE	(0<<3)
-#	define RADEON_PCIE_TX_GART_MODE_8_4_128_CACHE	(1<<3)
-#	define RADEON_PCIE_TX_GART_CHK_RW_VALID_EN      (1<<5)
-#	define RADEON_PCIE_TX_GART_INVALIDATE_TLB	(1<<8)
+#	define RADEON_PCIE_TX_GART_EN		(1 << 0)
+#	define RADEON_PCIE_TX_GART_UNMAPPED_ACCESS_PASS_THRU (0 << 1)
+#	define RADEON_PCIE_TX_GART_UNMAPPED_ACCESS_CLAMP_LO  (1 << 1)
+#	define RADEON_PCIE_TX_GART_UNMAPPED_ACCESS_DISCARD   (3 << 1)
+#	define RADEON_PCIE_TX_GART_MODE_32_128_CACHE	(0 << 3)
+#	define RADEON_PCIE_TX_GART_MODE_8_4_128_CACHE	(1 << 3)
+#	define RADEON_PCIE_TX_GART_CHK_RW_VALID_EN      (1 << 5)
+#	define RADEON_PCIE_TX_GART_INVALIDATE_TLB	(1 << 8)
 #define RADEON_PCIE_TX_DISCARD_RD_ADDR_LO 0x11
 #define RADEON_PCIE_TX_DISCARD_RD_ADDR_HI 0x12
-#define RADEON_PCIE_TX_GART_BASE  	0x13
+#define RADEON_PCIE_TX_GART_BASE	0x13
 #define RADEON_PCIE_TX_GART_START_LO	0x14
 #define RADEON_PCIE_TX_GART_START_HI	0x15
 #define RADEON_PCIE_TX_GART_END_LO	0x16
 #define RADEON_PCIE_TX_GART_END_HI	0x17
 
-#define RADEON_IGPGART_INDEX            0x168
-#define RADEON_IGPGART_DATA             0x16c
-#define RADEON_IGPGART_UNK_18           0x18
-#define RADEON_IGPGART_CTRL             0x2b
-#define RADEON_IGPGART_BASE_ADDR        0x2c
-#define RADEON_IGPGART_FLUSH            0x2e
-#define RADEON_IGPGART_ENABLE           0x38
-#define RADEON_IGPGART_UNK_39           0x39
+#define RS480_NB_MC_INDEX               0x168
+#	define RS480_NB_MC_IND_WR_EN	(1 << 8)
+#define RS480_NB_MC_DATA                0x16c
+
+#define RS690_MC_INDEX                  0x78
+#   define RS690_MC_INDEX_MASK          0x1ff
+#   define RS690_MC_INDEX_WR_EN         (1 << 9)
+#   define RS690_MC_INDEX_WR_ACK        0x7f
+#define RS690_MC_DATA                   0x7c
+
+/* MC indirect registers */
+#define RS480_MC_MISC_CNTL              0x18
+#	define RS480_DISABLE_GTW	(1 << 1)
+/* switch between MCIND GART and MM GART registers. 0 = mmgart, 1 = mcind gart */
+#	define RS480_GART_INDEX_REG_EN	(1 << 12)
+#	define RS690_BLOCK_GFX_D3_EN	(1 << 14)
+#define RS480_K8_FB_LOCATION            0x1e
+#define RS480_GART_FEATURE_ID           0x2b
+#	define RS480_HANG_EN	        (1 << 11)
+#	define RS480_TLB_ENABLE	        (1 << 18)
+#	define RS480_P2P_ENABLE	        (1 << 19)
+#	define RS480_GTW_LAC_EN	        (1 << 25)
+#	define RS480_2LEVEL_GART	(0 << 30)
+#	define RS480_1LEVEL_GART	(1 << 30)
+#	define RS480_PDC_EN	        (1 << 31)
+#define RS480_GART_BASE                 0x2c
+#define RS480_GART_CACHE_CNTRL          0x2e
+#	define RS480_GART_CACHE_INVALIDATE (1 << 0) /* wait for it to clear */
+#define RS480_AGP_ADDRESS_SPACE_SIZE    0x38
+#	define RS480_GART_EN	        (1 << 0)
+#	define RS480_VA_SIZE_32MB	(0 << 1)
+#	define RS480_VA_SIZE_64MB	(1 << 1)
+#	define RS480_VA_SIZE_128MB	(2 << 1)
+#	define RS480_VA_SIZE_256MB	(3 << 1)
+#	define RS480_VA_SIZE_512MB	(4 << 1)
+#	define RS480_VA_SIZE_1GB	(5 << 1)
+#	define RS480_VA_SIZE_2GB	(6 << 1)
+#define RS480_AGP_MODE_CNTL             0x39
+#	define RS480_POST_GART_Q_SIZE	(1 << 18)
+#	define RS480_NONGART_SNOOP	(1 << 19)
+#	define RS480_AGP_RD_BUF_SIZE	(1 << 20)
+#	define RS480_REQ_TYPE_SNOOP_SHIFT 22
+#	define RS480_REQ_TYPE_SNOOP_MASK  0x3
+#	define RS480_REQ_TYPE_SNOOP_DIS	(1 << 24)
+#define RS480_MC_MISC_UMA_CNTL          0x5f
+#define RS480_MC_MCLK_CNTL              0x7a
+#define RS480_MC_UMA_DUALCH_CNTL        0x86
+
+#define RS690_MC_FB_LOCATION            0x100
+#define RS690_MC_AGP_LOCATION           0x101
+#define RS690_MC_AGP_BASE               0x102
+#define RS690_MC_AGP_BASE_2             0x103
+
+#define R520_MC_IND_INDEX 0x70
+#define R520_MC_IND_WR_EN (1 << 24)
+#define R520_MC_IND_DATA  0x74
+
+#define RV515_MC_FB_LOCATION 0x01
+#define RV515_MC_AGP_LOCATION 0x02
+#define RV515_MC_AGP_BASE     0x03
+#define RV515_MC_AGP_BASE_2   0x04
+
+#define R520_MC_FB_LOCATION 0x04
+#define R520_MC_AGP_LOCATION 0x05
+#define R520_MC_AGP_BASE     0x06
+#define R520_MC_AGP_BASE_2   0x07
 
 #define RADEON_MPP_TB_CONFIG		0x01c0
 #define RADEON_MEM_CNTL			0x0140
 #define RADEON_MEM_SDRAM_MODE_REG	0x0158
+#define RADEON_AGP_BASE_2		0x015c /* r200+ only */
+#define RS480_AGP_BASE_2		0x0164
 #define RADEON_AGP_BASE			0x0170
+
+/* pipe config regs */
+#define R400_GB_PIPE_SELECT             0x402c
+#define R500_DYN_SCLK_PWMEM_PIPE        0x000d /* PLL */
+#define R500_SU_REG_DEST                0x42c8
+#define R300_GB_TILE_CONFIG             0x4018
+#       define R300_ENABLE_TILING       (1 << 0)
+#       define R300_PIPE_COUNT_RV350    (0 << 1)
+#       define R300_PIPE_COUNT_R300     (3 << 1)
+#       define R300_PIPE_COUNT_R420_3P  (6 << 1)
+#       define R300_PIPE_COUNT_R420     (7 << 1)
+#       define R300_TILE_SIZE_8         (0 << 4)
+#       define R300_TILE_SIZE_16        (1 << 4)
+#       define R300_TILE_SIZE_32        (2 << 4)
+#       define R300_SUBPIXEL_1_12       (0 << 16)
+#       define R300_SUBPIXEL_1_16       (1 << 16)
+#define R300_DST_PIPE_CONFIG            0x170c
+#       define R300_PIPE_AUTO_CONFIG    (1 << 31)
+#define R300_RB2D_DSTCACHE_MODE         0x3428
+#       define R300_DC_AUTOFLUSH_ENABLE (1 << 8)
+#       define R300_DC_DC_DISABLE_IGNORE_PE (1 << 17)
 
 #define RADEON_RB3D_COLOROFFSET		0x1c40
 #define RADEON_RB3D_COLORPITCH		0x1c48
@@ -512,12 +612,12 @@ extern int r300_do_cp_cmdbuf(struct drm_device * dev,
 
 #define RADEON_GEN_INT_STATUS		0x0044
 #	define RADEON_CRTC_VBLANK_STAT		(1 << 0)
-#	define RADEON_CRTC_VBLANK_STAT_ACK   	(1 << 0)
+#	define RADEON_CRTC_VBLANK_STAT_ACK	(1 << 0)
 #	define RADEON_CRTC2_VBLANK_STAT		(1 << 9)
-#	define RADEON_CRTC2_VBLANK_STAT_ACK   	(1 << 9)
+#	define RADEON_CRTC2_VBLANK_STAT_ACK	(1 << 9)
 #	define RADEON_GUI_IDLE_INT_TEST_ACK     (1 << 19)
 #	define RADEON_SW_INT_TEST		(1 << 25)
-#	define RADEON_SW_INT_TEST_ACK   	(1 << 25)
+#	define RADEON_SW_INT_TEST_ACK		(1 << 25)
 #	define RADEON_SW_INT_FIRE		(1 << 26)
 
 #define RADEON_HOST_PATH_CNTL		0x0130
@@ -562,11 +662,12 @@ extern int r300_do_cp_cmdbuf(struct drm_device * dev,
 #define RADEON_PP_TXFILTER_1		0x1c6c
 #define RADEON_PP_TXFILTER_2		0x1c84
 
-#define RADEON_RB2D_DSTCACHE_CTLSTAT	0x342c
-#	define RADEON_RB2D_DC_FLUSH		(3 << 0)
-#	define RADEON_RB2D_DC_FREE		(3 << 2)
-#	define RADEON_RB2D_DC_FLUSH_ALL		0xf
-#	define RADEON_RB2D_DC_BUSY		(1 << 31)
+#define R300_RB2D_DSTCACHE_CTLSTAT	0x342c /* use R300_DSTCACHE_CTLSTAT */
+#define R300_DSTCACHE_CTLSTAT		0x1714
+#	define R300_RB2D_DC_FLUSH		(3 << 0)
+#	define R300_RB2D_DC_FREE		(3 << 2)
+#	define R300_RB2D_DC_FLUSH_ALL		0xf
+#	define R300_RB2D_DC_BUSY		(1 << 31)
 #define RADEON_RB3D_CNTL		0x1c3c
 #	define RADEON_ALPHA_BLEND_ENABLE	(1 << 0)
 #	define RADEON_PLANE_MASK_ENABLE		(1 << 1)
@@ -589,11 +690,18 @@ extern int r300_do_cp_cmdbuf(struct drm_device * dev,
 #	define RADEON_RB3D_ZC_FREE		(1 << 2)
 #	define RADEON_RB3D_ZC_FLUSH_ALL		0x5
 #	define RADEON_RB3D_ZC_BUSY		(1 << 31)
+#define R300_ZB_ZCACHE_CTLSTAT                  0x4f18
+#	define R300_ZC_FLUSH		        (1 << 0)
+#	define R300_ZC_FREE		        (1 << 1)
+#	define R300_ZC_FLUSH_ALL		0x3
+#	define R300_ZC_BUSY		        (1 << 31)
 #define RADEON_RB3D_DSTCACHE_CTLSTAT	0x325c
 #	define RADEON_RB3D_DC_FLUSH		(3 << 0)
 #	define RADEON_RB3D_DC_FREE		(3 << 2)
 #	define RADEON_RB3D_DC_FLUSH_ALL		0xf
 #	define RADEON_RB3D_DC_BUSY		(1 << 31)
+#define R300_RB3D_DSTCACHE_CTLSTAT              0x4e4c
+#	define R300_RB3D_DC_FINISH		(1 << 4)
 #define RADEON_RB3D_ZSTENCILCNTL	0x1c2c
 #	define RADEON_Z_TEST_MASK		(7 << 4)
 #	define RADEON_Z_TEST_ALWAYS		(7 << 4)
@@ -615,9 +723,51 @@ extern int r300_do_cp_cmdbuf(struct drm_device * dev,
 #	define RADEON_SOFT_RESET_E2		(1 <<  5)
 #	define RADEON_SOFT_RESET_RB		(1 <<  6)
 #	define RADEON_SOFT_RESET_HDP		(1 <<  7)
+/*
+ *   6:0  Available slots in the FIFO
+ *   8    Host Interface active
+ *   9    CP request active
+ *   10   FIFO request active
+ *   11   Host Interface retry active
+ *   12   CP retry active
+ *   13   FIFO retry active
+ *   14   FIFO pipeline busy
+ *   15   Event engine busy
+ *   16   CP command stream busy
+ *   17   2D engine busy
+ *   18   2D portion of render backend busy
+ *   20   3D setup engine busy
+ *   26   GA engine busy
+ *   27   CBA 2D engine busy
+ *   31   2D engine busy or 3D engine busy or FIFO not empty or CP busy or
+ *           command stream queue not empty or Ring Buffer not empty
+ */
 #define RADEON_RBBM_STATUS		0x0e40
+/* Same as the previous RADEON_RBBM_STATUS; this is a mirror of that register.  */
+/* #define RADEON_RBBM_STATUS		0x1740 */
+/* bits 6:0 are dword slots available in the cmd fifo */
 #	define RADEON_RBBM_FIFOCNT_MASK		0x007f
-#	define RADEON_RBBM_ACTIVE		(1 << 31)
+#	define RADEON_HIRQ_ON_RBB	(1 <<  8)
+#	define RADEON_CPRQ_ON_RBB	(1 <<  9)
+#	define RADEON_CFRQ_ON_RBB	(1 << 10)
+#	define RADEON_HIRQ_IN_RTBUF	(1 << 11)
+#	define RADEON_CPRQ_IN_RTBUF	(1 << 12)
+#	define RADEON_CFRQ_IN_RTBUF	(1 << 13)
+#	define RADEON_PIPE_BUSY		(1 << 14)
+#	define RADEON_ENG_EV_BUSY	(1 << 15)
+#	define RADEON_CP_CMDSTRM_BUSY	(1 << 16)
+#	define RADEON_E2_BUSY		(1 << 17)
+#	define RADEON_RB2D_BUSY		(1 << 18)
+#	define RADEON_RB3D_BUSY		(1 << 19) /* not used on r300 */
+#	define RADEON_VAP_BUSY		(1 << 20)
+#	define RADEON_RE_BUSY		(1 << 21) /* not used on r300 */
+#	define RADEON_TAM_BUSY		(1 << 22) /* not used on r300 */
+#	define RADEON_TDM_BUSY		(1 << 23) /* not used on r300 */
+#	define RADEON_PB_BUSY		(1 << 24) /* not used on r300 */
+#	define RADEON_TIM_BUSY		(1 << 25) /* not used on r300 */
+#	define RADEON_GA_BUSY		(1 << 26)
+#	define RADEON_CBA2D_BUSY	(1 << 27)
+#	define RADEON_RBBM_ACTIVE	(1 << 31)
 #define RADEON_RE_LINE_PATTERN		0x1cd0
 #define RADEON_RE_MISC			0x26c4
 #define RADEON_RE_TOP_LEFT		0x26c0
@@ -961,6 +1111,31 @@ extern int r300_do_cp_cmdbuf(struct drm_device * dev,
 
 #define R200_VAP_PVS_CNTL_1               0x22D0
 
+#define R500_D1CRTC_STATUS 0x609c
+#define R500_D2CRTC_STATUS 0x689c
+#define R500_CRTC_V_BLANK (1<<0)
+
+#define R500_D1CRTC_FRAME_COUNT 0x60a4
+#define R500_D2CRTC_FRAME_COUNT 0x68a4
+
+#define R500_D1MODE_V_COUNTER 0x6530
+#define R500_D2MODE_V_COUNTER 0x6d30
+
+#define R500_D1MODE_VBLANK_STATUS 0x6534
+#define R500_D2MODE_VBLANK_STATUS 0x6d34
+#define R500_VBLANK_OCCURED (1<<0)
+#define R500_VBLANK_ACK     (1<<4)
+#define R500_VBLANK_STAT    (1<<12)
+#define R500_VBLANK_INT     (1<<16)
+
+#define R500_DxMODE_INT_MASK 0x6540
+#define R500_D1MODE_INT_MASK (1<<0)
+#define R500_D2MODE_INT_MASK (1<<8)
+
+#define R500_DISP_INTERRUPT_STATUS 0x7edc
+#define R500_D1_VBLANK_INTERRUPT (1 << 4)
+#define R500_D2_VBLANK_INTERRUPT (1 << 5)
+
 /* Constants */
 #define RADEON_MAX_USEC_TIMEOUT		100000	/* 100 ms */
 
@@ -982,26 +1157,48 @@ extern int r300_do_cp_cmdbuf(struct drm_device * dev,
 #define RADEON_READ8(reg)	DRM_READ8(  dev_priv->mmio, (reg) )
 #define RADEON_WRITE8(reg,val)	DRM_WRITE8( dev_priv->mmio, (reg), (val) )
 
-#define RADEON_WRITE_PLL( addr, val )					\
+#define RADEON_WRITE_PLL(addr, val)					\
 do {									\
-	RADEON_WRITE8( RADEON_CLOCK_CNTL_INDEX,				\
+	RADEON_WRITE8(RADEON_CLOCK_CNTL_INDEX,				\
 		       ((addr) & 0x1f) | RADEON_PLL_WR_EN );		\
-	RADEON_WRITE( RADEON_CLOCK_CNTL_DATA, (val) );			\
+	RADEON_WRITE(RADEON_CLOCK_CNTL_DATA, (val));			\
 } while (0)
 
-#define RADEON_WRITE_IGPGART( addr, val )				\
+#define RADEON_WRITE_PCIE(addr, val)					\
 do {									\
-	RADEON_WRITE( RADEON_IGPGART_INDEX,				\
-			((addr) & 0x7f) | (1 << 8));			\
-	RADEON_WRITE( RADEON_IGPGART_DATA, (val) );			\
-	RADEON_WRITE( RADEON_IGPGART_INDEX, 0x7f );			\
-} while (0)
-
-#define RADEON_WRITE_PCIE( addr, val )					\
-do {									\
-	RADEON_WRITE8( RADEON_PCIE_INDEX,				\
+	RADEON_WRITE8(RADEON_PCIE_INDEX,				\
 			((addr) & 0xff));				\
-	RADEON_WRITE( RADEON_PCIE_DATA, (val) );			\
+	RADEON_WRITE(RADEON_PCIE_DATA, (val));			\
+} while (0)
+
+#define R500_WRITE_MCIND(addr, val)					\
+do {								\
+	RADEON_WRITE(R520_MC_IND_INDEX, 0xff0000 | ((addr) & 0xff));	\
+	RADEON_WRITE(R520_MC_IND_DATA, (val));			\
+	RADEON_WRITE(R520_MC_IND_INDEX, 0);	\
+} while (0)
+
+#define RS480_WRITE_MCIND(addr, val)				\
+do {									\
+	RADEON_WRITE(RS480_NB_MC_INDEX,				\
+			((addr) & 0xff) | RS480_NB_MC_IND_WR_EN);	\
+	RADEON_WRITE(RS480_NB_MC_DATA, (val));			\
+	RADEON_WRITE(RS480_NB_MC_INDEX, 0xff);			\
+} while (0)
+
+#define RS690_WRITE_MCIND(addr, val)					\
+do {								\
+	RADEON_WRITE(RS690_MC_INDEX, RS690_MC_INDEX_WR_EN | ((addr) & RS690_MC_INDEX_MASK));	\
+	RADEON_WRITE(RS690_MC_DATA, val);			\
+	RADEON_WRITE(RS690_MC_INDEX, RS690_MC_INDEX_WR_ACK);	\
+} while (0)
+
+#define IGP_WRITE_MCIND(addr, val)				\
+do {									\
+	if ((dev_priv->flags & RADEON_FAMILY_MASK) == CHIP_RS690)       \
+		RS690_WRITE_MCIND(addr, val);				\
+	else								\
+		RS480_WRITE_MCIND(addr, val);				\
 } while (0)
 
 #define CP_PACKET0( reg, n )						\
@@ -1044,23 +1241,43 @@ do {									\
 } while (0)
 
 #define RADEON_FLUSH_CACHE() do {					\
-	OUT_RING( CP_PACKET0( RADEON_RB3D_DSTCACHE_CTLSTAT, 0 ) );	\
-	OUT_RING( RADEON_RB3D_DC_FLUSH );				\
+	if ((dev_priv->flags & RADEON_FAMILY_MASK) <= CHIP_RV280) {	\
+		OUT_RING(CP_PACKET0(RADEON_RB3D_DSTCACHE_CTLSTAT, 0));	\
+		OUT_RING(RADEON_RB3D_DC_FLUSH);				\
+	} else {                                                        \
+		OUT_RING(CP_PACKET0(R300_RB3D_DSTCACHE_CTLSTAT, 0));	\
+		OUT_RING(RADEON_RB3D_DC_FLUSH);				\
+	}                                                               \
 } while (0)
 
 #define RADEON_PURGE_CACHE() do {					\
-	OUT_RING( CP_PACKET0( RADEON_RB3D_DSTCACHE_CTLSTAT, 0 ) );	\
-	OUT_RING( RADEON_RB3D_DC_FLUSH_ALL );				\
+	if ((dev_priv->flags & RADEON_FAMILY_MASK) <= CHIP_RV280) {	\
+		OUT_RING(CP_PACKET0(RADEON_RB3D_DSTCACHE_CTLSTAT, 0));	\
+		OUT_RING(RADEON_RB3D_DC_FLUSH_ALL);			\
+	} else {                                                        \
+		OUT_RING(CP_PACKET0(R300_RB3D_DSTCACHE_CTLSTAT, 0));	\
+		OUT_RING(RADEON_RB3D_DC_FLUSH_ALL);			\
+	}                                                               \
 } while (0)
 
 #define RADEON_FLUSH_ZCACHE() do {					\
-	OUT_RING( CP_PACKET0( RADEON_RB3D_ZCACHE_CTLSTAT, 0 ) );	\
-	OUT_RING( RADEON_RB3D_ZC_FLUSH );				\
+	if ((dev_priv->flags & RADEON_FAMILY_MASK) <= CHIP_RV280) {	\
+		OUT_RING(CP_PACKET0(RADEON_RB3D_ZCACHE_CTLSTAT, 0));	\
+		OUT_RING(RADEON_RB3D_ZC_FLUSH);				\
+	} else {                                                        \
+		OUT_RING(CP_PACKET0(R300_ZB_ZCACHE_CTLSTAT, 0));	\
+		OUT_RING(R300_ZC_FLUSH);				\
+	}                                                               \
 } while (0)
 
 #define RADEON_PURGE_ZCACHE() do {					\
-	OUT_RING( CP_PACKET0( RADEON_RB3D_ZCACHE_CTLSTAT, 0 ) );	\
-	OUT_RING( RADEON_RB3D_ZC_FLUSH_ALL );				\
+	if ((dev_priv->flags & RADEON_FAMILY_MASK) <= CHIP_RV280) {	\
+		OUT_RING(CP_PACKET0(RADEON_RB3D_ZCACHE_CTLSTAT, 0));	\
+		OUT_RING(RADEON_RB3D_ZC_FLUSH_ALL);			\
+	} else {                                                        \
+		OUT_RING(CP_PACKET0(R300_RB3D_DSTCACHE_CTLSTAT, 0));	\
+		OUT_RING(R300_ZC_FLUSH_ALL);				\
+	}                                                               \
 } while (0)
 
 /* ================================================================
@@ -1114,8 +1331,7 @@ do {									\
 
 #define BEGIN_RING( n ) do {						\
 	if ( RADEON_VERBOSE ) {						\
-		DRM_INFO( "BEGIN_RING( %d ) in %s\n",			\
-			   n, __FUNCTION__ );				\
+		DRM_INFO( "BEGIN_RING( %d )\n", (n));			\
 	}								\
 	if ( dev_priv->ring.space <= (n) * sizeof(u32) ) {		\
                 COMMIT_RING();						\
@@ -1133,7 +1349,7 @@ do {									\
 			  write, dev_priv->ring.tail );			\
 	}								\
 	if (((dev_priv->ring.tail + _nr) & mask) != write) {		\
-		DRM_ERROR( 						\
+		DRM_ERROR(						\
 			"ADVANCE_RING(): mismatch: nr: %x write: %x line: %d\n",	\
 			((dev_priv->ring.tail + _nr) & mask),		\
 			write, __LINE__);						\

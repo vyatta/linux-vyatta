@@ -87,6 +87,7 @@ static ssize_t netdev_store(struct device *dev, struct device_attribute *attr,
 	return ret;
 }
 
+NETDEVICE_SHOW(dev_id, fmt_hex);
 NETDEVICE_SHOW(addr_len, fmt_dec);
 NETDEVICE_SHOW(iflink, fmt_dec);
 NETDEVICE_SHOW(ifindex, fmt_dec);
@@ -95,17 +96,6 @@ NETDEVICE_SHOW(type, fmt_dec);
 NETDEVICE_SHOW(link_mode, fmt_dec);
 
 /* use same locking rules as GIFHWADDR ioctl's */
-static ssize_t format_addr(char *buf, const unsigned char *addr, int len)
-{
-	int i;
-	char *cp = buf;
-
-	for (i = 0; i < len; i++)
-		cp += sprintf(cp, "%02x%c", addr[i],
-			      i == (len - 1) ? '\n' : ':');
-	return cp - buf;
-}
-
 static ssize_t show_address(struct device *dev, struct device_attribute *attr,
 			    char *buf)
 {
@@ -114,7 +104,7 @@ static ssize_t show_address(struct device *dev, struct device_attribute *attr,
 
 	read_lock(&dev_base_lock);
 	if (dev_isalive(net))
-	    ret = format_addr(buf, net->dev_addr, net->addr_len);
+		ret = sysfs_format_mac(buf, net->dev_addr, net->addr_len);
 	read_unlock(&dev_base_lock);
 	return ret;
 }
@@ -124,7 +114,7 @@ static ssize_t show_broadcast(struct device *dev,
 {
 	struct net_device *net = to_net_dev(dev);
 	if (dev_isalive(net))
-		return format_addr(buf, net->broadcast, net->addr_len);
+		return sysfs_format_mac(buf, net->broadcast, net->addr_len);
 	return -EINVAL;
 }
 
@@ -221,6 +211,7 @@ static ssize_t store_tx_queue_len(struct device *dev,
 
 static struct device_attribute net_class_attributes[] = {
 	__ATTR(addr_len, S_IRUGO, show_addr_len, NULL),
+	__ATTR(dev_id, S_IRUGO, show_dev_id, NULL),
 	__ATTR(iflink, S_IRUGO, show_iflink, NULL),
 	__ATTR(ifindex, S_IRUGO, show_ifindex, NULL),
 	__ATTR(features, S_IRUGO, show_features, NULL),
@@ -247,9 +238,8 @@ static ssize_t netstat_show(const struct device *d,
 	struct net_device_stats *stats;
 	ssize_t ret = -EINVAL;
 
-	if (offset > sizeof(struct net_device_stats) ||
-	    offset % sizeof(unsigned long) != 0)
-		WARN_ON(1);
+	WARN_ON(offset > sizeof(struct net_device_stats) ||
+			offset % sizeof(unsigned long) != 0);
 
 	read_lock(&dev_base_lock);
 	if (dev_isalive(dev) && dev->get_stats &&
@@ -459,7 +449,6 @@ int netdev_register_kobject(struct net_device *net)
 	struct device *dev = &(net->dev);
 	struct attribute_group **groups = net->sysfs_groups;
 
-	device_initialize(dev);
 	dev->class = &net_class;
 	dev->platform_data = net;
 	dev->groups = groups;
@@ -478,6 +467,12 @@ int netdev_register_kobject(struct net_device *net)
 #endif /* CONFIG_SYSFS */
 
 	return device_add(dev);
+}
+
+void netdev_initialize_kobject(struct net_device *net)
+{
+	struct device *device = &(net->dev);
+	device_initialize(device);
 }
 
 int netdev_kobject_init(void)

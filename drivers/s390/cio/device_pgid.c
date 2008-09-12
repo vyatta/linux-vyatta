@@ -22,6 +22,7 @@
 #include "css.h"
 #include "device.h"
 #include "ioasm.h"
+#include "io_sch.h"
 
 /*
  * Helper function called from interrupt context to decide whether an
@@ -78,7 +79,7 @@ __ccw_device_sense_pgid_start(struct ccw_device *cdev)
 			/* ret is 0, -EBUSY, -EACCES or -ENODEV */
 			if (ret != -EACCES)
 				return ret;
-			CIO_MSG_EVENT(2, "SNID - Device %04x on Subchannel "
+			CIO_MSG_EVENT(3, "SNID - Device %04x on Subchannel "
 				      "0.%x.%04x, lpm %02X, became 'not "
 				      "operational'\n",
 				      cdev->private->dev_id.devno,
@@ -155,10 +156,13 @@ __ccw_device_check_sense_pgid(struct ccw_device *cdev)
 		return -EAGAIN;
 	}
 	if (irb->scsw.cc == 3) {
-		CIO_MSG_EVENT(2, "SNID - Device %04x on Subchannel 0.%x.%04x,"
+		u8 lpm;
+
+		lpm = to_io_private(sch)->orb.lpm;
+		CIO_MSG_EVENT(3, "SNID - Device %04x on Subchannel 0.%x.%04x,"
 			      " lpm %02X, became 'not operational'\n",
 			      cdev->private->dev_id.devno, sch->schid.ssid,
-			      sch->schid.sch_no, sch->orb.lpm);
+			      sch->schid.sch_no, lpm);
 		return -EACCES;
 	}
 	i = 8 - ffs(cdev->private->imask);
@@ -239,16 +243,10 @@ __ccw_device_do_pgid(struct ccw_device *cdev, __u8 func)
 	/* Setup sense path group id channel program. */
 	cdev->private->pgid[0].inf.fc = func;
 	ccw = cdev->private->iccws;
-	if (!cdev->private->flags.pgid_single) {
-		cdev->private->pgid[0].inf.fc |= SPID_FUNC_MULTI_PATH;
-		ccw->cmd_code = CCW_CMD_SUSPEND_RECONN;
-		ccw->cda = 0;
-		ccw->count = 0;
-		ccw->flags = CCW_FLAG_SLI | CCW_FLAG_CC;
-		ccw++;
-	} else
+	if (cdev->private->flags.pgid_single)
 		cdev->private->pgid[0].inf.fc |= SPID_FUNC_SINGLE_PATH;
-
+	else
+		cdev->private->pgid[0].inf.fc |= SPID_FUNC_MULTI_PATH;
 	ccw->cmd_code = CCW_CMD_SET_PGID;
 	ccw->cda = (__u32) __pa (&cdev->private->pgid[0]);
 	ccw->count = sizeof (struct pgid);
@@ -271,7 +269,7 @@ __ccw_device_do_pgid(struct ccw_device *cdev, __u8 func)
 			return ret;
 	}
 	/* PGID command failed on this path. */
-	CIO_MSG_EVENT(2, "SPID - Device %04x on Subchannel "
+	CIO_MSG_EVENT(3, "SPID - Device %04x on Subchannel "
 		      "0.%x.%04x, lpm %02X, became 'not operational'\n",
 		      cdev->private->dev_id.devno, sch->schid.ssid,
 		      sch->schid.sch_no, cdev->private->imask);
@@ -313,7 +311,7 @@ static int __ccw_device_do_nop(struct ccw_device *cdev)
 			return ret;
 	}
 	/* nop command failed on this path. */
-	CIO_MSG_EVENT(2, "NOP - Device %04x on Subchannel "
+	CIO_MSG_EVENT(3, "NOP - Device %04x on Subchannel "
 		      "0.%x.%04x, lpm %02X, became 'not operational'\n",
 		      cdev->private->dev_id.devno, sch->schid.ssid,
 		      sch->schid.sch_no, cdev->private->imask);
@@ -358,7 +356,7 @@ __ccw_device_check_pgid(struct ccw_device *cdev)
 		return -EAGAIN;
 	}
 	if (irb->scsw.cc == 3) {
-		CIO_MSG_EVENT(2, "SPID - Device %04x on Subchannel 0.%x.%04x,"
+		CIO_MSG_EVENT(3, "SPID - Device %04x on Subchannel 0.%x.%04x,"
 			      " lpm %02X, became 'not operational'\n",
 			      cdev->private->dev_id.devno, sch->schid.ssid,
 			      sch->schid.sch_no, cdev->private->imask);
@@ -387,7 +385,7 @@ static int __ccw_device_check_nop(struct ccw_device *cdev)
 		return -ETIME;
 	}
 	if (irb->scsw.cc == 3) {
-		CIO_MSG_EVENT(2, "NOP - Device %04x on Subchannel 0.%x.%04x,"
+		CIO_MSG_EVENT(3, "NOP - Device %04x on Subchannel 0.%x.%04x,"
 			      " lpm %02X, became 'not operational'\n",
 			      cdev->private->dev_id.devno, sch->schid.ssid,
 			      sch->schid.sch_no, cdev->private->imask);

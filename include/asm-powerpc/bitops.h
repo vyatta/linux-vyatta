@@ -312,24 +312,31 @@ static __inline__ int fls(unsigned int x)
 	asm ("cntlzw %0,%1" : "=r" (lz) : "r" (x));
 	return 32 - lz;
 }
+
+static __inline__ unsigned long __fls(unsigned long x)
+{
+	return __ilog2(x);
+}
+
+/*
+ * 64-bit can do this using one cntlzd (count leading zeroes doubleword)
+ * instruction; for 32-bit we use the generic version, which does two
+ * 32-bit fls calls.
+ */
+#ifdef __powerpc64__
+static __inline__ int fls64(__u64 x)
+{
+	int lz;
+
+	asm ("cntlzd %0,%1" : "=r" (lz) : "r" (x));
+	return 64 - lz;
+}
+#else
 #include <asm-generic/bitops/fls64.h>
+#endif /* __powerpc64__ */
 
 #include <asm-generic/bitops/hweight.h>
-
-#define find_first_zero_bit(addr, size) find_next_zero_bit((addr), (size), 0)
-unsigned long find_next_zero_bit(const unsigned long *addr,
-				 unsigned long size, unsigned long offset);
-/**
- * find_first_bit - find the first set bit in a memory region
- * @addr: The address to start the search at
- * @size: The maximum size to search
- *
- * Returns the bit-number of the first set bit, not the number of the byte
- * containing a bit.
- */
-#define find_first_bit(addr, size) find_next_bit((addr), (size), 0)
-unsigned long find_next_bit(const unsigned long *addr,
-			    unsigned long size, unsigned long offset);
+#include <asm-generic/bitops/find.h>
 
 /* Little-endian versions */
 
@@ -359,6 +366,8 @@ static __inline__ int test_le_bit(unsigned long nr,
 unsigned long generic_find_next_zero_le_bit(const unsigned long *addr,
 				    unsigned long size, unsigned long offset);
 
+unsigned long generic_find_next_le_bit(const unsigned long *addr,
+				    unsigned long size, unsigned long offset);
 /* Bitmap functions for the ext2 filesystem */
 
 #define ext2_set_bit(nr,addr) \
@@ -378,6 +387,8 @@ unsigned long generic_find_next_zero_le_bit(const unsigned long *addr,
 #define ext2_find_next_zero_bit(addr, size, off) \
 	generic_find_next_zero_le_bit((unsigned long*)addr, size, off)
 
+#define ext2_find_next_bit(addr, size, off) \
+	generic_find_next_le_bit((unsigned long *)addr, size, off)
 /* Bitmap functions for the minix filesystem.  */
 
 #define minix_test_and_set_bit(nr,addr) \

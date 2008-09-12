@@ -3,7 +3,7 @@
 
 #include <linux/dcache.h>
 #include <linux/linkage.h>
-#include <linux/mount.h>
+#include <linux/path.h>
 
 struct vfsmount;
 
@@ -16,8 +16,7 @@ struct open_intent {
 enum { MAX_NESTED_LINKS = 8 };
 
 struct nameidata {
-	struct dentry	*dentry;
-	struct vfsmount *mnt;
+	struct path	path;
 	struct qstr	last;
 	unsigned int	flags;
 	int		last_type;
@@ -28,11 +27,6 @@ struct nameidata {
 	union {
 		struct open_intent open;
 	} intent;
-};
-
-struct path {
-	struct vfsmount *mnt;
-	struct dentry *dentry;
 };
 
 /*
@@ -63,17 +57,15 @@ enum {LAST_NORM, LAST_ROOT, LAST_DOT, LAST_DOTDOT, LAST_BIND};
 #define LOOKUP_ACCESS		(0x0400)
 #define LOOKUP_CHDIR		(0x0800)
 
-extern int FASTCALL(__user_walk(const char __user *, unsigned, struct nameidata *));
-extern int FASTCALL(__user_walk_fd(int dfd, const char __user *, unsigned, struct nameidata *));
+extern int __user_walk(const char __user *, unsigned, struct nameidata *);
+extern int __user_walk_fd(int dfd, const char __user *, unsigned, struct nameidata *);
 #define user_path_walk(name,nd) \
 	__user_walk_fd(AT_FDCWD, name, LOOKUP_FOLLOW, nd)
 #define user_path_walk_link(name,nd) \
 	__user_walk_fd(AT_FDCWD, name, 0, nd)
-extern int FASTCALL(path_lookup(const char *, unsigned, struct nameidata *));
+extern int path_lookup(const char *, unsigned, struct nameidata *);
 extern int vfs_path_lookup(struct dentry *, struct vfsmount *,
 			   const char *, unsigned int, struct nameidata *);
-extern void path_release(struct nameidata *);
-extern void path_release_on_umount(struct nameidata *);
 
 extern int __user_path_lookup_open(const char __user *, unsigned lookup_flags, struct nameidata *nd, int open_flags);
 extern int path_lookup_open(int dfd, const char *name, unsigned lookup_flags, struct nameidata *, int open_flags);
@@ -82,6 +74,7 @@ extern struct file *lookup_instantiate_filp(struct nameidata *nd, struct dentry 
 extern struct file *nameidata_to_filp(struct nameidata *nd, int flags);
 extern void release_open_intent(struct nameidata *);
 
+extern struct dentry * __lookup_hash(struct qstr *name, struct dentry * base, struct nameidata *nd);
 extern struct dentry *lookup_one_len(const char *, struct dentry *, int);
 extern struct dentry *lookup_one_noperm(const char *, struct dentry *);
 
@@ -99,18 +92,6 @@ static inline void nd_set_link(struct nameidata *nd, char *path)
 static inline char *nd_get_link(struct nameidata *nd)
 {
 	return nd->saved_names[nd->depth];
-}
-
-static inline void pathget(struct path *path)
-{
-	mntget(path->mnt);
-	dget(path->dentry);
-}
-
-static inline void pathput(struct path *path)
-{
-	dput(path->dentry);
-	mntput(path->mnt);
 }
 
 #endif /* _LINUX_NAMEI_H */

@@ -6,7 +6,7 @@
  *  Authors: Dave Boutcher <boutcher@us.ibm.com>
  *           Ryan Arnold <ryanarn@us.ibm.com>
  *           Colin Devilbiss <devilbis@us.ibm.com>
- *           Stephen Rothwell <sfr@au1.ibm.com>
+ *           Stephen Rothwell
  *
  * (C) Copyright 2000-2004 IBM Corporation
  *
@@ -144,6 +144,7 @@ static int proc_viocd_open(struct inode *inode, struct file *file)
 }
 
 static const struct file_operations proc_viocd_operations = {
+	.owner		= THIS_MODULE,
 	.open		= proc_viocd_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
@@ -289,7 +290,7 @@ static int send_request(struct request *req)
 	return 0;
 }
 
-static void viocd_end_request(struct request *req, int uptodate)
+static void viocd_end_request(struct request *req, int error)
 {
 	int nsectors = req->hard_nr_sectors;
 
@@ -302,11 +303,8 @@ static void viocd_end_request(struct request *req, int uptodate)
 	if (!nsectors)
 		nsectors = 1;
 
-	if (end_that_request_first(req, uptodate, nsectors))
+	if (__blk_end_request(req, error, nsectors << 9))
 		BUG();
-	add_disk_randomness(req->rq_disk);
-	blkdev_dequeue_request(req);
-	end_that_request_last(req, uptodate);
 }
 
 static int rwreq;
@@ -317,11 +315,11 @@ static void do_viocd_request(struct request_queue *q)
 
 	while ((rwreq == 0) && ((req = elv_next_request(q)) != NULL)) {
 		if (!blk_fs_request(req))
-			viocd_end_request(req, 0);
+			viocd_end_request(req, -EIO);
 		else if (send_request(req) < 0) {
 			printk(VIOCD_KERN_WARNING
 					"unable to send message to OS/400!");
-			viocd_end_request(req, 0);
+			viocd_end_request(req, -EIO);
 		} else
 			rwreq++;
 	}
@@ -532,9 +530,9 @@ return_complete:
 					"with rc %d:0x%04X: %s\n",
 					req, event->xRc,
 					bevent->sub_result, err->msg);
-			viocd_end_request(req, 0);
+			viocd_end_request(req, -EIO);
 		} else
-			viocd_end_request(req, 1);
+			viocd_end_request(req, 0);
 
 		/* restart handling of incoming requests */
 		spin_unlock_irqrestore(&viocd_reqlock, flags);
@@ -561,7 +559,7 @@ static struct cdrom_device_ops viocd_dops = {
 	.capability = CDC_CLOSE_TRAY | CDC_OPEN_TRAY | CDC_LOCK | CDC_SELECT_SPEED | CDC_SELECT_DISC | CDC_MULTI_SESSION | CDC_MCN | CDC_MEDIA_CHANGED | CDC_PLAY_AUDIO | CDC_RESET | CDC_DRIVE_STATUS | CDC_GENERIC_PACKET | CDC_CD_R | CDC_CD_RW | CDC_DVD | CDC_DVD_R | CDC_DVD_RAM | CDC_RAM
 };
 
-static int __init find_capability(const char *type)
+static int find_capability(const char *type)
 {
 	struct capability_entry *entry;
 
@@ -653,10 +651,7 @@ static int viocd_remove(struct vio_dev *vdev)
 {
 	struct disk_info *d = &viocd_diskinfo[vdev->unit_address];
 
-	if (unregister_cdrom(&d->viocd_info) != 0)
-		printk(VIOCD_KERN_WARNING
-				"Cannot unregister viocd CD-ROM %s!\n",
-				d->viocd_info.name);
+	unregister_cdrom(&d->viocd_info);
 	del_gendisk(d->viocd_disk);
 	blk_cleanup_queue(d->viocd_disk->queue);
 	put_disk(d->viocd_disk);
@@ -685,7 +680,6 @@ static struct vio_driver viocd_driver = {
 
 static int __init viocd_init(void)
 {
-	struct proc_dir_entry *e;
 	int ret = 0;
 
 	if (!firmware_has_feature(FW_FEATURE_ISERIES))
@@ -725,12 +719,8 @@ static int __init viocd_init(void)
 	if (ret)
 		goto out_free_info;
 
-	e = create_proc_entry("iSeries/viocd", S_IFREG|S_IRUGO, NULL);
-	if (e) {
-		e->owner = THIS_MODULE;
-		e->proc_fops = &proc_viocd_operations;
-	}
-
+	proc_create("iSeries/viocd", S_IFREG|S_IRUGO, NULL,
+		    &proc_viocd_operations);
 	return 0;
 
 out_free_info:

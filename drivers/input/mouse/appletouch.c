@@ -62,6 +62,10 @@
 #define GEYSER4_ISO_PRODUCT_ID	0x021B
 #define GEYSER4_JIS_PRODUCT_ID	0x021C
 
+#define GEYSER4_HF_ANSI_PRODUCT_ID	0x0229
+#define GEYSER4_HF_ISO_PRODUCT_ID	0x022A
+#define GEYSER4_HF_JIS_PRODUCT_ID	0x022B
+
 #define ATP_DEVICE(prod)					\
 	.match_flags = USB_DEVICE_ID_MATCH_DEVICE |		\
 		       USB_DEVICE_ID_MATCH_INT_CLASS |		\
@@ -92,6 +96,10 @@ static struct usb_device_id atp_table [] = {
 	{ ATP_DEVICE(GEYSER4_ANSI_PRODUCT_ID) },
 	{ ATP_DEVICE(GEYSER4_ISO_PRODUCT_ID) },
 	{ ATP_DEVICE(GEYSER4_JIS_PRODUCT_ID) },
+
+	{ ATP_DEVICE(GEYSER4_HF_ANSI_PRODUCT_ID) },
+	{ ATP_DEVICE(GEYSER4_HF_ISO_PRODUCT_ID) },
+	{ ATP_DEVICE(GEYSER4_HF_JIS_PRODUCT_ID) },
 
 	/* Terminating entry */
 	{ }
@@ -217,7 +225,10 @@ static inline int atp_is_geyser_3(struct atp *dev)
 		(productId == GEYSER3_JIS_PRODUCT_ID) ||
 		(productId == GEYSER4_ANSI_PRODUCT_ID) ||
 		(productId == GEYSER4_ISO_PRODUCT_ID) ||
-		(productId == GEYSER4_JIS_PRODUCT_ID);
+		(productId == GEYSER4_JIS_PRODUCT_ID) ||
+		(productId == GEYSER4_HF_ANSI_PRODUCT_ID) ||
+		(productId == GEYSER4_HF_ISO_PRODUCT_ID) ||
+		(productId == GEYSER4_HF_JIS_PRODUCT_ID);
 }
 
 /*
@@ -578,6 +589,21 @@ static void atp_close(struct input_dev *input)
 	dev->open = 0;
 }
 
+static int atp_handle_geyser(struct atp *dev)
+{
+	struct usb_device *udev = dev->udev;
+
+	if (!atp_is_fountain(dev)) {
+		/* switch to raw sensor mode */
+		if (atp_geyser_init(udev))
+			return -EIO;
+
+		printk(KERN_INFO "appletouch: Geyser mode initialized.\n");
+	}
+
+	return 0;
+}
+
 static int atp_probe(struct usb_interface *iface, const struct usb_device_id *id)
 {
 	struct atp *dev;
@@ -622,14 +648,6 @@ static int atp_probe(struct usb_interface *iface, const struct usb_device_id *id
 	else
 		dev->datalen = 81;
 
-	if (!atp_is_fountain(dev)) {
-		/* switch to raw sensor mode */
-		if (atp_geyser_init(udev))
-			goto err_free_devs;
-
-		printk(KERN_INFO "appletouch: Geyser mode initialized.\n");
-	}
-
 	dev->urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!dev->urb)
 		goto err_free_devs;
@@ -642,6 +660,10 @@ static int atp_probe(struct usb_interface *iface, const struct usb_device_id *id
 	usb_fill_int_urb(dev->urb, udev,
 			 usb_rcvintpipe(udev, int_in_endpointAddr),
 			 dev->data, dev->datalen, atp_complete, dev, 1);
+
+	error = atp_handle_geyser(dev);
+	if (error)
+		goto err_free_buffer;
 
 	usb_make_path(udev, dev->phys, sizeof(dev->phys));
 	strlcat(dev->phys, "/input0", sizeof(dev->phys));
@@ -733,6 +755,20 @@ static void atp_disconnect(struct usb_interface *iface)
 	printk(KERN_INFO "input: appletouch disconnected\n");
 }
 
+static int atp_recover(struct atp *dev)
+{
+	int error;
+
+	error = atp_handle_geyser(dev);
+	if (error)
+		return error;
+
+	if (dev->open && usb_submit_urb(dev->urb, GFP_ATOMIC))
+		return -EIO;
+
+	return 0;
+}
+
 static int atp_suspend(struct usb_interface *iface, pm_message_t message)
 {
 	struct atp *dev = usb_get_intfdata(iface);
@@ -753,12 +789,20 @@ static int atp_resume(struct usb_interface *iface)
 	return 0;
 }
 
+static int atp_reset_resume(struct usb_interface *iface)
+{
+	struct atp *dev = usb_get_intfdata(iface);
+
+	return atp_recover(dev);
+}
+
 static struct usb_driver atp_driver = {
 	.name		= "appletouch",
 	.probe		= atp_probe,
 	.disconnect	= atp_disconnect,
 	.suspend	= atp_suspend,
 	.resume		= atp_resume,
+	.reset_resume	= atp_reset_resume,
 	.id_table	= atp_table,
 };
 

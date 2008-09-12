@@ -235,7 +235,13 @@ unsigned long max_sane_readahead(unsigned long nr)
 
 static int __init readahead_init(void)
 {
-	return bdi_init(&default_backing_dev_info);
+	int err;
+
+	err = bdi_init(&default_backing_dev_info);
+	if (!err)
+		bdi_register(&default_backing_dev_info, NULL, "default");
+
+	return err;
 }
 subsys_initcall(readahead_init);
 
@@ -443,9 +449,10 @@ EXPORT_SYMBOL_GPL(page_cache_sync_readahead);
  *            pagecache pages
  *
  * page_cache_async_ondemand() should be called when a page is used which
- * has the PG_readahead flag: this is a marker to suggest that the application
+ * has the PG_readahead flag; this is a marker to suggest that the application
  * has used up enough of the readahead window that we should start pulling in
- * more pages. */
+ * more pages.
+ */
 void
 page_cache_async_readahead(struct address_space *mapping,
 			   struct file_ra_state *ra, struct file *filp,

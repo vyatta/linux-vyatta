@@ -40,11 +40,11 @@
 #include <asm/spu.h>
 #include <asm/spu_priv1.h>
 #include <asm/firmware.h>
+#include <asm/setjmp.h>
 
 #ifdef CONFIG_PPC64
 #include <asm/hvcall.h>
 #include <asm/paca.h>
-#include <asm/iseries/it_lp_reg_save.h>
 #endif
 
 #include "nonstdio.h"
@@ -71,12 +71,9 @@ static unsigned long ncsum = 4096;
 static int termch;
 static char tmpstr[128];
 
-#define JMP_BUF_LEN	23
 static long bus_error_jmp[JMP_BUF_LEN];
 static int catch_memory_errors;
 static long *xmon_fault_jmp[NR_CPUS];
-#define setjmp xmon_setjmp
-#define longjmp xmon_longjmp
 
 /* Breakpoint stuff */
 struct bpt {
@@ -153,13 +150,15 @@ static const char *getvecname(unsigned long vec);
 
 static int do_spu_cmd(void);
 
+#ifdef CONFIG_44x
+static void dump_tlb_44x(void);
+#endif
+
 int xmon_no_auto_backtrace;
 
 extern void xmon_enter(void);
 extern void xmon_leave(void);
 
-extern long setjmp(long *);
-extern void longjmp(long *, long);
 extern void xmon_save_regs(struct pt_regs *);
 
 #ifdef CONFIG_PPC64
@@ -230,6 +229,9 @@ Commands:\n\
 #endif
 #ifdef CONFIG_PPC_STD_MMU_32
 "  u	dump segment registers\n"
+#endif
+#ifdef CONFIG_44x
+"  u	dump TLB\n"
 #endif
 "  ?	help\n"
 "  zr	reboot\n\
@@ -856,6 +858,11 @@ cmds(struct pt_regs *excp)
 			dump_segments();
 			break;
 #endif
+#ifdef CONFIG_4xx
+		case 'u':
+			dump_tlb_44x();
+			break;
+#endif
 		default:
 			printf("Unrecognized command: ");
 		        do {
@@ -1236,15 +1243,12 @@ static void get_function_bounds(unsigned long pc, unsigned long *startp,
 
 static int xmon_depth_to_print = 64;
 
-#ifdef CONFIG_PPC64
-#define LRSAVE_OFFSET		0x10
-#define REG_FRAME_MARKER	0x7265677368657265ul	/* "regshere" */
-#define MARKER_OFFSET		0x60
+#define LRSAVE_OFFSET		(STACK_FRAME_LR_SAVE * sizeof(unsigned long))
+#define MARKER_OFFSET		(STACK_FRAME_MARKER * sizeof(unsigned long))
+
+#ifdef __powerpc64__
 #define REGS_OFFSET		0x70
 #else
-#define LRSAVE_OFFSET		4
-#define REG_FRAME_MARKER	0x72656773
-#define MARKER_OFFSET		8
 #define REGS_OFFSET		16
 #endif
 
@@ -1310,7 +1314,7 @@ static void xmon_show_stack(unsigned long sp, unsigned long lr,
 		/* Look for "regshere" marker to see if this is
 		   an exception frame. */
 		if (mread(sp + MARKER_OFFSET, &marker, sizeof(unsigned long))
-		    && marker == REG_FRAME_MARKER) {
+		    && marker == STACK_FRAME_REGS_MARKER) {
 			if (mread(sp + REGS_OFFSET, &regs, sizeof(regs))
 			    != sizeof(regs)) {
 				printf("Couldn't read registers at %lx\n",
@@ -1590,7 +1594,6 @@ void super_regs(void)
 		if (firmware_has_feature(FW_FEATURE_ISERIES)) {
 			struct paca_struct *ptrPaca;
 			struct lppaca *ptrLpPaca;
-			struct ItLpRegSave *ptrLpRegSave;
 
 			/* Dump out relevant Paca data areas. */
 			printf("Paca: \n");
@@ -1603,15 +1606,6 @@ void super_regs(void)
 			printf("    Saved Gpr3=%.16lx  Saved Gpr4=%.16lx \n",
 			       ptrLpPaca->saved_gpr3, ptrLpPaca->saved_gpr4);
 			printf("    Saved Gpr5=%.16lx \n", ptrLpPaca->saved_gpr5);
-
-			printf("  Local Processor Register Save Area (LpRegSave): \n");
-			ptrLpRegSave = ptrPaca->reg_save_ptr;
-			printf("    Saved Sprg0=%.16lx  Saved Sprg1=%.16lx \n",
-			       ptrLpRegSave->xSPRG0, ptrLpRegSave->xSPRG0);
-			printf("    Saved Sprg2=%.16lx  Saved Sprg3=%.16lx \n",
-			       ptrLpRegSave->xSPRG2, ptrLpRegSave->xSPRG3);
-			printf("    Saved Msr  =%.16lx  Saved Nia  =%.16lx \n",
-			       ptrLpRegSave->xMSR, ptrLpRegSave->xNIA);
 		}
 #endif
 
@@ -2527,16 +2521,33 @@ static void xmon_print_symbol(unsigned long address, const char *mid,
 static void dump_slb(void)
 {
 	int i;
-	unsigned long tmp;
+	unsigned long esid,vsid,valid;
+	unsigned long llp;
 
 	printf("SLB contents of cpu %x\n", smp_processor_id());
 
-	for (i = 0; i < SLB_NUM_ENTRIES; i++) {
-		asm volatile("slbmfee  %0,%1" : "=r" (tmp) : "r" (i));
-		printf("%02d %016lx ", i, tmp);
-
-		asm volatile("slbmfev  %0,%1" : "=r" (tmp) : "r" (i));
-		printf("%016lx\n", tmp);
+	for (i = 0; i < mmu_slb_size; i++) {
+		asm volatile("slbmfee  %0,%1" : "=r" (esid) : "r" (i));
+		asm volatile("slbmfev  %0,%1" : "=r" (vsid) : "r" (i));
+		valid = (esid & SLB_ESID_V);
+		if (valid | esid | vsid) {
+			printf("%02d %016lx %016lx", i, esid, vsid);
+			if (valid) {
+				llp = vsid & SLB_VSID_LLP;
+				if (vsid & SLB_VSID_B_1T) {
+					printf("  1T  ESID=%9lx  VSID=%13lx LLP:%3lx \n",
+						GET_ESID_1T(esid),
+						(vsid & ~SLB_VSID_B) >> SLB_VSID_SHIFT_1T,
+						llp);
+				} else {
+					printf(" 256M ESID=%9lx  VSID=%13lx LLP:%3lx \n",
+						GET_ESID(esid),
+						(vsid & ~SLB_VSID_B) >> SLB_VSID_SHIFT,
+						llp);
+				}
+			} else
+				printf("\n");
+		}
 	}
 }
 
@@ -2581,6 +2592,32 @@ void dump_segments(void)
 }
 #endif
 
+#ifdef CONFIG_44x
+static void dump_tlb_44x(void)
+{
+	int i;
+
+	for (i = 0; i < PPC44x_TLB_SIZE; i++) {
+		unsigned long w0,w1,w2;
+		asm volatile("tlbre  %0,%1,0" : "=r" (w0) : "r" (i));
+		asm volatile("tlbre  %0,%1,1" : "=r" (w1) : "r" (i));
+		asm volatile("tlbre  %0,%1,2" : "=r" (w2) : "r" (i));
+		printf("[%02x] %08x %08x %08x ", i, w0, w1, w2);
+		if (w0 & PPC44x_TLB_VALID) {
+			printf("V %08x -> %01x%08x %c%c%c%c%c",
+			       w0 & PPC44x_TLB_EPN_MASK,
+			       w1 & PPC44x_TLB_ERPN_MASK,
+			       w1 & PPC44x_TLB_RPN_MASK,
+			       (w2 & PPC44x_TLB_W) ? 'W' : 'w',
+			       (w2 & PPC44x_TLB_I) ? 'I' : 'i',
+			       (w2 & PPC44x_TLB_M) ? 'M' : 'm',
+			       (w2 & PPC44x_TLB_G) ? 'G' : 'g',
+			       (w2 & PPC44x_TLB_E) ? 'E' : 'e');
+		}
+		printf("\n");
+	}
+}
+#endif /* CONFIG_44x */
 void xmon_init(int enable)
 {
 #ifdef CONFIG_PPC_ISERIES
@@ -2805,9 +2842,10 @@ static void dump_spu_fields(struct spu *spu)
 	DUMP_FIELD(spu, "0x%lx", ls_size);
 	DUMP_FIELD(spu, "0x%x", node);
 	DUMP_FIELD(spu, "0x%lx", flags);
-	DUMP_FIELD(spu, "0x%lx", dar);
-	DUMP_FIELD(spu, "0x%lx", dsisr);
 	DUMP_FIELD(spu, "%d", class_0_pending);
+	DUMP_FIELD(spu, "0x%lx", class_0_dar);
+	DUMP_FIELD(spu, "0x%lx", class_1_dar);
+	DUMP_FIELD(spu, "0x%lx", class_1_dsisr);
 	DUMP_FIELD(spu, "0x%lx", irqs[0]);
 	DUMP_FIELD(spu, "0x%lx", irqs[1]);
 	DUMP_FIELD(spu, "0x%lx", irqs[2]);

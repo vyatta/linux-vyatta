@@ -122,7 +122,7 @@ EXPORT_SYMBOL(drm_agp_acquire);
 int drm_agp_acquire_ioctl(struct drm_device *dev, void *data,
 			  struct drm_file *file_priv)
 {
-	return drm_agp_acquire((struct drm_device *) file_priv->head->dev);
+	return drm_agp_acquire((struct drm_device *) file_priv->minor->dev);
 }
 
 /**
@@ -166,7 +166,6 @@ int drm_agp_enable(struct drm_device * dev, struct drm_agp_mode mode)
 
 	dev->agp->mode = mode.mode;
 	agp_enable(dev->agp->bridge, mode.mode);
-	dev->agp->base = dev->agp->agp_info.aper_base;
 	dev->agp->enabled = 1;
 	return 0;
 }
@@ -417,7 +416,7 @@ struct drm_agp_head *drm_agp_init(struct drm_device *dev)
 	INIT_LIST_HEAD(&head->memory);
 	head->cant_use_aperture = head->agp_info.cant_use_aperture;
 	head->page_mask = head->agp_info.page_mask;
-
+	head->base = head->agp_info.aper_base;
 	return head;
 }
 

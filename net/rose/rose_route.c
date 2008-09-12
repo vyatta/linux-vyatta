@@ -857,7 +857,6 @@ int rose_route_frame(struct sk_buff *skb, ax25_cb *ax25)
 	src_addr  = (rose_address *)(skb->data + 9);
 	dest_addr = (rose_address *)(skb->data + 4);
 
-	spin_lock_bh(&rose_node_list_lock);
 	spin_lock_bh(&rose_neigh_list_lock);
 	spin_lock_bh(&rose_route_list_lock);
 
@@ -994,8 +993,8 @@ int rose_route_frame(struct sk_buff *skb, ax25_cb *ax25)
 		goto out;
 	}
 
-	len  = (((skb->data[3] >> 4) & 0x0F) + 1) / 2;
-	len += (((skb->data[3] >> 0) & 0x0F) + 1) / 2;
+	len  = (((skb->data[3] >> 4) & 0x0F) + 1) >> 1;
+	len += (((skb->data[3] >> 0) & 0x0F) + 1) >> 1;
 
 	memset(&facilities, 0x00, sizeof(struct rose_facilities_struct));
 
@@ -1060,7 +1059,6 @@ int rose_route_frame(struct sk_buff *skb, ax25_cb *ax25)
 out:
 	spin_unlock_bh(&rose_route_list_lock);
 	spin_unlock_bh(&rose_neigh_list_lock);
-	spin_unlock_bh(&rose_node_list_lock);
 
 	return res;
 }
@@ -1068,11 +1066,12 @@ out:
 #ifdef CONFIG_PROC_FS
 
 static void *rose_node_start(struct seq_file *seq, loff_t *pos)
+	__acquires(rose_node_list_lock)
 {
 	struct rose_node *rose_node;
 	int i = 1;
 
-	spin_lock_bh(&rose_neigh_list_lock);
+	spin_lock_bh(&rose_node_list_lock);
 	if (*pos == 0)
 		return SEQ_START_TOKEN;
 
@@ -1091,8 +1090,9 @@ static void *rose_node_next(struct seq_file *seq, void *v, loff_t *pos)
 }
 
 static void rose_node_stop(struct seq_file *seq, void *v)
+	__releases(rose_node_list_lock)
 {
-	spin_unlock_bh(&rose_neigh_list_lock);
+	spin_unlock_bh(&rose_node_list_lock);
 }
 
 static int rose_node_show(struct seq_file *seq, void *v)
@@ -1144,6 +1144,7 @@ const struct file_operations rose_nodes_fops = {
 };
 
 static void *rose_neigh_start(struct seq_file *seq, loff_t *pos)
+	__acquires(rose_neigh_list_lock)
 {
 	struct rose_neigh *rose_neigh;
 	int i = 1;
@@ -1167,6 +1168,7 @@ static void *rose_neigh_next(struct seq_file *seq, void *v, loff_t *pos)
 }
 
 static void rose_neigh_stop(struct seq_file *seq, void *v)
+	__releases(rose_neigh_list_lock)
 {
 	spin_unlock_bh(&rose_neigh_list_lock);
 }
@@ -1227,6 +1229,7 @@ const struct file_operations rose_neigh_fops = {
 
 
 static void *rose_route_start(struct seq_file *seq, loff_t *pos)
+	__acquires(rose_route_list_lock)
 {
 	struct rose_route *rose_route;
 	int i = 1;
@@ -1250,6 +1253,7 @@ static void *rose_route_next(struct seq_file *seq, void *v, loff_t *pos)
 }
 
 static void rose_route_stop(struct seq_file *seq, void *v)
+	__releases(rose_route_list_lock)
 {
 	spin_unlock_bh(&rose_route_list_lock);
 }

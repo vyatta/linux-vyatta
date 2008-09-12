@@ -26,7 +26,7 @@ struct _fpstate_ia32 {
 	__u32 	cw;
 	__u32	sw;
 	__u32	tag;	/* not compatible to 64bit twd */
-	__u32	ipoff;			
+	__u32	ipoff;
 	__u32	cssel;
 	__u32	dataoff;
 	__u32	datasel;
@@ -39,7 +39,7 @@ struct _fpstate_ia32 {
 	__u32	mxcsr;
 	__u32	reserved;
 	struct _fpxreg	_fxsr_st[8];
-	struct _xmmreg	_xmm[8];	/* It's actually 16 */ 
+	struct _xmmreg	_xmm[8];	/* It's actually 16 */
 	__u32	padding[56];
 };
 
@@ -48,20 +48,20 @@ struct sigcontext_ia32 {
        unsigned short fs, __fsh;
        unsigned short es, __esh;
        unsigned short ds, __dsh;
-       unsigned int edi;
-       unsigned int esi;
-       unsigned int ebp;
-       unsigned int esp;
-       unsigned int ebx;
-       unsigned int edx;
-       unsigned int ecx;
-       unsigned int eax;
+       unsigned int di;
+       unsigned int si;
+       unsigned int bp;
+       unsigned int sp;
+       unsigned int bx;
+       unsigned int dx;
+       unsigned int cx;
+       unsigned int ax;
        unsigned int trapno;
        unsigned int err;
-       unsigned int eip;
+       unsigned int ip;
        unsigned short cs, __csh;
-       unsigned int eflags;
-       unsigned int esp_at_signal;
+       unsigned int flags;
+       unsigned int sp_at_signal;
        unsigned short ss, __ssh;
        unsigned int fpstate;		/* really (struct _fpstate_ia32 *) */
        unsigned int oldmask;

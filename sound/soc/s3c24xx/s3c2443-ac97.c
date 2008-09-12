@@ -19,11 +19,11 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/interrupt.h>
+#include <linux/io.h>
 #include <linux/wait.h>
 #include <linux/delay.h>
 #include <linux/clk.h>
 
-#include <sound/driver.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/ac97_codec.h>
@@ -31,7 +31,6 @@
 #include <sound/soc.h>
 
 #include <asm/hardware.h>
-#include <asm/io.h>
 #include <asm/plat-s3c/regs-ac97.h>
 #include <asm/arch/regs-gpio.h>
 #include <asm/arch/regs-clock.h>
@@ -48,7 +47,7 @@ struct s3c24xx_ac97_info {
 };
 static struct s3c24xx_ac97_info s3c24xx_ac97;
 
-DECLARE_COMPLETION(ac97_completion);
+static DECLARE_COMPLETION(ac97_completion);
 static u32 codec_ready;
 static DECLARE_MUTEX(ac97_mutex);
 
@@ -253,7 +252,7 @@ static int s3c2443_ac97_probe(struct platform_device *pdev)
 	ac_glbctrl |= S3C_AC97_GLBCTRL_TRANSFERDATAENABLE;
 	writel(ac_glbctrl, s3c24xx_ac97.regs + S3C_AC97_GLBCTRL);
 
-	ret = request_irq(IRQ_S3C2443_AC97, s3c2443_ac97_irq,
+	ret = request_irq(IRQ_S3C244x_AC97, s3c2443_ac97_irq,
 		IRQF_DISABLED, "AC97", NULL);
 	if (ret < 0) {
 		printk(KERN_ERR "s3c24xx-ac97: interrupt request failed.\n");
@@ -266,7 +265,7 @@ static int s3c2443_ac97_probe(struct platform_device *pdev)
 
 static void s3c2443_ac97_remove(struct platform_device *pdev)
 {
-	free_irq(IRQ_S3C2443_AC97, NULL);
+	free_irq(IRQ_S3C244x_AC97, NULL);
 	clk_disable(s3c24xx_ac97.ac97_clk);
 	clk_put(s3c24xx_ac97.ac97_clk);
 	iounmap(s3c24xx_ac97.regs);
@@ -291,7 +290,7 @@ static int s3c2443_ac97_trigger(struct snd_pcm_substream *substream, int cmd)
 	u32 ac_glbctrl;
 
 	ac_glbctrl = readl(s3c24xx_ac97.regs + S3C_AC97_GLBCTRL);
-	switch(cmd) {
+	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
@@ -334,7 +333,7 @@ static int s3c2443_ac97_mic_trigger(struct snd_pcm_substream *substream,
 	u32 ac_glbctrl;
 
 	ac_glbctrl = readl(s3c24xx_ac97.regs + S3C_AC97_GLBCTRL);
-	switch(cmd) {
+	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
@@ -392,7 +391,6 @@ struct snd_soc_cpu_dai s3c2443_ac97_dai[] = {
 		.trigger = s3c2443_ac97_mic_trigger,},
 },
 };
-
 EXPORT_SYMBOL_GPL(s3c2443_ac97_dai);
 EXPORT_SYMBOL_GPL(soc_ac97_ops);
 

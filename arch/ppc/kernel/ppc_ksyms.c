@@ -12,7 +12,6 @@
 #include <linux/irq.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
-#include <linux/ide.h>
 #include <linux/pm.h>
 #include <linux/bitops.h>
 
@@ -25,6 +24,7 @@
 #include <asm/checksum.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
+#include <asm/cacheflush.h>
 #include <linux/adb.h>
 #include <linux/cuda.h>
 #include <linux/pmu.h>
@@ -45,7 +45,7 @@
 #include <asm/dcr.h>
 
 #ifdef  CONFIG_8xx
-#include <asm/commproc.h>
+#include <asm/cpm1.h>
 #endif
 
 extern void transfer_to_handler(void);
@@ -60,8 +60,10 @@ long long __ashrdi3(long long, int);
 long long __ashldi3(long long, int);
 long long __lshrdi3(long long, int);
 
+EXPORT_SYMBOL(empty_zero_page);
 EXPORT_SYMBOL(clear_pages);
 EXPORT_SYMBOL(clear_user_page);
+EXPORT_SYMBOL(copy_page);
 EXPORT_SYMBOL(transfer_to_handler);
 EXPORT_SYMBOL(do_IRQ);
 EXPORT_SYMBOL(machine_check_exception);
@@ -89,6 +91,7 @@ EXPORT_SYMBOL(strncpy);
 EXPORT_SYMBOL(strcat);
 EXPORT_SYMBOL(strlen);
 EXPORT_SYMBOL(strcmp);
+EXPORT_SYMBOL(strncmp);
 
 EXPORT_SYMBOL(csum_partial);
 EXPORT_SYMBOL(csum_partial_copy_generic);
@@ -123,10 +126,6 @@ EXPORT_SYMBOL(ioremap64);
 EXPORT_SYMBOL(__ioremap);
 EXPORT_SYMBOL(iounmap);
 EXPORT_SYMBOL(ioremap_bot);	/* aka VMALLOC_END */
-
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-EXPORT_SYMBOL(ppc_ide_md);
-#endif
 
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL(isa_io_base);
@@ -166,12 +165,6 @@ EXPORT_SYMBOL(last_task_used_altivec);
 #endif
 EXPORT_SYMBOL(giveup_altivec);
 #endif /* CONFIG_ALTIVEC */
-#ifdef CONFIG_SPE
-#ifndef CONFIG_SMP
-EXPORT_SYMBOL(last_task_used_spe);
-#endif
-EXPORT_SYMBOL(giveup_spe);
-#endif /* CONFIG_SPE */
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(smp_call_function);
 EXPORT_SYMBOL(smp_hw_index);
@@ -192,9 +185,6 @@ EXPORT_SYMBOL(cuda_poll);
 #endif /* CONFIG_ADB_CUDA */
 #if defined(CONFIG_BOOTX_TEXT)
 EXPORT_SYMBOL(btext_update_display);
-#endif
-#ifdef CONFIG_VT
-EXPORT_SYMBOL(kd_mksound);
 #endif
 EXPORT_SYMBOL(to_tm);
 
@@ -244,8 +234,7 @@ EXPORT_SYMBOL(debugger_fault_handler);
 EXPORT_SYMBOL(cpm_install_handler);
 EXPORT_SYMBOL(cpm_free_handler);
 #endif /* CONFIG_8xx */
-#if defined(CONFIG_8xx) || defined(CONFIG_40x) || defined(CONFIG_85xx) ||\
-	defined(CONFIG_83xx)
+#if defined(CONFIG_8xx) || defined(CONFIG_40x)
 EXPORT_SYMBOL(__res);
 #endif
 

@@ -169,7 +169,7 @@ static int ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 	if (quirk_zfmicro(ohci)
 			&& (ed->type == PIPE_INTERRUPT)
 			&& !(ohci->eds_scheduled++))
-		mod_timer(&ohci->unlink_watchdog, round_jiffies_relative(HZ));
+		mod_timer(&ohci->unlink_watchdog, round_jiffies(jiffies + HZ));
 	wmb ();
 
 	/* we care about rm_list when setting CLE/BLE in case the HC was at
@@ -952,6 +952,7 @@ rescan_this:
 			struct urb	*urb;
 			urb_priv_t	*urb_priv;
 			__hc32		savebits;
+			u32		tdINFO;
 
 			td = list_entry (entry, struct td, td_list);
 			urb = td->urb;
@@ -965,6 +966,17 @@ rescan_this:
 			/* patch pointer hc uses */
 			savebits = *prev & ~cpu_to_hc32 (ohci, TD_MASK);
 			*prev = td->hwNextTD | savebits;
+
+			/* If this was unlinked, the TD may not have been
+			 * retired ... so manually save the data toggle.
+			 * The controller ignores the value we save for
+			 * control and ISO endpoints.
+			 */
+			tdINFO = hc32_to_cpup(ohci, &td->hwINFO);
+			if ((tdINFO & TD_T) == TD_T_DATA0)
+				ed->hwHeadP &= ~cpu_to_hc32(ohci, ED_C);
+			else if ((tdINFO & TD_T) == TD_T_DATA1)
+				ed->hwHeadP |= cpu_to_hc32(ohci, ED_C);
 
 			/* HC may have partly processed this TD */
 			td_done (ohci, urb, td);

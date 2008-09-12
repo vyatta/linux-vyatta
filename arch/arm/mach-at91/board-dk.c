@@ -132,8 +132,7 @@ static struct i2c_board_info __initdata dk_i2c_devices[] = {
 		I2C_BOARD_INFO("x9429", 0x28),
 	},
 	{
-		I2C_BOARD_INFO("at24c", 0x50),
-		.type	= "24c1024",
+		I2C_BOARD_INFO("24c1024", 0x50),
 	}
 };
 
@@ -183,6 +182,14 @@ static struct platform_device dk_flash = {
 	.num_resources	= 1,
 };
 
+static struct gpio_led dk_leds[] = {
+	{
+		.name			= "led0",
+		.gpio			= AT91_PIN_PB2,
+		.active_low		= 1,
+		.default_trigger	= "heartbeat",
+	}
+};
 
 static void __init dk_board_init(void)
 {
@@ -213,6 +220,8 @@ static void __init dk_board_init(void)
 	at91_add_device_nand(&dk_nand_data);
 	/* NOR Flash */
 	platform_device_register(&dk_flash);
+	/* LEDs */
+	at91_gpio_leds(dk_leds, ARRAY_SIZE(dk_leds));
 	/* VGA */
 //	dk_add_device_video();
 }

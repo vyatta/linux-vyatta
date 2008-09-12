@@ -20,6 +20,7 @@
 #include "css.h"
 #include "device.h"
 #include "ioasm.h"
+#include "io_sch.h"
 
 /*
  * Check for any kind of channel or interface control check but don't
@@ -61,7 +62,7 @@ ccw_device_path_notoper(struct ccw_device *cdev)
 	stsch (sch->schid, &sch->schib);
 
 	CIO_MSG_EVENT(0, "%s(0.%x.%04x) - path(s) %02x are "
-		      "not operational \n", __FUNCTION__,
+		      "not operational \n", __func__,
 		      sch->schid.ssid, sch->schid.sch_no,
 		      sch->schib.pmcw.pnom);
 
@@ -310,6 +311,8 @@ int
 ccw_device_do_sense(struct ccw_device *cdev, struct irb *irb)
 {
 	struct subchannel *sch;
+	struct ccw1 *sense_ccw;
+	int rc;
 
 	sch = to_subchannel(cdev->dev.parent);
 
@@ -326,15 +329,19 @@ ccw_device_do_sense(struct ccw_device *cdev, struct irb *irb)
 	/*
 	 * We have ending status but no sense information. Do a basic sense.
 	 */
-	sch->sense_ccw.cmd_code = CCW_CMD_BASIC_SENSE;
-	sch->sense_ccw.cda = (__u32) __pa(cdev->private->irb.ecw);
-	sch->sense_ccw.count = SENSE_MAX_COUNT;
-	sch->sense_ccw.flags = CCW_FLAG_SLI;
+	sense_ccw = &to_io_private(sch)->sense_ccw;
+	sense_ccw->cmd_code = CCW_CMD_BASIC_SENSE;
+	sense_ccw->cda = (__u32) __pa(cdev->private->irb.ecw);
+	sense_ccw->count = SENSE_MAX_COUNT;
+	sense_ccw->flags = CCW_FLAG_SLI;
 
 	/* Reset internal retry indication. */
 	cdev->private->flags.intretry = 0;
 
-	return cio_start (sch, &sch->sense_ccw, 0xff);
+	rc = cio_start(sch, sense_ccw, 0xff);
+	if (rc == -ENODEV || rc == -EACCES)
+		dev_fsm_event(cdev, DEV_EVENT_VERIFY);
+	return rc;
 }
 
 /*

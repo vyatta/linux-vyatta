@@ -116,6 +116,7 @@
 
 #include <linux/capability.h>
 #include <linux/file.h>
+#include <linux/fdtable.h>
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -125,8 +126,8 @@
 #include <linux/syscalls.h>
 #include <linux/time.h>
 #include <linux/rcupdate.h>
+#include <linux/pid_namespace.h>
 
-#include <asm/semaphore.h>
 #include <asm/uaccess.h>
 
 #define IS_POSIX(fl)	(fl->fl_flags & FL_POSIX)
@@ -185,6 +186,7 @@ void locks_init_lock(struct file_lock *fl)
 	fl->fl_fasync = NULL;
 	fl->fl_owner = NULL;
 	fl->fl_pid = 0;
+	fl->fl_nspid = NULL;
 	fl->fl_file = NULL;
 	fl->fl_flags = 0;
 	fl->fl_type = 0;
@@ -223,7 +225,7 @@ static void locks_copy_private(struct file_lock *new, struct file_lock *fl)
 /*
  * Initialize a new lock from an existing file_lock structure.
  */
-static void __locks_copy_lock(struct file_lock *new, const struct file_lock *fl)
+void __locks_copy_lock(struct file_lock *new, const struct file_lock *fl)
 {
 	new->fl_owner = fl->fl_owner;
 	new->fl_pid = fl->fl_pid;
@@ -235,6 +237,7 @@ static void __locks_copy_lock(struct file_lock *new, const struct file_lock *fl)
 	new->fl_ops = NULL;
 	new->fl_lmops = NULL;
 }
+EXPORT_SYMBOL(__locks_copy_lock);
 
 void locks_copy_lock(struct file_lock *new, struct file_lock *fl)
 {
@@ -553,12 +556,11 @@ static void locks_insert_lock(struct file_lock **pos, struct file_lock *fl)
 {
 	list_add(&fl->fl_link, &file_lock_list);
 
+	fl->fl_nspid = get_pid(task_tgid(current));
+
 	/* insert into file's list */
 	fl->fl_next = *pos;
 	*pos = fl;
-
-	if (fl->fl_ops && fl->fl_ops->fl_insert)
-		fl->fl_ops->fl_insert(fl);
 }
 
 /*
@@ -581,8 +583,10 @@ static void locks_delete_lock(struct file_lock **thisfl_p)
 		fl->fl_fasync = NULL;
 	}
 
-	if (fl->fl_ops && fl->fl_ops->fl_remove)
-		fl->fl_ops->fl_remove(fl);
+	if (fl->fl_nspid) {
+		put_pid(fl->fl_nspid);
+		fl->fl_nspid = NULL;
+	}
 
 	locks_wake_up_blocks(fl);
 	locks_free_lock(fl);
@@ -634,33 +638,6 @@ static int flock_locks_conflict(struct file_lock *caller_fl, struct file_lock *s
 	return (locks_conflict(caller_fl, sys_fl));
 }
 
-static int interruptible_sleep_on_locked(wait_queue_head_t *fl_wait, int timeout)
-{
-	int result = 0;
-	DECLARE_WAITQUEUE(wait, current);
-
-	__set_current_state(TASK_INTERRUPTIBLE);
-	add_wait_queue(fl_wait, &wait);
-	if (timeout == 0)
-		schedule();
-	else
-		result = schedule_timeout(timeout);
-	if (signal_pending(current))
-		result = -ERESTARTSYS;
-	remove_wait_queue(fl_wait, &wait);
-	__set_current_state(TASK_RUNNING);
-	return result;
-}
-
-static int locks_block_on_timeout(struct file_lock *blocker, struct file_lock *waiter, int time)
-{
-	int result;
-	locks_insert_block(blocker, waiter);
-	result = interruptible_sleep_on_locked(&waiter->fl_wait, time);
-	__locks_delete_block(waiter);
-	return result;
-}
-
 void
 posix_test_lock(struct file *filp, struct file_lock *fl)
 {
@@ -673,55 +650,66 @@ posix_test_lock(struct file *filp, struct file_lock *fl)
 		if (posix_locks_conflict(fl, cfl))
 			break;
 	}
-	if (cfl)
+	if (cfl) {
 		__locks_copy_lock(fl, cfl);
-	else
+		if (cfl->fl_nspid)
+			fl->fl_pid = pid_vnr(cfl->fl_nspid);
+	} else
 		fl->fl_type = F_UNLCK;
 	unlock_kernel();
 	return;
 }
-
 EXPORT_SYMBOL(posix_test_lock);
 
-/* This function tests for deadlock condition before putting a process to
- * sleep. The detection scheme is no longer recursive. Recursive was neat,
- * but dangerous - we risked stack corruption if the lock data was bad, or
- * if the recursion was too deep for any other reason.
+/*
+ * Deadlock detection:
  *
- * We rely on the fact that a task can only be on one lock's wait queue
- * at a time. When we find blocked_task on a wait queue we can re-search
- * with blocked_task equal to that queue's owner, until either blocked_task
- * isn't found, or blocked_task is found on a queue owned by my_task.
+ * We attempt to detect deadlocks that are due purely to posix file
+ * locks.
  *
- * Note: the above assumption may not be true when handling lock requests
- * from a broken NFS client. But broken NFS clients have a lot more to
- * worry about than proper deadlock detection anyway... --okir
+ * We assume that a task can be waiting for at most one lock at a time.
+ * So for any acquired lock, the process holding that lock may be
+ * waiting on at most one other lock.  That lock in turns may be held by
+ * someone waiting for at most one other lock.  Given a requested lock
+ * caller_fl which is about to wait for a conflicting lock block_fl, we
+ * follow this chain of waiters to ensure we are not about to create a
+ * cycle.
  *
- * However, the failure of this assumption (also possible in the case of
- * multiple tasks sharing the same open file table) also means there's no
- * guarantee that the loop below will terminate.  As a hack, we give up
- * after a few iterations.
+ * Since we do this before we ever put a process to sleep on a lock, we
+ * are ensured that there is never a cycle; that is what guarantees that
+ * the while() loop in posix_locks_deadlock() eventually completes.
+ *
+ * Note: the above assumption may not be true when handling lock
+ * requests from a broken NFS client. It may also fail in the presence
+ * of tasks (such as posix threads) sharing the same open file table.
+ *
+ * To handle those cases, we just bail out after a few iterations.
  */
 
 #define MAX_DEADLK_ITERATIONS 10
 
+/* Find a lock that the owner of the given block_fl is blocking on. */
+static struct file_lock *what_owner_is_waiting_for(struct file_lock *block_fl)
+{
+	struct file_lock *fl;
+
+	list_for_each_entry(fl, &blocked_list, fl_link) {
+		if (posix_same_owner(fl, block_fl))
+			return fl->fl_next;
+	}
+	return NULL;
+}
+
 static int posix_locks_deadlock(struct file_lock *caller_fl,
 				struct file_lock *block_fl)
 {
-	struct file_lock *fl;
 	int i = 0;
 
-next_task:
-	if (posix_same_owner(caller_fl, block_fl))
-		return 1;
-	list_for_each_entry(fl, &blocked_list, fl_link) {
-		if (posix_same_owner(fl, block_fl)) {
-			if (i++ > MAX_DEADLK_ITERATIONS)
-				return 0;
-			fl = fl->fl_next;
-			block_fl = fl;
-			goto next_task;
-		}
+	while ((block_fl = what_owner_is_waiting_for(block_fl))) {
+		if (i++ > MAX_DEADLK_ITERATIONS)
+			return 0;
+		if (posix_same_owner(caller_fl, block_fl))
+			return 1;
 	}
 	return 0;
 }
@@ -779,7 +767,7 @@ static int flock_lock_file(struct file *filp, struct file_lock *request)
 	 * give it the opportunity to lock the file.
 	 */
 	if (found)
-		cond_resched();
+		cond_resched_bkl();
 
 find_conflict:
 	for_each_lock(inode, before) {
@@ -841,7 +829,7 @@ static int __posix_lock_file(struct inode *inode, struct file_lock *request, str
 			if (!posix_locks_conflict(request, fl))
 				continue;
 			if (conflock)
-				locks_copy_lock(conflock, fl);
+				__locks_copy_lock(conflock, fl);
 			error = -EAGAIN;
 			if (!(request->fl_flags & FL_SLEEP))
 				goto out;
@@ -1256,7 +1244,10 @@ restart:
 		if (break_time == 0)
 			break_time++;
 	}
-	error = locks_block_on_timeout(flock, new_fl, break_time);
+	locks_insert_block(flock, new_fl);
+	error = wait_event_interruptible_timeout(new_fl->fl_wait,
+						!new_fl->fl_next, break_time);
+	__locks_delete_block(new_fl);
 	if (error >= 0) {
 		if (error == 0)
 			time_out_leases(inode);
@@ -1279,13 +1270,13 @@ out:
 EXPORT_SYMBOL(__break_lease);
 
 /**
- *	lease_get_mtime
+ *	lease_get_mtime - get the last modified time of an inode
  *	@inode: the inode
  *      @time:  pointer to a timespec which will contain the last modified time
  *
  * This is to force NFS clients to flush their caches for files with
  * exclusive leases.  The justification is that if someone has an
- * exclusive lease, then they could be modifiying it.
+ * exclusive lease, then they could be modifying it.
  */
 void lease_get_mtime(struct inode *inode, struct timespec *time)
 {
@@ -1372,18 +1363,20 @@ int generic_setlease(struct file *filp, long arg, struct file_lock **flp)
 
 	lease = *flp;
 
-	error = -EAGAIN;
-	if ((arg == F_RDLCK) && (atomic_read(&inode->i_writecount) > 0))
-		goto out;
-	if ((arg == F_WRLCK)
-	    && ((atomic_read(&dentry->d_count) > 1)
-		|| (atomic_read(&inode->i_count) > 1)))
-		goto out;
+	if (arg != F_UNLCK) {
+		error = -ENOMEM;
+		new_fl = locks_alloc_lock();
+		if (new_fl == NULL)
+			goto out;
 
-	error = -ENOMEM;
-	new_fl = locks_alloc_lock();
-	if (new_fl == NULL)
-		goto out;
+		error = -EAGAIN;
+		if ((arg == F_RDLCK) && (atomic_read(&inode->i_writecount) > 0))
+			goto out;
+		if ((arg == F_WRLCK)
+		    && ((atomic_read(&dentry->d_count) > 1)
+			|| (atomic_read(&inode->i_count) > 1)))
+			goto out;
+	}
 
 	/*
 	 * At this point, we know that if there is an exclusive
@@ -1409,6 +1402,7 @@ int generic_setlease(struct file *filp, long arg, struct file_lock **flp)
 			rdlease_count++;
 	}
 
+	error = -EAGAIN;
 	if ((arg == F_RDLCK && (wrlease_count > 0)) ||
 	    (arg == F_WRLCK && ((rdlease_count + wrlease_count) > 0)))
 		goto out;
@@ -1495,8 +1489,7 @@ EXPORT_SYMBOL_GPL(vfs_setlease);
 int fcntl_setlease(unsigned int fd, struct file *filp, long arg)
 {
 	struct file_lock fl, *flp = &fl;
-	struct dentry *dentry = filp->f_path.dentry;
-	struct inode *inode = dentry->d_inode;
+	struct inode *inode = filp->f_path.dentry->d_inode;
 	int error;
 
 	locks_init_lock(&fl);
@@ -2105,6 +2098,12 @@ static void lock_get_status(struct seq_file *f, struct file_lock *fl,
 							int id, char *pfx)
 {
 	struct inode *inode = NULL;
+	unsigned int fl_pid;
+
+	if (fl->fl_nspid)
+		fl_pid = pid_vnr(fl->fl_nspid);
+	else
+		fl_pid = fl->fl_pid;
 
 	if (fl->fl_file != NULL)
 		inode = fl->fl_file->f_path.dentry->d_inode;
@@ -2145,16 +2144,16 @@ static void lock_get_status(struct seq_file *f, struct file_lock *fl,
 	}
 	if (inode) {
 #ifdef WE_CAN_BREAK_LSLK_NOW
-		seq_printf(f, "%d %s:%ld ", fl->fl_pid,
+		seq_printf(f, "%d %s:%ld ", fl_pid,
 				inode->i_sb->s_id, inode->i_ino);
 #else
 		/* userspace relies on this representation of dev_t ;-( */
-		seq_printf(f, "%d %02x:%02x:%ld ", fl->fl_pid,
+		seq_printf(f, "%d %02x:%02x:%ld ", fl_pid,
 				MAJOR(inode->i_sb->s_dev),
 				MINOR(inode->i_sb->s_dev), inode->i_ino);
 #endif
 	} else {
-		seq_printf(f, "%d <none>:0 ", fl->fl_pid);
+		seq_printf(f, "%d <none>:0 ", fl_pid);
 	}
 	if (IS_POSIX(fl)) {
 		if (fl->fl_end == OFFSET_MAX)

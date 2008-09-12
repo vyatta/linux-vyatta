@@ -627,7 +627,6 @@ static int	stli_initopen(struct stlibrd *brdp, struct stliport *portp);
 static int	stli_rawopen(struct stlibrd *brdp, struct stliport *portp, unsigned long arg, int wait);
 static int	stli_rawclose(struct stlibrd *brdp, struct stliport *portp, unsigned long arg, int wait);
 static int	stli_waitcarrier(struct stlibrd *brdp, struct stliport *portp, struct file *filp);
-static void	stli_dohangup(struct work_struct *);
 static int	stli_setport(struct stliport *portp);
 static int	stli_cmdwait(struct stlibrd *brdp, struct stliport *portp, unsigned long cmd, void *arg, int size, int copyback);
 static void	stli_sendcmd(struct stlibrd *brdp, struct stliport *portp, unsigned long cmd, void *arg, int size, int copyback);
@@ -1683,16 +1682,6 @@ static int stli_ioctl(struct tty_struct *tty, struct file *file, unsigned int cm
 	rc = 0;
 
 	switch (cmd) {
-	case TIOCGSOFTCAR:
-		rc = put_user(((tty->termios->c_cflag & CLOCAL) ? 1 : 0),
-			(unsigned __user *) arg);
-		break;
-	case TIOCSSOFTCAR:
-		if ((rc = get_user(ival, (unsigned __user *) arg)) == 0)
-			tty->termios->c_cflag =
-				(tty->termios->c_cflag & ~CLOCAL) |
-				(ival ? CLOCAL : 0);
-		break;
 	case TIOCGSERIAL:
 		rc = stli_getserial(portp, argp);
 		break;
@@ -1819,25 +1808,6 @@ static void stli_stop(struct tty_struct *tty)
 
 static void stli_start(struct tty_struct *tty)
 {
-}
-
-/*****************************************************************************/
-
-/*
- *	Scheduler called hang up routine. This is called from the scheduler,
- *	not direct from the driver "poll" routine. We can't call it there
- *	since the real local hangup code will enable/disable the board and
- *	other things that we can't do while handling the poll. Much easier
- *	to deal with it some time later (don't really care when, hangups
- *	aren't that time critical).
- */
-
-static void stli_dohangup(struct work_struct *ugly_api)
-{
-	struct stliport *portp = container_of(ugly_api, struct stliport, tqhangup);
-	if (portp->tty != NULL) {
-		tty_hangup(portp->tty);
-	}
 }
 
 /*****************************************************************************/
@@ -2405,7 +2375,7 @@ static int stli_hostcmd(struct stlibrd *brdp, struct stliport *portp)
 			    ((portp->sigs & TIOCM_CD) == 0)) {
 				if (portp->flags & ASYNC_CHECK_CD) {
 					if (tty)
-						schedule_work(&portp->tqhangup);
+						tty_hangup(tty);
 				}
 			}
 		}
@@ -2733,7 +2703,6 @@ static int stli_initports(struct stlibrd *brdp)
 		portp->baud_base = STL_BAUDBASE;
 		portp->close_delay = STL_CLOSEDELAY;
 		portp->closing_wait = 30 * HZ;
-		INIT_WORK(&portp->tqhangup, stli_dohangup);
 		init_waitqueue_head(&portp->open_wait);
 		init_waitqueue_head(&portp->close_wait);
 		init_waitqueue_head(&portp->raw_wait);
@@ -3288,7 +3257,7 @@ static int stli_initecp(struct stlibrd *brdp)
  */
 	EBRDINIT(brdp);
 
-	brdp->membase = ioremap(brdp->memaddr, brdp->memsize);
+	brdp->membase = ioremap_nocache(brdp->memaddr, brdp->memsize);
 	if (brdp->membase == NULL) {
 		retval = -ENOMEM;
 		goto err_reg;
@@ -3445,7 +3414,7 @@ static int stli_initonb(struct stlibrd *brdp)
  */
 	EBRDINIT(brdp);
 
-	brdp->membase = ioremap(brdp->memaddr, brdp->memsize);
+	brdp->membase = ioremap_nocache(brdp->memaddr, brdp->memsize);
 	if (brdp->membase == NULL) {
 		retval = -ENOMEM;
 		goto err_reg;
@@ -3696,7 +3665,7 @@ static int stli_eisamemprobe(struct stlibrd *brdp)
  */
 	for (i = 0; (i < stli_eisamempsize); i++) {
 		brdp->memaddr = stli_eisamemprobeaddrs[i];
-		brdp->membase = ioremap(brdp->memaddr, brdp->memsize);
+		brdp->membase = ioremap_nocache(brdp->memaddr, brdp->memsize);
 		if (brdp->membase == NULL)
 			continue;
 
@@ -4454,6 +4423,8 @@ static int stli_memioctl(struct inode *ip, struct file *fp, unsigned int cmd, un
 	done = 0;
 	rc = 0;
 
+	lock_kernel();
+
 	switch (cmd) {
 	case COM_GETPORTSTATS:
 		rc = stli_getportstats(NULL, argp);
@@ -4476,6 +4447,7 @@ static int stli_memioctl(struct inode *ip, struct file *fp, unsigned int cmd, un
 		done++;
 		break;
 	}
+	unlock_kernel();
 
 	if (done)
 		return rc;
@@ -4492,6 +4464,8 @@ static int stli_memioctl(struct inode *ip, struct file *fp, unsigned int cmd, un
 		return -ENODEV;
 	if (brdp->state == 0)
 		return -ENODEV;
+
+	lock_kernel();
 
 	switch (cmd) {
 	case STL_BINTR:
@@ -4515,6 +4489,7 @@ static int stli_memioctl(struct inode *ip, struct file *fp, unsigned int cmd, un
 		rc = -ENOIOCTLCMD;
 		break;
 	}
+	unlock_kernel();
 	return rc;
 }
 

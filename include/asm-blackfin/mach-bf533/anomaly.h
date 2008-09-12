@@ -2,14 +2,12 @@
  * File: include/asm-blackfin/mach-bf533/anomaly.h
  * Bugs: Enter bugs at http://blackfin.uclinux.org/
  *
- * Copyright (C) 2004-2007 Analog Devices Inc.
+ * Copyright (C) 2004-2008 Analog Devices Inc.
  * Licensed under the GPL-2 or later.
  */
 
 /* This file shoule be up to date with:
- *  - Revision X,  March 23, 2007; ADSP-BF533 Blackfin Processor Anomaly List
- *  - Revision AB, March 23, 2007; ADSP-BF532 Blackfin Processor Anomaly List
- *  - Revision W,  March 23, 2007; ADSP-BF531 Blackfin Processor Anomaly List
+ *  - Revision C, 02/08/2008; ADSP-BF531/BF532/BF533 Blackfin Processor Anomaly List
  */
 
 #ifndef _MACH_ANOMALY_H_
@@ -17,7 +15,7 @@
 
 /* We do not support 0.1 or 0.2 silicon - sorry */
 #if __SILICON_REVISION__ < 3
-# error Kernel will not work on BF533 silicon version 0.0, 0.1, or 0.2
+# error will not work on BF533 silicon version 0.0, 0.1, or 0.2
 #endif
 
 #if defined(__ADSPBF531__)
@@ -178,6 +176,21 @@
 #define ANOMALY_05000315 (1)
 /* Internal Voltage Regulator Values of 1.05V, 1.10V and 1.15V Not Allowed for LQFP Packages */
 #define ANOMALY_05000319 (ANOMALY_BF531 || ANOMALY_BF532)
+/* Serial Port (SPORT) Multichannel Transmit Failure when Channel 0 Is Disabled */
+#define ANOMALY_05000357 (1)
+/* UART Break Signal Issues */
+#define ANOMALY_05000363 (__SILICON_REVISION__ < 5)
+/* PPI Underflow Error Goes Undetected in ITU-R 656 Mode */
+#define ANOMALY_05000366 (1)
+/* Possible RETS Register Corruption when Subroutine Is under 5 Cycles in Duration */
+#define ANOMALY_05000371 (1)
+/* PPI Does Not Start Properly In Specific Mode */
+#define ANOMALY_05000400 (__SILICON_REVISION__ >= 5)
+/* SSYNC Stalls Processor when Executed from Non-Cacheable Memory */
+#define ANOMALY_05000402 (__SILICON_REVISION__ >= 5)
+/* Level-Sensitive External GPIO Wakeups May Cause Indefinite Stall */
+#define ANOMALY_05000403 (1)
+
 
 /* These anomalies have been "phased" out of analog.com anomaly sheets and are
  * here to show running on older silicon just isn't feasible.

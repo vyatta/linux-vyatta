@@ -79,7 +79,7 @@ static int debug;
 #define PL2303_BUF_SIZE		1024
 #define PL2303_TMP_BUF_SIZE	1024
 
-struct pl2303_buf {
+struct oti6858_buf {
 	unsigned int	buf_size;
 	char		*buf_buf;
 	char		*buf_get;
@@ -98,7 +98,7 @@ struct pl2303_buf {
 
 /* format of the control packet */
 struct oti6858_control_pkt {
-	u16	divisor;	/* baud rate = 96000000 / (16 * divisor), LE */
+	__le16	divisor;	/* baud rate = 96000000 / (16 * divisor), LE */
 #define OTI6858_MAX_BAUD_RATE	3000000
 	u8	frame_fmt;
 #define FMT_STOP_BITS_MASK	0xc0
@@ -161,14 +161,14 @@ static int oti6858_startup(struct usb_serial *serial);
 static void oti6858_shutdown(struct usb_serial *serial);
 
 /* functions operating on buffers */
-static struct pl2303_buf *pl2303_buf_alloc(unsigned int size);
-static void pl2303_buf_free(struct pl2303_buf *pb);
-static void pl2303_buf_clear(struct pl2303_buf *pb);
-static unsigned int pl2303_buf_data_avail(struct pl2303_buf *pb);
-static unsigned int pl2303_buf_space_avail(struct pl2303_buf *pb);
-static unsigned int pl2303_buf_put(struct pl2303_buf *pb, const char *buf,
+static struct oti6858_buf *oti6858_buf_alloc(unsigned int size);
+static void oti6858_buf_free(struct oti6858_buf *pb);
+static void oti6858_buf_clear(struct oti6858_buf *pb);
+static unsigned int oti6858_buf_data_avail(struct oti6858_buf *pb);
+static unsigned int oti6858_buf_space_avail(struct oti6858_buf *pb);
+static unsigned int oti6858_buf_put(struct oti6858_buf *pb, const char *buf,
 					unsigned int count);
-static unsigned int pl2303_buf_get(struct pl2303_buf *pb, char *buf,
+static unsigned int oti6858_buf_get(struct oti6858_buf *pb, char *buf,
 					unsigned int count);
 
 
@@ -179,9 +179,6 @@ static struct usb_serial_driver oti6858_device = {
 		.name =		"oti6858",
 	},
 	.id_table =		id_table,
-	.num_interrupt_in =	1,
-	.num_bulk_in =		1,
-	.num_bulk_out =		1,
 	.num_ports =		1,
 	.open =			oti6858_open,
 	.close =		oti6858_close,
@@ -203,7 +200,7 @@ static struct usb_serial_driver oti6858_device = {
 struct oti6858_private {
 	spinlock_t lock;
 
-	struct pl2303_buf *buf;
+	struct oti6858_buf *buf;
 	struct oti6858_control_pkt status;
 
 	struct {
@@ -214,7 +211,7 @@ struct oti6858_private {
 	struct delayed_work delayed_write_work;
 
 	struct {
-		u16 divisor;
+		__le16 divisor;
 		u8 frame_fmt;
 		u8 control;
 	} pending_setup;
@@ -238,10 +235,10 @@ static void setup_line(struct work_struct *work)
 	unsigned long flags;
 	int result;
 
-	dbg("%s(port = %d)", __FUNCTION__, port->number);
+	dbg("%s(port = %d)", __func__, port->number);
 
 	if ((new_setup = kmalloc(OTI6858_CTRL_PKT_SIZE, GFP_KERNEL)) == NULL) {
-		dev_err(&port->dev, "%s(): out of memory!\n", __FUNCTION__);
+		dev_err(&port->dev, "%s(): out of memory!\n", __func__);
 		/* we will try again */
 		schedule_delayed_work(&priv->delayed_setup_work, msecs_to_jiffies(2));
 		return;
@@ -256,7 +253,7 @@ static void setup_line(struct work_struct *work)
 				100);
 
 	if (result != OTI6858_CTRL_PKT_SIZE) {
-		dev_err(&port->dev, "%s(): error reading status\n", __FUNCTION__);
+		dev_err(&port->dev, "%s(): error reading status\n", __func__);
 		kfree(new_setup);
 		/* we will try again */
 		schedule_delayed_work(&priv->delayed_setup_work, msecs_to_jiffies(2));
@@ -289,12 +286,12 @@ static void setup_line(struct work_struct *work)
 	priv->setup_done = 1;
 	spin_unlock_irqrestore(&priv->lock, flags);
 
-	dbg("%s(): submitting interrupt urb", __FUNCTION__);
+	dbg("%s(): submitting interrupt urb", __func__);
 	port->interrupt_in_urb->dev = port->serial->dev;
 	result = usb_submit_urb(port->interrupt_in_urb, GFP_ATOMIC);
 	if (result != 0) {
 		dev_err(&port->dev, "%s(): usb_submit_urb() failed"
-				" with error %d\n", __FUNCTION__, result);
+				" with error %d\n", __func__, result);
 	}
 }
 
@@ -306,7 +303,7 @@ void send_data(struct work_struct *work)
 	unsigned long flags;
 	unsigned char allow;
 
-	dbg("%s(port = %d)", __FUNCTION__, port->number);
+	dbg("%s(port = %d)", __func__, port->number);
 
 	spin_lock_irqsave(&priv->lock, flags);
 	if (priv->flags.write_urb_in_use) {
@@ -316,7 +313,7 @@ void send_data(struct work_struct *work)
 	}
 	priv->flags.write_urb_in_use = 1;
 
-	count = pl2303_buf_data_avail(priv->buf);
+	count = oti6858_buf_data_avail(priv->buf);
 	spin_unlock_irqrestore(&priv->lock, flags);
 	if (count > port->bulk_out_size)
 		count = port->bulk_out_size;
@@ -334,18 +331,18 @@ void send_data(struct work_struct *work)
 	if (count == 0) {
 		priv->flags.write_urb_in_use = 0;
 
-		dbg("%s(): submitting interrupt urb", __FUNCTION__);
+		dbg("%s(): submitting interrupt urb", __func__);
 		port->interrupt_in_urb->dev = port->serial->dev;
 		result = usb_submit_urb(port->interrupt_in_urb, GFP_ATOMIC);
 		if (result != 0) {
 			dev_err(&port->dev, "%s(): usb_submit_urb() failed"
-				" with error %d\n", __FUNCTION__, result);
+				" with error %d\n", __func__, result);
 		}
 		return;
 	}
 
 	spin_lock_irqsave(&priv->lock, flags);
-	pl2303_buf_get(priv->buf, port->write_urb->transfer_buffer, count);
+	oti6858_buf_get(priv->buf, port->write_urb->transfer_buffer, count);
 	spin_unlock_irqrestore(&priv->lock, flags);
 
 	port->write_urb->transfer_buffer_length = count;
@@ -353,7 +350,7 @@ void send_data(struct work_struct *work)
 	result = usb_submit_urb(port->write_urb, GFP_ATOMIC);
 	if (result != 0) {
 		dev_err(&port->dev, "%s(): usb_submit_urb() failed"
-			       " with error %d\n", __FUNCTION__, result);
+			       " with error %d\n", __func__, result);
 		priv->flags.write_urb_in_use = 0;
 	}
 
@@ -370,7 +367,7 @@ static int oti6858_startup(struct usb_serial *serial)
 		priv = kzalloc(sizeof(struct oti6858_private), GFP_KERNEL);
 		if (!priv)
 			break;
-		priv->buf = pl2303_buf_alloc(PL2303_BUF_SIZE);
+		priv->buf = oti6858_buf_alloc(PL2303_BUF_SIZE);
 		if (priv->buf == NULL) {
 			kfree(priv);
 			break;
@@ -391,7 +388,7 @@ static int oti6858_startup(struct usb_serial *serial)
 
 	for (--i; i >= 0; --i) {
 		priv = usb_get_serial_port_data(serial->port[i]);
-		pl2303_buf_free(priv->buf);
+		oti6858_buf_free(priv->buf);
 		kfree(priv);
 		usb_set_serial_port_data(serial->port[i], NULL);
 	}
@@ -404,13 +401,13 @@ static int oti6858_write(struct usb_serial_port *port,
 	struct oti6858_private *priv = usb_get_serial_port_data(port);
 	unsigned long flags;
 
-	dbg("%s(port = %d, count = %d)", __FUNCTION__, port->number, count);
+	dbg("%s(port = %d, count = %d)", __func__, port->number, count);
 
 	if (!count)
 		return count;
 
 	spin_lock_irqsave(&priv->lock, flags);
-	count = pl2303_buf_put(priv->buf, buf, count);
+	count = oti6858_buf_put(priv->buf, buf, count);
 	spin_unlock_irqrestore(&priv->lock, flags);
 
 	return count;
@@ -422,10 +419,10 @@ static int oti6858_write_room(struct usb_serial_port *port)
 	int room = 0;
 	unsigned long flags;
 
-	dbg("%s(port = %d)", __FUNCTION__, port->number);
+	dbg("%s(port = %d)", __func__, port->number);
 
 	spin_lock_irqsave(&priv->lock, flags);
-	room = pl2303_buf_space_avail(priv->buf);
+	room = oti6858_buf_space_avail(priv->buf);
 	spin_unlock_irqrestore(&priv->lock, flags);
 
 	return room;
@@ -437,10 +434,10 @@ static int oti6858_chars_in_buffer(struct usb_serial_port *port)
 	int chars = 0;
 	unsigned long flags;
 
-	dbg("%s(port = %d)", __FUNCTION__, port->number);
+	dbg("%s(port = %d)", __func__, port->number);
 
 	spin_lock_irqsave(&priv->lock, flags);
-	chars = pl2303_buf_data_avail(priv->buf);
+	chars = oti6858_buf_data_avail(priv->buf);
 	spin_unlock_irqrestore(&priv->lock, flags);
 
 	return chars;
@@ -453,13 +450,13 @@ static void oti6858_set_termios(struct usb_serial_port *port,
 	unsigned long flags;
 	unsigned int cflag;
 	u8 frame_fmt, control;
-	u16 divisor;
+	__le16 divisor;
 	int br;
 
-	dbg("%s(port = %d)", __FUNCTION__, port->number);
+	dbg("%s(port = %d)", __func__, port->number);
 
-	if ((!port->tty) || (!port->tty->termios)) {
-		dbg("%s(): no tty structures", __FUNCTION__);
+	if (!port->tty || !port->tty->termios) {
+		dbg("%s(): no tty structures", __func__);
 		return;
 	}
 
@@ -468,6 +465,8 @@ static void oti6858_set_termios(struct usb_serial_port *port,
 		*(port->tty->termios) = tty_std_termios;
 		port->tty->termios->c_cflag = B38400 | CS8 | CREAD | HUPCL | CLOCAL;
 		priv->flags.termios_initialized = 1;
+		port->tty->termios->c_ispeed = 38400;
+		port->tty->termios->c_ospeed = 38400;
 	}
 	spin_unlock_irqrestore(&priv->lock, flags);
 
@@ -504,19 +503,15 @@ static void oti6858_set_termios(struct usb_serial_port *port,
 	br = tty_get_baud_rate(port->tty);
 	if (br == 0) {
 		divisor = 0;
-	} else if (br <= OTI6858_MAX_BAUD_RATE) {
-		int real_br;
-
-		divisor = (96000000 + 8 * br) / (16 * br);
-		real_br = 96000000 / (16 * divisor);
-		if ((((real_br - br) * 100 + br - 1) / br) > 2) {
-			dbg("%s(): baud rate %d is invalid", __FUNCTION__, br);
-			return;
-		}
-		divisor = cpu_to_le16(divisor);
 	} else {
-		dbg("%s(): baud rate %d is too high", __FUNCTION__, br);
-		return;
+		int real_br;
+		int new_divisor;
+		br = min(br, OTI6858_MAX_BAUD_RATE);
+
+		new_divisor = (96000000 + 8 * br) / (16 * br);
+		real_br = 96000000 / (16 * new_divisor);
+		divisor = cpu_to_le16(new_divisor);
+		tty_encode_baud_rate(port->tty, real_br, real_br);
 	}
 
 	frame_fmt &= ~FMT_STOP_BITS_MASK;
@@ -578,7 +573,7 @@ static int oti6858_open(struct usb_serial_port *port, struct file *filp)
 	unsigned long flags;
 	int result;
 
-	dbg("%s(port = %d)", __FUNCTION__, port->number);
+	dbg("%s(port = %d)", __func__, port->number);
 
 	usb_clear_halt(serial->dev, port->write_urb->pipe);
 	usb_clear_halt(serial->dev, port->read_urb->pipe);
@@ -587,7 +582,7 @@ static int oti6858_open(struct usb_serial_port *port, struct file *filp)
 		return 0;
 
 	if ((buf = kmalloc(OTI6858_CTRL_PKT_SIZE, GFP_KERNEL)) == NULL) {
-		dev_err(&port->dev, "%s(): out of memory!\n", __FUNCTION__);
+		dev_err(&port->dev, "%s(): out of memory!\n", __func__);
 		return -ENOMEM;
 	}
 
@@ -616,12 +611,12 @@ static int oti6858_open(struct usb_serial_port *port, struct file *filp)
 	spin_unlock_irqrestore(&priv->lock, flags);
 	kfree(buf);
 
-	dbg("%s(): submitting interrupt urb", __FUNCTION__);
+	dbg("%s(): submitting interrupt urb", __func__);
 	port->interrupt_in_urb->dev = serial->dev;
 	result = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
 	if (result != 0) {
 		dev_err(&port->dev, "%s(): usb_submit_urb() failed"
-			       " with error %d\n", __FUNCTION__, result);
+			       " with error %d\n", __func__, result);
 		oti6858_close(port, NULL);
 		return -EPROTO;
 	}
@@ -640,19 +635,19 @@ static void oti6858_close(struct usb_serial_port *port, struct file *filp)
 	long timeout;
 	wait_queue_t wait;
 
-	dbg("%s(port = %d)", __FUNCTION__, port->number);
+	dbg("%s(port = %d)", __func__, port->number);
 
 	/* wait for data to drain from the buffer */
 	spin_lock_irqsave(&priv->lock, flags);
 	timeout = 30 * HZ;	/* PL2303_CLOSING_WAIT */
 	init_waitqueue_entry(&wait, current);
 	add_wait_queue(&port->tty->write_wait, &wait);
-	dbg("%s(): entering wait loop", __FUNCTION__);
+	dbg("%s(): entering wait loop", __func__);
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		if (pl2303_buf_data_avail(priv->buf) == 0
+		if (oti6858_buf_data_avail(priv->buf) == 0
 		|| timeout == 0 || signal_pending(current)
-		|| !usb_get_intfdata(port->serial->interface))	/* disconnect */
+		|| port->serial->disconnected)
 			break;
 		spin_unlock_irqrestore(&priv->lock, flags);
 		timeout = schedule_timeout(timeout);
@@ -660,10 +655,10 @@ static void oti6858_close(struct usb_serial_port *port, struct file *filp)
 	}
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&port->tty->write_wait, &wait);
-	dbg("%s(): after wait loop", __FUNCTION__);
+	dbg("%s(): after wait loop", __func__);
 
 	/* clear out any remaining data in the buffer */
-	pl2303_buf_clear(priv->buf);
+	oti6858_buf_clear(priv->buf);
 	spin_unlock_irqrestore(&priv->lock, flags);
 
 	/* wait for characters to drain from the device */
@@ -681,7 +676,7 @@ static void oti6858_close(struct usb_serial_port *port, struct file *filp)
 	*/
 		timeout = 2*HZ;
 	schedule_timeout_interruptible(timeout);
-	dbg("%s(): after schedule_timeout_interruptible()", __FUNCTION__);
+	dbg("%s(): after schedule_timeout_interruptible()", __func__);
 
 	/* cancel scheduled setup */
 	cancel_delayed_work(&priv->delayed_setup_work);
@@ -689,7 +684,7 @@ static void oti6858_close(struct usb_serial_port *port, struct file *filp)
 	flush_scheduled_work();
 
 	/* shutdown our urbs */
-	dbg("%s(): shutting down urbs", __FUNCTION__);
+	dbg("%s(): shutting down urbs", __func__);
 	usb_kill_urb(port->write_urb);
 	usb_kill_urb(port->read_urb);
 	usb_kill_urb(port->interrupt_in_urb);
@@ -712,7 +707,7 @@ static int oti6858_tiocmset(struct usb_serial_port *port, struct file *file,
 	u8 control;
 
 	dbg("%s(port = %d, set = 0x%08x, clear = 0x%08x)",
-				__FUNCTION__, port->number, set, clear);
+				__func__, port->number, set, clear);
 
 	if (!usb_get_intfdata(port->serial->interface))
 		return -ENODEV;
@@ -744,7 +739,7 @@ static int oti6858_tiocmget(struct usb_serial_port *port, struct file *file)
 	unsigned pin_state;
 	unsigned result = 0;
 
-	dbg("%s(port = %d)", __FUNCTION__, port->number);
+	dbg("%s(port = %d)", __func__, port->number);
 
 	if (!usb_get_intfdata(port->serial->interface))
 		return -ENODEV;
@@ -767,7 +762,7 @@ static int oti6858_tiocmget(struct usb_serial_port *port, struct file *file)
 	if ((pin_state & PIN_DCD) != 0)
 		result |= TIOCM_CD;
 
-	dbg("%s() = 0x%08x", __FUNCTION__, result);
+	dbg("%s() = 0x%08x", __func__, result);
 
 	return result;
 }
@@ -814,13 +809,9 @@ static int oti6858_ioctl(struct usb_serial_port *port, struct file *file,
 	unsigned int x;
 
 	dbg("%s(port = %d, cmd = 0x%04x, arg = 0x%08lx)",
-				__FUNCTION__, port->number, cmd, arg);
+				__func__, port->number, cmd, arg);
 
 	switch (cmd) {
-		case TCFLSH:
-			/* FIXME */
-			return 0;
-
 		case TIOCMBIS:
 			if (copy_from_user(&x, user_arg, sizeof(x)))
 				return -EFAULT;
@@ -831,27 +822,12 @@ static int oti6858_ioctl(struct usb_serial_port *port, struct file *file,
 				return -EFAULT;
 			return oti6858_tiocmset(port, NULL, 0, x);
 
-		case TIOCGSERIAL:
-			if (copy_to_user(user_arg, port->tty->termios,
-						sizeof(struct ktermios))) {
-				return -EFAULT;
-			}
-                        return 0;
-
-		case TIOCSSERIAL:
-			if (copy_from_user(port->tty->termios, user_arg,
-						sizeof(struct ktermios))) {
-				return -EFAULT;
-			}
-			oti6858_set_termios(port, NULL);
-			return 0;
-
 		case TIOCMIWAIT:
-			dbg("%s(): TIOCMIWAIT", __FUNCTION__);
+			dbg("%s(): TIOCMIWAIT", __func__);
 			return wait_modem_info(port, arg);
 
 		default:
-			dbg("%s(): 0x%04x not supported", __FUNCTION__, cmd);
+			dbg("%s(): 0x%04x not supported", __func__, cmd);
 			break;
 	}
 
@@ -862,10 +838,10 @@ static void oti6858_break_ctl(struct usb_serial_port *port, int break_state)
 {
 	int state;
 
-	dbg("%s(port = %d)", __FUNCTION__, port->number);
+	dbg("%s(port = %d)", __func__, port->number);
 
 	state = (break_state == 0) ? 0 : 1;
-	dbg("%s(): turning break %s", __FUNCTION__, state ? "on" : "off");
+	dbg("%s(): turning break %s", __func__, state ? "on" : "off");
 
 	/* FIXME */
 /*
@@ -873,7 +849,7 @@ static void oti6858_break_ctl(struct usb_serial_port *port, int break_state)
 				  BREAK_REQUEST, BREAK_REQUEST_TYPE, state,
 				  0, NULL, 0, 100);
 	if (result != 0)
-		dbg("%s(): error sending break", __FUNCTION__);
+		dbg("%s(): error sending break", __func__);
  */
 }
 
@@ -882,12 +858,12 @@ static void oti6858_shutdown(struct usb_serial *serial)
 	struct oti6858_private *priv;
 	int i;
 
-	dbg("%s()", __FUNCTION__);
+	dbg("%s()", __func__);
 
 	for (i = 0; i < serial->num_ports; ++i) {
 		priv = usb_get_serial_port_data(serial->port[i]);
 		if (priv) {
-			pl2303_buf_free(priv->buf);
+			oti6858_buf_free(priv->buf);
 			kfree(priv);
 			usb_set_serial_port_data(serial->port[i], NULL);
 		}
@@ -896,13 +872,13 @@ static void oti6858_shutdown(struct usb_serial *serial)
 
 static void oti6858_read_int_callback(struct urb *urb)
 {
-	struct usb_serial_port *port = (struct usb_serial_port *) urb->context;
+	struct usb_serial_port *port =  urb->context;
 	struct oti6858_private *priv = usb_get_serial_port_data(port);
 	int transient = 0, can_recv = 0, resubmit = 1;
 	int status = urb->status;
 
 	dbg("%s(port = %d, status = %d)",
-				__FUNCTION__, port->number, status);
+				__func__, port->number, status);
 
 	switch (status) {
 	case 0:
@@ -913,11 +889,11 @@ static void oti6858_read_int_callback(struct urb *urb)
 	case -ESHUTDOWN:
 		/* this urb is terminated, clean up */
 		dbg("%s(): urb shutting down with status: %d",
-					__FUNCTION__, status);
+					__func__, status);
 		return;
 	default:
 		dbg("%s(): nonzero urb status received: %d",
-					__FUNCTION__, status);
+					__func__, status);
 		break;
 	}
 
@@ -934,7 +910,7 @@ static void oti6858_read_int_callback(struct urb *urb)
 					priv->setup_done = 0;
 					resubmit = 0;
 					dbg("%s(): scheduling setup_line()",
-					    __FUNCTION__);
+					    __func__);
 					schedule_delayed_work(&priv->delayed_setup_work, 0);
 				}
 			}
@@ -949,7 +925,7 @@ static void oti6858_read_int_callback(struct urb *urb)
 					priv->setup_done = 0;
 					resubmit = 0;
 					dbg("%s(): scheduling setup_line()",
-					    __FUNCTION__);
+					    __func__);
 					schedule_delayed_work(&priv->delayed_setup_work, 0);
 				}
 			}
@@ -978,7 +954,7 @@ static void oti6858_read_int_callback(struct urb *urb)
 		if (result != 0) {
 			priv->flags.read_urb_in_use = 0;
 			dev_err(&port->dev, "%s(): usb_submit_urb() failed,"
-					" error %d\n", __FUNCTION__, result);
+					" error %d\n", __func__, result);
 		} else {
 			resubmit = 0;
 		}
@@ -987,7 +963,7 @@ static void oti6858_read_int_callback(struct urb *urb)
 
 		spin_lock_irqsave(&priv->lock, flags);
 		if (priv->flags.write_urb_in_use == 0
-				&& pl2303_buf_data_avail(priv->buf) != 0) {
+				&& oti6858_buf_data_avail(priv->buf) != 0) {
 			schedule_delayed_work(&priv->delayed_write_work,0);
 			resubmit = 0;
 		}
@@ -997,30 +973,29 @@ static void oti6858_read_int_callback(struct urb *urb)
 	if (resubmit) {
 		int result;
 
-//		dbg("%s(): submitting interrupt urb", __FUNCTION__);
+//		dbg("%s(): submitting interrupt urb", __func__);
 		urb->dev = port->serial->dev;
 		result = usb_submit_urb(urb, GFP_ATOMIC);
 		if (result != 0) {
 			dev_err(&urb->dev->dev,
 					"%s(): usb_submit_urb() failed with"
-					" error %d\n", __FUNCTION__, result);
+					" error %d\n", __func__, result);
 		}
 	}
 }
 
 static void oti6858_read_bulk_callback(struct urb *urb)
 {
-	struct usb_serial_port *port = (struct usb_serial_port *) urb->context;
+	struct usb_serial_port *port =  urb->context;
 	struct oti6858_private *priv = usb_get_serial_port_data(port);
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
 	unsigned long flags;
-	int i, result;
 	int status = urb->status;
-	char tty_flag;
+	int result;
 
 	dbg("%s(port = %d, status = %d)",
-				__FUNCTION__, port->number, status);
+				__func__, port->number, status);
 
 	spin_lock_irqsave(&priv->lock, flags);
 	priv->flags.read_urb_in_use = 0;
@@ -1028,44 +1003,26 @@ static void oti6858_read_bulk_callback(struct urb *urb)
 
 	if (status != 0) {
 		if (!port->open_count) {
-			dbg("%s(): port is closed, exiting", __FUNCTION__);
+			dbg("%s(): port is closed, exiting", __func__);
 			return;
 		}
 		/*
 		if (status == -EPROTO) {
 			// PL2303 mysteriously fails with -EPROTO reschedule the read
-			dbg("%s - caught -EPROTO, resubmitting the urb", __FUNCTION__);
+			dbg("%s - caught -EPROTO, resubmitting the urb", __func__);
 			result = usb_submit_urb(urb, GFP_ATOMIC);
 			if (result)
-				dev_err(&urb->dev->dev, "%s - failed resubmitting read urb, error %d\n", __FUNCTION__, result);
+				dev_err(&urb->dev->dev, "%s - failed resubmitting read urb, error %d\n", __func__, result);
 			return;
 		}
 		*/
-		dbg("%s(): unable to handle the error, exiting", __FUNCTION__);
+		dbg("%s(): unable to handle the error, exiting", __func__);
 		return;
 	}
 
-	// get tty_flag from status
-	tty_flag = TTY_NORMAL;
-
-/* FIXME: probably, errors will be signalled using interrupt pipe! */
-/*
-	// break takes precedence over parity,
-	// which takes precedence over framing errors
-	if (status & UART_BREAK_ERROR )
-		tty_flag = TTY_BREAK;
-	else if (status & UART_PARITY_ERROR)
-		tty_flag = TTY_PARITY;
-	else if (status & UART_FRAME_ERROR)
-		tty_flag = TTY_FRAME;
-	dbg("%s - tty_flag = %d", __FUNCTION__, tty_flag);
-*/
-
 	tty = port->tty;
 	if (tty != NULL && urb->actual_length > 0) {
-		tty_buffer_request_room(tty, urb->actual_length);
-		for (i = 0; i < urb->actual_length; ++i)
-			tty_insert_flip_char(tty, data[i], tty_flag);
+		tty_insert_flip_string(tty, data, urb->actual_length);
 		tty_flip_buffer_push(tty);
 	}
 
@@ -1075,20 +1032,20 @@ static void oti6858_read_bulk_callback(struct urb *urb)
 		result = usb_submit_urb(port->interrupt_in_urb, GFP_ATOMIC);
 		if (result != 0) {
 			dev_err(&port->dev, "%s(): usb_submit_urb() failed,"
-					" error %d\n", __FUNCTION__, result);
+					" error %d\n", __func__, result);
 		}
 	}
 }
 
 static void oti6858_write_bulk_callback(struct urb *urb)
 {
-	struct usb_serial_port *port = (struct usb_serial_port *) urb->context;
+	struct usb_serial_port *port =  urb->context;
 	struct oti6858_private *priv = usb_get_serial_port_data(port);
 	int status = urb->status;
 	int result;
 
 	dbg("%s(port = %d, status = %d)",
-				__FUNCTION__, port->number, status);
+				__func__, port->number, status);
 
 	switch (status) {
 	case 0:
@@ -1099,21 +1056,21 @@ static void oti6858_write_bulk_callback(struct urb *urb)
 	case -ESHUTDOWN:
 		/* this urb is terminated, clean up */
 		dbg("%s(): urb shutting down with status: %d",
-					__FUNCTION__, status);
+					__func__, status);
 		priv->flags.write_urb_in_use = 0;
 		return;
 	default:
 		/* error in the urb, so we have to resubmit it */
 		dbg("%s(): nonzero write bulk status received: %d",
-					__FUNCTION__, status);
-		dbg("%s(): overflow in write", __FUNCTION__);
+					__func__, status);
+		dbg("%s(): overflow in write", __func__);
 
 		port->write_urb->transfer_buffer_length = 1;
 		port->write_urb->dev = port->serial->dev;
 		result = usb_submit_urb(port->write_urb, GFP_ATOMIC);
 		if (result) {
 			dev_err(&port->dev, "%s(): usb_submit_urb() failed,"
-					" error %d\n", __FUNCTION__, result);
+					" error %d\n", __func__, result);
 		} else {
 			return;
 		}
@@ -1123,28 +1080,28 @@ static void oti6858_write_bulk_callback(struct urb *urb)
 
 	// schedule the interrupt urb if we are still open */
 	port->interrupt_in_urb->dev = port->serial->dev;
-	dbg("%s(): submitting interrupt urb", __FUNCTION__);
+	dbg("%s(): submitting interrupt urb", __func__);
 	result = usb_submit_urb(port->interrupt_in_urb, GFP_ATOMIC);
 	if (result != 0) {
 		dev_err(&port->dev, "%s(): failed submitting int urb,"
-					" error %d\n", __FUNCTION__, result);
+					" error %d\n", __func__, result);
 	}
 }
 
 
 /*
- * pl2303_buf_alloc
+ * oti6858_buf_alloc
  *
  * Allocate a circular buffer and all associated memory.
  */
-static struct pl2303_buf *pl2303_buf_alloc(unsigned int size)
+static struct oti6858_buf *oti6858_buf_alloc(unsigned int size)
 {
-	struct pl2303_buf *pb;
+	struct oti6858_buf *pb;
 
 	if (size == 0)
 		return NULL;
 
-	pb = kmalloc(sizeof(struct pl2303_buf), GFP_KERNEL);
+	pb = kmalloc(sizeof(struct oti6858_buf), GFP_KERNEL);
 	if (pb == NULL)
 		return NULL;
 
@@ -1161,11 +1118,11 @@ static struct pl2303_buf *pl2303_buf_alloc(unsigned int size)
 }
 
 /*
- * pl2303_buf_free
+ * oti6858_buf_free
  *
  * Free the buffer and all associated memory.
  */
-static void pl2303_buf_free(struct pl2303_buf *pb)
+static void oti6858_buf_free(struct oti6858_buf *pb)
 {
 	if (pb) {
 		kfree(pb->buf_buf);
@@ -1174,11 +1131,11 @@ static void pl2303_buf_free(struct pl2303_buf *pb)
 }
 
 /*
- * pl2303_buf_clear
+ * oti6858_buf_clear
  *
  * Clear out all data in the circular buffer.
  */
-static void pl2303_buf_clear(struct pl2303_buf *pb)
+static void oti6858_buf_clear(struct oti6858_buf *pb)
 {
 	if (pb != NULL) {
 		/* equivalent to a get of all data available */
@@ -1187,12 +1144,12 @@ static void pl2303_buf_clear(struct pl2303_buf *pb)
 }
 
 /*
- * pl2303_buf_data_avail
+ * oti6858_buf_data_avail
  *
  * Return the number of bytes of data available in the circular
  * buffer.
  */
-static unsigned int pl2303_buf_data_avail(struct pl2303_buf *pb)
+static unsigned int oti6858_buf_data_avail(struct oti6858_buf *pb)
 {
 	if (pb == NULL)
 		return 0;
@@ -1200,12 +1157,12 @@ static unsigned int pl2303_buf_data_avail(struct pl2303_buf *pb)
 }
 
 /*
- * pl2303_buf_space_avail
+ * oti6858_buf_space_avail
  *
  * Return the number of bytes of space available in the circular
  * buffer.
  */
-static unsigned int pl2303_buf_space_avail(struct pl2303_buf *pb)
+static unsigned int oti6858_buf_space_avail(struct oti6858_buf *pb)
 {
 	if (pb == NULL)
 		return 0;
@@ -1213,14 +1170,14 @@ static unsigned int pl2303_buf_space_avail(struct pl2303_buf *pb)
 }
 
 /*
- * pl2303_buf_put
+ * oti6858_buf_put
  *
  * Copy data data from a user buffer and put it into the circular buffer.
  * Restrict to the amount of space available.
  *
  * Return the number of bytes copied.
  */
-static unsigned int pl2303_buf_put(struct pl2303_buf *pb, const char *buf,
+static unsigned int oti6858_buf_put(struct oti6858_buf *pb, const char *buf,
 					unsigned int count)
 {
 	unsigned int len;
@@ -1228,7 +1185,7 @@ static unsigned int pl2303_buf_put(struct pl2303_buf *pb, const char *buf,
 	if (pb == NULL)
 		return 0;
 
-	len  = pl2303_buf_space_avail(pb);
+	len  = oti6858_buf_space_avail(pb);
 	if (count > len)
 		count = len;
 
@@ -1252,14 +1209,14 @@ static unsigned int pl2303_buf_put(struct pl2303_buf *pb, const char *buf,
 }
 
 /*
- * pl2303_buf_get
+ * oti6858_buf_get
  *
  * Get data from the circular buffer and copy to the given buffer.
  * Restrict to the amount of data available.
  *
  * Return the number of bytes copied.
  */
-static unsigned int pl2303_buf_get(struct pl2303_buf *pb, char *buf,
+static unsigned int oti6858_buf_get(struct oti6858_buf *pb, char *buf,
 					unsigned int count)
 {
 	unsigned int len;
@@ -1267,7 +1224,7 @@ static unsigned int pl2303_buf_get(struct pl2303_buf *pb, char *buf,
 	if (pb == NULL)
 		return 0;
 
-	len = pl2303_buf_data_avail(pb);
+	len = oti6858_buf_data_avail(pb);
 	if (count > len)
 		count = len;
 

@@ -18,6 +18,7 @@
 #include <linux/kdev_t.h>
 #include <linux/delay.h>
 #include <linux/seq_file.h>
+#include <linux/of_platform.h>
 
 #include <asm/system.h>
 #include <asm/time.h>
@@ -54,7 +55,7 @@ static void mpc86xx_8259_cascade(unsigned int irq, struct irq_desc *desc)
 }
 #endif	/* CONFIG_PCI */
 
-void __init
+static void __init
 mpc86xx_hpcn_init_irq(void)
 {
 	struct mpic *mpic1;
@@ -116,7 +117,7 @@ static int mpc86xx_exclude_device(struct pci_controller *hose,
 	struct device_node* node;	
 	struct resource rsrc;
 
-	node = (struct device_node *)hose->arch_data;
+	node = hose->dn;
 	of_address_to_resource(node, 0, &rsrc);
 
 	if ((rsrc.start & 0xfffff) == 0x8000) {
@@ -161,7 +162,7 @@ mpc86xx_hpcn_setup_arch(void)
 }
 
 
-void
+static void
 mpc86xx_hpcn_show_cpuinfo(struct seq_file *m)
 {
 	struct device_node *root;
@@ -189,13 +190,19 @@ static int __init mpc86xx_hpcn_probe(void)
 {
 	unsigned long root = of_get_flat_dt_root();
 
-	if (of_flat_dt_is_compatible(root, "mpc86xx"))
+	if (of_flat_dt_is_compatible(root, "fsl,mpc8641hpcn"))
 		return 1;	/* Looks good */
+
+	/* Be nice and don't give silent boot death.  Delete this in 2.6.27 */
+	if (of_flat_dt_is_compatible(root, "mpc86xx")) {
+		pr_warning("WARNING: your dts/dtb is old. You must update before the next kernel release\n");
+		return 1;
+	}
 
 	return 0;
 }
 
-long __init
+static long __init
 mpc86xx_time_init(void)
 {
 	unsigned int temp;
@@ -211,6 +218,20 @@ mpc86xx_time_init(void)
 
 	return 0;
 }
+
+static __initdata struct of_device_id of_bus_ids[] = {
+	{ .compatible = "simple-bus", },
+	{ .compatible = "fsl,rapidio-delta", },
+	{},
+};
+
+static int __init declare_of_platform_devices(void)
+{
+	of_platform_bus_probe(NULL, of_bus_ids, NULL);
+
+	return 0;
+}
+machine_device_initcall(mpc86xx_hpcn, declare_of_platform_devices);
 
 define_machine(mpc86xx_hpcn) {
 	.name			= "MPC86xx HPCN",

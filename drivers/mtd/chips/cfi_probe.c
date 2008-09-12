@@ -39,7 +39,7 @@ struct mtd_info *cfi_probe(struct map_info *map);
 #define xip_allowed(base, map) \
 do { \
 	(void) map_read(map, base); \
-	asm volatile (".rep 8; nop; .endr"); \
+	xip_iprefetch(); \
 	local_irq_enable(); \
 } while (0)
 
@@ -232,6 +232,11 @@ static int __xipram cfi_chip_setup(struct map_info *map,
 	cfi->mfr = cfi_read_query16(map, base);
 	cfi->id = cfi_read_query16(map, base + ofs_factor);
 
+	/* Get AMD/Spansion extended JEDEC ID */
+	if (cfi->mfr == CFI_MFR_AMD && (cfi->id & 0xff) == 0x7e)
+		cfi->id = cfi_read_query(map, base + 0xe * ofs_factor) << 8 |
+			  cfi_read_query(map, base + 0xf * ofs_factor);
+
 	/* Put it back into Read Mode */
 	cfi_send_gen_cmd(0xF0, 0, base, map, cfi, cfi->device_type, NULL);
 	/* ... even if it's an Intel chip */
@@ -370,27 +375,27 @@ static void print_cfi_ident(struct cfi_ident *cfip)
 	printk("Device size: 0x%X bytes (%d MiB)\n", 1 << cfip->DevSize, 1<< (cfip->DevSize - 20));
 	printk("Flash Device Interface description: 0x%4.4X\n", cfip->InterfaceDesc);
 	switch(cfip->InterfaceDesc) {
-	case 0:
+	case CFI_INTERFACE_X8_ASYNC:
 		printk("  - x8-only asynchronous interface\n");
 		break;
 
-	case 1:
+	case CFI_INTERFACE_X16_ASYNC:
 		printk("  - x16-only asynchronous interface\n");
 		break;
 
-	case 2:
+	case CFI_INTERFACE_X8_BY_X16_ASYNC:
 		printk("  - supports x8 and x16 via BYTE# with asynchronous interface\n");
 		break;
 
-	case 3:
+	case CFI_INTERFACE_X32_ASYNC:
 		printk("  - x32-only asynchronous interface\n");
 		break;
 
-	case 4:
+	case CFI_INTERFACE_X16_BY_X32_ASYNC:
 		printk("  - supports x16 and x32 via Word# with asynchronous interface\n");
 		break;
 
-	case 65535:
+	case CFI_INTERFACE_NOT_ALLOWED:
 		printk("  - Not Allowed / Reserved\n");
 		break;
 

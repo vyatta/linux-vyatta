@@ -25,11 +25,18 @@
 #include <asm/arch/gpio.h>
 #include <asm/arch/pxafb.h>
 #include <asm/arch/zylonite.h>
+#include <asm/arch/mmc.h>
+#include <asm/arch/pxa27x_keypad.h>
 
 #include "generic.h"
 
+#define MAX_SLOTS	3
+struct platform_mmc_slot zylonite_mmc_slot[MAX_SLOTS];
+
 int gpio_backlight;
 int gpio_eth_irq;
+
+int wm9713_irq;
 
 int lcd_id;
 int lcd_orientation;
@@ -43,7 +50,7 @@ static struct resource smc91x_resources[] = {
 	[1] = {
 		.start	= -1,	/* for run-time assignment */
 		.end	= -1,
-		.flags	= IORESOURCE_IRQ,
+		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
 	}
 };
 
@@ -54,7 +61,7 @@ static struct platform_device smc91x_device = {
 	.resource	= smc91x_resources,
 };
 
-#if defined(CONFIG_FB_PXA) || (CONFIG_FB_PXA_MODULES)
+#if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
 static void zylonite_backlight_power(int on)
 {
 	gpio_set_value(gpio_backlight, on);
@@ -90,8 +97,7 @@ static struct pxafb_mode_info toshiba_ltm04c380k_mode = {
 
 static struct pxafb_mach_info zylonite_toshiba_lcd_info = {
 	.num_modes      	= 1,
-	.lccr0			= LCCR0_Act,
-	.lccr3			= LCCR3_PCP,
+	.lcd_conn		= LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
 	.pxafb_backlight_power	= zylonite_backlight_power,
 };
 
@@ -127,8 +133,7 @@ static struct pxafb_mode_info sharp_ls037_modes[] = {
 static struct pxafb_mach_info zylonite_sharp_lcd_info = {
 	.modes			= sharp_ls037_modes,
 	.num_modes		= 2,
-	.lccr0			= LCCR0_Act,
-	.lccr3			= LCCR3_PCP | LCCR3_HSP | LCCR3_VSP,
+	.lcd_conn		= LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
 	.pxafb_backlight_power	= zylonite_backlight_power,
 };
 
@@ -156,6 +161,160 @@ static void __init zylonite_init_lcd(void)
 static inline void zylonite_init_lcd(void) {}
 #endif
 
+#if defined(CONFIG_MMC)
+static int zylonite_mci_ro(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+
+	return gpio_get_value(zylonite_mmc_slot[pdev->id].gpio_wp);
+}
+
+static int zylonite_mci_init(struct device *dev,
+			     irq_handler_t zylonite_detect_int,
+			     void *data)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	int err, cd_irq, gpio_cd, gpio_wp;
+
+	cd_irq = gpio_to_irq(zylonite_mmc_slot[pdev->id].gpio_cd);
+	gpio_cd = zylonite_mmc_slot[pdev->id].gpio_cd;
+	gpio_wp = zylonite_mmc_slot[pdev->id].gpio_wp;
+
+	/*
+	 * setup GPIO for Zylonite MMC controller
+	 */
+	err = gpio_request(gpio_cd, "mmc card detect");
+	if (err)
+		goto err_request_cd;
+	gpio_direction_input(gpio_cd);
+
+	err = gpio_request(gpio_wp, "mmc write protect");
+	if (err)
+		goto err_request_wp;
+	gpio_direction_input(gpio_wp);
+
+	err = request_irq(cd_irq, zylonite_detect_int,
+			  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+			  "MMC card detect", data);
+	if (err) {
+		printk(KERN_ERR "%s: MMC/SD/SDIO: "
+				"can't request card detect IRQ\n", __func__);
+		goto err_request_irq;
+	}
+
+	return 0;
+
+err_request_irq:
+	gpio_free(gpio_wp);
+err_request_wp:
+	gpio_free(gpio_cd);
+err_request_cd:
+	return err;
+}
+
+static void zylonite_mci_exit(struct device *dev, void *data)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	int cd_irq, gpio_cd, gpio_wp;
+
+	cd_irq = gpio_to_irq(zylonite_mmc_slot[pdev->id].gpio_cd);
+	gpio_cd = zylonite_mmc_slot[pdev->id].gpio_cd;
+	gpio_wp = zylonite_mmc_slot[pdev->id].gpio_wp;
+
+	free_irq(cd_irq, data);
+	gpio_free(gpio_cd);
+	gpio_free(gpio_wp);
+}
+
+static struct pxamci_platform_data zylonite_mci_platform_data = {
+	.detect_delay	= 20,
+	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+	.init 		= zylonite_mci_init,
+	.exit		= zylonite_mci_exit,
+	.get_ro		= zylonite_mci_ro,
+};
+
+static struct pxamci_platform_data zylonite_mci2_platform_data = {
+	.detect_delay	= 20,
+	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+};
+
+static void __init zylonite_init_mmc(void)
+{
+	pxa_set_mci_info(&zylonite_mci_platform_data);
+	pxa3xx_set_mci2_info(&zylonite_mci2_platform_data);
+	if (cpu_is_pxa310())
+		pxa3xx_set_mci3_info(&zylonite_mci_platform_data);
+}
+#else
+static inline void zylonite_init_mmc(void) {}
+#endif
+
+#if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULES)
+static unsigned int zylonite_matrix_key_map[] = {
+	/* KEY(row, col, key_code) */
+	KEY(0, 0, KEY_A), KEY(0, 1, KEY_B), KEY(0, 2, KEY_C), KEY(0, 5, KEY_D),
+	KEY(1, 0, KEY_E), KEY(1, 1, KEY_F), KEY(1, 2, KEY_G), KEY(1, 5, KEY_H),
+	KEY(2, 0, KEY_I), KEY(2, 1, KEY_J), KEY(2, 2, KEY_K), KEY(2, 5, KEY_L),
+	KEY(3, 0, KEY_M), KEY(3, 1, KEY_N), KEY(3, 2, KEY_O), KEY(3, 5, KEY_P),
+	KEY(5, 0, KEY_Q), KEY(5, 1, KEY_R), KEY(5, 2, KEY_S), KEY(5, 5, KEY_T),
+	KEY(6, 0, KEY_U), KEY(6, 1, KEY_V), KEY(6, 2, KEY_W), KEY(6, 5, KEY_X),
+	KEY(7, 1, KEY_Y), KEY(7, 2, KEY_Z),
+
+	KEY(4, 4, KEY_0), KEY(1, 3, KEY_1), KEY(4, 1, KEY_2), KEY(1, 4, KEY_3),
+	KEY(2, 3, KEY_4), KEY(4, 2, KEY_5), KEY(2, 4, KEY_6), KEY(3, 3, KEY_7),
+	KEY(4, 3, KEY_8), KEY(3, 4, KEY_9),
+
+	KEY(4, 5, KEY_SPACE),
+	KEY(5, 3, KEY_KPASTERISK), 	/* * */
+	KEY(5, 4, KEY_KPDOT), 		/* #" */
+
+	KEY(0, 7, KEY_UP),
+	KEY(1, 7, KEY_DOWN),
+	KEY(2, 7, KEY_LEFT),
+	KEY(3, 7, KEY_RIGHT),
+	KEY(2, 6, KEY_HOME),
+	KEY(3, 6, KEY_END),
+	KEY(6, 4, KEY_DELETE),
+	KEY(6, 6, KEY_BACK),
+	KEY(6, 3, KEY_CAPSLOCK),	/* KEY_LEFTSHIFT), */
+
+	KEY(4, 6, KEY_ENTER),		/* scroll push */
+	KEY(5, 7, KEY_ENTER),		/* keypad action */
+
+	KEY(0, 4, KEY_EMAIL),
+	KEY(5, 6, KEY_SEND),
+	KEY(4, 0, KEY_CALENDAR),
+	KEY(7, 6, KEY_RECORD),
+	KEY(6, 7, KEY_VOLUMEUP),
+	KEY(7, 7, KEY_VOLUMEDOWN),
+
+	KEY(0, 6, KEY_F22),	/* soft1 */
+	KEY(1, 6, KEY_F23),	/* soft2 */
+	KEY(0, 3, KEY_AUX),	/* contact */
+};
+
+static struct pxa27x_keypad_platform_data zylonite_keypad_info = {
+	.matrix_key_rows	= 8,
+	.matrix_key_cols	= 8,
+	.matrix_key_map		= zylonite_matrix_key_map,
+	.matrix_key_map_size	= ARRAY_SIZE(zylonite_matrix_key_map),
+
+	.enable_rotary0		= 1,
+	.rotary0_up_key		= KEY_UP,
+	.rotary0_down_key	= KEY_DOWN,
+
+	.debounce_interval	= 30,
+};
+
+static void __init zylonite_init_keypad(void)
+{
+	pxa_set_keypad_info(&zylonite_keypad_info);
+}
+#else
+static inline void zylonite_init_keypad(void) {}
+#endif
+
 static void __init zylonite_init(void)
 {
 	/* board-processor specific initialization */
@@ -171,6 +330,8 @@ static void __init zylonite_init(void)
 	platform_device_register(&smc91x_device);
 
 	zylonite_init_lcd();
+	zylonite_init_mmc();
+	zylonite_init_keypad();
 }
 
 MACHINE_START(ZYLONITE, "PXA3xx Platform Development Kit (aka Zylonite)")

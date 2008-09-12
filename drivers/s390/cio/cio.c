@@ -23,11 +23,13 @@
 #include <asm/reset.h>
 #include <asm/ipl.h>
 #include <asm/chpid.h>
-#include "airq.h"
+#include <asm/airq.h>
+#include <asm/cpu.h>
 #include "cio.h"
 #include "css.h"
 #include "chsc.h"
 #include "ioasm.h"
+#include "io_sch.h"
 #include "blacklist.h"
 #include "cio_debug.h"
 #include "chp.h"
@@ -37,58 +39,39 @@ debug_info_t *cio_debug_msg_id;
 debug_info_t *cio_debug_trace_id;
 debug_info_t *cio_debug_crw_id;
 
-int cio_show_msg;
-
-static int __init
-cio_setup (char *parm)
-{
-	if (!strcmp (parm, "yes"))
-		cio_show_msg = 1;
-	else if (!strcmp (parm, "no"))
-		cio_show_msg = 0;
-	else
-		printk(KERN_ERR "cio: cio_setup: "
-		       "invalid cio_msg parameter '%s'", parm);
-	return 1;
-}
-
-__setup ("cio_msg=", cio_setup);
-
 /*
  * Function: cio_debug_init
- * Initializes three debug logs (under /proc/s390dbf) for common I/O:
- * - cio_msg logs the messages which are printk'ed when CONFIG_DEBUG_IO is on
+ * Initializes three debug logs for common I/O:
+ * - cio_msg logs generic cio messages
  * - cio_trace logs the calling of different functions
- * - cio_crw logs the messages which are printk'ed when CONFIG_DEBUG_CRW is on
- * debug levels depend on CONFIG_DEBUG_IO resp. CONFIG_DEBUG_CRW
+ * - cio_crw logs machine check related cio messages
  */
-static int __init
-cio_debug_init (void)
+static int __init cio_debug_init(void)
 {
-	cio_debug_msg_id = debug_register ("cio_msg", 16, 4, 16*sizeof (long));
+	cio_debug_msg_id = debug_register("cio_msg", 16, 1, 16 * sizeof(long));
 	if (!cio_debug_msg_id)
 		goto out_unregister;
-	debug_register_view (cio_debug_msg_id, &debug_sprintf_view);
-	debug_set_level (cio_debug_msg_id, 2);
-	cio_debug_trace_id = debug_register ("cio_trace", 16, 4, 16);
+	debug_register_view(cio_debug_msg_id, &debug_sprintf_view);
+	debug_set_level(cio_debug_msg_id, 2);
+	cio_debug_trace_id = debug_register("cio_trace", 16, 1, 16);
 	if (!cio_debug_trace_id)
 		goto out_unregister;
-	debug_register_view (cio_debug_trace_id, &debug_hex_ascii_view);
-	debug_set_level (cio_debug_trace_id, 2);
-	cio_debug_crw_id = debug_register ("cio_crw", 4, 4, 16*sizeof (long));
+	debug_register_view(cio_debug_trace_id, &debug_hex_ascii_view);
+	debug_set_level(cio_debug_trace_id, 2);
+	cio_debug_crw_id = debug_register("cio_crw", 16, 1, 16 * sizeof(long));
 	if (!cio_debug_crw_id)
 		goto out_unregister;
-	debug_register_view (cio_debug_crw_id, &debug_sprintf_view);
-	debug_set_level (cio_debug_crw_id, 2);
+	debug_register_view(cio_debug_crw_id, &debug_sprintf_view);
+	debug_set_level(cio_debug_crw_id, 4);
 	return 0;
 
 out_unregister:
 	if (cio_debug_msg_id)
-		debug_unregister (cio_debug_msg_id);
+		debug_unregister(cio_debug_msg_id);
 	if (cio_debug_trace_id)
-		debug_unregister (cio_debug_trace_id);
+		debug_unregister(cio_debug_trace_id);
 	if (cio_debug_crw_id)
-		debug_unregister (cio_debug_crw_id);
+		debug_unregister(cio_debug_crw_id);
 	printk(KERN_WARNING"cio: could not initialize debugging\n");
 	return -1;
 }
@@ -147,7 +130,7 @@ cio_tpi(void)
 	spin_lock(sch->lock);
 	memcpy (&sch->schib.scsw, &irb->scsw, sizeof (struct scsw));
 	if (sch->driver && sch->driver->irq)
-		sch->driver->irq(&sch->dev);
+		sch->driver->irq(sch);
 	spin_unlock(sch->lock);
 	irq_exit ();
 	_local_bh_enable();
@@ -166,7 +149,7 @@ cio_start_handle_notoper(struct subchannel *sch, __u8 lpm)
 
 	stsch (sch->schid, &sch->schib);
 
-	CIO_MSG_EVENT(0, "cio_start: 'not oper' status for "
+	CIO_MSG_EVENT(2, "cio_start: 'not oper' status for "
 		      "subchannel 0.%x.%04x!\n", sch->schid.ssid,
 		      sch->schid.sch_no);
 	sprintf(dbf_text, "no%s", sch->dev.bus_id);
@@ -184,33 +167,35 @@ cio_start_key (struct subchannel *sch,	/* subchannel structure */
 {
 	char dbf_txt[15];
 	int ccode;
+	struct orb *orb;
 
-	CIO_TRACE_EVENT (4, "stIO");
-	CIO_TRACE_EVENT (4, sch->dev.bus_id);
+	CIO_TRACE_EVENT(4, "stIO");
+	CIO_TRACE_EVENT(4, sch->dev.bus_id);
 
+	orb = &to_io_private(sch)->orb;
 	/* sch is always under 2G. */
-	sch->orb.intparm = (__u32)(unsigned long)sch;
-	sch->orb.fmt = 1;
+	orb->intparm = (u32)(addr_t)sch;
+	orb->fmt = 1;
 
-	sch->orb.pfch = sch->options.prefetch == 0;
-	sch->orb.spnd = sch->options.suspend;
-	sch->orb.ssic = sch->options.suspend && sch->options.inter;
-	sch->orb.lpm = (lpm != 0) ? lpm : sch->lpm;
+	orb->pfch = sch->options.prefetch == 0;
+	orb->spnd = sch->options.suspend;
+	orb->ssic = sch->options.suspend && sch->options.inter;
+	orb->lpm = (lpm != 0) ? lpm : sch->lpm;
 #ifdef CONFIG_64BIT
 	/*
 	 * for 64 bit we always support 64 bit IDAWs with 4k page size only
 	 */
-	sch->orb.c64 = 1;
-	sch->orb.i2k = 0;
+	orb->c64 = 1;
+	orb->i2k = 0;
 #endif
-	sch->orb.key = key >> 4;
+	orb->key = key >> 4;
 	/* issue "Start Subchannel" */
-	sch->orb.cpa = (__u32) __pa (cpa);
-	ccode = ssch (sch->schid, &sch->orb);
+	orb->cpa = (__u32) __pa(cpa);
+	ccode = ssch(sch->schid, orb);
 
 	/* process condition code */
-	sprintf (dbf_txt, "ccode:%d", ccode);
-	CIO_TRACE_EVENT (4, dbf_txt);
+	sprintf(dbf_txt, "ccode:%d", ccode);
+	CIO_TRACE_EVENT(4, dbf_txt);
 
 	switch (ccode) {
 	case 0:
@@ -405,8 +390,7 @@ cio_modify (struct subchannel *sch)
 /*
  * Enable subchannel.
  */
-int
-cio_enable_subchannel (struct subchannel *sch, unsigned int isc)
+int cio_enable_subchannel(struct subchannel *sch, u32 intparm)
 {
 	char dbf_txt[15];
 	int ccode;
@@ -424,8 +408,8 @@ cio_enable_subchannel (struct subchannel *sch, unsigned int isc)
 
 	for (retry = 5, ret = 0; retry > 0; retry--) {
 		sch->schib.pmcw.ena = 1;
-		sch->schib.pmcw.isc = isc;
-		sch->schib.pmcw.intparm = (__u32)(unsigned long)sch;
+		sch->schib.pmcw.isc = sch->isc;
+		sch->schib.pmcw.intparm = intparm;
 		ret = cio_modify(sch);
 		if (ret == -ENODEV)
 			break;
@@ -566,55 +550,54 @@ cio_validate_subchannel (struct subchannel *sch, struct subchannel_id schid)
 	 * ... just being curious we check for non I/O subchannels
 	 */
 	if (sch->st != 0) {
-		CIO_DEBUG(KERN_INFO, 0,
-			  "cio: Subchannel 0.%x.%04x reports "
-			  "non-I/O subchannel type %04X\n",
-			  sch->schid.ssid, sch->schid.sch_no, sch->st);
+		CIO_MSG_EVENT(4, "Subchannel 0.%x.%04x reports "
+			      "non-I/O subchannel type %04X\n",
+			      sch->schid.ssid, sch->schid.sch_no, sch->st);
 		/* We stop here for non-io subchannels. */
 		err = sch->st;
 		goto out;
 	}
 
 	/* Initialization for io subchannels. */
-	if (!sch->schib.pmcw.dnv) {
-		/* io subchannel but device number is invalid. */
+	if (!css_sch_is_valid(&sch->schib)) {
 		err = -ENODEV;
 		goto out;
 	}
+
 	/* Devno is valid. */
 	if (is_blacklisted (sch->schid.ssid, sch->schib.pmcw.dev)) {
 		/*
 		 * This device must not be known to Linux. So we simply
 		 * say that there is no device and return ENODEV.
 		 */
-		CIO_MSG_EVENT(4, "Blacklisted device detected "
+		CIO_MSG_EVENT(6, "Blacklisted device detected "
 			      "at devno %04X, subchannel set %x\n",
 			      sch->schib.pmcw.dev, sch->schid.ssid);
 		err = -ENODEV;
 		goto out;
 	}
-	if (cio_is_console(sch->schid))
+	if (cio_is_console(sch->schid)) {
 		sch->opm = 0xff;
-	else
+		sch->isc = 1;
+	} else {
 		sch->opm = chp_get_sch_opm(sch);
+		sch->isc = 3;
+	}
 	sch->lpm = sch->schib.pmcw.pam & sch->opm;
 
-	CIO_DEBUG(KERN_INFO, 0,
-		  "cio: Detected device %04x on subchannel 0.%x.%04X"
-		  " - PIM = %02X, PAM = %02X, POM = %02X\n",
-		  sch->schib.pmcw.dev, sch->schid.ssid,
-		  sch->schid.sch_no, sch->schib.pmcw.pim,
-		  sch->schib.pmcw.pam, sch->schib.pmcw.pom);
+	CIO_MSG_EVENT(6, "Detected device %04x on subchannel 0.%x.%04X "
+		      "- PIM = %02X, PAM = %02X, POM = %02X\n",
+		      sch->schib.pmcw.dev, sch->schid.ssid,
+		      sch->schid.sch_no, sch->schib.pmcw.pim,
+		      sch->schib.pmcw.pam, sch->schib.pmcw.pom);
 
 	/*
 	 * We now have to initially ...
-	 *  ... set "interruption subclass"
 	 *  ... enable "concurrent sense"
 	 *  ... enable "multipath mode" if more than one
 	 *	  CHPID is available. This is done regardless
 	 *	  whether multiple paths are available for us.
 	 */
-	sch->schib.pmcw.isc = 3;	/* could be smth. else */
 	sch->schib.pmcw.csense = 1;	/* concurrent sense */
 	sch->schib.pmcw.ena = 0;
 	if ((sch->lpm & (sch->lpm - 1)) != 0)
@@ -648,13 +631,10 @@ do_IRQ (struct pt_regs *regs)
 
 	old_regs = set_irq_regs(regs);
 	irq_enter();
-	asm volatile ("mc 0,0");
-	if (S390_lowcore.int_clock >= S390_lowcore.jiffy_timer)
-		/**
-		 * Make sure that the i/o interrupt did not "overtake"
-		 * the last HZ timer interrupt.
-		 */
-		account_ticks(S390_lowcore.int_clock);
+	s390_idle_check();
+	if (S390_lowcore.int_clock >= S390_lowcore.clock_comparator)
+		/* Serve timer interrupts first. */
+		clock_comparator_work();
 	/*
 	 * Get interrupt information from lowcore
 	 */
@@ -671,19 +651,22 @@ do_IRQ (struct pt_regs *regs)
 			continue;
 		}
 		sch = (struct subchannel *)(unsigned long)tpi_info->intparm;
-		if (sch)
-			spin_lock(sch->lock);
+		if (!sch) {
+			/* Clear pending interrupt condition. */
+			tsch(tpi_info->schid, irb);
+			continue;
+		}
+		spin_lock(sch->lock);
 		/* Store interrupt response block to lowcore. */
-		if (tsch (tpi_info->schid, irb) == 0 && sch) {
+		if (tsch(tpi_info->schid, irb) == 0) {
 			/* Keep subchannel information word up to date. */
 			memcpy (&sch->schib.scsw, &irb->scsw,
 				sizeof (irb->scsw));
 			/* Call interrupt handler if there is one. */
 			if (sch->driver && sch->driver->irq)
-				sch->driver->irq(&sch->dev);
+				sch->driver->irq(sch);
 		}
-		if (sch)
-			spin_unlock(sch->lock);
+		spin_unlock(sch->lock);
 		/*
 		 * Are more interrupts pending?
 		 * If so, the tpi instruction will update the lowcore
@@ -698,13 +681,20 @@ do_IRQ (struct pt_regs *regs)
 
 #ifdef CONFIG_CCW_CONSOLE
 static struct subchannel console_subchannel;
+static struct io_subchannel_private console_priv;
 static int console_subchannel_in_use;
+
+void *cio_get_console_priv(void)
+{
+	return &console_priv;
+}
 
 /*
  * busy wait for the next interrupt on the console
  */
-void
-wait_cons_dev (void)
+void wait_cons_dev(void)
+	__releases(console_subchannel.lock)
+	__acquires(console_subchannel.lock)
 {
 	unsigned long cr6      __attribute__ ((aligned (8)));
 	unsigned long save_cr6 __attribute__ ((aligned (8)));
@@ -716,9 +706,9 @@ wait_cons_dev (void)
 	if (!console_subchannel_in_use)
 		return;
 
-	/* disable all but isc 7 (console device) */
+	/* disable all but isc 1 (console device) */
 	__ctl_store (save_cr6, 6, 6);
-	cr6 = 0x01000000;
+	cr6 = 0x40000000;
 	__ctl_load (cr6, 6, 6);
 
 	do {
@@ -738,9 +728,9 @@ cio_test_for_console(struct subchannel_id schid, void *data)
 {
 	if (stsch_err(schid, &console_subchannel.schib) != 0)
 		return -ENXIO;
-	if (console_subchannel.schib.pmcw.dnv &&
-	    console_subchannel.schib.pmcw.dev ==
-	    console_devno) {
+	if ((console_subchannel.schib.pmcw.st == SUBCHANNEL_TYPE_IO) &&
+	    console_subchannel.schib.pmcw.dnv &&
+	    (console_subchannel.schib.pmcw.dev == console_devno)) {
 		console_irq = schid.sch_no;
 		return 1; /* found */
 	}
@@ -758,6 +748,7 @@ cio_get_console_sch_no(void)
 		/* VM provided us with the irq number of the console. */
 		schid.sch_no = console_irq;
 		if (stsch(schid, &console_subchannel.schib) != 0 ||
+		    (console_subchannel.schib.pmcw.st != SUBCHANNEL_TYPE_IO) ||
 		    !console_subchannel.schib.pmcw.dnv)
 			return -1;
 		console_devno = console_subchannel.schib.pmcw.dev;
@@ -799,12 +790,13 @@ cio_probe_console(void)
 	}
 
 	/*
-	 * enable console I/O-interrupt subclass 7
+	 * enable console I/O-interrupt subclass 1
 	 */
-	ctl_set_bit(6, 24);
-	console_subchannel.schib.pmcw.isc = 7;
+	ctl_set_bit(6, 30);
+	console_subchannel.isc = 1;
+	console_subchannel.schib.pmcw.isc = 1;
 	console_subchannel.schib.pmcw.intparm =
-		(__u32)(unsigned long)&console_subchannel;
+		(u32)(addr_t)&console_subchannel;
 	ret = cio_modify(&console_subchannel);
 	if (ret) {
 		console_subchannel_in_use = 0;
@@ -1022,7 +1014,7 @@ static int __reipl_subchannel_match(struct subchannel_id schid, void *data)
 
 	if (stsch_reset(schid, &schib))
 		return -ENXIO;
-	if (schib.pmcw.dnv &&
+	if ((schib.pmcw.st == SUBCHANNEL_TYPE_IO) && schib.pmcw.dnv &&
 	    (schib.pmcw.dev == match_id->devid.devno) &&
 	    (schid.ssid == match_id->devid.ssid)) {
 		match_id->schid = schid;
@@ -1067,6 +1059,8 @@ int __init cio_get_iplinfo(struct cio_iplinfo *iplinfo)
 	if (!schid.one)
 		return -ENODEV;
 	if (stsch(schid, &schib))
+		return -ENODEV;
+	if (schib.pmcw.st != SUBCHANNEL_TYPE_IO)
 		return -ENODEV;
 	if (!schib.pmcw.dnv)
 		return -ENODEV;

@@ -98,8 +98,7 @@ void cifs_dump_mids(struct TCP_Server_Info *server)
 			if (mid_entry->resp_buf) {
 				cifs_dump_detail(mid_entry->resp_buf);
 				cifs_dump_mem("existing buf: ",
-					mid_entry->resp_buf,
-					62 /* fixme */);
+					mid_entry->resp_buf, 62);
 			}
 		}
 	}
@@ -439,7 +438,7 @@ cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
 
 	return length;
 }
-#endif
+#endif /* STATS */
 
 static struct proc_dir_entry *proc_fs_cifs;
 read_proc_t cifs_txanchor_read;
@@ -469,7 +468,7 @@ cifs_proc_init(void)
 {
 	struct proc_dir_entry *pde;
 
-	proc_fs_cifs = proc_mkdir("cifs", proc_root_fs);
+	proc_fs_cifs = proc_mkdir("fs/cifs", NULL);
 	if (proc_fs_cifs == NULL)
 		return;
 
@@ -482,7 +481,7 @@ cifs_proc_init(void)
 				cifs_stats_read, NULL);
 	if (pde)
 		pde->write_proc = cifs_stats_write;
-#endif
+#endif /* STATS */
 	pde = create_proc_read_entry("cifsFYI", 0, proc_fs_cifs,
 				cifsFYI_read, NULL);
 	if (pde)
@@ -560,7 +559,7 @@ cifs_proc_clean(void)
 	remove_proc_entry("LinuxExtensionsEnabled", proc_fs_cifs);
 	remove_proc_entry("Experimental", proc_fs_cifs);
 	remove_proc_entry("LookupCacheEnabled", proc_fs_cifs);
-	remove_proc_entry("cifs", proc_root_fs);
+	remove_proc_entry("fs/cifs", NULL);
 }
 
 static int
@@ -918,4 +917,12 @@ security_flags_write(struct file *file, const char __user *buffer,
 	/* BB should we turn on MAY flags for other MUST options? */
 	return count;
 }
-#endif
+#else
+inline void cifs_proc_init(void)
+{
+}
+
+inline void cifs_proc_clean(void)
+{
+}
+#endif /* PROC_FS */

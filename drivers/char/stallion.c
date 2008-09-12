@@ -145,8 +145,7 @@ static struct stlbrd		*stl_brds[STL_MAXBRDS];
  */
 #define	ASYI_TXBUSY	1
 #define	ASYI_TXLOW	2
-#define	ASYI_DCDCHANGE	3
-#define	ASYI_TXFLOWED	4
+#define	ASYI_TXFLOWED	3
 
 /*
  *	Define an array of board names as printable strings. Handy for
@@ -610,6 +609,23 @@ static const struct file_operations	stl_fsiomem = {
 
 static struct class *stallion_class;
 
+static void stl_cd_change(struct stlport *portp)
+{
+	unsigned int oldsigs = portp->sigs;
+
+	if (!portp->tty)
+		return;
+
+	portp->sigs = stl_getsignals(portp);
+
+	if ((portp->sigs & TIOCM_CD) && ((oldsigs & TIOCM_CD) == 0))
+		wake_up_interruptible(&portp->open_wait);
+
+	if ((oldsigs & TIOCM_CD) && ((portp->sigs & TIOCM_CD) == 0))
+		if (portp->flags & ASYNC_CHECK_CD)
+			tty_hangup(portp->tty);
+}
+
 /*
  *	Check for any arguments passed in on the module load command line.
  */
@@ -859,6 +875,7 @@ static void stl_waituntilsent(struct tty_struct *tty, int timeout)
 		timeout = HZ;
 	tend = jiffies + timeout;
 
+	lock_kernel();
 	while (stl_datastate(portp)) {
 		if (signal_pending(current))
 			break;
@@ -866,6 +883,7 @@ static void stl_waituntilsent(struct tty_struct *tty, int timeout)
 		if (time_after_eq(jiffies, tend))
 			break;
 	}
+	unlock_kernel();
 }
 
 /*****************************************************************************/
@@ -1257,18 +1275,9 @@ static int stl_ioctl(struct tty_struct *tty, struct file *file, unsigned int cmd
 
 	rc = 0;
 
+	lock_kernel();
+
 	switch (cmd) {
-	case TIOCGSOFTCAR:
-		rc = put_user(((tty->termios->c_cflag & CLOCAL) ? 1 : 0),
-			(unsigned __user *) argp);
-		break;
-	case TIOCSSOFTCAR:
-		if (get_user(ival, (unsigned int __user *) arg))
-			return -EFAULT;
-		tty->termios->c_cflag =
-				(tty->termios->c_cflag & ~CLOCAL) |
-				(ival ? CLOCAL : 0);
-		break;
 	case TIOCGSERIAL:
 		rc = stl_getserial(portp, argp);
 		break;
@@ -1292,7 +1301,7 @@ static int stl_ioctl(struct tty_struct *tty, struct file *file, unsigned int cmd
 		rc = -ENOIOCTLCMD;
 		break;
 	}
-
+	unlock_kernel();
 	return rc;
 }
 
@@ -1629,7 +1638,7 @@ static irqreturn_t stl_intr(int irq, void *dev_id)
 {
 	struct stlbrd *brdp = dev_id;
 
-	pr_debug("stl_intr(brdp=%p,irq=%d)\n", brdp, irq);
+	pr_debug("stl_intr(brdp=%p,irq=%d)\n", brdp, brdp->irq);
 
 	return IRQ_RETVAL((* brdp->isr)(brdp));
 }
@@ -1771,41 +1780,6 @@ static int stl_echpci64intr(struct stlbrd *brdp)
 /*****************************************************************************/
 
 /*
- *	Service an off-level request for some channel.
- */
-static void stl_offintr(struct work_struct *work)
-{
-	struct stlport		*portp = container_of(work, struct stlport, tqueue);
-	struct tty_struct	*tty;
-	unsigned int		oldsigs;
-
-	pr_debug("stl_offintr(portp=%p)\n", portp);
-
-	if (portp == NULL)
-		return;
-
-	tty = portp->tty;
-	if (tty == NULL)
-		return;
-
-	if (test_bit(ASYI_TXLOW, &portp->istate))
-		tty_wakeup(tty);
-
-	if (test_bit(ASYI_DCDCHANGE, &portp->istate)) {
-		clear_bit(ASYI_DCDCHANGE, &portp->istate);
-		oldsigs = portp->sigs;
-		portp->sigs = stl_getsignals(portp);
-		if ((portp->sigs & TIOCM_CD) && ((oldsigs & TIOCM_CD) == 0))
-			wake_up_interruptible(&portp->open_wait);
-		if ((oldsigs & TIOCM_CD) && ((portp->sigs & TIOCM_CD) == 0))
-			if (portp->flags & ASYNC_CHECK_CD)
-				tty_hangup(tty);	/* FIXME: module removal race here - AKPM */
-	}
-}
-
-/*****************************************************************************/
-
-/*
  *	Initialize all the ports on a panel.
  */
 
@@ -1840,7 +1814,6 @@ static int __devinit stl_initports(struct stlbrd *brdp, struct stlpanel *panelp)
 		portp->baud_base = STL_BAUDBASE;
 		portp->close_delay = STL_CLOSEDELAY;
 		portp->closing_wait = 30 * HZ;
-		INIT_WORK(&portp->tqueue, stl_offintr);
 		init_waitqueue_head(&portp->open_wait);
 		init_waitqueue_head(&portp->close_wait);
 		portp->stats.brd = portp->brdnr;
@@ -3530,7 +3503,8 @@ static void stl_cd1400txisr(struct stlpanel *panelp, int ioaddr)
 	if ((len == 0) || ((len < STL_TXBUFLOW) &&
 	    (test_bit(ASYI_TXLOW, &portp->istate) == 0))) {
 		set_bit(ASYI_TXLOW, &portp->istate);
-		schedule_work(&portp->tqueue);
+		if (portp->tty)
+			tty_wakeup(portp->tty);
 	}
 
 	if (len == 0) {
@@ -3546,7 +3520,8 @@ static void stl_cd1400txisr(struct stlpanel *panelp, int ioaddr)
 	} else {
 		len = min(len, CD1400_TXFIFOSIZE);
 		portp->stats.txtotal += len;
-		stlen = min(len, ((portp->tx.buf + STL_TXBUFSIZE) - tail));
+		stlen = min_t(unsigned int, len,
+				(portp->tx.buf + STL_TXBUFSIZE) - tail);
 		outb((TDR + portp->uartaddr), ioaddr);
 		outsb((ioaddr + EREG_DATA), tail, stlen);
 		len -= stlen;
@@ -3599,7 +3574,7 @@ static void stl_cd1400rxisr(struct stlpanel *panelp, int ioaddr)
 		outb((RDCR + portp->uartaddr), ioaddr);
 		len = inb(ioaddr + EREG_DATA);
 		if (tty == NULL || (buflen = tty_buffer_request_room(tty, len)) == 0) {
-			len = min(len, sizeof(stl_unwanted));
+			len = min_t(unsigned int, len, sizeof(stl_unwanted));
 			outb((RDSR + portp->uartaddr), ioaddr);
 			insb((ioaddr + EREG_DATA), &stl_unwanted[0], len);
 			portp->stats.rxlost += len;
@@ -3692,8 +3667,7 @@ static void stl_cd1400mdmisr(struct stlpanel *panelp, int ioaddr)
 	outb((MISR + portp->uartaddr), ioaddr);
 	misr = inb(ioaddr + EREG_DATA);
 	if (misr & MISR_DCD) {
-		set_bit(ASYI_DCDCHANGE, &portp->istate);
-		schedule_work(&portp->tqueue);
+		stl_cd_change(portp);
 		portp->stats.modem++;
 	}
 
@@ -4447,7 +4421,8 @@ static void stl_sc26198txisr(struct stlport *portp)
 	if ((len == 0) || ((len < STL_TXBUFLOW) &&
 	    (test_bit(ASYI_TXLOW, &portp->istate) == 0))) {
 		set_bit(ASYI_TXLOW, &portp->istate);
-		schedule_work(&portp->tqueue); 
+		if (portp->tty)
+			tty_wakeup(portp->tty);
 	}
 
 	if (len == 0) {
@@ -4465,7 +4440,8 @@ static void stl_sc26198txisr(struct stlport *portp)
 	} else {
 		len = min(len, SC26198_TXFIFOSIZE);
 		portp->stats.txtotal += len;
-		stlen = min(len, ((portp->tx.buf + STL_TXBUFSIZE) - tail));
+		stlen = min_t(unsigned int, len,
+				(portp->tx.buf + STL_TXBUFSIZE) - tail);
 		outb(GTXFIFO, (ioaddr + XP_ADDR));
 		outsb((ioaddr + XP_DATA), tail, stlen);
 		len -= stlen;
@@ -4506,7 +4482,7 @@ static void stl_sc26198rxisr(struct stlport *portp, unsigned int iack)
 
 	if ((iack & IVR_TYPEMASK) == IVR_RXDATA) {
 		if (tty == NULL || (buflen = tty_buffer_request_room(tty, len)) == 0) {
-			len = min(len, sizeof(stl_unwanted));
+			len = min_t(unsigned int, len, sizeof(stl_unwanted));
 			outb(GRXFIFO, (ioaddr + XP_ADDR));
 			insb((ioaddr + XP_DATA), &stl_unwanted[0], len);
 			portp->stats.rxlost += len;
@@ -4647,8 +4623,7 @@ static void stl_sc26198otherisr(struct stlport *portp, unsigned int iack)
 	case CIR_SUBCOS:
 		ipr = stl_sc26198getreg(portp, IPR);
 		if (ipr & IPR_DCDCHANGE) {
-			set_bit(ASYI_DCDCHANGE, &portp->istate);
-			schedule_work(&portp->tqueue); 
+			stl_cd_change(portp);
 			portp->stats.modem++;
 		}
 		break;

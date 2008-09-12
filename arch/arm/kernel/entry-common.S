@@ -72,7 +72,7 @@ no_work_pending:
 	ldr	r1, [sp, #S_PSR]		@ get calling cpsr
 	ldr	lr, [sp, #S_PC]!		@ get pc
 	msr	spsr_cxsf, r1			@ save in spsr_svc
-	ldmdb	sp, {r0 - lr}^			@ get calling r1 - lr
+	ldmdb	sp, {r0 - lr}^			@ get calling r0 - lr
 	mov	r0, r0
 	add	sp, sp, #S_FRAME_SIZE - S_PC
 	movs	pc, lr				@ return & move spsr_svc into cpsr
@@ -351,6 +351,11 @@ sys_mmap2:
 		str	r5, [sp, #4]
 		b	do_mmap2
 #endif
+
+ENTRY(pabort_ifar)
+		mrc	p15, 0, r0, cr6, cr0, 2
+ENTRY(pabort_noifar)
+		mov	pc, lr
 
 #ifdef CONFIG_OABI_COMPAT
 

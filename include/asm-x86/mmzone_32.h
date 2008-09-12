@@ -18,7 +18,7 @@ extern struct pglist_data *node_data[];
 	#include <asm/srat.h>
 #endif
 
-extern int get_memcfg_numa_flat(void );
+extern int get_memcfg_numa_flat(void);
 /*
  * This allows any one NUMA architecture to be compiled
  * for, and still fall back to the flat function if it
@@ -87,9 +87,6 @@ static inline int pfn_to_nid(unsigned long pfn)
 	__pgdat->node_start_pfn + __pgdat->node_spanned_pages;		\
 })
 
-/* XXX: FIXME -- wli */
-#define kern_addr_valid(kaddr)	(0)
-
 #ifdef CONFIG_X86_NUMAQ            /* we have contiguous memory on NUMA-Q */
 #define pfn_valid(pfn)          ((pfn) < num_physpages)
 #else
@@ -110,8 +107,8 @@ static inline int pfn_valid(int pfn)
 /*
  * Following are macros that are specific to this numa platform.
  */
-#define reserve_bootmem(addr, size) \
-	reserve_bootmem_node(NODE_DATA(0), (addr), (size))
+#define reserve_bootmem(addr, size, flags) \
+	reserve_bootmem_node(NODE_DATA(0), (addr), (size), (flags))
 #define alloc_bootmem(x) \
 	__alloc_bootmem_node(NODE_DATA(0), (x), SMP_CACHE_BYTES, __pa(MAX_DMA_ADDRESS))
 #define alloc_bootmem_low(x) \
@@ -132,7 +129,7 @@ static inline int pfn_valid(int pfn)
 	struct pglist_data  __maybe_unused			\
 				*__alloc_bootmem_node__pgdat = (pgdat);	\
 	__alloc_bootmem_node(NODE_DATA(0), (x), PAGE_SIZE,		\
-						__pa(MAX_DMA_ADDRESS))	\
+						__pa(MAX_DMA_ADDRESS));	\
 })
 #define alloc_bootmem_low_pages_node(pgdat, x)				\
 ({									\

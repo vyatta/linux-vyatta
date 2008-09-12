@@ -109,15 +109,22 @@ static int fw_device_op_open(struct inode *inode, struct file *file)
 	struct client *client;
 	unsigned long flags;
 
-	device = fw_device_from_devt(inode->i_rdev);
+	device = fw_device_get_by_devt(inode->i_rdev);
 	if (device == NULL)
 		return -ENODEV;
 
-	client = kzalloc(sizeof(*client), GFP_KERNEL);
-	if (client == NULL)
-		return -ENOMEM;
+	if (fw_device_is_shutdown(device)) {
+		fw_device_put(device);
+		return -ENODEV;
+	}
 
-	client->device = fw_device_get(device);
+	client = kzalloc(sizeof(*client), GFP_KERNEL);
+	if (client == NULL) {
+		fw_device_put(device);
+		return -ENOMEM;
+	}
+
+	client->device = device;
 	INIT_LIST_HEAD(&client->event_list);
 	INIT_LIST_HEAD(&client->resource_list);
 	spin_lock_init(&client->lock);
@@ -198,6 +205,7 @@ fw_device_op_read(struct file *file,
 	return dequeue_event(client, buffer, count);
 }
 
+/* caller must hold card->lock so that node pointers can be dereferenced here */
 static void
 fill_bus_reset_event(struct fw_cdev_event_bus_reset *event,
 		     struct client *client)
@@ -206,12 +214,12 @@ fill_bus_reset_event(struct fw_cdev_event_bus_reset *event,
 
 	event->closure	     = client->bus_reset_closure;
 	event->type          = FW_CDEV_EVENT_BUS_RESET;
+	event->generation    = client->device->generation;
 	event->node_id       = client->device->node_id;
 	event->local_node_id = card->local_node->node_id;
 	event->bm_node_id    = 0; /* FIXME: We don't track the BM. */
 	event->irm_node_id   = card->irm_node->node_id;
 	event->root_node_id  = card->root_node->node_id;
-	event->generation    = card->generation;
 }
 
 static void
@@ -266,31 +274,43 @@ static int ioctl_get_info(struct client *client, void *buffer)
 {
 	struct fw_cdev_get_info *get_info = buffer;
 	struct fw_cdev_event_bus_reset bus_reset;
+	struct fw_card *card = client->device->card;
+	unsigned long ret = 0;
 
 	client->version = get_info->version;
 	get_info->version = FW_CDEV_VERSION;
+
+	down_read(&fw_device_rwsem);
 
 	if (get_info->rom != 0) {
 		void __user *uptr = u64_to_uptr(get_info->rom);
 		size_t want = get_info->rom_length;
 		size_t have = client->device->config_rom_length * 4;
 
-		if (copy_to_user(uptr, client->device->config_rom,
-				 min(want, have)))
-			return -EFAULT;
+		ret = copy_to_user(uptr, client->device->config_rom,
+				   min(want, have));
 	}
 	get_info->rom_length = client->device->config_rom_length * 4;
+
+	up_read(&fw_device_rwsem);
+
+	if (ret != 0)
+		return -EFAULT;
 
 	client->bus_reset_closure = get_info->bus_reset_closure;
 	if (get_info->bus_reset != 0) {
 		void __user *uptr = u64_to_uptr(get_info->bus_reset);
+		unsigned long flags;
 
+		spin_lock_irqsave(&card->lock, flags);
 		fill_bus_reset_event(&bus_reset, client);
+		spin_unlock_irqrestore(&card->lock, flags);
+
 		if (copy_to_user(uptr, &bus_reset, sizeof(bus_reset)))
 			return -EFAULT;
 	}
 
-	get_info->card = client->device->card->index;
+	get_info->card = card->index;
 
 	return 0;
 }
@@ -643,6 +663,10 @@ static int ioctl_create_iso_context(struct client *client, void *buffer)
 	struct fw_cdev_create_iso_context *request = buffer;
 	struct fw_iso_context *context;
 
+	/* We only support one context at this time. */
+	if (client->iso_context != NULL)
+		return -EBUSY;
+
 	if (request->channel > 63)
 		return -EINVAL;
 
@@ -789,8 +813,9 @@ static int ioctl_start_iso(struct client *client, void *buffer)
 {
 	struct fw_cdev_start_iso *request = buffer;
 
-	if (request->handle != 0)
+	if (client->iso_context == NULL || request->handle != 0)
 		return -EINVAL;
+
 	if (client->iso_context->type == FW_ISO_CONTEXT_RECEIVE) {
 		if (request->tags == 0 || request->tags > 15)
 			return -EINVAL;
@@ -807,7 +832,7 @@ static int ioctl_stop_iso(struct client *client, void *buffer)
 {
 	struct fw_cdev_stop_iso *request = buffer;
 
-	if (request->handle != 0)
+	if (client->iso_context == NULL || request->handle != 0)
 		return -EINVAL;
 
 	return fw_iso_context_stop(client->iso_context);
@@ -886,6 +911,9 @@ fw_device_op_ioctl(struct file *file,
 {
 	struct client *client = file->private_data;
 
+	if (fw_device_is_shutdown(client->device))
+		return -ENODEV;
+
 	return dispatch_ioctl(client, cmd, (void __user *) arg);
 }
 
@@ -895,6 +923,9 @@ fw_device_op_compat_ioctl(struct file *file,
 			  unsigned int cmd, unsigned long arg)
 {
 	struct client *client = file->private_data;
+
+	if (fw_device_is_shutdown(client->device))
+		return -ENODEV;
 
 	return dispatch_ioctl(client, cmd, compat_ptr(arg));
 }
@@ -906,6 +937,9 @@ static int fw_device_op_mmap(struct file *file, struct vm_area_struct *vma)
 	enum dma_data_direction direction;
 	unsigned long size;
 	int page_count, retval;
+
+	if (fw_device_is_shutdown(client->device))
+		return -ENODEV;
 
 	/* FIXME: We could support multiple buffers, but we don't. */
 	if (client->buffer.pages != NULL)

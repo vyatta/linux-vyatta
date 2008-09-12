@@ -88,19 +88,23 @@ struct wireless_dev;
 #define NETDEV_TX_BUSY 1	/* driver tx path was busy*/
 #define NETDEV_TX_LOCKED -1	/* driver tx lock was already taken */
 
+#ifdef  __KERNEL__
+
 /*
  *	Compute the worst case header length according to the protocols
  *	used.
  */
  
-#if !defined(CONFIG_AX25) && !defined(CONFIG_AX25_MODULE) && !defined(CONFIG_TR)
-#define LL_MAX_HEADER	32
+#if defined(CONFIG_WLAN_80211) || defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
+# if defined(CONFIG_MAC80211_MESH)
+#  define LL_MAX_HEADER 128
+# else
+#  define LL_MAX_HEADER 96
+# endif
+#elif defined(CONFIG_TR)
+# define LL_MAX_HEADER 48
 #else
-#if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
-#define LL_MAX_HEADER	96
-#else
-#define LL_MAX_HEADER	48
-#endif
+# define LL_MAX_HEADER 32
 #endif
 
 #if !defined(CONFIG_NET_IPIP) && !defined(CONFIG_NET_IPIP_MODULE) && \
@@ -111,6 +115,8 @@ struct wireless_dev;
 #else
 #define MAX_HEADER (LL_MAX_HEADER + 48)
 #endif
+
+#endif  /*  __KERNEL__  */
 
 struct net_device_subqueue
 {
@@ -244,11 +250,16 @@ struct hh_cache
  *
  * We could use other alignment values, but we must maintain the
  * relationship HH alignment <= LL alignment.
+ *
+ * LL_ALLOCATED_SPACE also takes into account the tailroom the device
+ * may need.
  */
 #define LL_RESERVED_SPACE(dev) \
-	(((dev)->hard_header_len&~(HH_DATA_MOD - 1)) + HH_DATA_MOD)
+	((((dev)->hard_header_len+(dev)->needed_headroom)&~(HH_DATA_MOD - 1)) + HH_DATA_MOD)
 #define LL_RESERVED_SPACE_EXTRA(dev,extra) \
-	((((dev)->hard_header_len+extra)&~(HH_DATA_MOD - 1)) + HH_DATA_MOD)
+	((((dev)->hard_header_len+(dev)->needed_headroom+(extra))&~(HH_DATA_MOD - 1)) + HH_DATA_MOD)
+#define LL_ALLOCATED_SPACE(dev) \
+	((((dev)->hard_header_len+(dev)->needed_headroom+(dev)->needed_tailroom)&~(HH_DATA_MOD - 1)) + HH_DATA_MOD)
 
 struct header_ops {
 	int	(*create) (struct sk_buff *skb, struct net_device *dev,
@@ -322,7 +333,7 @@ enum
 	NAPI_STATE_DISABLE,	/* Disable pending */
 };
 
-extern void FASTCALL(__napi_schedule(struct napi_struct *n));
+extern void __napi_schedule(struct napi_struct *n);
 
 static inline int napi_disable_pending(struct napi_struct *n)
 {
@@ -383,9 +394,11 @@ static inline void __napi_complete(struct napi_struct *n)
 
 static inline void napi_complete(struct napi_struct *n)
 {
-	local_irq_disable();
+	unsigned long flags;
+
+	local_irq_save(flags);
 	__napi_complete(n);
-	local_irq_enable();
+	local_irq_restore(flags);
 }
 
 /**
@@ -565,6 +578,13 @@ struct net_device
 	unsigned short		type;	/* interface hardware type	*/
 	unsigned short		hard_header_len;	/* hardware hdr length	*/
 
+	/* extra head- and tailroom the hardware may need, but not in all cases
+	 * can this be guaranteed, especially tailroom. Some cases also use
+	 * LL_MAX_HEADER instead to allocate the skb.
+	 */
+	unsigned short		needed_headroom;
+	unsigned short		needed_tailroom;
+
 	struct net_device	*master; /* Pointer to master device of a group,
 					  * which this device is member of.
 					  */
@@ -604,6 +624,10 @@ struct net_device
 
 	unsigned char		broadcast[MAX_ADDR_LEN];	/* hw bcast add	*/
 
+	/* ingress path synchronizer */
+	spinlock_t		ingress_lock;
+	struct Qdisc		*qdisc_ingress;
+
 /*
  * Cache line mostly used on queue transmit path (qdisc)
  */
@@ -616,10 +640,6 @@ struct net_device
 
 	/* Partially transmitted GSO packet. */
 	struct sk_buff		*gso_skb;
-
-	/* ingress path synchronizer */
-	spinlock_t		ingress_lock;
-	struct Qdisc		*qdisc_ingress;
 
 /*
  * One part is mostly used on xmit path (device)
@@ -708,8 +728,13 @@ struct net_device
 	void                    (*poll_controller)(struct net_device *dev);
 #endif
 
+#ifdef CONFIG_NET_NS
 	/* Network namespace this network device is inside */
 	struct net		*nd_net;
+#endif
+
+	/* mid-layer private */
+	void			*ml_priv;
 
 	/* bridge stuff */
 	struct net_bridge_port	*br_port;
@@ -724,6 +749,13 @@ struct net_device
 	/* rtnetlink link ops */
 	const struct rtnl_link_ops *rtnl_link_ops;
 
+	/* VLAN feature mask */
+	unsigned long vlan_features;
+
+	/* for setting kernel sock attribute on TCP connection setup */
+#define GSO_MAX_SIZE		65536
+	unsigned int		gso_max_size;
+
 	/* The TX queue control structures */
 	unsigned int			egress_subqueue_count;
 	struct net_device_subqueue	egress_subqueue[1];
@@ -732,6 +764,28 @@ struct net_device
 
 #define	NETDEV_ALIGN		32
 #define	NETDEV_ALIGN_CONST	(NETDEV_ALIGN - 1)
+
+/*
+ * Net namespace inlines
+ */
+static inline
+struct net *dev_net(const struct net_device *dev)
+{
+#ifdef CONFIG_NET_NS
+	return dev->nd_net;
+#else
+	return &init_net;
+#endif
+}
+
+static inline
+void dev_net_set(struct net_device *dev, struct net *net)
+{
+#ifdef CONFIG_NET_NS
+	release_net(dev->nd_net);
+	dev->nd_net = hold_net(net);
+#endif
+}
 
 /**
  *	netdev_priv - access network device private data
@@ -809,7 +863,7 @@ static inline struct net_device *next_net_device(struct net_device *dev)
 	struct list_head *lh;
 	struct net *net;
 
-	net = dev->nd_net;
+	net = dev_net(dev);
 	lh = dev->dev_list.next;
 	return lh == &net->dev_base_head ? NULL : net_device_entry(lh);
 }
@@ -1072,12 +1126,14 @@ static inline int netif_is_multiqueue(const struct net_device *dev)
 }
 
 /* Use this variant when it is known for sure that it
- * is executing from interrupt context.
+ * is executing from hardware interrupt context or with hardware interrupts
+ * disabled.
  */
 extern void dev_kfree_skb_irq(struct sk_buff *skb);
 
 /* Use this variant in places where it could be invoked
- * either from interrupt or non-interrupt context.
+ * from either hardware interrupt or other context, with hardware interrupts
+ * either disabled or enabled.
  */
 extern void dev_kfree_skb_any(struct sk_buff *skb);
 
@@ -1414,12 +1470,16 @@ extern void		dev_set_rx_mode(struct net_device *dev);
 extern void		__dev_set_rx_mode(struct net_device *dev);
 extern int		dev_unicast_delete(struct net_device *dev, void *addr, int alen);
 extern int		dev_unicast_add(struct net_device *dev, void *addr, int alen);
+extern int		dev_unicast_sync(struct net_device *to, struct net_device *from);
+extern void		dev_unicast_unsync(struct net_device *to, struct net_device *from);
 extern int 		dev_mc_delete(struct net_device *dev, void *addr, int alen, int all);
 extern int		dev_mc_add(struct net_device *dev, void *addr, int alen, int newonly);
 extern int		dev_mc_sync(struct net_device *to, struct net_device *from);
 extern void		dev_mc_unsync(struct net_device *to, struct net_device *from);
 extern int 		__dev_addr_delete(struct dev_addr_list **list, int *count, void *addr, int alen, int all);
 extern int		__dev_addr_add(struct dev_addr_list **list, int *count, void *addr, int alen, int newonly);
+extern int		__dev_addr_sync(struct dev_addr_list **to, int *to_count, struct dev_addr_list **from, int *from_count);
+extern void		__dev_addr_unsync(struct dev_addr_list **to, int *to_count, struct dev_addr_list **from, int *from_count);
 extern void		dev_set_promiscuity(struct net_device *dev, int inc);
 extern void		dev_set_allmulti(struct net_device *dev, int inc);
 extern void		netdev_state_change(struct net_device *dev);
@@ -1469,6 +1529,12 @@ static inline int netif_needs_gso(struct net_device *dev, struct sk_buff *skb)
 	return skb_is_gso(skb) &&
 	       (!skb_gso_ok(skb, dev->features) ||
 		unlikely(skb->ip_summed != CHECKSUM_PARTIAL));
+}
+
+static inline void netif_set_gso_max_size(struct net_device *dev,
+					  unsigned int size)
+{
+	dev->gso_max_size = size;
 }
 
 /* On bonding slaves other than the currently active slave, suppress

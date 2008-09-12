@@ -3,6 +3,10 @@
 # subdirectories here. Add them in the ".gitignore" file
 # in that subdirectory instead.
 #
+# NOTE! Please use 'git-ls-files -i --exclude-standard'
+# command after changing this file, to see if there are
+# any tracked files which get ignored after the change.
+#
 # Normal rules
 #
 .*
@@ -17,18 +21,24 @@
 *.i
 *.lst
 *.symtypes
+*.order
+*.elf
+*.bin
+*.gz
 *.pyc
 *.lds
+
 #
 # Top-level generic files
 #
 tags
 TAGS
-vmlinux*
-!vmlinux.lds.S
+vmlinux
 System.map
+Module.markers
 Module.symvers
 !.gitignore
+!.mailmap
 modules.order
 
 #
@@ -41,6 +51,7 @@ include/linux/autoconf.h
 include/linux/compile.h
 include/linux/version.h
 include/linux/utsrelease.h
+include/linux/bounds.h
 
 # stgit generated dirs
 patches-*
@@ -51,16 +62,11 @@ series
 
 # cscope files
 cscope.*
+ncscope.*
 
 *.orig
 *.rej
 *~
-
-/debian/build
-/debian/stamps
-/debian/files
-/debian/linux-*
-/debian/control
-/debian/control.md5sum
-/debian/rules.gen
-
+stamp-*
+conf.vars
+config.precious

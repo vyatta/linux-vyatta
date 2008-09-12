@@ -18,7 +18,6 @@
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/delay.h>
-#include <sound/driver.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/initval.h>
@@ -26,6 +25,7 @@
 
 #include <asm/hardware.h>
 #include <asm/arch/pxa-regs.h>
+#include <asm/arch/pxa2xx-gpio.h>
 #include <asm/arch/audio.h>
 
 #include "pxa2xx-pcm.h"

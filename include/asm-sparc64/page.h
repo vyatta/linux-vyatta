@@ -1,9 +1,5 @@
-/* $Id: page.h,v 1.39 2002/02/09 19:49:31 davem Exp $ */
-
 #ifndef _SPARC64_PAGE_H
 #define _SPARC64_PAGE_H
-
-#ifdef __KERNEL__
 
 #include <linux/const.h>
 
@@ -41,8 +37,6 @@
 #define HPAGE_SIZE		(_AC(1,UL) << HPAGE_SHIFT)
 #define HPAGE_MASK		(~(HPAGE_SIZE - 1UL))
 #define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
-#define ARCH_HAS_SETCLEAR_HUGE_PTE
-#define ARCH_HAS_HUGETLB_PREFAULT_HOOK
 #define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
 #endif
 
@@ -106,6 +100,8 @@ typedef unsigned long pgprot_t;
 
 #endif /* (STRICT_MM_TYPECHECKS) */
 
+typedef struct page *pgtable_t;
+
 #define TASK_UNMAPPED_BASE	(test_thread_flag(TIF_32BIT) ? \
 				 (_AC(0x0000000070000000,UL)) : \
 				 (_AC(0xfffff80000000000,UL) + (1UL << 32UL)))
@@ -143,5 +139,4 @@ typedef unsigned long pgprot_t;
 
 #include <asm-generic/page.h>
 
-#endif /* __KERNEL__ */
 #endif /* _SPARC64_PAGE_H */

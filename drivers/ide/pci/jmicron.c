@@ -8,12 +8,9 @@
 #include <linux/types.h>
 #include <linux/module.h>
 #include <linux/pci.h>
-#include <linux/delay.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
 #include <linux/init.h>
-
-#include <asm/io.h>
 
 typedef enum {
 	PORT_PATA0 = 0,
@@ -22,15 +19,15 @@ typedef enum {
 } port_type;
 
 /**
- *	ata66_jmicron		-	Cable check
+ *	jmicron_cable_detect	-	cable detection
  *	@hwif: IDE port
  *
  *	Returns the cable type.
  */
 
-static u8 __devinit ata66_jmicron(ide_hwif_t *hwif)
+static u8 __devinit jmicron_cable_detect(ide_hwif_t *hwif)
 {
-	struct pci_dev *pdev = hwif->pci_dev;
+	struct pci_dev *pdev = to_pci_dev(hwif->dev);
 
 	u32 control;
 	u32 control5;
@@ -66,8 +63,7 @@ static u8 __devinit ata66_jmicron(ide_hwif_t *hwif)
 	 *	actually do our cable checking etc. Thankfully we don't need
 	 *	to do the plumbing for other cases.
 	 */
-	switch (port_map[port])
-	{
+	switch (port_map[port]) {
 	case PORT_PATA0:
 		if (control & (1 << 3))	/* 40/80 pin primary */
 			return ATA_CBL_PATA40;
@@ -99,30 +95,16 @@ static void jmicron_set_dma_mode(ide_drive_t *drive, const u8 mode)
 {
 }
 
-/**
- *	init_hwif_jmicron	-	set up hwif structs
- *	@hwif: interface to set up
- *
- *	Minimal set up is required for the Jmicron hardware.
- */
-
-static void __devinit init_hwif_jmicron(ide_hwif_t *hwif)
-{
-	hwif->set_pio_mode = &jmicron_set_pio_mode;
-	hwif->set_dma_mode = &jmicron_set_dma_mode;
-
-	if (hwif->dma_base == 0)
-		return;
-
-	if (hwif->cbl != ATA_CBL_PATA40_SHORT)
-		hwif->cbl = ata66_jmicron(hwif);
-}
+static const struct ide_port_ops jmicron_port_ops = {
+	.set_pio_mode		= jmicron_set_pio_mode,
+	.set_dma_mode		= jmicron_set_dma_mode,
+	.cable_detect		= jmicron_cable_detect,
+};
 
 static const struct ide_port_info jmicron_chipset __devinitdata = {
 	.name		= "JMB",
-	.init_hwif	= init_hwif_jmicron,
-	.host_flags	= IDE_HFLAG_BOOTABLE,
 	.enablebits	= { { 0x40, 0x01, 0x01 }, { 0x40, 0x10, 0x10 } },
+	.port_ops	= &jmicron_port_ops,
 	.pio_mask	= ATA_PIO5,
 	.mwdma_mask	= ATA_MWDMA2,
 	.udma_mask	= ATA_UDMA6,

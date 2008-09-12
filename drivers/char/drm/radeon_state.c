@@ -898,7 +898,7 @@ static void radeon_cp_dispatch_clear(struct drm_device * dev,
 			int w = pbox[i].x2 - x;
 			int h = pbox[i].y2 - y;
 
-			DRM_DEBUG("dispatch clear %d,%d-%d,%d flags 0x%x\n",
+			DRM_DEBUG("%d,%d-%d,%d flags 0x%x\n",
 				  x, y, w, h, flags);
 
 			if (flags & RADEON_FRONT) {
@@ -1368,7 +1368,7 @@ static void radeon_cp_dispatch_swap(struct drm_device * dev)
 		int w = pbox[i].x2 - x;
 		int h = pbox[i].y2 - y;
 
-		DRM_DEBUG("dispatch swap %d,%d-%d,%d\n", x, y, w, h);
+		DRM_DEBUG("%d,%d-%d,%d\n", x, y, w, h);
 
 		BEGIN_RING(9);
 
@@ -1422,8 +1422,7 @@ static void radeon_cp_dispatch_flip(struct drm_device * dev)
 	int offset = (dev_priv->sarea_priv->pfCurrentPage == 1)
 	    ? dev_priv->front_offset : dev_priv->back_offset;
 	RING_LOCALS;
-	DRM_DEBUG("%s: pfCurrentPage=%d\n",
-		  __FUNCTION__,
+	DRM_DEBUG("pfCurrentPage=%d\n",
 		  dev_priv->sarea_priv->pfCurrentPage);
 
 	/* Do some trivial performance monitoring...
@@ -1562,7 +1561,7 @@ static void radeon_cp_dispatch_indirect(struct drm_device * dev,
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	RING_LOCALS;
-	DRM_DEBUG("indirect: buf=%d s=0x%x e=0x%x\n", buf->idx, start, end);
+	DRM_DEBUG("buf=%d s=0x%x e=0x%x\n", buf->idx, start, end);
 
 	if (start != end) {
 		int offset = (dev_priv->gart_buffers_offset
@@ -1663,7 +1662,7 @@ static int radeon_cp_dispatch_texture(struct drm_device * dev,
 	u32 height;
 	int i;
 	u32 texpitch, microtile;
-	u32 offset;
+	u32 offset, byte_offset;
 	RING_LOCALS;
 
 	if (radeon_check_and_fixup_offset(dev_priv, file_priv, &tex->offset)) {
@@ -1728,6 +1727,13 @@ static int radeon_cp_dispatch_texture(struct drm_device * dev,
 	} else
 		microtile = 0;
 
+	/* this might fail for zero-sized uploads - are those illegal? */
+	if (!radeon_check_offset(dev_priv, tex->offset + image->height *
+				blit_width - 1)) {
+		DRM_ERROR("Invalid final destination offset\n");
+		return -EINVAL;
+	}
+
 	DRM_DEBUG("tex=%dx%d blit=%d\n", tex_width, tex->height, blit_width);
 
 	do {
@@ -1758,7 +1764,7 @@ static int radeon_cp_dispatch_texture(struct drm_device * dev,
 			buf = radeon_freelist_get(dev);
 		}
 		if (!buf) {
-			DRM_DEBUG("radeon_cp_dispatch_texture: EAGAIN\n");
+			DRM_DEBUG("EAGAIN\n");
 			if (DRM_COPY_TO_USER(tex->image, image, sizeof(*image)))
 				return -EFAULT;
 			return -EAGAIN;
@@ -1841,6 +1847,7 @@ static int radeon_cp_dispatch_texture(struct drm_device * dev,
 		}
 
 #undef RADEON_COPY_MT
+		byte_offset = (image->y & ~2047) * blit_width;
 		buf->file_priv = file_priv;
 		buf->used = size;
 		offset = dev_priv->gart_buffers_offset + buf->offset;
@@ -1855,9 +1862,9 @@ static int radeon_cp_dispatch_texture(struct drm_device * dev,
 			 RADEON_DP_SRC_SOURCE_MEMORY |
 			 RADEON_GMC_CLR_CMP_CNTL_DIS | RADEON_GMC_WR_MSK_DIS);
 		OUT_RING((spitch << 22) | (offset >> 10));
-		OUT_RING((texpitch << 22) | (tex->offset >> 10));
+		OUT_RING((texpitch << 22) | ((tex->offset >> 10) + (byte_offset >> 10)));
 		OUT_RING(0);
-		OUT_RING((image->x << 16) | image->y);
+		OUT_RING((image->x << 16) | (image->y % 2048));
 		OUT_RING((image->width << 16) | height);
 		RADEON_WAIT_UNTIL_2D_IDLE();
 		ADVANCE_RING();
@@ -2413,7 +2420,7 @@ static int radeon_cp_indirect(struct drm_device *dev, void *data, struct drm_fil
 
 	LOCK_TEST_WITH_RETURN(dev, file_priv);
 
-	DRM_DEBUG("indirect: idx=%d s=%d e=%d d=%d\n",
+	DRM_DEBUG("idx=%d s=%d e=%d d=%d\n",
 		  indirect->idx, indirect->start, indirect->end,
 		  indirect->discard);
 
@@ -2779,7 +2786,7 @@ static int radeon_emit_wait(struct drm_device * dev, int flags)
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	RING_LOCALS;
 
-	DRM_DEBUG("%s: %x\n", __FUNCTION__, flags);
+	DRM_DEBUG("%x\n", flags);
 	switch (flags) {
 	case RADEON_WAIT_2D:
 		BEGIN_RING(2);
@@ -3034,6 +3041,12 @@ static int radeon_cp_getparam(struct drm_device *dev, void *data, struct drm_fil
 		break;
 	case RADEON_PARAM_VBLANK_CRTC:
 		value = radeon_vblank_crtc_get(dev);
+		break;
+	case RADEON_PARAM_FB_LOCATION:
+		value = radeon_read_fb_location(dev_priv);
+		break;
+	case RADEON_PARAM_NUM_GB_PIPES:
+		value = dev_priv->num_gb_pipes;
 		break;
 	default:
 		DRM_DEBUG("Invalid parameter %d\n", param->param);

@@ -109,7 +109,6 @@ void show_mem(void)
 
 	printk("Mem-info:\n");
 	show_free_areas();
-	printk("Free swap:       %6ldkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
 	i = max_mapnr;
 	while (i-- > 0) {
 		total++;
@@ -241,12 +240,6 @@ void __init MMU_init(void)
 	if (__max_memory && total_memory > __max_memory)
 		total_memory = __max_memory;
 	total_lowmem = total_memory;
-#ifdef CONFIG_FSL_BOOKE
-	/* Freescale Book-E parts expect lowmem to be mapped by fixed TLB
-	 * entries, so we need to adjust lowmem to match the amount we can map
-	 * in the fixed entries */
-	adjust_total_lowmem();
-#endif /* CONFIG_FSL_BOOKE */
 	if (total_lowmem > __max_low_memory) {
 		total_lowmem = __max_low_memory;
 #ifndef CONFIG_HIGHMEM

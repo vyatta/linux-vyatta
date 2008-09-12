@@ -46,27 +46,25 @@
 #include <linux/timer.h>
 #include <linux/mutex.h>
 #include <linux/list.h>
-
-#include <asm/semaphore.h>
+#include <linux/semaphore.h>
 
 #include "mthca_provider.h"
 #include "mthca_doorbell.h"
 
 #define DRV_NAME	"ib_mthca"
 #define PFX		DRV_NAME ": "
-#define DRV_VERSION	"0.08"
-#define DRV_RELDATE	"February 14, 2006"
+#define DRV_VERSION	"1.0"
+#define DRV_RELDATE	"April 4, 2008"
 
 enum {
 	MTHCA_FLAG_DDR_HIDDEN = 1 << 1,
 	MTHCA_FLAG_SRQ        = 1 << 2,
-	MTHCA_FLAG_MSI        = 1 << 3,
-	MTHCA_FLAG_MSI_X      = 1 << 4,
-	MTHCA_FLAG_NO_LAM     = 1 << 5,
-	MTHCA_FLAG_FMR        = 1 << 6,
-	MTHCA_FLAG_MEMFREE    = 1 << 7,
-	MTHCA_FLAG_PCIE       = 1 << 8,
-	MTHCA_FLAG_SINAI_OPT  = 1 << 9
+	MTHCA_FLAG_MSI_X      = 1 << 3,
+	MTHCA_FLAG_NO_LAM     = 1 << 4,
+	MTHCA_FLAG_FMR        = 1 << 5,
+	MTHCA_FLAG_MEMFREE    = 1 << 6,
+	MTHCA_FLAG_PCIE       = 1 << 7,
+	MTHCA_FLAG_SINAI_OPT  = 1 << 8
 };
 
 enum {
@@ -391,11 +389,11 @@ extern void __buggy_use_of_MTHCA_PUT(void);
 	do {                                                          \
 		void *__p = (char *) (source) + (offset);             \
 		switch (sizeof (dest)) {                              \
-			case 1: (dest) = *(u8 *) __p;       break;    \
-			case 2: (dest) = be16_to_cpup(__p); break;    \
-			case 4: (dest) = be32_to_cpup(__p); break;    \
-			case 8: (dest) = be64_to_cpup(__p); break;    \
-			default: __buggy_use_of_MTHCA_GET();          \
+		case 1: (dest) = *(u8 *) __p;       break;	      \
+		case 2: (dest) = be16_to_cpup(__p); break;	      \
+		case 4: (dest) = be32_to_cpup(__p); break;	      \
+		case 8: (dest) = be64_to_cpup(__p); break;	      \
+		default: __buggy_use_of_MTHCA_GET();		      \
 		}                                                     \
 	} while (0)
 

@@ -221,6 +221,9 @@ static void scsi_unlock_floptical(struct scsi_device *sdev,
 
 /**
  * scsi_alloc_sdev - allocate and setup a scsi_Device
+ * @starget: which target to allocate a &scsi_device for
+ * @lun: which lun
+ * @hostdata: usually NULL and set by ->slave_alloc instead
  *
  * Description:
  *     Allocate, initialize for io, and return a pointer to a scsi_Device.
@@ -319,6 +322,21 @@ out:
 	return NULL;
 }
 
+static void scsi_target_destroy(struct scsi_target *starget)
+{
+	struct device *dev = &starget->dev;
+	struct Scsi_Host *shost = dev_to_shost(dev->parent);
+	unsigned long flags;
+
+	transport_destroy_device(dev);
+	spin_lock_irqsave(shost->host_lock, flags);
+	if (shost->hostt->target_destroy)
+		shost->hostt->target_destroy(starget);
+	list_del_init(&starget->siblings);
+	spin_unlock_irqrestore(shost->host_lock, flags);
+	put_device(dev);
+}
+
 static void scsi_target_dev_release(struct device *dev)
 {
 	struct device *parent = dev->parent;
@@ -328,9 +346,14 @@ static void scsi_target_dev_release(struct device *dev)
 	put_device(parent);
 }
 
+struct device_type scsi_target_type = {
+	.name =		"scsi_target",
+	.release =	scsi_target_dev_release,
+};
+
 int scsi_is_target_device(const struct device *dev)
 {
-	return dev->release == scsi_target_dev_release;
+	return dev->type == &scsi_target_type;
 }
 EXPORT_SYMBOL(scsi_is_target_device);
 
@@ -388,14 +411,17 @@ static struct scsi_target *scsi_alloc_target(struct device *parent,
 	device_initialize(dev);
 	starget->reap_ref = 1;
 	dev->parent = get_device(parent);
-	dev->release = scsi_target_dev_release;
 	sprintf(dev->bus_id, "target%d:%d:%d",
 		shost->host_no, channel, id);
+#ifndef CONFIG_SYSFS_DEPRECATED
+	dev->bus = &scsi_bus_type;
+#endif
+	dev->type = &scsi_target_type;
 	starget->id = id;
 	starget->channel = channel;
 	INIT_LIST_HEAD(&starget->siblings);
 	INIT_LIST_HEAD(&starget->devices);
-	starget->state = STARGET_RUNNING;
+	starget->state = STARGET_CREATED;
 	starget->scsi_level = SCSI_2;
  retry:
 	spin_lock_irqsave(shost->host_lock, flags);
@@ -408,18 +434,6 @@ static struct scsi_target *scsi_alloc_target(struct device *parent,
 	spin_unlock_irqrestore(shost->host_lock, flags);
 	/* allocate and add */
 	transport_setup_device(dev);
-	error = device_add(dev);
-	if (error) {
-		dev_err(dev, "target device_add failed, error %d\n", error);
-		spin_lock_irqsave(shost->host_lock, flags);
-		list_del_init(&starget->siblings);
-		spin_unlock_irqrestore(shost->host_lock, flags);
-		transport_destroy_device(dev);
-		put_device(parent);
-		kfree(starget);
-		return NULL;
-	}
-	transport_add_device(dev);
 	if (shost->hostt->target_alloc) {
 		error = shost->hostt->target_alloc(starget);
 
@@ -427,9 +441,7 @@ static struct scsi_target *scsi_alloc_target(struct device *parent,
 			dev_printk(KERN_ERR, dev, "target allocation failed, error %d\n", error);
 			/* don't want scsi_target_reap to do the final
 			 * put because it will be under the host lock */
-			get_device(dev);
-			scsi_target_reap(starget);
-			put_device(dev);
+			scsi_target_destroy(starget);
 			return NULL;
 		}
 	}
@@ -456,23 +468,14 @@ static void scsi_target_reap_usercontext(struct work_struct *work)
 {
 	struct scsi_target *starget =
 		container_of(work, struct scsi_target, ew.work);
-	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
-	unsigned long flags;
 
 	transport_remove_device(&starget->dev);
 	device_del(&starget->dev);
-	transport_destroy_device(&starget->dev);
-	spin_lock_irqsave(shost->host_lock, flags);
-	if (shost->hostt->target_destroy)
-		shost->hostt->target_destroy(starget);
-	list_del_init(&starget->siblings);
-	spin_unlock_irqrestore(shost->host_lock, flags);
-	put_device(&starget->dev);
+	scsi_target_destroy(starget);
 }
 
 /**
  * scsi_target_reap - check to see if target is in use and destroy if not
- *
  * @starget: target to be checked
  *
  * This is used after removing a LUN or doing a last put of the target
@@ -483,21 +486,25 @@ void scsi_target_reap(struct scsi_target *starget)
 {
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
 	unsigned long flags;
+	enum scsi_target_state state;
+	int empty;
 
 	spin_lock_irqsave(shost->host_lock, flags);
-
-	if (--starget->reap_ref == 0 && list_empty(&starget->devices)) {
-		BUG_ON(starget->state == STARGET_DEL);
-		starget->state = STARGET_DEL;
-		spin_unlock_irqrestore(shost->host_lock, flags);
-		execute_in_process_context(scsi_target_reap_usercontext,
-					   &starget->ew);
-		return;
-
-	}
+	state = starget->state;
+	empty = --starget->reap_ref == 0 &&
+		list_empty(&starget->devices) ? 1 : 0;
 	spin_unlock_irqrestore(shost->host_lock, flags);
 
-	return;
+	if (!empty)
+		return;
+
+	BUG_ON(state == STARGET_DEL);
+	starget->state = STARGET_DEL;
+	if (state == STARGET_CREATED)
+		scsi_target_destroy(starget);
+	else
+		execute_in_process_context(scsi_target_reap_usercontext,
+					   &starget->ew);
 }
 
 /**
@@ -863,7 +870,7 @@ static int scsi_add_lun(struct scsi_device *sdev, unsigned char *inq_result,
 		sdev->no_start_on_add = 1;
 
 	if (*bflags & BLIST_SINGLELUN)
-		sdev->single_lun = 1;
+		scsi_target(sdev)->single_lun = 1;
 
 	sdev->use_10_for_rw = 1;
 
@@ -928,8 +935,7 @@ static inline void scsi_destroy_sdev(struct scsi_device *sdev)
 
 #ifdef CONFIG_SCSI_LOGGING
 /** 
- * scsi_inq_str - print INQUIRY data from min to max index,
- * strip trailing whitespace
+ * scsi_inq_str - print INQUIRY data from min to max index, strip trailing whitespace
  * @buf:   Output buffer with at least end-first+1 bytes of space
  * @inq:   Inquiry buffer (input)
  * @first: Offset of string into inq
@@ -957,9 +963,10 @@ static unsigned char *scsi_inq_str(unsigned char *buf, unsigned char *inq,
  * scsi_probe_and_add_lun - probe a LUN, if a LUN is found add it
  * @starget:	pointer to target device structure
  * @lun:	LUN of target device
- * @sdevscan:	probe the LUN corresponding to this scsi_device
- * @sdevnew:	store the value of any new scsi_device allocated
  * @bflagsp:	store bflags here if not NULL
+ * @sdevp:	probe the LUN corresponding to this scsi_device
+ * @rescan:     if nonzero skip some code only needed on first scan
+ * @hostdata:	passed to scsi_alloc_sdev()
  *
  * Description:
  *     Call scsi_probe_lun, if a LUN with an attached device is found,
@@ -1046,8 +1053,9 @@ static int scsi_probe_and_add_lun(struct scsi_target *starget,
 					scsi_inq_str(vend, result, 8, 16),
 					scsi_inq_str(mod, result, 16, 32));
 			});
+
 		}
-		
+
 		res = SCSI_SCAN_TARGET_PRESENT;
 		goto out_free_result;
 	}
@@ -1110,6 +1118,8 @@ static int scsi_probe_and_add_lun(struct scsi_target *starget,
  * scsi_sequential_lun_scan - sequentially scan a SCSI target
  * @starget:	pointer to target structure to scan
  * @bflags:	black/white list flag for LUN 0
+ * @scsi_level: Which version of the standard does this device adhere to
+ * @rescan:     passed to scsi_probe_add_lun()
  *
  * Description:
  *     Generally, scan from LUN 1 (LUN 0 is assumed to already have been
@@ -1220,7 +1230,7 @@ EXPORT_SYMBOL(scsilun_to_int);
 
 /**
  * int_to_scsilun: reverts an int into a scsi_lun
- * @int:        integer to be reverted
+ * @lun:        integer to be reverted
  * @scsilun:	struct scsi_lun to be set.
  *
  * Description:
@@ -1252,18 +1262,22 @@ EXPORT_SYMBOL(int_to_scsilun);
 
 /**
  * scsi_report_lun_scan - Scan using SCSI REPORT LUN results
- * @sdevscan:	scan the host, channel, and id of this scsi_device
+ * @starget: which target
+ * @bflags: Zero or a mix of BLIST_NOLUN, BLIST_REPORTLUN2, or BLIST_NOREPORTLUN
+ * @rescan: nonzero if we can skip code only needed on first scan
  *
  * Description:
- *     If @sdevscan is for a SCSI-3 or up device, send a REPORT LUN
- *     command, and scan the resulting list of LUNs by calling
- *     scsi_probe_and_add_lun.
+ *   Fast scanning for modern (SCSI-3) devices by sending a REPORT LUN command.
+ *   Scan the resulting list of LUNs by calling scsi_probe_and_add_lun.
  *
- *     Modifies sdevscan->lun.
+ *   If BLINK_REPORTLUN2 is set, scan a target that supports more than 8
+ *   LUNs even if it's older than SCSI-3.
+ *   If BLIST_NOREPORTLUN is set, return 1 always.
+ *   If BLIST_NOLUN is set, return 0 always.
  *
  * Return:
  *     0: scan completed (or no memory, so further scanning is futile)
- *     1: no report lun scan, or not configured
+ *     1: could not scan with REPORT LUN
  **/
 static int scsi_report_lun_scan(struct scsi_target *starget, int bflags,
 				int rescan)
@@ -1567,8 +1581,7 @@ static void __scsi_scan_target(struct device *parent, unsigned int channel,
 }
 
 /**
- * scsi_scan_target - scan a target id, possibly including all LUNs on the
- *     target.
+ * scsi_scan_target - scan a target id, possibly including all LUNs on the target.
  * @parent:	host to scan
  * @channel:	channel to scan
  * @id:		target id to scan
@@ -1815,7 +1828,7 @@ void scsi_scan_host(struct Scsi_Host *shost)
 	}
 
 	p = kthread_run(do_scan_async, data, "scsi_scan_%d", shost->host_no);
-	if (unlikely(IS_ERR(p)))
+	if (IS_ERR(p))
 		do_scan_async(data);
 }
 EXPORT_SYMBOL(scsi_scan_host);

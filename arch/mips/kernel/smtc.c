@@ -16,7 +16,6 @@
 #include <asm/hazards.h>
 #include <asm/irq.h>
 #include <asm/mmu_context.h>
-#include <asm/smp.h>
 #include <asm/mipsregs.h>
 #include <asm/cacheflush.h>
 #include <asm/time.h>
@@ -66,7 +65,7 @@ asiduse smtc_live_asid[MAX_SMTC_TLBS][MAX_SMTC_ASIDS];
 static atomic_t ipi_timer_latch[NR_CPUS];
 
 /*
- * Number of InterProcessor Interupt (IPI) message buffers to allocate
+ * Number of InterProcessor Interrupt (IPI) message buffers to allocate
  */
 
 #define IPIBUF_PER_CPU 4
@@ -174,14 +173,6 @@ static atomic_t idle_hook_initialized = {0};
 static int clock_hang_reported[NR_CPUS];
 
 #endif /* CONFIG_SMTC_IDLE_HOOK_DEBUG */
-
-/* Initialize shared TLB - the should probably migrate to smtc_setup_cpus() */
-
-void __init sanitize_tlb_entries(void)
-{
-	printk("Deprecated sanitize_tlb_entries() invoked\n");
-}
-
 
 /*
  * Configure shared TLB - VPC configuration bit must be set by caller
@@ -340,7 +331,8 @@ static void smtc_tc_setup(int vpe, int tc, int cpu)
 	/* In general, all TCs should have the same cpu_data indications */
 	memcpy(&cpu_data[cpu], &cpu_data[0], sizeof(struct cpuinfo_mips));
 	/* For 34Kf, start with TC/CPU 0 as sole owner of single FPU context */
-	if (cpu_data[0].cputype == CPU_34K)
+	if (cpu_data[0].cputype == CPU_34K ||
+	    cpu_data[0].cputype == CPU_1004K)
 		cpu_data[cpu].options &= ~MIPS_CPU_FPU;
 	cpu_data[cpu].vpe_id = vpe;
 	cpu_data[cpu].tc_id = tc;
@@ -781,7 +773,7 @@ void smtc_send_ipi(int cpu, int type, unsigned int action)
 	if (cpu_data[cpu].vpe_id != cpu_data[smp_processor_id()].vpe_id) {
 		if (type == SMTC_CLOCK_TICK)
 			atomic_inc(&ipi_timer_latch[cpu]);
-		/* If not on same VPE, enqueue and send cross-VPE interupt */
+		/* If not on same VPE, enqueue and send cross-VPE interrupt */
 		smtc_ipi_nq(&IPIQ[cpu], pipi);
 		LOCK_CORE_PRA();
 		settc(cpu_data[cpu].tc_id);
@@ -1064,7 +1056,7 @@ static void setup_cross_vpe_interrupts(unsigned int nvpe)
 		return;
 
 	if (!cpu_has_vint)
-		panic("SMTC Kernel requires Vectored Interupt support");
+		panic("SMTC Kernel requires Vectored Interrupt support");
 
 	set_vi_handler(MIPS_CPU_IPI_IRQ, ipi_irq_dispatch);
 

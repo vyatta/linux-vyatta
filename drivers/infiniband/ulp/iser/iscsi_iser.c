@@ -129,7 +129,7 @@ error:
  * iscsi_iser_cmd_init - Initialize iSCSI SCSI_READ or SCSI_WRITE commands
  *
  **/
-static void
+static int
 iscsi_iser_cmd_init(struct iscsi_cmd_task *ctask)
 {
 	struct iscsi_iser_conn     *iser_conn  = ctask->conn->dd_data;
@@ -138,6 +138,7 @@ iscsi_iser_cmd_init(struct iscsi_cmd_task *ctask)
 	iser_ctask->command_sent = 0;
 	iser_ctask->iser_conn    = iser_conn;
 	iser_ctask_rdma_init(iser_ctask);
+	return 0;
 }
 
 /**
@@ -219,12 +220,6 @@ iscsi_iser_ctask_xmit(struct iscsi_conn *conn,
 
 	debug_scsi("ctask deq [cid %d itt 0x%x]\n",
 		   conn->id, ctask->itt);
-
-	/*
-	 * serialize with TMF AbortTask
-	 */
-	if (ctask->mtask)
-		return error;
 
 	/* Send the cmd PDU */
 	if (!iser_ctask->command_sent) {
@@ -406,6 +401,7 @@ iscsi_iser_session_create(struct iscsi_transport *iscsit,
 		ctask      = session->cmds[i];
 		iser_ctask = ctask->dd_data;
 		ctask->hdr = (struct iscsi_cmd *)&iser_ctask->desc.iscsi_header;
+		ctask->hdr_max = sizeof(iser_ctask->desc.iscsi_header);
 	}
 
 	for (i = 0; i < session->mgmtpool_max; i++) {
@@ -477,13 +473,15 @@ iscsi_iser_conn_get_stats(struct iscsi_cls_conn *cls_conn, struct iscsi_stats *s
 	stats->r2t_pdus = conn->r2t_pdus_cnt; /* always 0 */
 	stats->tmfcmd_pdus = conn->tmfcmd_pdus_cnt;
 	stats->tmfrsp_pdus = conn->tmfrsp_pdus_cnt;
-	stats->custom_length = 3;
+	stats->custom_length = 4;
 	strcpy(stats->custom[0].desc, "qp_tx_queue_full");
 	stats->custom[0].value = 0; /* TB iser_conn->qp_tx_queue_full; */
 	strcpy(stats->custom[1].desc, "fmr_map_not_avail");
 	stats->custom[1].value = 0; /* TB iser_conn->fmr_map_not_avail */;
 	strcpy(stats->custom[2].desc, "eh_abort_cnt");
 	stats->custom[2].value = conn->eh_abort_cnt;
+	strcpy(stats->custom[3].desc, "fmr_unalign_cnt");
+	stats->custom[3].value = conn->fmr_unalign_cnt;
 }
 
 static int
@@ -551,11 +549,13 @@ static struct scsi_host_template iscsi_iser_sht = {
 	.module                 = THIS_MODULE,
 	.name                   = "iSCSI Initiator over iSER, v." DRV_VER,
 	.queuecommand           = iscsi_queuecommand,
+	.change_queue_depth	= iscsi_change_queue_depth,
 	.can_queue		= ISCSI_DEF_XMIT_CMDS_MAX - 1,
 	.sg_tablesize           = ISCSI_ISER_SG_TABLESIZE,
 	.max_sectors		= 1024,
 	.cmd_per_lun            = ISCSI_MAX_CMD_PER_LUN,
 	.eh_abort_handler       = iscsi_eh_abort,
+	.eh_device_reset_handler= iscsi_eh_device_reset,
 	.eh_host_reset_handler	= iscsi_eh_host_reset,
 	.use_clustering         = DISABLE_CLUSTERING,
 	.proc_name              = "iscsi_iser",
@@ -582,7 +582,9 @@ static struct iscsi_transport iscsi_iser_transport = {
 				  ISCSI_PERSISTENT_ADDRESS |
 				  ISCSI_TARGET_NAME | ISCSI_TPGT |
 				  ISCSI_USERNAME | ISCSI_PASSWORD |
-				  ISCSI_USERNAME_IN | ISCSI_PASSWORD_IN,
+				  ISCSI_USERNAME_IN | ISCSI_PASSWORD_IN |
+				  ISCSI_FAST_ABORT | ISCSI_ABORT_TMO |
+				  ISCSI_PING_TMO | ISCSI_RECV_TMO,
 	.host_param_mask	= ISCSI_HOST_HWADDRESS |
 				  ISCSI_HOST_NETDEV_NAME |
 				  ISCSI_HOST_INITIATOR_NAME,

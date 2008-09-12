@@ -1,6 +1,4 @@
 /*
- *  linux/drivers/ide/ppc/ide-m8xx.c
- *
  *  Copyright (C) 2000, 2001 Wolfgang Denk, wd@denx.de
  *  Modified for direct IDE interface
  *	by Thomas Lange, thomas@corelatus.com
@@ -19,7 +17,6 @@
 #include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/user.h>
-#include <linux/a.out.h>
 #include <linux/tty.h>
 #include <linux/major.h>
 #include <linux/interrupt.h>
@@ -38,6 +35,8 @@
 #include <asm/8xx_immap.h>
 #include <asm/machdep.h>
 #include <asm/irq.h>
+
+#define DRV_NAME "ide-mpc8xx"
 
 static int identify  (volatile u8 *p);
 static void print_fixed (volatile u8 *p);
@@ -102,32 +101,6 @@ static int _slot_ = -1;			/* will be read from PCMCIA registers   */
 /* Make clock cycles and always round up */
 #define PCMCIA_MK_CLKS( t, T ) (( (t) * ((T)/1000000) + 999U ) / 1000U )
 
-
-
-/*
- * IDE stuff.
- */
-static int
-m8xx_ide_default_irq(unsigned long base)
-{
-#ifdef CONFIG_BLK_DEV_MPC8xx_IDE
-	if (base >= MAX_HWIFS)
-		return 0;
-
-	printk("[%d] m8xx_ide_default_irq %d\n",__LINE__,ioport_dsc[base].irq);
-	
-	return (ioport_dsc[base].irq);
-#else
-        return 9;
-#endif
-}
-
-static unsigned long
-m8xx_ide_default_io_base(int index)
-{
-        return index;
-}
-
 #define M8XX_PCMCIA_CD2(slot)      (0x10000000 >> (slot << 4))
 #define M8XX_PCMCIA_CD1(slot)      (0x08000000 >> (slot << 4))
 
@@ -152,14 +125,13 @@ static int pcmcia_schlvl = PCMCIA_SCHLVL;
  */
 
 /*
- * m8xx_ide_init_hwif_ports for a direct IDE interface _using_
+ * m8xx_ide_init_ports() for a direct IDE interface _using_
+ * MPC8xx's internal PCMCIA interface
  */
 #if defined(CONFIG_IDE_8xx_PCCARD) || defined(CONFIG_IDE_8xx_DIRECT)
-static void
-m8xx_ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port, 
-		unsigned long ctrl_port, int *irq)
+static int __init m8xx_ide_init_ports(hw_regs_t *hw, unsigned long data_port)
 {
-	unsigned long *p = hw->io_ports;
+	unsigned long *p = hw->io_ports_array;
 	int i;
 
 	typedef struct {
@@ -176,8 +148,6 @@ m8xx_ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
 	unsigned long base;
 
 	*p = 0;
-	if (irq)
-		*irq = 0;
 
 	pcmp = (pcmconf8xx_t *)(&(((immap_t *)IMAP_ADDR)->im_pcmcia));
 
@@ -213,6 +183,13 @@ m8xx_ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
 			'A' + _slot_,
 			pcmcia_phy_base, pcmcia_phy_end,
 			pcmcia_phy_end - pcmcia_phy_base);
+
+		if (!request_mem_region(pcmcia_phy_base,
+					pcmcia_phy_end - pcmcia_phy_base,
+					DRV_NAME)) {
+			printk(KERN_ERR "%s: resources busy\n", DRV_NAME);
+			return -EBUSY;
+		}
 
 		pcmcia_base=(unsigned long)ioremap(pcmcia_phy_base,
 						   pcmcia_phy_end-pcmcia_phy_base);
@@ -251,9 +228,6 @@ m8xx_ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
 		}
 	}
 
-	if (data_port >= MAX_HWIFS)
-		return;
-
 	if (_slot_ == -1) {
 		printk ("PCMCIA slot has not been defined! Using A as default\n");
 		_slot_ = 0;
@@ -271,7 +245,7 @@ m8xx_ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
 	if (pcmp->pcmc_pipr & (M8XX_PCMCIA_CD1(_slot_)|M8XX_PCMCIA_CD2(_slot_))) {
 		printk ("No card in slot %c: PIPR=%08x\n",
 			'A' + _slot_, (u32) pcmp->pcmc_pipr);
-		return;		/* No card in slot */
+		return -ENODEV;		/* No card in slot */
 	}
 
 	check_ide_device (pcmcia_base);
@@ -295,11 +269,13 @@ m8xx_ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
 	 	*p++ = base + ioport_dsc[data_port].reg_off[i];
 	}
 
-	if (irq) {
+	hw->irq = ioport_dsc[data_port].irq;
+	hw->ack_intr = (ide_ack_intr_t *)ide_interrupt_ack;
+
 #ifdef CONFIG_IDE_8xx_PCCARD
+	{
 		unsigned int reg;
 
-		*irq = ioport_dsc[data_port].irq;
 		if (_slot_)
 			pgcrx = &((immap_t *) IMAP_ADDR)->im_pcmcia.pcmc_pgcrb;
 		else
@@ -309,14 +285,8 @@ m8xx_ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
 		reg |= mk_int_int_mask (pcmcia_schlvl) << 24;
 		reg |= mk_int_int_mask (pcmcia_schlvl) << 16;
 		*pgcrx = reg;
-#else	/* direct connected IDE drive, i.e. external IRQ, not the PCMCIA irq */
-		*irq = ioport_dsc[data_port].irq;
-#endif	/* CONFIG_IDE_8xx_PCCARD */
 	}
-
-	ide_hwifs[data_port].pio_mask = ATA_PIO4;
-	ide_hwifs[data_port].set_pio_mode = m8xx_ide_set_pio_mode;
-	ide_hwifs[data_port].ack_intr = (ide_ack_intr_t *)ide_interrupt_ack;
+#endif	/* CONFIG_IDE_8xx_PCCARD */
 
 	/* Enable Harddisk Interrupt,
 	 * and make it edge sensitive
@@ -332,18 +302,21 @@ m8xx_ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
 	/* Enable falling edge irq */
 	pcmp->pcmc_per = 0x100000 >> (16 * _slot_);
 #endif	/* CONFIG_IDE_8xx_PCCARD */
-}	/* m8xx_ide_init_hwif_ports() using 8xx internal PCMCIA interface */
+
+	hw->chipset = ide_generic;
+
+	return 0;
+}
 #endif /* CONFIG_IDE_8xx_PCCARD || CONFIG_IDE_8xx_DIRECT */
 
 /*
- * m8xx_ide_init_hwif_ports for a direct IDE interface _not_ using
+ * m8xx_ide_init_ports() for a direct IDE interface _not_ using
  * MPC8xx's internal PCMCIA interface
  */
 #if defined(CONFIG_IDE_EXT_DIRECT)
-void m8xx_ide_init_hwif_ports (hw_regs_t *hw,
-	unsigned long data_port, unsigned long ctrl_port, int *irq)
+static int __init m8xx_ide_init_ports(hw_regs_t *hw, unsigned long data_port)
 {
-	unsigned long *p = hw->io_ports;
+	unsigned long *p = hw->io_ports_array;
 	int i;
 
 	u32 ide_phy_base;
@@ -352,8 +325,6 @@ void m8xx_ide_init_hwif_ports (hw_regs_t *hw,
 	unsigned long base;
 
 	*p = 0;
-	if (irq)
-		*irq = 0;
 
 	if (!ide_base) {
 
@@ -366,7 +337,12 @@ void m8xx_ide_init_hwif_ports (hw_regs_t *hw,
 		printk ("IDE phys mem : %08x...%08x (size %08x)\n",
 			ide_phy_base, ide_phy_end,
 			ide_phy_end - ide_phy_base);
-		
+
+		if (!request_mem_region(ide_phy_base, 0x200, DRV_NAME)) {
+			printk(KERN_ERR "%s: resources busy\n", DRV_NAME);
+			return -EBUSY;
+		}
+
 		ide_base=(unsigned long)ioremap(ide_phy_base,
 						ide_phy_end-ide_phy_base);
 
@@ -374,9 +350,6 @@ void m8xx_ide_init_hwif_ports (hw_regs_t *hw,
 		printk ("IDE virt base: %08lx\n", ide_base);
 #endif
 	}
-
-	if (data_port >= MAX_HWIFS)
-		return;
 
 	base = ide_base + ioport_dsc[data_port].base_off;
 #ifdef DEBUG
@@ -395,14 +368,9 @@ void m8xx_ide_init_hwif_ports (hw_regs_t *hw,
 	 	*p++ = base + ioport_dsc[data_port].reg_off[i];
 	}
 
-	if (irq) {
-		/* direct connected IDE drive, i.e. external IRQ */
-		*irq = ioport_dsc[data_port].irq;
-	}
-
-	ide_hwifs[data_port].pio_mask = ATA_PIO4;
-	ide_hwifs[data_port].set_pio_mode = m8xx_ide_set_pio_mode;
-	ide_hwifs[data_port].ack_intr = (ide_ack_intr_t *)ide_interrupt_ack;
+	/* direct connected IDE drive, i.e. external IRQ */
+	hw->irq = ioport_dsc[data_port].irq;
+	hw->ack_intr = (ide_ack_intr_t *)ide_interrupt_ack;
 
 	/* Enable Harddisk Interrupt,
 	 * and make it edge sensitive
@@ -410,8 +378,11 @@ void m8xx_ide_init_hwif_ports (hw_regs_t *hw,
 	/* (11-18) Set edge detect for irq, no wakeup from low power mode */
 	((immap_t *) IMAP_ADDR)->im_siu_conf.sc_siel |=
 			(0x80000000 >> ioport_dsc[data_port].irq);
-}	/* m8xx_ide_init_hwif_ports() for CONFIG_IDE_8xx_DIRECT */ 
 
+	hw->chipset = ide_generic;
+
+	return 0;
+}
 #endif	/* CONFIG_IDE_8xx_DIRECT */
 
 
@@ -471,9 +442,13 @@ static void m8xx_ide_set_pio_mode(ide_drive_t *drive, const u8 pio)
 #elif defined(CONFIG_IDE_EXT_DIRECT)
 
 	printk("%s[%d] %s: not implemented yet!\n",
-		__FILE__,__LINE__,__FUNCTION__);
+		__FILE__, __LINE__, __func__);
 #endif /* defined(CONFIG_IDE_8xx_PCCARD) || defined(CONFIG_IDE_8xx_PCMCIA */
 }
+
+static const struct ide_port_ops m8xx_port_ops = {
+	.set_pio_mode		= m8xx_ide_set_pio_mode,
+};
 
 static void
 ide_interrupt_ack (void *dev)
@@ -832,9 +807,45 @@ static int identify  (volatile u8 *p)
 	return (0);	/* don't know */
 }
 
-void m8xx_ide_init(void)
+static int __init mpc8xx_ide_probe(void)
 {
-	ppc_ide_md.default_irq          = m8xx_ide_default_irq;
-	ppc_ide_md.default_io_base      = m8xx_ide_default_io_base;
-	ppc_ide_md.ide_init_hwif        = m8xx_ide_init_hwif_ports;
+	hw_regs_t hw;
+	u8 idx[4] = { 0xff, 0xff, 0xff, 0xff };
+
+#ifdef IDE0_BASE_OFFSET
+	memset(&hw, 0, sizeof(hw));
+	if (!m8xx_ide_init_ports(&hw, 0)) {
+		ide_hwif_t *hwif = ide_find_port();
+
+		if (hwif) {
+			ide_init_port_hw(hwif, &hw);
+			hwif->pio_mask = ATA_PIO4;
+			hwif->port_ops = &m8xx_port_ops;
+
+			idx[0] = hwif->index;
+		}
+	}
+#ifdef IDE1_BASE_OFFSET
+	memset(&hw, 0, sizeof(hw));
+	if (!m8xx_ide_init_ports(&hw, 1)) {
+		ide_hwif_t *mate = ide_find_port();
+
+		if (mate) {
+			ide_init_port_hw(mate, &hw);
+			mate->pio_mask = ATA_PIO4;
+			mate->port_ops = &m8xx_port_ops;
+
+			idx[1] = mate->index;
+		}
+	}
+#endif
+#endif
+
+	ide_device_add(idx, NULL);
+
+	return 0;
 }
+
+module_init(mpc8xx_ide_probe);
+
+MODULE_LICENSE("GPL");

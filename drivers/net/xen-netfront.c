@@ -946,8 +946,7 @@ err:
 		work_done++;
 	}
 
-	while ((skb = __skb_dequeue(&errq)))
-		kfree_skb(skb);
+	__skb_queue_purge(&errq);
 
 	work_done -= handle_incoming_queue(dev, &rxq);
 
@@ -1073,14 +1072,13 @@ static void xennet_release_rx_bufs(struct netfront_info *np)
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 			/* Do all the remapping work and M2P updates. */
 			MULTI_mmu_update(mcl, np->rx_mmu, mmu - np->rx_mmu,
-					 0, DOMID_SELF);
+					 NULL, DOMID_SELF);
 			mcl++;
 			HYPERVISOR_multicall(np->rx_mcl, mcl - np->rx_mcl);
 		}
 	}
 
-	while ((skb = __skb_dequeue(&free_list)) != NULL)
-		dev_kfree_skb(skb);
+	__skb_queue_purge(&free_list);
 
 	spin_unlock_bh(&np->rx_lock);
 }
@@ -1803,9 +1801,11 @@ static void __exit netif_exit(void)
 	if (is_initial_xendomain())
 		return;
 
-	return xenbus_unregister_driver(&netfront);
+	xenbus_unregister_driver(&netfront);
 }
 module_exit(netif_exit);
 
 MODULE_DESCRIPTION("Xen virtual network device frontend");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("xen:vif");
+MODULE_ALIAS("xennet");

@@ -19,7 +19,6 @@
  *
  */
 
-#include <sound/driver.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/file.h>
@@ -42,6 +41,40 @@ struct snd_card *snd_cards[SNDRV_CARDS];
 EXPORT_SYMBOL(snd_cards);
 
 static DEFINE_MUTEX(snd_card_mutex);
+
+static char *slots[SNDRV_CARDS];
+module_param_array(slots, charp, NULL, 0444);
+MODULE_PARM_DESC(slots, "Module names assigned to the slots.");
+
+/* return non-zero if the given index is already reserved for another
+ * module via slots option
+ */
+static int module_slot_mismatch(struct module *module, int idx)
+{
+#ifdef MODULE
+	char *s1, *s2;
+	if (!module || !module->name || !slots[idx])
+		return 0;
+	s1 = slots[idx];
+	s2 = module->name;
+	/* compare module name strings
+	 * hyphens are handled as equivalent with underscore
+	 */
+	for (;;) {
+		char c1 = *s1++;
+		char c2 = *s2++;
+		if (c1 == '-')
+			c1 = '_';
+		if (c2 == '-')
+			c2 = '_';
+		if (c1 != c2)
+			return 1;
+		if (!c1)
+			break;
+	}
+#endif
+	return 0;
+}
 
 #if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 int (*snd_mixer_oss_notify_callback)(struct snd_card *card, int free_flag);
@@ -115,6 +148,8 @@ struct snd_card *snd_card_new(int idx, const char *xid,
 		for (idx2 = 0; idx2 < SNDRV_CARDS; idx2++)
 			/* idx == -1 == 0xffff means: take any free slot */
 			if (~snd_cards_lock & idx & 1<<idx2) {
+				if (module_slot_mismatch(module, idx2))
+					continue;
 				idx = idx2;
 				if (idx >= snd_ecards_limit)
 					snd_ecards_limit = idx + 1;
@@ -219,7 +254,7 @@ static int snd_disconnect_release(struct inode *inode, struct file *file)
 	if (likely(df))
 		return df->disconnected_f_op->release(inode, file);
 
-	panic("%s(%p, %p) failed!", __FUNCTION__, inode, file);
+	panic("%s(%p, %p) failed!", __func__, inode, file);
 }
 
 static unsigned int snd_disconnect_poll(struct file * file, poll_table * wait)
@@ -276,6 +311,9 @@ int snd_card_disconnect(struct snd_card *card)
 	struct file *file;
 	int err;
 
+	if (!card)
+		return -EINVAL;
+
 	spin_lock(&card->files_lock);
 	if (card->shutdown) {
 		spin_unlock(&card->files_lock);
@@ -287,6 +325,7 @@ int snd_card_disconnect(struct snd_card *card)
 	/* phase 1: disable fops (user space) operations for ALSA API */
 	mutex_lock(&snd_card_mutex);
 	snd_cards[card->number] = NULL;
+	snd_cards_lock &= ~(1 << card->number);
 	mutex_unlock(&snd_card_mutex);
 	
 	/* phase 2: replace file->f_op with special dummy operations */
@@ -304,8 +343,8 @@ int snd_card_disconnect(struct snd_card *card)
 		list_add(&mfile->shutdown_list, &shutdown_files);
 		spin_unlock(&shutdown_lock);
 
-		fops_get(&snd_shutdown_f_ops);
 		mfile->file->f_op = &snd_shutdown_f_ops;
+		fops_get(mfile->file->f_op);
 		
 		mfile = mfile->next;
 	}
@@ -325,6 +364,15 @@ int snd_card_disconnect(struct snd_card *card)
 		snd_printk(KERN_ERR "not all devices for card %i can be disconnected\n", card->number);
 
 	snd_info_card_disconnect(card);
+#ifndef CONFIG_SYSFS_DEPRECATED
+	if (card->card_dev) {
+		device_unregister(card->card_dev);
+		card->card_dev = NULL;
+	}
+#endif
+#ifdef CONFIG_PM
+	wake_up(&card->power_sleep);
+#endif
 	return 0;	
 }
 
@@ -366,33 +414,14 @@ static int snd_card_do_free(struct snd_card *card)
 		snd_printk(KERN_WARNING "unable to free card info\n");
 		/* Not fatal error */
 	}
-#ifndef CONFIG_SYSFS_DEPRECATED
-	if (card->card_dev)
-		device_unregister(card->card_dev);
-#endif
 	kfree(card);
-	return 0;
-}
-
-static int snd_card_free_prepare(struct snd_card *card)
-{
-	if (card == NULL)
-		return -EINVAL;
-	(void) snd_card_disconnect(card);
-	mutex_lock(&snd_card_mutex);
-	snd_cards[card->number] = NULL;
-	snd_cards_lock &= ~(1 << card->number);
-	mutex_unlock(&snd_card_mutex);
-#ifdef CONFIG_PM
-	wake_up(&card->power_sleep);
-#endif
 	return 0;
 }
 
 int snd_card_free_when_closed(struct snd_card *card)
 {
 	int free_now = 0;
-	int ret = snd_card_free_prepare(card);
+	int ret = snd_card_disconnect(card);
 	if (ret)
 		return ret;
 
@@ -412,7 +441,7 @@ EXPORT_SYMBOL(snd_card_free_when_closed);
 
 int snd_card_free(struct snd_card *card)
 {
-	int ret = snd_card_free_prepare(card);
+	int ret = snd_card_disconnect(card);
 	if (ret)
 		return ret;
 

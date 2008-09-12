@@ -22,11 +22,21 @@
  *
  */
 
+#include <linux/module.h>
 #include <linux/sched.h>		/* wake_up() */
 #include <linux/mutex.h>		/* struct mutex */
 #include <linux/rwsem.h>		/* struct rw_semaphore */
 #include <linux/pm.h>			/* pm_message_t */
 #include <linux/device.h>
+
+/* number of supported soundcards */
+#ifdef CONFIG_SND_DYNAMIC_MINORS
+#define SNDRV_CARDS 32
+#else
+#define SNDRV_CARDS 8		/* don't change - minor numbers */
+#endif
+
+#define CONFIG_SND_MAJOR	116	/* standard configuration */
 
 /* forward declarations */
 #ifdef CONFIG_PCI
@@ -267,8 +277,8 @@ int snd_minor_info_done(void);
 int snd_minor_info_oss_init(void);
 int snd_minor_info_oss_done(void);
 #else
-#define snd_minor_info_oss_init() /*NOP*/
-#define snd_minor_info_oss_done() /*NOP*/
+static inline int snd_minor_info_oss_init(void) { return 0; }
+static inline int snd_minor_info_oss_done(void) { return 0; }
 #endif
 
 /* memory.c */
@@ -300,7 +310,7 @@ int snd_card_file_add(struct snd_card *card, struct file *file);
 int snd_card_file_remove(struct snd_card *card, struct file *file);
 
 #ifndef snd_card_set_dev
-#define snd_card_set_dev(card,devptr) ((card)->dev = (devptr))
+#define snd_card_set_dev(card, devptr) ((card)->dev = (devptr))
 #endif
 
 /* device.c */
@@ -363,7 +373,7 @@ void snd_verbose_printd(const char *file, int line, const char *format, ...)
  * snd_printd - debug printk
  * @fmt: format string
  *
- * Compiled only when Works like snd_printk() for debugging purpose.
+ * Works like snd_printk() for debugging purposes.
  * Ignored when CONFIG_SND_DEBUG is not set.
  */
 #define snd_printd(fmt, args...) \
@@ -407,7 +417,7 @@ void snd_verbose_printd(const char *file, int line, const char *format, ...)
  * snd_printdd - debug printk
  * @format: format string
  *
- * Compiled only when Works like snd_printk() for debugging purpose.
+ * Works like snd_printk() for debugging purposes.
  * Ignored when CONFIG_SND_DEBUG_DETECT is not set.
  */
 #define snd_printdd(format, args...) snd_printk(format, ##args)

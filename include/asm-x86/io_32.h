@@ -49,12 +49,6 @@
 #include <linux/vmalloc.h>
 
 /*
- * Convert a physical pointer to a virtual kernel pointer for /dev/mem
- * access
- */
-#define xlate_dev_mem_ptr(p)	__va(p)
-
-/*
  * Convert a virtual cached pointer to an uncached pointer
  */
 #define xlate_dev_kmem_ptr(p)	p
@@ -65,14 +59,14 @@
  *
  *	The returned physical address is the physical (CPU) mapping for
  *	the memory address given. It is only valid to use this function on
- *	addresses directly mapped or allocated via kmalloc. 
+ *	addresses directly mapped or allocated via kmalloc.
  *
  *	This function does not give bus mappings for DMA transfers. In
  *	almost all conceivable cases a device driver should not be using
  *	this function
  */
- 
-static inline unsigned long virt_to_phys(volatile void * address)
+
+static inline unsigned long virt_to_phys(volatile void *address)
 {
 	return __pa(address);
 }
@@ -90,7 +84,7 @@ static inline unsigned long virt_to_phys(volatile void * address)
  *	this function
  */
 
-static inline void * phys_to_virt(unsigned long address)
+static inline void *phys_to_virt(unsigned long address)
 {
 	return __va(address);
 }
@@ -99,8 +93,6 @@ static inline void * phys_to_virt(unsigned long address)
  * Change "struct page" to physical address.
  */
 #define page_to_phys(page)    ((dma_addr_t)page_to_pfn(page) << PAGE_SHIFT)
-
-extern void __iomem * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
 
 /**
  * ioremap     -   map bus memory into CPU space
@@ -111,33 +103,35 @@ extern void __iomem * __ioremap(unsigned long offset, unsigned long size, unsign
  * make bus memory CPU accessible via the readb/readw/readl/writeb/
  * writew/writel functions and the other mmio helpers. The returned
  * address is not guaranteed to be usable directly as a virtual
- * address. 
+ * address.
  *
  * If the area you are trying to map is a PCI BAR you should have a
  * look at pci_iomap().
  */
+extern void __iomem *ioremap_nocache(resource_size_t offset, unsigned long size);
+extern void __iomem *ioremap_cache(resource_size_t offset, unsigned long size);
 
-static inline void __iomem * ioremap(unsigned long offset, unsigned long size)
+/*
+ * The default ioremap() behavior is non-cached:
+ */
+static inline void __iomem *ioremap(resource_size_t offset, unsigned long size)
 {
-	return __ioremap(offset, size, 0);
+	return ioremap_nocache(offset, size);
 }
 
-extern void __iomem * ioremap_nocache(unsigned long offset, unsigned long size);
 extern void iounmap(volatile void __iomem *addr);
 
 /*
- * bt_ioremap() and bt_iounmap() are for temporary early boot-time
+ * early_ioremap() and early_iounmap() are for temporary early boot-time
  * mappings, before the real ioremap() is functional.
  * A boot-time mapping is currently limited to at most 16 pages.
  */
-extern void *bt_ioremap(unsigned long offset, unsigned long size);
-extern void bt_iounmap(void *addr, unsigned long size);
+extern void early_ioremap_init(void);
+extern void early_ioremap_clear(void);
+extern void early_ioremap_reset(void);
+extern void *early_ioremap(unsigned long offset, unsigned long size);
+extern void early_iounmap(void *addr, unsigned long size);
 extern void __iomem *fix_ioremap(unsigned idx, unsigned long phys);
-
-/* Use early IO mappings for DMI because it's initialized early */
-#define dmi_ioremap bt_ioremap
-#define dmi_iounmap bt_iounmap
-#define dmi_alloc alloc_bootmem
 
 /*
  * ISA I/O bus memory addresses are 1:1 with the physical address.
@@ -164,16 +158,19 @@ extern void __iomem *fix_ioremap(unsigned idx, unsigned long phys);
 
 static inline unsigned char readb(const volatile void __iomem *addr)
 {
-	return *(volatile unsigned char __force *) addr;
+	return *(volatile unsigned char __force *)addr;
 }
+
 static inline unsigned short readw(const volatile void __iomem *addr)
 {
-	return *(volatile unsigned short __force *) addr;
+	return *(volatile unsigned short __force *)addr;
 }
+
 static inline unsigned int readl(const volatile void __iomem *addr)
 {
 	return *(volatile unsigned int __force *) addr;
 }
+
 #define readb_relaxed(addr) readb(addr)
 #define readw_relaxed(addr) readw(addr)
 #define readl_relaxed(addr) readl(addr)
@@ -183,15 +180,17 @@ static inline unsigned int readl(const volatile void __iomem *addr)
 
 static inline void writeb(unsigned char b, volatile void __iomem *addr)
 {
-	*(volatile unsigned char __force *) addr = b;
+	*(volatile unsigned char __force *)addr = b;
 }
+
 static inline void writew(unsigned short b, volatile void __iomem *addr)
 {
-	*(volatile unsigned short __force *) addr = b;
+	*(volatile unsigned short __force *)addr = b;
 }
+
 static inline void writel(unsigned int b, volatile void __iomem *addr)
 {
-	*(volatile unsigned int __force *) addr = b;
+	*(volatile unsigned int __force *)addr = b;
 }
 #define __raw_writeb writeb
 #define __raw_writew writew
@@ -234,12 +233,12 @@ memcpy_toio(volatile void __iomem *dst, const void *src, int count)
  *	1. Out of order aware processors
  *	2. Accidentally out of order processors (PPro errata #51)
  */
- 
+
 #if defined(CONFIG_X86_OOSTORE) || defined(CONFIG_X86_PPRO_FENCE)
 
 static inline void flush_write_buffers(void)
 {
-	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory");
+	asm volatile("lock; addl $0,0(%%esp)": : :"memory");
 }
 
 #else
@@ -250,16 +249,17 @@ static inline void flush_write_buffers(void)
 
 #endif /* __KERNEL__ */
 
-static inline void native_io_delay(void)
-{
-	asm volatile("outb %%al,$0x80" : : : "memory");
-}
+extern void native_io_delay(void);
+
+extern int io_delay_type;
+extern void io_delay_init(void);
 
 #if defined(CONFIG_PARAVIRT)
 #include <asm/paravirt.h>
 #else
 
-static inline void slow_down_io(void) {
+static inline void slow_down_io(void)
+{
 	native_io_delay();
 #ifdef REALLY_SLOW_IO
 	native_io_delay();
@@ -270,76 +270,74 @@ static inline void slow_down_io(void) {
 
 #endif
 
-#ifdef CONFIG_X86_NUMAQ
-extern void *xquad_portio;    /* Where the IO area was mapped */
-#define XQUAD_PORT_ADDR(port, quad) (xquad_portio + (XQUAD_PORTIO_QUAD*quad) + port)
-#define __BUILDIO(bwl,bw,type) \
-static inline void out##bwl##_quad(unsigned type value, int port, int quad) { \
-	if (xquad_portio) \
-		write##bwl(value, XQUAD_PORT_ADDR(port, quad)); \
-	else \
-		out##bwl##_local(value, port); \
-} \
-static inline void out##bwl(unsigned type value, int port) { \
-	out##bwl##_quad(value, port, 0); \
-} \
-static inline unsigned type in##bwl##_quad(int port, int quad) { \
-	if (xquad_portio) \
-		return read##bwl(XQUAD_PORT_ADDR(port, quad)); \
-	else \
-		return in##bwl##_local(port); \
-} \
-static inline unsigned type in##bwl(int port) { \
-	return in##bwl##_quad(port, 0); \
-}
-#else
-#define __BUILDIO(bwl,bw,type) \
-static inline void out##bwl(unsigned type value, int port) { \
-	out##bwl##_local(value, port); \
-} \
-static inline unsigned type in##bwl(int port) { \
-	return in##bwl##_local(port); \
-}
-#endif
-
-
-#define BUILDIO(bwl,bw,type) \
-static inline void out##bwl##_local(unsigned type value, int port) { \
-	__asm__ __volatile__("out" #bwl " %" #bw "0, %w1" : : "a"(value), "Nd"(port)); \
-} \
-static inline unsigned type in##bwl##_local(int port) { \
-	unsigned type value; \
-	__asm__ __volatile__("in" #bwl " %w1, %" #bw "0" : "=a"(value) : "Nd"(port)); \
-	return value; \
-} \
-static inline void out##bwl##_local_p(unsigned type value, int port) { \
-	out##bwl##_local(value, port); \
-	slow_down_io(); \
-} \
-static inline unsigned type in##bwl##_local_p(int port) { \
-	unsigned type value = in##bwl##_local(port); \
-	slow_down_io(); \
-	return value; \
-} \
-__BUILDIO(bwl,bw,type) \
-static inline void out##bwl##_p(unsigned type value, int port) { \
-	out##bwl(value, port); \
-	slow_down_io(); \
-} \
-static inline unsigned type in##bwl##_p(int port) { \
-	unsigned type value = in##bwl(port); \
-	slow_down_io(); \
-	return value; \
-} \
-static inline void outs##bwl(int port, const void *addr, unsigned long count) { \
-	__asm__ __volatile__("rep; outs" #bwl : "+S"(addr), "+c"(count) : "d"(port)); \
-} \
-static inline void ins##bwl(int port, void *addr, unsigned long count) { \
-	__asm__ __volatile__("rep; ins" #bwl : "+D"(addr), "+c"(count) : "d"(port)); \
+#define __BUILDIO(bwl, bw, type)				\
+static inline void out##bwl(unsigned type value, int port)	\
+{								\
+	out##bwl##_local(value, port);				\
+}								\
+								\
+static inline unsigned type in##bwl(int port)			\
+{								\
+	return in##bwl##_local(port);				\
 }
 
-BUILDIO(b,b,char)
-BUILDIO(w,w,short)
-BUILDIO(l,,int)
+#define BUILDIO(bwl, bw, type)						\
+static inline void out##bwl##_local(unsigned type value, int port)	\
+{									\
+	asm volatile("out" #bwl " %" #bw "0, %w1"		\
+		     : : "a"(value), "Nd"(port));			\
+}									\
+									\
+static inline unsigned type in##bwl##_local(int port)			\
+{									\
+	unsigned type value;						\
+	asm volatile("in" #bwl " %w1, %" #bw "0"		\
+		     : "=a"(value) : "Nd"(port));			\
+	return value;							\
+}									\
+									\
+static inline void out##bwl##_local_p(unsigned type value, int port)	\
+{									\
+	out##bwl##_local(value, port);					\
+	slow_down_io();							\
+}									\
+									\
+static inline unsigned type in##bwl##_local_p(int port)			\
+{									\
+	unsigned type value = in##bwl##_local(port);			\
+	slow_down_io();							\
+	return value;							\
+}									\
+									\
+__BUILDIO(bwl, bw, type)						\
+									\
+static inline void out##bwl##_p(unsigned type value, int port)		\
+{									\
+	out##bwl(value, port);						\
+	slow_down_io();							\
+}									\
+									\
+static inline unsigned type in##bwl##_p(int port)			\
+{									\
+	unsigned type value = in##bwl(port);				\
+	slow_down_io();							\
+	return value;							\
+}									\
+									\
+static inline void outs##bwl(int port, const void *addr, unsigned long count) \
+{									\
+	asm volatile("rep; outs" #bwl					\
+		     : "+S"(addr), "+c"(count) : "d"(port));		\
+}									\
+									\
+static inline void ins##bwl(int port, void *addr, unsigned long count)	\
+{									\
+	asm volatile("rep; ins" #bwl					\
+		     : "+D"(addr), "+c"(count) : "d"(port));		\
+}
+
+BUILDIO(b, b, char)
+BUILDIO(w, w, short)
+BUILDIO(l, , int)
 
 #endif

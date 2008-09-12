@@ -1,4 +1,4 @@
-/* $Id: unaligned.c,v 1.24 2002/02/09 19:49:31 davem Exp $
+/*
  * unaligned.c: Unaligned load/store trap handling with special
  *              cases for the kernel to do them more quickly.
  *
@@ -7,6 +7,7 @@
  */
 
 
+#include <linux/jiffies.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
@@ -175,7 +176,7 @@ unsigned long compute_effective_address(struct pt_regs *regs,
 }
 
 /* This is just to make gcc think die_if_kernel does return... */
-static void __attribute_used__ unaligned_panic(char *str, struct pt_regs *regs)
+static void __used unaligned_panic(char *str, struct pt_regs *regs)
 {
 	die_if_kernel(str, regs);
 }
@@ -283,7 +284,7 @@ static void log_unaligned(struct pt_regs *regs)
 {
 	static unsigned long count, last_time;
 
-	if (jiffies - last_time > 5 * HZ)
+	if (time_after(jiffies, last_time + 5 * HZ))
 		count = 0;
 	if (count < 5) {
 		last_time = jiffies;

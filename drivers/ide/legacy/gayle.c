@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/legacy/gayle.c -- Amiga Gayle IDE Driver
+ *  Amiga Gayle IDE Driver
  *
  *     Created 9 Jul 1997 by Geert Uytterhoeven
  *
@@ -16,6 +16,7 @@
 #include <linux/ide.h>
 #include <linux/init.h>
 #include <linux/zorro.h>
+#include <linux/module.h>
 
 #include <asm/setup.h>
 #include <asm/amigahw.h>
@@ -34,21 +35,7 @@
      *  Offsets from one of the above bases
      */
 
-#define GAYLE_DATA	0x00
-#define GAYLE_ERROR	0x06		/* see err-bits */
-#define GAYLE_NSECTOR	0x0a		/* nr of sectors to read/write */
-#define GAYLE_SECTOR	0x0e		/* starting sector */
-#define GAYLE_LCYL	0x12		/* starting cylinder */
-#define GAYLE_HCYL	0x16		/* high byte of starting cyl */
-#define GAYLE_SELECT	0x1a		/* 101dhhhh , d=drive, hhhh=head */
-#define GAYLE_STATUS	0x1e		/* see status-bits */
 #define GAYLE_CONTROL	0x101a
-
-static int gayle_offsets[IDE_NR_PORTS] __initdata = {
-    GAYLE_DATA, GAYLE_ERROR, GAYLE_NSECTOR, GAYLE_SECTOR, GAYLE_LCYL,
-    GAYLE_HCYL, GAYLE_SELECT, GAYLE_STATUS, -1, -1
-};
-
 
     /*
      *  These are at different offsets from the base
@@ -76,7 +63,12 @@ static int gayle_offsets[IDE_NR_PORTS] __initdata = {
 					       GAYLE_NUM_HWIFS-1)
 #define GAYLE_HAS_CONTROL_REG	(!ide_doubler)
 #define GAYLE_IDEREG_SIZE	(ide_doubler ? 0x1000 : 0x2000)
+
 int ide_doubler = 0;	/* support IDE doublers? */
+EXPORT_SYMBOL_GPL(ide_doubler);
+
+module_param_named(doubler, ide_doubler, bool, 0);
+MODULE_PARM_DESC(doubler, "enable support for IDE doublers");
 #endif /* CONFIG_BLK_DEV_IDEDOUBLER */
 
 
@@ -88,7 +80,7 @@ static int gayle_ack_intr_a4000(ide_hwif_t *hwif)
 {
     unsigned char ch;
 
-    ch = z_readb(hwif->io_ports[IDE_IRQ_OFFSET]);
+    ch = z_readb(hwif->io_ports.irq_addr);
     if (!(ch & GAYLE_IRQ_IDE))
 	return 0;
     return 1;
@@ -98,24 +90,47 @@ static int gayle_ack_intr_a1200(ide_hwif_t *hwif)
 {
     unsigned char ch;
 
-    ch = z_readb(hwif->io_ports[IDE_IRQ_OFFSET]);
+    ch = z_readb(hwif->io_ports.irq_addr);
     if (!(ch & GAYLE_IRQ_IDE))
 	return 0;
-    (void)z_readb(hwif->io_ports[IDE_STATUS_OFFSET]);
-    z_writeb(0x7c, hwif->io_ports[IDE_IRQ_OFFSET]);
+    (void)z_readb(hwif->io_ports.status_addr);
+    z_writeb(0x7c, hwif->io_ports.irq_addr);
     return 1;
+}
+
+static void __init gayle_setup_ports(hw_regs_t *hw, unsigned long base,
+				     unsigned long ctl, unsigned long irq_port,
+				     ide_ack_intr_t *ack_intr)
+{
+	int i;
+
+	memset(hw, 0, sizeof(*hw));
+
+	hw->io_ports.data_addr = base;
+
+	for (i = 1; i < 8; i++)
+		hw->io_ports_array[i] = base + 2 + i * 4;
+
+	hw->io_ports.ctl_addr = ctl;
+	hw->io_ports.irq_addr = irq_port;
+
+	hw->irq = IRQ_AMIGA_PORTS;
+	hw->ack_intr = ack_intr;
+
+	hw->chipset = ide_generic;
 }
 
     /*
      *  Probe for a Gayle IDE interface (and optionally for an IDE doubler)
      */
 
-void __init gayle_init(void)
+static int __init gayle_init(void)
 {
     int a4000, i;
+    u8 idx[4] = { 0xff, 0xff, 0xff, 0xff };
 
     if (!MACH_IS_AMIGA)
-	return;
+	return -ENODEV;
 
     if ((a4000 = AMIGAHW_PRESENT(A4000_IDE)) || AMIGAHW_PRESENT(A1200_IDE))
 	goto found;
@@ -125,15 +140,21 @@ void __init gayle_init(void)
 			  NULL))
 	goto found;
 #endif
-    return;
+    return -ENODEV;
 
 found:
+	printk(KERN_INFO "ide: Gayle IDE controller (A%d style%s)\n",
+			 a4000 ? 4000 : 1200,
+#ifdef CONFIG_BLK_DEV_IDEDOUBLER
+			 ide_doubler ? ", IDE doubler" :
+#endif
+			 "");
+
     for (i = 0; i < GAYLE_NUM_PROBE_HWIFS; i++) {
 	unsigned long base, ctrlport, irqport;
 	ide_ack_intr_t *ack_intr;
 	hw_regs_t hw;
 	ide_hwif_t *hwif;
-	int index;
 	unsigned long phys_base, res_start, res_n;
 
 	if (a4000) {
@@ -160,26 +181,25 @@ found:
 	base = (unsigned long)ZTWO_VADDR(phys_base);
 	ctrlport = GAYLE_HAS_CONTROL_REG ? (base + GAYLE_CONTROL) : 0;
 
-	ide_setup_ports(&hw, base, gayle_offsets,
-			ctrlport, irqport, ack_intr,
-//			&gayle_iops,
-			IRQ_AMIGA_PORTS);
+	gayle_setup_ports(&hw, base, ctrlport, irqport, ack_intr);
 
-	index = ide_register_hw(&hw, NULL, 1, &hwif);
-	if (index != -1) {
-	    hwif->mmio = 1;
-	    switch (i) {
-		case 0:
-		    printk("ide%d: Gayle IDE interface (A%d style)\n", index,
-			   a4000 ? 4000 : 1200);
-		    break;
-#ifdef CONFIG_BLK_DEV_IDEDOUBLER
-		case 1:
-		    printk("ide%d: IDE doubler\n", index);
-		    break;
-#endif /* CONFIG_BLK_DEV_IDEDOUBLER */
-	    }
+	hwif = ide_find_port();
+	if (hwif) {
+	    u8 index = hwif->index;
+
+	    ide_init_port_data(hwif, index);
+	    ide_init_port_hw(hwif, &hw);
+
+	    idx[i] = index;
 	} else
 	    release_mem_region(res_start, res_n);
     }
+
+    ide_device_add(idx, NULL);
+
+    return 0;
 }
+
+module_init(gayle_init);
+
+MODULE_LICENSE("GPL");

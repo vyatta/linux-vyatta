@@ -32,27 +32,27 @@
 
 #include <linux/module.h>
 #include <linux/init.h>
-
+#include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/kernel.h>
 #include <linux/proc_fs.h>
 #include <linux/timer.h>
 #include <linux/mempool.h>
+#include <linux/semaphore.h>
 
 #include <asm/ccwdev.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
-#include <asm/semaphore.h>
 #include <asm/timex.h>
 
 #include <asm/debug.h>
 #include <asm/s390_rdev.h>
 #include <asm/qdio.h>
+#include <asm/airq.h>
 
 #include "cio.h"
 #include "css.h"
 #include "device.h"
-#include "airq.h"
 #include "qdio.h"
 #include "ioasm.h"
 #include "chsc.h"
@@ -96,7 +96,7 @@ static debug_info_t *qdio_dbf_slsb_in;
 static volatile struct qdio_q *tiq_list=NULL; /* volatile as it could change
 						 during a while loop */
 static DEFINE_SPINLOCK(ttiq_list_lock);
-static int register_thinint_result;
+static void *tiqdio_ind;
 static void tiqdio_tl(unsigned long);
 static DECLARE_TASKLET(tiqdio_tasklet,tiqdio_tl,0);
 
@@ -399,7 +399,7 @@ qdio_get_indicator(void)
 {
 	int i;
 
-	for (i=1;i<INDICATORS_PER_CACHELINE;i++)
+	for (i = 0; i < INDICATORS_PER_CACHELINE; i++)
 		if (!indicator_used[i]) {
 			indicator_used[i]=1;
 			return indicators+i;
@@ -1215,9 +1215,6 @@ tiqdio_is_inbound_q_done(struct qdio_q *q)
 
 	if (!no_used)
 		return 1;
-	if (!q->siga_sync && !irq->is_qebsm)
-		/* we'll check for more primed buffers in qeth_stop_polling */
-		return 0;
 	if (irq->is_qebsm) {
 		count = 1;
 		start_buf = q->first_to_check;
@@ -1402,14 +1399,13 @@ __tiqdio_inbound_processing(struct qdio_q *q, int spare_ind_was_set)
 	 * q->dev_st_chg_ind is the indicator, be it shared or not.
 	 * only clear it, if indicator is non-shared
 	 */
-	if (!spare_ind_was_set)
+	if (q->dev_st_chg_ind != &spare_indicator)
 		tiqdio_clear_summary_bit((__u32*)q->dev_st_chg_ind);
 
 	if (q->hydra_gives_outbound_pcis) {
 		if (!q->siga_sync_done_on_thinints) {
 			SYNC_MEMORY_ALL;
-		} else if ((!q->siga_sync_done_on_outb_tis)&&
-			 (q->hydra_gives_outbound_pcis)) {
+		} else if (!q->siga_sync_done_on_outb_tis) {
 			SYNC_MEMORY_ALL_OUTB;
 		}
 	} else {
@@ -1911,8 +1907,7 @@ qdio_fill_thresholds(struct qdio_irq *irq_ptr,
 	}
 }
 
-static int
-tiqdio_thinint_handler(void)
+static void tiqdio_thinint_handler(void *ind, void *drv_data)
 {
 	QDIO_DBF_TEXT4(0,trace,"thin_int");
 
@@ -1925,7 +1920,6 @@ tiqdio_thinint_handler(void)
 		tiqdio_clear_global_summary();
 
 	tiqdio_inbound_checks();
-	return 0;
 }
 
 static void
@@ -2223,9 +2217,78 @@ qdio_synchronize(struct ccw_device *cdev, unsigned int flags,
 	return cc;
 }
 
+static int
+qdio_get_ssqd_information(struct subchannel_id *schid,
+			  struct qdio_chsc_ssqd **ssqd_area)
+{
+	int result;
+
+	QDIO_DBF_TEXT0(0, setup, "getssqd");
+	*ssqd_area = mempool_alloc(qdio_mempool_scssc, GFP_ATOMIC);
+	if (!ssqd_area) {
+		QDIO_PRINT_WARN("Could not get memory for chsc on sch x%x.\n",
+				schid->sch_no);
+		return -ENOMEM;
+	}
+
+	(*ssqd_area)->request = (struct chsc_header) {
+		.length = 0x0010,
+		.code	= 0x0024,
+	};
+	(*ssqd_area)->first_sch = schid->sch_no;
+	(*ssqd_area)->last_sch = schid->sch_no;
+	(*ssqd_area)->ssid = schid->ssid;
+	result = chsc(*ssqd_area);
+
+	if (result) {
+		QDIO_PRINT_WARN("CHSC returned cc %i on sch 0.%x.%x.\n",
+				result, schid->ssid, schid->sch_no);
+		goto out;
+	}
+
+	if ((*ssqd_area)->response.code != QDIO_CHSC_RESPONSE_CODE_OK) {
+		QDIO_PRINT_WARN("CHSC response is 0x%x on sch 0.%x.%x.\n",
+				(*ssqd_area)->response.code,
+				schid->ssid, schid->sch_no);
+		goto out;
+	}
+	if (!((*ssqd_area)->flags & CHSC_FLAG_QDIO_CAPABILITY) ||
+	    !((*ssqd_area)->flags & CHSC_FLAG_VALIDITY) ||
+	    ((*ssqd_area)->sch != schid->sch_no)) {
+		QDIO_PRINT_WARN("huh? problems checking out sch 0.%x.%x... " \
+				"using all SIGAs.\n",
+				schid->ssid, schid->sch_no);
+		goto out;
+	}
+	return 0;
+out:
+	return -EINVAL;
+}
+
+int
+qdio_get_ssqd_pct(struct ccw_device *cdev)
+{
+	struct qdio_chsc_ssqd *ssqd_area;
+	struct subchannel_id schid;
+	char dbf_text[15];
+	int rc;
+	int pct = 0;
+
+	QDIO_DBF_TEXT0(0, setup, "getpct");
+	schid = ccw_device_get_subchannel_id(cdev);
+	rc = qdio_get_ssqd_information(&schid, &ssqd_area);
+	if (!rc)
+		pct = (int)ssqd_area->pct;
+	if (rc != -ENOMEM)
+		mempool_free(ssqd_area, qdio_mempool_scssc);
+	sprintf(dbf_text, "pct: %d", pct);
+	QDIO_DBF_TEXT2(0, setup, dbf_text);
+	return pct;
+}
+EXPORT_SYMBOL(qdio_get_ssqd_pct);
+
 static void
-qdio_check_subchannel_qebsm(struct qdio_irq *irq_ptr, unsigned char qdioac,
-			    unsigned long token)
+qdio_check_subchannel_qebsm(struct qdio_irq *irq_ptr, unsigned long token)
 {
 	struct qdio_q *q;
 	int i;
@@ -2233,7 +2296,7 @@ qdio_check_subchannel_qebsm(struct qdio_irq *irq_ptr, unsigned char qdioac,
 	char dbf_text[15];
 
 	/*check if QEBSM is disabled */
-	if (!(irq_ptr->is_qebsm) || !(qdioac & 0x01)) {
+	if (!(irq_ptr->is_qebsm) || !(irq_ptr->qdioac & 0x01)) {
 		irq_ptr->is_qebsm  = 0;
 		irq_ptr->sch_token = 0;
 		irq_ptr->qib.rflags &= ~QIB_RFLAGS_ENABLE_QEBSM;
@@ -2262,102 +2325,27 @@ qdio_check_subchannel_qebsm(struct qdio_irq *irq_ptr, unsigned char qdioac,
 }
 
 static void
-qdio_get_ssqd_information(struct qdio_irq *irq_ptr)
+qdio_get_ssqd_siga(struct qdio_irq *irq_ptr)
 {
-	int result;
-	unsigned char qdioac;
-	struct {
-		struct chsc_header request;
-		u16 reserved1:10;
-		u16 ssid:2;
-		u16 fmt:4;
-		u16 first_sch;
-		u16 reserved2;
-		u16 last_sch;
-		u32 reserved3;
-		struct chsc_header response;
-		u32 reserved4;
-		u8  flags;
-		u8  reserved5;
-		u16 sch;
-		u8  qfmt;
-		u8  parm;
-		u8  qdioac1;
-		u8  sch_class;
-		u8  reserved7;
-		u8  icnt;
-		u8  reserved8;
-		u8  ocnt;
-		u8 reserved9;
-		u8 mbccnt;
-		u16 qdioac2;
-		u64 sch_token;
-	} *ssqd_area;
+	int rc;
+	struct qdio_chsc_ssqd *ssqd_area;
 
 	QDIO_DBF_TEXT0(0,setup,"getssqd");
-	qdioac = 0;
-	ssqd_area = mempool_alloc(qdio_mempool_scssc, GFP_ATOMIC);
-	if (!ssqd_area) {
-	        QDIO_PRINT_WARN("Could not get memory for chsc. Using all " \
-				"SIGAs for sch x%x.\n", irq_ptr->schid.sch_no);
+	irq_ptr->qdioac = 0;
+	rc = qdio_get_ssqd_information(&irq_ptr->schid, &ssqd_area);
+	if (rc) {
+		QDIO_PRINT_WARN("using all SIGAs for sch x%x.n",
+			irq_ptr->schid.sch_no);
 		irq_ptr->qdioac = CHSC_FLAG_SIGA_INPUT_NECESSARY |
 				  CHSC_FLAG_SIGA_OUTPUT_NECESSARY |
 				  CHSC_FLAG_SIGA_SYNC_NECESSARY; /* all flags set */
 		irq_ptr->is_qebsm = 0;
-		irq_ptr->sch_token = 0;
-		irq_ptr->qib.rflags &= ~QIB_RFLAGS_ENABLE_QEBSM;
-		return;
-	}
+	} else
+		irq_ptr->qdioac = ssqd_area->qdioac1;
 
-	ssqd_area->request = (struct chsc_header) {
-		.length = 0x0010,
-		.code   = 0x0024,
-	};
-	ssqd_area->first_sch = irq_ptr->schid.sch_no;
-	ssqd_area->last_sch = irq_ptr->schid.sch_no;
-	ssqd_area->ssid = irq_ptr->schid.ssid;
-	result = chsc(ssqd_area);
-
-	if (result) {
-		QDIO_PRINT_WARN("CHSC returned cc %i. Using all " \
-				"SIGAs for sch 0.%x.%x.\n", result,
-				irq_ptr->schid.ssid, irq_ptr->schid.sch_no);
-		qdioac = CHSC_FLAG_SIGA_INPUT_NECESSARY |
-			CHSC_FLAG_SIGA_OUTPUT_NECESSARY |
-			CHSC_FLAG_SIGA_SYNC_NECESSARY; /* all flags set */
-		irq_ptr->is_qebsm  = 0;
-		goto out;
-	}
-
-	if (ssqd_area->response.code != QDIO_CHSC_RESPONSE_CODE_OK) {
-		QDIO_PRINT_WARN("response upon checking SIGA needs " \
-				"is 0x%x. Using all SIGAs for sch 0.%x.%x.\n",
-				ssqd_area->response.code,
-				irq_ptr->schid.ssid, irq_ptr->schid.sch_no);
-		qdioac = CHSC_FLAG_SIGA_INPUT_NECESSARY |
-			CHSC_FLAG_SIGA_OUTPUT_NECESSARY |
-			CHSC_FLAG_SIGA_SYNC_NECESSARY; /* all flags set */
-		irq_ptr->is_qebsm  = 0;
-		goto out;
-	}
-	if (!(ssqd_area->flags & CHSC_FLAG_QDIO_CAPABILITY) ||
-	    !(ssqd_area->flags & CHSC_FLAG_VALIDITY) ||
-	    (ssqd_area->sch != irq_ptr->schid.sch_no)) {
-		QDIO_PRINT_WARN("huh? problems checking out sch 0.%x.%x... " \
-				"using all SIGAs.\n",
-				irq_ptr->schid.ssid, irq_ptr->schid.sch_no);
-		qdioac = CHSC_FLAG_SIGA_INPUT_NECESSARY |
-			CHSC_FLAG_SIGA_OUTPUT_NECESSARY |
-			CHSC_FLAG_SIGA_SYNC_NECESSARY; /* worst case */
-		irq_ptr->is_qebsm  = 0;
-		goto out;
-	}
-	qdioac = ssqd_area->qdioac1;
-out:
-	qdio_check_subchannel_qebsm(irq_ptr, qdioac,
-				    ssqd_area->sch_token);
-	mempool_free(ssqd_area, qdio_mempool_scssc);
-	irq_ptr->qdioac = qdioac;
+	qdio_check_subchannel_qebsm(irq_ptr, ssqd_area->sch_token);
+	if (rc != -ENOMEM)
+		mempool_free(ssqd_area, qdio_mempool_scssc);
 }
 
 static unsigned int
@@ -2445,7 +2433,7 @@ tiqdio_set_subchannel_ind(struct qdio_irq *irq_ptr, int reset_to_zero)
 		real_addr_dev_st_chg_ind=0;
 	} else {
 		real_addr_local_summary_bit=
-			virt_to_phys((volatile void *)indicators);
+			virt_to_phys((volatile void *)tiqdio_ind);
 		real_addr_dev_st_chg_ind=
 			virt_to_phys((volatile void *)irq_ptr->dev_st_chg_ind);
 	}
@@ -3192,13 +3180,11 @@ qdio_establish(struct qdio_initialize *init_data)
 	spin_lock_irqsave(get_ccwdev_lock(cdev),saveflags);
 
 	ccw_device_set_options_mask(cdev, 0);
-	result=ccw_device_start_timeout(cdev,&irq_ptr->ccw,
-					QDIO_DOING_ESTABLISH,0, 0,
-					QDIO_ESTABLISH_TIMEOUT);
+	result = ccw_device_start(cdev, &irq_ptr->ccw,
+				QDIO_DOING_ESTABLISH, 0, 0);
 	if (result) {
-		result2=ccw_device_start_timeout(cdev,&irq_ptr->ccw,
-						 QDIO_DOING_ESTABLISH,0,0,
-						 QDIO_ESTABLISH_TIMEOUT);
+		result2 = ccw_device_start(cdev, &irq_ptr->ccw,
+					QDIO_DOING_ESTABLISH, 0, 0);
 		sprintf(dbf_text,"eq:io%4x",result);
 		QDIO_DBF_TEXT2(1,setup,dbf_text);
 		if (result2) {
@@ -3222,10 +3208,10 @@ qdio_establish(struct qdio_initialize *init_data)
 		return result;
 	}
 	
-	/* Timeout is cared for already by using ccw_device_start_timeout(). */
-	wait_event_interruptible(cdev->private->wait_q,
-		 irq_ptr->state == QDIO_IRQ_STATE_ESTABLISHED ||
-		 irq_ptr->state == QDIO_IRQ_STATE_ERR);
+	wait_event_interruptible_timeout(cdev->private->wait_q,
+		irq_ptr->state == QDIO_IRQ_STATE_ESTABLISHED ||
+		irq_ptr->state == QDIO_IRQ_STATE_ERR,
+		QDIO_ESTABLISH_TIMEOUT);
 
 	if (irq_ptr->state == QDIO_IRQ_STATE_ESTABLISHED)
 		result = 0;
@@ -3235,7 +3221,7 @@ qdio_establish(struct qdio_initialize *init_data)
 		return -EIO;
 	}
 
-	qdio_get_ssqd_information(irq_ptr);
+	qdio_get_ssqd_siga(irq_ptr);
 	/* if this gets set once, we're running under VM and can omit SVSes */
 	if (irq_ptr->qdioac&CHSC_FLAG_SIGA_SYNC_NECESSARY)
 		omit_svs=1;
@@ -3337,13 +3323,7 @@ qdio_activate(struct ccw_device *cdev, int flags)
 		}
 	}
 
-	wait_event_interruptible_timeout(cdev->private->wait_q,
-					 ((irq_ptr->state ==
-					  QDIO_IRQ_STATE_STOPPED) ||
-					  (irq_ptr->state ==
-					   QDIO_IRQ_STATE_ERR)),
-					 QDIO_ACTIVATE_TIMEOUT);
-
+	msleep(QDIO_ACTIVATE_TIMEOUT);
 	switch (irq_ptr->state) {
 	case QDIO_IRQ_STATE_STOPPED:
 	case QDIO_IRQ_STATE_ERR:
@@ -3652,7 +3632,7 @@ qdio_add_procfs_entry(void)
 {
         proc_perf_file_registration=0;
 	qdio_perf_proc_file=create_proc_entry(QDIO_PERF,
-					      S_IFREG|0444,&proc_root);
+					      S_IFREG|0444,NULL);
 	if (qdio_perf_proc_file) {
 		qdio_perf_proc_file->read_proc=&qdio_perf_procfile_read;
 	} else proc_perf_file_registration=-1;
@@ -3667,7 +3647,7 @@ static void
 qdio_remove_procfs_entry(void)
 {
         if (!proc_perf_file_registration) /* means if it went ok earlier */
-		remove_proc_entry(QDIO_PERF,&proc_root);
+		remove_proc_entry(QDIO_PERF,NULL);
 }
 
 /**
@@ -3683,11 +3663,11 @@ qdio_performance_stats_show(struct bus_type *bus, char *buf)
 static ssize_t
 qdio_performance_stats_store(struct bus_type *bus, const char *buf, size_t count)
 {
-	char *tmp;
-	int i;
+	unsigned long i;
+	int ret;
 
-	i = simple_strtoul(buf, &tmp, 16);
-	if ((i == 0) || (i == 1)) {
+	ret = strict_strtoul(buf, 16, &i);
+	if (!ret && ((i == 0) || (i == 1))) {
 		if (i == qdio_performance_stats)
 			return count;
 		qdio_performance_stats = i;
@@ -3740,23 +3720,25 @@ static void
 tiqdio_register_thinints(void)
 {
 	char dbf_text[20];
-	register_thinint_result=
-		s390_register_adapter_interrupt(&tiqdio_thinint_handler);
-	if (register_thinint_result) {
-		sprintf(dbf_text,"regthn%x",(register_thinint_result&0xff));
+
+	tiqdio_ind =
+		s390_register_adapter_interrupt(&tiqdio_thinint_handler, NULL);
+	if (IS_ERR(tiqdio_ind)) {
+		sprintf(dbf_text, "regthn%lx", PTR_ERR(tiqdio_ind));
 		QDIO_DBF_TEXT0(0,setup,dbf_text);
 		QDIO_PRINT_ERR("failed to register adapter handler " \
-			       "(rc=%i).\nAdapter interrupts might " \
+			       "(rc=%li).\nAdapter interrupts might " \
 			       "not work. Continuing.\n",
-			       register_thinint_result);
+			       PTR_ERR(tiqdio_ind));
+		tiqdio_ind = NULL;
 	}
 }
 
 static void
 tiqdio_unregister_thinints(void)
 {
-	if (!register_thinint_result)
-		s390_unregister_adapter_interrupt(&tiqdio_thinint_handler);
+	if (tiqdio_ind)
+		s390_unregister_adapter_interrupt(tiqdio_ind);
 }
 
 static int
@@ -3768,8 +3750,8 @@ qdio_get_qdio_memory(void)
 	for (i=1;i<INDICATORS_PER_CACHELINE;i++)
 		indicator_used[i]=0;
 	indicators = kzalloc(sizeof(__u32)*(INDICATORS_PER_CACHELINE),
-				   GFP_KERNEL);
-       	if (!indicators)
+			     GFP_KERNEL);
+	if (!indicators)
 		return -ENOMEM;
 	return 0;
 }
@@ -3779,7 +3761,6 @@ qdio_release_qdio_memory(void)
 {
 	kfree(indicators);
 }
-
 
 static void
 qdio_unregister_dbf_views(void)

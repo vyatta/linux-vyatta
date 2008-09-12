@@ -10,7 +10,6 @@
 #include <linux/reboot.h>
 #include <linux/delay.h>
 #include <linux/initrd.h>
-#include <linux/ide.h>
 #include <linux/screen_info.h>
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>
@@ -37,10 +36,9 @@
 #include <asm/nvram.h>
 #include <asm/xmon.h>
 #include <asm/ocp.h>
-#include <asm/prom.h>
+#include <asm/irq.h>
 
-#define USES_PPC_SYS (defined(CONFIG_85xx) || defined(CONFIG_83xx) || \
-		      defined(CONFIG_MPC10X_BRIDGE) || defined(CONFIG_8260) || \
+#define USES_PPC_SYS (defined(CONFIG_MPC10X_BRIDGE) || defined(CONFIG_8260) || \
 		      defined(CONFIG_PPC_MPC52xx))
 
 #if USES_PPC_SYS
@@ -59,7 +57,6 @@ extern void ppc6xx_idle(void);
 extern void power4_idle(void);
 
 extern boot_infos_t *boot_infos;
-struct ide_machdep_calls ppc_ide_md;
 
 /* Used with the BI_MEMSIZE bootinfo parameter to store the memory
    size value reported by the boot loader. */
@@ -277,7 +274,7 @@ static void c_stop(struct seq_file *m, void *v)
 {
 }
 
-struct seq_operations cpuinfo_op = {
+const struct seq_operations cpuinfo_op = {
 	.start =c_start,
 	.next =	c_next,
 	.stop =	c_stop,

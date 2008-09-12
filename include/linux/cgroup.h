@@ -14,6 +14,7 @@
 #include <linux/nodemask.h>
 #include <linux/rcupdate.h>
 #include <linux/cgroupstats.h>
+#include <linux/prio_heap.h>
 
 #ifdef CONFIG_CGROUPS
 
@@ -87,6 +88,17 @@ static inline void css_put(struct cgroup_subsys_state *css)
 		__css_put(css);
 }
 
+/* bits in struct cgroup flags field */
+enum {
+	/* Control Group is dead */
+	CGRP_REMOVED,
+	/* Control Group has previously had a child cgroup or a task,
+	 * but no longer (only if CGRP_NOTIFY_ON_RELEASE is set) */
+	CGRP_RELEASABLE,
+	/* Control Group requires release notifications to userspace */
+	CGRP_NOTIFY_ON_RELEASE,
+};
+
 struct cgroup {
 	unsigned long flags;		/* "unsigned long" so bitops work */
 
@@ -138,10 +150,10 @@ struct css_set {
 	struct kref ref;
 
 	/*
-	 * List running through all cgroup groups. Protected by
-	 * css_set_lock
+	 * List running through all cgroup groups in the same hash
+	 * slot. Protected by css_set_lock
 	 */
-	struct list_head list;
+	struct hlist_node hlist;
 
 	/*
 	 * List running through all tasks using this cgroup
@@ -162,7 +174,16 @@ struct css_set {
 	 * during subsystem registration (at boot time).
 	 */
 	struct cgroup_subsys_state *subsys[CGROUP_SUBSYS_COUNT];
+};
 
+/*
+ * cgroup_map_cb is an abstract callback API for reporting map-valued
+ * control files
+ */
+
+struct cgroup_map_cb {
+	int (*fill)(struct cgroup_map_cb *cb, const char *key, u64 value);
+	void *state;
 };
 
 /* struct cftype:
@@ -174,7 +195,7 @@ struct css_set {
  *
  *
  * When reading/writing to a file:
- *	- the cgroup to use in file->f_dentry->d_parent->d_fsdata
+ *	- the cgroup to use is file->f_dentry->d_parent->d_fsdata
  *	- the 'cftype' of the file is file->f_dentry->d_fsdata
  */
 
@@ -185,67 +206,114 @@ struct cftype {
 	char name[MAX_CFTYPE_NAME];
 	int private;
 	int (*open) (struct inode *inode, struct file *file);
-	ssize_t (*read) (struct cgroup *cont, struct cftype *cft,
+	ssize_t (*read) (struct cgroup *cgrp, struct cftype *cft,
 			 struct file *file,
 			 char __user *buf, size_t nbytes, loff_t *ppos);
 	/*
-	 * read_uint() is a shortcut for the common case of returning a
+	 * read_u64() is a shortcut for the common case of returning a
 	 * single integer. Use it in place of read()
 	 */
-	u64 (*read_uint) (struct cgroup *cont, struct cftype *cft);
-	ssize_t (*write) (struct cgroup *cont, struct cftype *cft,
+	u64 (*read_u64) (struct cgroup *cgrp, struct cftype *cft);
+	/*
+	 * read_s64() is a signed version of read_u64()
+	 */
+	s64 (*read_s64) (struct cgroup *cgrp, struct cftype *cft);
+	/*
+	 * read_map() is used for defining a map of key/value
+	 * pairs. It should call cb->fill(cb, key, value) for each
+	 * entry. The key/value pairs (and their ordering) should not
+	 * change between reboots.
+	 */
+	int (*read_map) (struct cgroup *cont, struct cftype *cft,
+			 struct cgroup_map_cb *cb);
+	/*
+	 * read_seq_string() is used for outputting a simple sequence
+	 * using seqfile.
+	 */
+	int (*read_seq_string) (struct cgroup *cont, struct cftype *cft,
+			 struct seq_file *m);
+
+	ssize_t (*write) (struct cgroup *cgrp, struct cftype *cft,
 			  struct file *file,
 			  const char __user *buf, size_t nbytes, loff_t *ppos);
 
 	/*
-	 * write_uint() is a shortcut for the common case of accepting
+	 * write_u64() is a shortcut for the common case of accepting
 	 * a single integer (as parsed by simple_strtoull) from
 	 * userspace. Use in place of write(); return 0 or error.
 	 */
-	int (*write_uint) (struct cgroup *cont, struct cftype *cft, u64 val);
+	int (*write_u64) (struct cgroup *cgrp, struct cftype *cft, u64 val);
+	/*
+	 * write_s64() is a signed version of write_u64()
+	 */
+	int (*write_s64) (struct cgroup *cgrp, struct cftype *cft, s64 val);
+
+	/*
+	 * trigger() callback can be used to get some kick from the
+	 * userspace, when the actual string written is not important
+	 * at all. The private field can be used to determine the
+	 * kick type for multiplexing.
+	 */
+	int (*trigger)(struct cgroup *cgrp, unsigned int event);
 
 	int (*release) (struct inode *inode, struct file *file);
 };
 
+struct cgroup_scanner {
+	struct cgroup *cg;
+	int (*test_task)(struct task_struct *p, struct cgroup_scanner *scan);
+	void (*process_task)(struct task_struct *p,
+			struct cgroup_scanner *scan);
+	struct ptr_heap *heap;
+};
+
 /* Add a new file to the given cgroup directory. Should only be
  * called by subsystems from within a populate() method */
-int cgroup_add_file(struct cgroup *cont, struct cgroup_subsys *subsys,
+int cgroup_add_file(struct cgroup *cgrp, struct cgroup_subsys *subsys,
 		       const struct cftype *cft);
 
 /* Add a set of new files to the given cgroup directory. Should
  * only be called by subsystems from within a populate() method */
-int cgroup_add_files(struct cgroup *cont,
+int cgroup_add_files(struct cgroup *cgrp,
 			struct cgroup_subsys *subsys,
 			const struct cftype cft[],
 			int count);
 
-int cgroup_is_removed(const struct cgroup *cont);
+int cgroup_is_removed(const struct cgroup *cgrp);
 
-int cgroup_path(const struct cgroup *cont, char *buf, int buflen);
+int cgroup_path(const struct cgroup *cgrp, char *buf, int buflen);
 
-int cgroup_task_count(const struct cgroup *cont);
+int cgroup_task_count(const struct cgroup *cgrp);
 
 /* Return true if the cgroup is a descendant of the current cgroup */
-int cgroup_is_descendant(const struct cgroup *cont);
+int cgroup_is_descendant(const struct cgroup *cgrp);
 
 /* Control Group subsystem type. See Documentation/cgroups.txt for details */
 
 struct cgroup_subsys {
 	struct cgroup_subsys_state *(*create)(struct cgroup_subsys *ss,
-						  struct cgroup *cont);
-	void (*destroy)(struct cgroup_subsys *ss, struct cgroup *cont);
+						  struct cgroup *cgrp);
+	void (*pre_destroy)(struct cgroup_subsys *ss, struct cgroup *cgrp);
+	void (*destroy)(struct cgroup_subsys *ss, struct cgroup *cgrp);
 	int (*can_attach)(struct cgroup_subsys *ss,
-			  struct cgroup *cont, struct task_struct *tsk);
-	void (*attach)(struct cgroup_subsys *ss, struct cgroup *cont,
-			struct cgroup *old_cont, struct task_struct *tsk);
+			  struct cgroup *cgrp, struct task_struct *tsk);
+	void (*attach)(struct cgroup_subsys *ss, struct cgroup *cgrp,
+			struct cgroup *old_cgrp, struct task_struct *tsk);
 	void (*fork)(struct cgroup_subsys *ss, struct task_struct *task);
 	void (*exit)(struct cgroup_subsys *ss, struct task_struct *task);
 	int (*populate)(struct cgroup_subsys *ss,
-			struct cgroup *cont);
-	void (*post_clone)(struct cgroup_subsys *ss, struct cgroup *cont);
+			struct cgroup *cgrp);
+	void (*post_clone)(struct cgroup_subsys *ss, struct cgroup *cgrp);
 	void (*bind)(struct cgroup_subsys *ss, struct cgroup *root);
+	/*
+	 * This routine is called with the task_lock of mm->owner held
+	 */
+	void (*mm_owner_changed)(struct cgroup_subsys *ss,
+					struct cgroup *old,
+					struct cgroup *new);
 	int subsys_id;
 	int active;
+	int disabled;
 	int early_init;
 #define MAX_CGROUP_TYPE_NAMELEN 32
 	const char *name;
@@ -263,9 +331,9 @@ struct cgroup_subsys {
 #undef SUBSYS
 
 static inline struct cgroup_subsys_state *cgroup_subsys_state(
-	struct cgroup *cont, int subsys_id)
+	struct cgroup *cgrp, int subsys_id)
 {
-	return cont->subsys[subsys_id];
+	return cgrp->subsys[subsys_id];
 }
 
 static inline struct cgroup_subsys_state *task_subsys_state(
@@ -279,8 +347,6 @@ static inline struct cgroup* task_cgroup(struct task_struct *task,
 {
 	return task_subsys_state(task, subsys_id)->cgroup;
 }
-
-int cgroup_path(const struct cgroup *cont, char *buf, int buflen);
 
 int cgroup_clone(struct task_struct *tsk, struct cgroup_subsys *ss);
 
@@ -298,11 +364,17 @@ struct cgroup_iter {
  *    returns NULL or until you want to end the iteration
  *
  * 3) call cgroup_iter_end() to destroy the iterator.
+ *
+ * Or, call cgroup_scan_tasks() to iterate through every task in a cpuset.
+ *    - cgroup_scan_tasks() holds the css_set_lock when calling the test_task()
+ *      callback, but not while calling the process_task() callback.
  */
-void cgroup_iter_start(struct cgroup *cont, struct cgroup_iter *it);
-struct task_struct *cgroup_iter_next(struct cgroup *cont,
+void cgroup_iter_start(struct cgroup *cgrp, struct cgroup_iter *it);
+struct task_struct *cgroup_iter_next(struct cgroup *cgrp,
 					struct cgroup_iter *it);
-void cgroup_iter_end(struct cgroup *cont, struct cgroup_iter *it);
+void cgroup_iter_end(struct cgroup *cgrp, struct cgroup_iter *it);
+int cgroup_scan_tasks(struct cgroup_scanner *scan);
+int cgroup_attach_task(struct cgroup *, struct task_struct *);
 
 #else /* !CONFIG_CGROUPS */
 
@@ -324,4 +396,13 @@ static inline int cgroupstats_build(struct cgroupstats *stats,
 
 #endif /* !CONFIG_CGROUPS */
 
+#ifdef CONFIG_MM_OWNER
+extern void
+cgroup_mm_owner_callbacks(struct task_struct *old, struct task_struct *new);
+#else /* !CONFIG_MM_OWNER */
+static inline void
+cgroup_mm_owner_callbacks(struct task_struct *old, struct task_struct *new)
+{
+}
+#endif /* CONFIG_MM_OWNER */
 #endif /* _LINUX_CGROUP_H */

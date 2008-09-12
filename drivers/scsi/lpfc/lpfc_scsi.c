@@ -1,7 +1,7 @@
 /*******************************************************************
  * This file is part of the Emulex Linux Device Driver for         *
  * Fibre Channel Host Bus Adapters.                                *
- * Copyright (C) 2004-2007 Emulex.  All rights reserved.           *
+ * Copyright (C) 2004-2008 Emulex.  All rights reserved.           *
  * EMULEX and SLI are trademarks of Emulex.                        *
  * www.emulex.com                                                  *
  * Portions Copyright (C) 2004-2005 Christoph Hellwig              *
@@ -130,7 +130,7 @@ lpfc_ramp_down_queue_handler(struct lpfc_hba *phba)
 
 	vports = lpfc_create_vport_work_array(phba);
 	if (vports != NULL)
-		for(i = 0; i < LPFC_MAX_VPORTS && vports[i] != NULL; i++) {
+		for(i = 0; i <= phba->max_vpi && vports[i] != NULL; i++) {
 			shost = lpfc_shost_from_vport(vports[i]);
 			shost_for_each_device(sdev, shost) {
 				new_queue_depth =
@@ -151,7 +151,7 @@ lpfc_ramp_down_queue_handler(struct lpfc_hba *phba)
 							new_queue_depth);
 			}
 		}
-	lpfc_destroy_vport_work_array(vports);
+	lpfc_destroy_vport_work_array(phba, vports);
 	atomic_set(&phba->num_rsrc_err, 0);
 	atomic_set(&phba->num_cmd_success, 0);
 }
@@ -166,9 +166,12 @@ lpfc_ramp_up_queue_handler(struct lpfc_hba *phba)
 
 	vports = lpfc_create_vport_work_array(phba);
 	if (vports != NULL)
-		for(i = 0; i < LPFC_MAX_VPORTS && vports[i] != NULL; i++) {
+		for(i = 0; i <= phba->max_vpi && vports[i] != NULL; i++) {
 			shost = lpfc_shost_from_vport(vports[i]);
 			shost_for_each_device(sdev, shost) {
+				if (vports[i]->cfg_lun_queue_depth <=
+				    sdev->queue_depth)
+					continue;
 				if (sdev->ordered_tags)
 					scsi_adjust_queue_depth(sdev,
 							MSG_ORDERED_TAG,
@@ -179,7 +182,7 @@ lpfc_ramp_up_queue_handler(struct lpfc_hba *phba)
 							sdev->queue_depth+1);
 			}
 		}
-	lpfc_destroy_vport_work_array(vports);
+	lpfc_destroy_vport_work_array(phba, vports);
 	atomic_set(&phba->num_rsrc_err, 0);
 	atomic_set(&phba->num_cmd_success, 0);
 }
@@ -380,7 +383,7 @@ lpfc_scsi_prep_dma_buf(struct lpfc_hba *phba, struct lpfc_scsi_buf *lpfc_cmd)
 		(num_bde * sizeof (struct ulp_bde64));
 	iocb_cmd->ulpBdeCount = 1;
 	iocb_cmd->ulpLe = 1;
-	fcp_cmnd->fcpDl = be32_to_cpu(scsi_bufflen(scsi_cmnd));
+	fcp_cmnd->fcpDl = cpu_to_be32(scsi_bufflen(scsi_cmnd));
 	return 0;
 }
 
@@ -542,6 +545,7 @@ lpfc_scsi_cmd_iocb_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pIocbIn,
 	int result;
 	struct scsi_device *sdev, *tmp_sdev;
 	int depth = 0;
+	unsigned long flags;
 
 	lpfc_cmd->result = pIocbOut->iocb.un.ulpWord[4];
 	lpfc_cmd->status = pIocbOut->iocb.ulpStatus;
@@ -577,14 +581,14 @@ lpfc_scsi_cmd_iocb_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pIocbIn,
 			    lpfc_cmd->result == IOERR_NO_RESOURCES ||
 			    lpfc_cmd->result == RJT_LOGIN_REQUIRED) {
 				cmd->result = ScsiResult(DID_REQUEUE, 0);
-			break;
-		} /* else: fall through */
+				break;
+			} /* else: fall through */
 		default:
 			cmd->result = ScsiResult(DID_ERROR, 0);
 			break;
 		}
 
-		if ((pnode == NULL )
+		if (!pnode || !NLP_CHK_NODE_ACT(pnode)
 		    || (pnode->nlp_state != NLP_STE_MAPPED_NODE))
 			cmd->result = ScsiResult(DID_BUS_BUSY, SAM_STAT_BUSY);
 	} else {
@@ -605,9 +609,20 @@ lpfc_scsi_cmd_iocb_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pIocbIn,
 	result = cmd->result;
 	sdev = cmd->device;
 	lpfc_scsi_unprep_dma_buf(phba, lpfc_cmd);
+	spin_lock_irqsave(sdev->host->host_lock, flags);
+	lpfc_cmd->pCmd = NULL;	/* This must be done before scsi_done */
+	spin_unlock_irqrestore(sdev->host->host_lock, flags);
 	cmd->scsi_done(cmd);
 
 	if (phba->cfg_poll & ENABLE_FCP_RING_POLLING) {
+		/*
+		 * If there is a thread waiting for command completion
+		 * wake up the thread.
+		 */
+		spin_lock_irqsave(sdev->host->host_lock, flags);
+		if (lpfc_cmd->waitq)
+			wake_up(lpfc_cmd->waitq);
+		spin_unlock_irqrestore(sdev->host->host_lock, flags);
 		lpfc_release_scsi_buf(phba, lpfc_cmd);
 		return;
 	}
@@ -616,7 +631,7 @@ lpfc_scsi_cmd_iocb_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pIocbIn,
 	if (!result)
 		lpfc_rampup_queue_depth(vport, sdev);
 
-	if (!result && pnode != NULL &&
+	if (!result && pnode && NLP_CHK_NODE_ACT(pnode) &&
 	   ((jiffies - pnode->last_ramp_up_time) >
 		LPFC_Q_RAMP_UP_INTERVAL * HZ) &&
 	   ((jiffies - pnode->last_q_full_time) >
@@ -644,7 +659,8 @@ lpfc_scsi_cmd_iocb_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pIocbIn,
 	 * Check for queue full.  If the lun is reporting queue full, then
 	 * back off the lun queue depth to prevent target overloads.
 	 */
-	if (result == SAM_STAT_TASK_SET_FULL && pnode != NULL) {
+	if (result == SAM_STAT_TASK_SET_FULL && pnode &&
+	    NLP_CHK_NODE_ACT(pnode)) {
 		pnode->last_q_full_time = jiffies;
 
 		shost_for_each_device(tmp_sdev, sdev->host) {
@@ -669,6 +685,15 @@ lpfc_scsi_cmd_iocb_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pIocbIn,
 		}
 	}
 
+	/*
+	 * If there is a thread waiting for command completion
+	 * wake up the thread.
+	 */
+	spin_lock_irqsave(sdev->host->host_lock, flags);
+	if (lpfc_cmd->waitq)
+		wake_up(lpfc_cmd->waitq);
+	spin_unlock_irqrestore(sdev->host->host_lock, flags);
+
 	lpfc_release_scsi_buf(phba, lpfc_cmd);
 }
 
@@ -683,6 +708,9 @@ lpfc_scsi_prep_cmnd(struct lpfc_vport *vport, struct lpfc_scsi_buf *lpfc_cmd,
 	struct lpfc_iocbq *piocbq = &(lpfc_cmd->cur_iocbq);
 	int datadir = scsi_cmnd->sc_data_direction;
 	char tag[2];
+
+	if (!pnode || !NLP_CHK_NODE_ACT(pnode))
+		return;
 
 	lpfc_cmd->fcp_rsp->rspSnsLen = 0;
 	/* clear task management bits */
@@ -743,6 +771,8 @@ lpfc_scsi_prep_cmnd(struct lpfc_vport *vport, struct lpfc_scsi_buf *lpfc_cmd,
 	piocbq->iocb.ulpContext = pnode->nlp_rpi;
 	if (pnode->nlp_fcp_info & NLP_FCP_2_DEVICE)
 		piocbq->iocb.ulpFCP2Rcvy = 1;
+	else
+		piocbq->iocb.ulpFCP2Rcvy = 0;
 
 	piocbq->iocb.ulpClass = (pnode->nlp_fcp_info & 0x0f);
 	piocbq->context1  = lpfc_cmd;
@@ -763,9 +793,9 @@ lpfc_scsi_prep_task_mgmt_cmd(struct lpfc_vport *vport,
 	struct lpfc_rport_data *rdata = lpfc_cmd->rdata;
 	struct lpfc_nodelist *ndlp = rdata->pnode;
 
-	if ((ndlp == NULL) || (ndlp->nlp_state != NLP_STE_MAPPED_NODE)) {
+	if (!ndlp || !NLP_CHK_NODE_ACT(ndlp) ||
+	    ndlp->nlp_state != NLP_STE_MAPPED_NODE)
 		return 0;
-	}
 
 	piocbq = &(lpfc_cmd->cur_iocbq);
 	piocbq->vport = vport;
@@ -820,7 +850,7 @@ lpfc_scsi_tgt_reset(struct lpfc_scsi_buf *lpfc_cmd, struct lpfc_vport *vport,
 	struct lpfc_iocbq *iocbqrsp;
 	int ret;
 
-	if (!rdata->pnode)
+	if (!rdata->pnode || !NLP_CHK_NODE_ACT(rdata->pnode))
 		return FAILED;
 
 	lpfc_cmd->rdata = rdata;
@@ -937,7 +967,7 @@ lpfc_queuecommand(struct scsi_cmnd *cmnd, void (*done) (struct scsi_cmnd *))
 	 * Catch race where our node has transitioned, but the
 	 * transport is still transitioning.
 	 */
-	if (!ndlp) {
+	if (!ndlp || !NLP_CHK_NODE_ACT(ndlp)) {
 		cmnd->result = ScsiResult(DID_BUS_BUSY, 0);
 		goto out_fail_command;
 	}
@@ -1018,8 +1048,8 @@ lpfc_abort_handler(struct scsi_cmnd *cmnd)
 	struct lpfc_iocbq *abtsiocb;
 	struct lpfc_scsi_buf *lpfc_cmd;
 	IOCB_t *cmd, *icmd;
-	unsigned int loop_count = 0;
 	int ret = SUCCESS;
+	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(waitq);
 
 	lpfc_block_error_handler(cmnd);
 	lpfc_cmd = (struct lpfc_scsi_buf *)cmnd->host_scribble;
@@ -1074,17 +1104,15 @@ lpfc_abort_handler(struct scsi_cmnd *cmnd)
 	if (phba->cfg_poll & DISABLE_FCP_RING_INT)
 		lpfc_sli_poll_fcp_ring (phba);
 
+	lpfc_cmd->waitq = &waitq;
 	/* Wait for abort to complete */
-	while (lpfc_cmd->pCmd == cmnd)
-	{
-		if (phba->cfg_poll & DISABLE_FCP_RING_INT)
-			lpfc_sli_poll_fcp_ring (phba);
+	wait_event_timeout(waitq,
+			  (lpfc_cmd->pCmd != cmnd),
+			   (2*vport->cfg_devloss_tmo*HZ));
 
-		schedule_timeout_uninterruptible(LPFC_ABORT_WAIT * HZ);
-		if (++loop_count
-		    > (2 * vport->cfg_devloss_tmo)/LPFC_ABORT_WAIT)
-			break;
-	}
+	spin_lock_irq(shost->host_lock);
+	lpfc_cmd->waitq = NULL;
+	spin_unlock_irq(shost->host_lock);
 
 	if (lpfc_cmd->pCmd == cmnd) {
 		ret = FAILED;
@@ -1126,7 +1154,7 @@ lpfc_device_reset_handler(struct scsi_cmnd *cmnd)
 	 * target is rediscovered or devloss timeout expires.
 	 */
 	while (1) {
-		if (!pnode)
+		if (!pnode || !NLP_CHK_NODE_ACT(pnode))
 			goto out;
 
 		if (pnode->nlp_state != NLP_STE_MAPPED_NODE) {
@@ -1142,7 +1170,7 @@ lpfc_device_reset_handler(struct scsi_cmnd *cmnd)
 				goto out;
 			}
 			pnode = rdata->pnode;
-			if (!pnode)
+			if (!pnode || !NLP_CHK_NODE_ACT(pnode))
 				goto out;
 		}
 		if (pnode->nlp_state == NLP_STE_MAPPED_NODE)
@@ -1263,6 +1291,8 @@ lpfc_bus_reset_handler(struct scsi_cmnd *cmnd)
 		match = 0;
 		spin_lock_irq(shost->host_lock);
 		list_for_each_entry(ndlp, &vport->fc_nodes, nlp_listp) {
+			if (!NLP_CHK_NODE_ACT(ndlp))
+				continue;
 			if (ndlp->nlp_state == NLP_STE_MAPPED_NODE &&
 			    i == ndlp->nlp_sid &&
 			    ndlp->rport) {
@@ -1438,8 +1468,7 @@ struct scsi_host_template lpfc_template = {
 	.slave_destroy		= lpfc_slave_destroy,
 	.scan_finished		= lpfc_scan_finished,
 	.this_id		= -1,
-	.sg_tablesize		= LPFC_SG_SEG_CNT,
-	.use_sg_chaining	= ENABLE_SG_CHAINING,
+	.sg_tablesize		= LPFC_DEFAULT_SG_SEG_CNT,
 	.cmd_per_lun		= LPFC_CMD_PER_LUN,
 	.use_clustering		= ENABLE_CLUSTERING,
 	.shost_attrs		= lpfc_hba_attrs,
@@ -1459,10 +1488,9 @@ struct scsi_host_template lpfc_vport_template = {
 	.slave_destroy		= lpfc_slave_destroy,
 	.scan_finished		= lpfc_scan_finished,
 	.this_id		= -1,
-	.sg_tablesize		= LPFC_SG_SEG_CNT,
+	.sg_tablesize		= LPFC_DEFAULT_SG_SEG_CNT,
 	.cmd_per_lun		= LPFC_CMD_PER_LUN,
 	.use_clustering		= ENABLE_CLUSTERING,
-	.use_sg_chaining	= ENABLE_SG_CHAINING,
 	.shost_attrs		= lpfc_vport_attrs,
 	.max_sectors		= 0xFFFF,
 };

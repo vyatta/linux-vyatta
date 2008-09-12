@@ -45,7 +45,7 @@ static const struct inode_operations hugetlbfs_inode_operations;
 
 static struct backing_dev_info hugetlbfs_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
-	.capabilities	= BDI_CAP_NO_ACCT_DIRTY | BDI_CAP_NO_WRITEBACK,
+	.capabilities	= BDI_CAP_NO_ACCT_AND_WRITEBACK,
 };
 
 int sysctl_hugetlb_shm_group;
@@ -504,7 +504,7 @@ static struct inode *hugetlbfs_get_inode(struct super_block *sb, uid_t uid,
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 		INIT_LIST_HEAD(&inode->i_mapping->private_list);
 		info = HUGETLBFS_I(inode);
-		mpol_shared_policy_init(&info->policy, MPOL_DEFAULT, NULL);
+		mpol_shared_policy_init(&info->policy, NULL);
 		switch (mode & S_IFMT) {
 		default:
 			init_special_inode(inode, mode, dev);
@@ -734,6 +734,7 @@ static const struct super_operations hugetlbfs_ops = {
 	.delete_inode	= hugetlbfs_delete_inode,
 	.drop_inode	= hugetlbfs_drop_inode,
 	.put_super	= hugetlbfs_put_super,
+	.show_options	= generic_show_options,
 };
 
 static int
@@ -768,7 +769,7 @@ hugetlbfs_parse_options(char *options, struct hugetlbfs_config *pconfig)
 		case Opt_mode:
 			if (match_octal(&args[0], &option))
  				goto bad_val;
-			pconfig->mode = option & 0777U;
+			pconfig->mode = option & 01777U;
 			break;
 
 		case Opt_size: {
@@ -816,6 +817,8 @@ hugetlbfs_fill_super(struct super_block *sb, void *data, int silent)
 	int ret;
 	struct hugetlbfs_config config;
 	struct hugetlbfs_sb_info *sbinfo;
+
+	save_mount_options(sb, data);
 
 	config.nr_blocks = -1; /* No limit on size by default */
 	config.nr_inodes = -1; /* No limit on number of inodes by default */
@@ -951,7 +954,7 @@ struct file *hugetlb_file_setup(const char *name, size_t size)
 			FMODE_WRITE | FMODE_READ,
 			&hugetlbfs_file_operations);
 	if (!file)
-		goto out_inode;
+		goto out_dentry; /* inode is already attached */
 
 	return file;
 

@@ -57,11 +57,11 @@ static struct usbvideo *cams;
 static int debug;
 #define DEBUG(n, format, arg...) \
 	if (n <= debug) {	 \
-		printk(KERN_DEBUG __FILE__ ":%s(): " format "\n", __FUNCTION__ , ## arg); \
+		printk(KERN_DEBUG __FILE__ ":%s(): " format "\n", __func__ , ## arg); \
 	}
 #else
 #define DEBUG(n, arg...)
-static const int debug = 0;
+static const int debug;
 #endif
 
 
@@ -240,8 +240,6 @@ static void konicawc_register_input(struct konicawc *cam, struct usb_device *dev
 
 	input_dev->evbit[0] = BIT_MASK(EV_KEY);
 	input_dev->keybit[BIT_WORD(BTN_0)] = BIT_MASK(BTN_0);
-
-	input_dev->private = cam;
 
 	error = input_register_device(cam->input);
 	if (error) {

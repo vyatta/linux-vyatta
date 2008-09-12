@@ -27,11 +27,6 @@ static unsigned long *relocs;
  * absolute relocations present w.r.t these symbols.
  */
 static const char* safe_abs_relocs[] = {
-		"__kernel_vsyscall",
-		"__kernel_rt_sigreturn",
-		"__kernel_sigreturn",
-		"SYSENTER_RETURN",
-		"VDSO_NOTE_MASK",
 		"xen_irq_disable_direct_reloc",
 		"xen_save_fl_direct_reloc",
 };
@@ -45,6 +40,8 @@ static int is_safe_abs_reloc(const char* sym_name)
 			/* Match found */
 			return 1;
 	}
+	if (strncmp(sym_name, "VDSO", 4) == 0)
+		return 1;
 	if (strncmp(sym_name, "__crc_", 6) == 0)
 		return 1;
 	return 0;
@@ -194,7 +191,7 @@ static void read_ehdr(FILE *fp)
 		die("Cannot read ELF header: %s\n",
 			strerror(errno));
 	}
-	if (memcmp(ehdr.e_ident, ELFMAG, 4) != 0) {
+	if (memcmp(ehdr.e_ident, ELFMAG, SELFMAG) != 0) {
 		die("No ELF magic\n");
 	}
 	if (ehdr.e_ident[EI_CLASS] != ELFCLASS32) {

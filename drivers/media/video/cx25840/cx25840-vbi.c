@@ -85,7 +85,7 @@ static int decode_vps(u8 * dst, u8 * p)
 void cx25840_vbi_setup(struct i2c_client *client)
 {
 	struct cx25840_state *state = i2c_get_clientdata(client);
-	v4l2_std_id std = cx25840_get_v4lstd(client);
+	v4l2_std_id std = state->std;
 	int hblank,hactive,burst,vblank,vactive,sc,vblank656,src_decimation;
 	int luma_lpf,uv_lpf, comb;
 	u32 pll_int,pll_frac,pll_post;
@@ -180,7 +180,7 @@ void cx25840_vbi_setup(struct i2c_client *client)
 						fsc/1000000,fsc%1000000);
 
 		v4l_dbg(1, cx25840_debug, client, "hblank %i, hactive %i, "
-			"vblank %i , vactive %i, vblank656 %i, src_dec %i,"
+			"vblank %i, vactive %i, vblank656 %i, src_dec %i, "
 			"burst 0x%02x, luma_lpf %i, uv_lpf %i, comb 0x%02x,"
 			" sc 0x%06x\n",
 			hblank, hactive, vblank, vactive, vblank656,
@@ -242,7 +242,7 @@ int cx25840_vbi(struct i2c_client *client, unsigned int cmd, void *arg)
 			0, 0, V4L2_SLICED_VPS, 0, 0,	/* 9 */
 			0, 0, 0, 0
 		};
-		int is_pal = !(cx25840_get_v4lstd(client) & V4L2_STD_525_60);
+		int is_pal = !(state->std & V4L2_STD_525_60);
 		int i;
 
 		fmt = arg;
@@ -279,7 +279,7 @@ int cx25840_vbi(struct i2c_client *client, unsigned int cmd, void *arg)
 
 	case VIDIOC_S_FMT:
 	{
-		int is_pal = !(cx25840_get_v4lstd(client) & V4L2_STD_525_60);
+		int is_pal = !(state->std & V4L2_STD_525_60);
 		int vbi_offset = is_pal ? 1 : 0;
 		int i, x;
 		u8 lcr[24];

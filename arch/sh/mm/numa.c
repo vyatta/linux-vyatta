@@ -59,7 +59,7 @@ void __init setup_bootmem_node(int nid, unsigned long start, unsigned long end)
 	free_pfn = start_pfn = start >> PAGE_SHIFT;
 	end_pfn = end >> PAGE_SHIFT;
 
-	add_active_range(nid, start_pfn, end_pfn);
+	__add_active_range(nid, start_pfn, end_pfn);
 
 	/* Node-local pgdat */
 	NODE_DATA(nid) = pfn_to_kaddr(free_pfn);
@@ -80,9 +80,9 @@ void __init setup_bootmem_node(int nid, unsigned long start, unsigned long end)
 
 	/* Reserve the pgdat and bootmap space with the bootmem allocator */
 	reserve_bootmem_node(NODE_DATA(nid), start_pfn << PAGE_SHIFT,
-			     sizeof(struct pglist_data));
+			     sizeof(struct pglist_data), BOOTMEM_DEFAULT);
 	reserve_bootmem_node(NODE_DATA(nid), free_pfn << PAGE_SHIFT,
-			     bootmap_pages << PAGE_SHIFT);
+			     bootmap_pages << PAGE_SHIFT, BOOTMEM_DEFAULT);
 
 	/* It's up */
 	node_set_online(nid);

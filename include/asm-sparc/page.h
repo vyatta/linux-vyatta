@@ -1,4 +1,4 @@
-/* $Id: page.h,v 1.55 2000/10/30 21:01:41 davem Exp $
+/*
  * page.h:  Various defines and such for MMU operations on the Sparc for
  *          the Linux kernel.
  *
@@ -7,8 +7,6 @@
 
 #ifndef _SPARC_PAGE_H
 #define _SPARC_PAGE_H
-
-#ifdef __KERNEL__
 
 #ifdef CONFIG_SUN4
 #define PAGE_SHIFT   13
@@ -40,12 +38,11 @@
 
 /* The following structure is used to hold the physical
  * memory configuration of the machine.  This is filled in
- * probe_memory() and is later used by mem_init() to set up
- * mem_map[].  We statically allocate SPARC_PHYS_BANKS of
+ * prom_meminit() and is later used by mem_init() to set up
+ * mem_map[].  We statically allocate SPARC_PHYS_BANKS+1 of
  * these structs, this is arbitrary.  The entry after the
  * last valid one has num_bytes==0.
  */
-
 struct sparc_phys_banks {
   unsigned long base_addr;
   unsigned long num_bytes;
@@ -125,6 +122,8 @@ typedef unsigned long iopgprot_t;
 
 #endif
 
+typedef struct page *pgtable_t;
+
 extern unsigned long sparc_unmapped_base;
 
 BTFIXUPDEF_SETHI(sparc_unmapped_base)
@@ -162,7 +161,5 @@ extern unsigned long pfn_base;
 
 #include <asm-generic/memory_model.h>
 #include <asm-generic/page.h>
-
-#endif /* __KERNEL__ */
 
 #endif /* _SPARC_PAGE_H */

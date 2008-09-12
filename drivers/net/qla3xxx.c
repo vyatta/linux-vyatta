@@ -540,20 +540,12 @@ static void eeprom_readword(struct ql3_adapter *qdev,
 	fm93c56a_deselect(qdev);
 }
 
-static void ql_swap_mac_addr(u8 * macAddress)
+static void ql_set_mac_addr(struct net_device *ndev, u16 *addr)
 {
-#ifdef __BIG_ENDIAN
-	u8 temp;
-	temp = macAddress[0];
-	macAddress[0] = macAddress[1];
-	macAddress[1] = temp;
-	temp = macAddress[2];
-	macAddress[2] = macAddress[3];
-	macAddress[3] = temp;
-	temp = macAddress[4];
-	macAddress[4] = macAddress[5];
-	macAddress[5] = temp;
-#endif
+	__le16 *p = (__le16 *)ndev->dev_addr;
+	p[0] = cpu_to_le16(addr[0]);
+	p[1] = cpu_to_le16(addr[1]);
+	p[2] = cpu_to_le16(addr[2]);
 }
 
 static int ql_get_nvram_params(struct ql3_adapter *qdev)
@@ -589,18 +581,6 @@ static int ql_get_nvram_params(struct ql3_adapter *qdev)
 		spin_unlock_irqrestore(&qdev->hw_lock, hw_flags);
 		return -1;
 	}
-
-	/*
-	 * We have a problem with endianness for the MAC addresses
-	 * and the two 8-bit values version, and numPorts.  We
-	 * have to swap them on big endian systems.
-	 */
-	ql_swap_mac_addr(qdev->nvram_data.funcCfg_fn0.macAddress);
-	ql_swap_mac_addr(qdev->nvram_data.funcCfg_fn1.macAddress);
-	ql_swap_mac_addr(qdev->nvram_data.funcCfg_fn2.macAddress);
-	ql_swap_mac_addr(qdev->nvram_data.funcCfg_fn3.macAddress);
-	pEEPROMData = (u16 *) & qdev->nvram_data.version;
-	*pEEPROMData = le16_to_cpu(*pEEPROMData);
 
 	spin_unlock_irqrestore(&qdev->hw_lock, hw_flags);
 	return checksum;
@@ -711,7 +691,7 @@ static int ql_mii_write_reg_ex(struct ql3_adapter *qdev,
 	if (ql_wait_for_mii_ready(qdev)) {
 		if (netif_msg_link(qdev))
 			printk(KERN_WARNING PFX
-			       "%s: Timed out waiting for management port to"
+			       "%s: Timed out waiting for management port to "
 			       "get free before issuing command.\n",
 			       qdev->ndev->name);
 		return -1;
@@ -2492,8 +2472,7 @@ static int ql_send_map(struct ql3_adapter *qdev,
 
 	if (seg_cnt == 1) {
 		/* Terminate the last segment. */
-		oal_entry->len =
-		    cpu_to_le32(le32_to_cpu(oal_entry->len) | OAL_LAST_ENTRY);
+		oal_entry->len |= cpu_to_le32(OAL_LAST_ENTRY);
 	} else {
 		oal = tx_cb->oal;
 		for (completed_segs=0; completed_segs<frag_cnt; completed_segs++,seg++) {
@@ -2550,8 +2529,7 @@ static int ql_send_map(struct ql3_adapter *qdev,
 					  frag->size);
 		}
 		/* Terminate the last segment. */
-		oal_entry->len =
-		    cpu_to_le32(le32_to_cpu(oal_entry->len) | OAL_LAST_ENTRY);
+		oal_entry->len |= cpu_to_le32(OAL_LAST_ENTRY);
 	}
 
 	return NETDEV_TX_OK;
@@ -3035,7 +3013,7 @@ static int ql_alloc_mem_resources(struct ql3_adapter *qdev)
 		    LS_64BITS(qdev->shadow_reg_phy_addr);
 
 		qdev->prsp_producer_index =
-		    (u32 *) (((u8 *) qdev->preq_consumer_index) + 8);
+		    (__le32 *) (((u8 *) qdev->preq_consumer_index) + 8);
 		qdev->rsp_producer_index_phy_addr_high =
 		    qdev->req_consumer_index_phy_addr_high;
 		qdev->rsp_producer_index_phy_addr_low =
@@ -3215,7 +3193,7 @@ static int ql_adapter_initialize(struct ql3_adapter *qdev)
 	ql_write_page1_reg(qdev, &hmem_regs->reqLength, NUM_REQ_Q_ENTRIES);
 
 	/* Response Queue Registers */
-	*((u16 *) (qdev->prsp_producer_index)) = 0;
+	*((__le16 *) (qdev->prsp_producer_index)) = 0;
 	qdev->rsp_consumer_index = 0;
 	qdev->rsp_current = qdev->rsp_q_virt_addr;
 
@@ -3548,7 +3526,7 @@ static void ql_set_mac_info(struct ql3_adapter *qdev)
 		       qdev->ndev->name,value);
 		break;
 	}
-	qdev->numPorts = qdev->nvram_data.numPorts;
+	qdev->numPorts = qdev->nvram_data.version_and_numPorts >> 8;
 }
 
 static void ql_display_dev_info(struct net_device *ndev)
@@ -3723,7 +3701,9 @@ static int ql_cycle_adapter(struct ql3_adapter *qdev, int reset)
 		printk(KERN_ERR PFX
 				"%s: Driver up/down cycle failed, "
 				"closing device\n",qdev->ndev->name);
+		rtnl_lock();
 		dev_close(qdev->ndev);
+		rtnl_unlock();
 		return -1;
 	}
 	return 0;
@@ -4051,12 +4031,10 @@ static int __devinit ql3xxx_probe(struct pci_dev *pdev,
 	/* Validate and set parameters */
 	if (qdev->mac_index) {
 		ndev->mtu = qdev->nvram_data.macCfg_port1.etherMtu_mac ;
-		memcpy(ndev->dev_addr, &qdev->nvram_data.funcCfg_fn2.macAddress,
-		       ETH_ALEN);
+		ql_set_mac_addr(ndev, qdev->nvram_data.funcCfg_fn2.macAddress);
 	} else {
 		ndev->mtu = qdev->nvram_data.macCfg_port0.etherMtu_mac ;
-		memcpy(ndev->dev_addr, &qdev->nvram_data.funcCfg_fn0.macAddress,
-		       ETH_ALEN);
+		ql_set_mac_addr(ndev, qdev->nvram_data.funcCfg_fn0.macAddress);
 	}
 	memcpy(ndev->perm_addr, ndev->dev_addr, ndev->addr_len);
 

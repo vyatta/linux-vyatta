@@ -11,6 +11,7 @@
 #include <linux/bootmem.h>
 #include <linux/bitops.h>
 #include <linux/module.h>
+#include <linux/kgdb.h>
 #include <asm/pda.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
@@ -23,8 +24,13 @@
 #include <asm/proto.h>
 #include <asm/sections.h>
 #include <asm/setup.h>
+#include <asm/genapic.h>
 
+#ifndef CONFIG_DEBUG_BOOT_PARAMS
 struct boot_params __initdata boot_params;
+#else
+struct boot_params boot_params;
+#endif
 
 cpumask_t cpu_initialized __cpuinitdata = CPU_MASK_NONE;
 
@@ -37,6 +43,8 @@ struct desc_ptr idt_descr = { 256 * 16 - 1, (unsigned long) idt_table };
 char boot_cpu_stack[IRQSTACKSIZE] __attribute__((section(".bss.page_aligned")));
 
 unsigned long __supported_pte_mask __read_mostly = ~0UL;
+EXPORT_SYMBOL_GPL(__supported_pte_mask);
+
 static int do_not_nx __cpuinitdata = 0;
 
 /* noexec=on|off
@@ -66,8 +74,8 @@ int force_personality32 = 0;
 Control non executable heap for 32bit processes.
 To control the stack too use noexec=off
 
-on	PROT_READ does not imply PROT_EXEC for 32bit processes
-off	PROT_READ implies PROT_EXEC (default)
+on	PROT_READ does not imply PROT_EXEC for 32bit processes (default)
+off	PROT_READ implies PROT_EXEC
 */
 static int __init nonx32_setup(char *str)
 {
@@ -78,41 +86,6 @@ static int __init nonx32_setup(char *str)
 	return 1;
 }
 __setup("noexec32=", nonx32_setup);
-
-/*
- * Great future plan:
- * Declare PDA itself and support (irqstack,tss,pgd) as per cpu data.
- * Always point %gs to its beginning
- */
-void __init setup_per_cpu_areas(void)
-{ 
-	int i;
-	unsigned long size;
-
-#ifdef CONFIG_HOTPLUG_CPU
-	prefill_possible_map();
-#endif
-
-	/* Copy section for each CPU (we discard the original) */
-	size = PERCPU_ENOUGH_ROOM;
-
-	printk(KERN_INFO "PERCPU: Allocating %lu bytes of per cpu data\n", size);
-	for_each_cpu_mask (i, cpu_possible_map) {
-		char *ptr;
-
-		if (!NODE_DATA(cpu_to_node(i))) {
-			printk("cpu with no node %d, num_online_nodes %d\n",
-			       i, num_online_nodes());
-			ptr = alloc_bootmem_pages(size);
-		} else { 
-			ptr = alloc_bootmem_pages_node(NODE_DATA(cpu_to_node(i)), size);
-		}
-		if (!ptr)
-			panic("Cannot allocate cpu data for CPU %d\n", i);
-		cpu_pda(i)->data_offset = ptr - __per_cpu_start;
-		memcpy(ptr, __per_cpu_start, __per_cpu_end - __per_cpu_start);
-	}
-} 
 
 void pda_init(int cpu)
 { 
@@ -169,7 +142,8 @@ void syscall_init(void)
 #endif
 
 	/* Flags to clear on syscall */
-	wrmsrl(MSR_SYSCALL_MASK, EF_TF|EF_DF|EF_IE|0x3000); 
+	wrmsrl(MSR_SYSCALL_MASK,
+	       X86_EFLAGS_TF|X86_EFLAGS_DF|X86_EFLAGS_IF|X86_EFLAGS_IOPL);
 }
 
 void __cpuinit check_efer(void)
@@ -227,7 +201,7 @@ void __cpuinit cpu_init (void)
 	 * and set up the GDT descriptor:
 	 */
 	if (cpu)
- 		memcpy(cpu_gdt(cpu), cpu_gdt_table, GDT_SIZE);
+		memcpy(get_cpu_gdt_table(cpu), cpu_gdt_table, GDT_SIZE);
 
 	cpu_gdt_descr[cpu].size = GDT_SIZE;
 	load_gdt((const struct desc_ptr *)&cpu_gdt_descr[cpu]);
@@ -257,10 +231,10 @@ void __cpuinit cpu_init (void)
 				      v, cpu); 
 		}
 		estacks += PAGE_SIZE << order[v];
-		orig_ist->ist[v] = t->ist[v] = (unsigned long)estacks;
+		orig_ist->ist[v] = t->x86_tss.ist[v] = (unsigned long)estacks;
 	}
 
-	t->io_bitmap_base = offsetof(struct tss_struct, io_bitmap);
+	t->x86_tss.io_bitmap_base = offsetof(struct tss_struct, io_bitmap);
 	/*
 	 * <= is required because the CPU will access up to
 	 * 8 bits beyond the end of the IO permission bitmap.
@@ -278,6 +252,17 @@ void __cpuinit cpu_init (void)
 	load_TR_desc();
 	load_LDT(&init_mm.context);
 
+#ifdef CONFIG_KGDB
+	/*
+	 * If the kgdb is connected no debug regs should be altered.  This
+	 * is only applicable when KGDB and a KGDB I/O module are built
+	 * into the kernel and you are using early debugging with
+	 * kgdbwait. KGDB will control the kernel HW breakpoint registers.
+	 */
+	if (kgdb_connected && arch_kgdb_ops.correct_hw_break)
+		arch_kgdb_ops.correct_hw_break();
+	else {
+#endif
 	/*
 	 * Clear all 6 debug registers:
 	 */
@@ -288,8 +273,15 @@ void __cpuinit cpu_init (void)
 	set_debugreg(0UL, 3);
 	set_debugreg(0UL, 6);
 	set_debugreg(0UL, 7);
+#ifdef CONFIG_KGDB
+	/* If the kgdb is connected no debug regs should be altered. */
+	}
+#endif
 
 	fpu_init(); 
 
 	raw_local_save_flags(kernel_eflags);
+
+	if (is_uv_system())
+		uv_cpu_init();
 }

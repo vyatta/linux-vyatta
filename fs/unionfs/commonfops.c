@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2007 Erez Zadok
+ * Copyright (c) 2003-2008 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005-2006 Junjiro Okajima
@@ -8,8 +8,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2007 Stony Brook University
- * Copyright (c) 2003-2007 The Research Foundation of SUNY
+ * Copyright (c) 2003-2008 Stony Brook University
+ * Copyright (c) 2003-2008 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -275,22 +275,12 @@ static int do_delayed_copyup(struct file *file)
 			fput(unionfs_lower_file_idx(file, bindex));
 			unionfs_set_lower_file_idx(file, bindex, NULL);
 		}
-		if (unionfs_lower_mnt_idx(dentry, bindex)) {
-			unionfs_mntput(dentry, bindex);
-			unionfs_set_lower_mnt_idx(dentry, bindex, NULL);
-		}
-		if (unionfs_lower_dentry_idx(dentry, bindex)) {
-			BUG_ON(!dentry->d_inode);
-			iput(unionfs_lower_inode_idx(dentry->d_inode, bindex));
-			unionfs_set_lower_inode_idx(dentry->d_inode, bindex,
-						    NULL);
-			dput(unionfs_lower_dentry_idx(dentry, bindex));
-			unionfs_set_lower_dentry_idx(dentry, bindex, NULL);
-		}
 	}
+	path_put_lowers(dentry, bstart, bend, false);
+	iput_lowers(dentry->d_inode, bstart, bend, false);
 	/* for reg file, we only open it "once" */
 	fbend(file) = fbstart(file);
-	set_dbend(dentry, dbstart(dentry));
+	dbend(dentry) = dbstart(dentry);
 	ibend(dentry->d_inode) = ibstart(dentry->d_inode);
 
 out:
@@ -432,7 +422,8 @@ reval_dentry:
 	dgen = atomic_read(&UNIONFS_D(dentry)->generation);
 
 	if (unlikely(sbgen > dgen)) {
-		pr_debug("unionfs: retry dentry revalidation\n");
+		pr_debug("unionfs: retry dentry %s revalidation\n",
+			 dentry->d_name.name);
 		schedule();
 		goto reval_dentry;
 	}
@@ -475,7 +466,8 @@ reval_dentry:
 	dgen = atomic_read(&UNIONFS_D(dentry)->generation);
 
 	if (unlikely(sbgen > dgen)) {
-		pr_debug("unionfs: retry (locked) dentry revalidation\n");
+		pr_debug("unionfs: retry (locked) dentry %s revalidation\n",
+			 dentry->d_name.name);
 		schedule();
 		goto reval_dentry;
 	}
@@ -823,8 +815,8 @@ static int unionfs_ioctl_queryfile(struct file *file, unsigned int cmd,
 		}
 	}
 	/* restore original dentry's offsets */
-	set_dbstart(dentry, orig_bstart);
-	set_dbend(dentry, orig_bend);
+	dbstart(dentry) = orig_bstart;
+	dbend(dentry) = orig_bend;
 	ibstart(dentry->d_inode) = orig_bstart;
 	ibend(dentry->d_inode) = orig_bend;
 

@@ -133,6 +133,11 @@ enum {
 	MLX4_STAT_RATE_OFFSET	= 5
 };
 
+static inline u64 mlx4_fw_ver(u64 major, u64 minor, u64 subminor)
+{
+	return (major << 32) | (minor << 16) | subminor;
+}
+
 struct mlx4_caps {
 	u64			fw_ver;
 	int			num_ports;
@@ -181,6 +186,7 @@ struct mlx4_caps {
 	u32			flags;
 	u16			stat_rate_support;
 	u8			port_width_cap[MLX4_MAX_PORTS + 1];
+	int			max_gso_sz;
 };
 
 struct mlx4_buf_list {
@@ -189,10 +195,8 @@ struct mlx4_buf_list {
 };
 
 struct mlx4_buf {
-	union {
-		struct mlx4_buf_list	direct;
-		struct mlx4_buf_list   *page_list;
-	} u;
+	struct mlx4_buf_list	direct;
+	struct mlx4_buf_list   *page_list;
 	int			nbufs;
 	int			npages;
 	int			page_shift;
@@ -202,6 +206,38 @@ struct mlx4_mtt {
 	u32			first_seg;
 	int			order;
 	int			page_shift;
+};
+
+enum {
+	MLX4_DB_PER_PAGE = PAGE_SIZE / 4
+};
+
+struct mlx4_db_pgdir {
+	struct list_head	list;
+	DECLARE_BITMAP(order0, MLX4_DB_PER_PAGE);
+	DECLARE_BITMAP(order1, MLX4_DB_PER_PAGE / 2);
+	unsigned long	       *bits[2];
+	__be32		       *db_page;
+	dma_addr_t		db_dma;
+};
+
+struct mlx4_ib_user_db_page;
+
+struct mlx4_db {
+	__be32			*db;
+	union {
+		struct mlx4_db_pgdir		*pgdir;
+		struct mlx4_ib_user_db_page	*user_page;
+	}			u;
+	dma_addr_t		dma;
+	int			index;
+	int			order;
+};
+
+struct mlx4_hwq_resources {
+	struct mlx4_db		db;
+	struct mlx4_mtt		mtt;
+	struct mlx4_buf		buf;
 };
 
 struct mlx4_mr {
@@ -308,6 +344,14 @@ struct mlx4_init_port_param {
 int mlx4_buf_alloc(struct mlx4_dev *dev, int size, int max_direct,
 		   struct mlx4_buf *buf);
 void mlx4_buf_free(struct mlx4_dev *dev, int size, struct mlx4_buf *buf);
+static inline void *mlx4_buf_offset(struct mlx4_buf *buf, int offset)
+{
+	if (BITS_PER_LONG == 64 || buf->nbufs == 1)
+		return buf->direct.buf + offset;
+	else
+		return buf->page_list[offset >> PAGE_SHIFT].buf +
+			(offset & (PAGE_SIZE - 1));
+}
 
 int mlx4_pd_alloc(struct mlx4_dev *dev, u32 *pdn);
 void mlx4_pd_free(struct mlx4_dev *dev, u32 pdn);
@@ -329,8 +373,17 @@ int mlx4_write_mtt(struct mlx4_dev *dev, struct mlx4_mtt *mtt,
 int mlx4_buf_write_mtt(struct mlx4_dev *dev, struct mlx4_mtt *mtt,
 		       struct mlx4_buf *buf);
 
+int mlx4_db_alloc(struct mlx4_dev *dev, struct mlx4_db *db, int order);
+void mlx4_db_free(struct mlx4_dev *dev, struct mlx4_db *db);
+
+int mlx4_alloc_hwq_res(struct mlx4_dev *dev, struct mlx4_hwq_resources *wqres,
+		       int size, int max_direct);
+void mlx4_free_hwq_res(struct mlx4_dev *mdev, struct mlx4_hwq_resources *wqres,
+		       int size);
+
 int mlx4_cq_alloc(struct mlx4_dev *dev, int nent, struct mlx4_mtt *mtt,
-		  struct mlx4_uar *uar, u64 db_rec, struct mlx4_cq *cq);
+		  struct mlx4_uar *uar, u64 db_rec, struct mlx4_cq *cq,
+		  int collapsed);
 void mlx4_cq_free(struct mlx4_dev *dev, struct mlx4_cq *cq);
 
 int mlx4_qp_alloc(struct mlx4_dev *dev, int sqpn, struct mlx4_qp *qp);

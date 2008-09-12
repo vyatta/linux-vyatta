@@ -22,6 +22,7 @@
 #include <linux/mempolicy.h>
 #include <linux/sem.h>
 #include <linux/file.h>
+#include <linux/fdtable.h>
 #include <linux/key.h>
 #include <linux/binfmts.h>
 #include <linux/mman.h>
@@ -40,6 +41,7 @@
 #include <linux/ptrace.h>
 #include <linux/mount.h>
 #include <linux/audit.h>
+#include <linux/memcontrol.h>
 #include <linux/profile.h>
 #include <linux/rmap.h>
 #include <linux/acct.h>
@@ -51,6 +53,7 @@
 #include <linux/random.h>
 #include <linux/tty.h>
 #include <linux/proc_fs.h>
+#include <linux/blkdev.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -130,6 +133,14 @@ void __put_task_struct(struct task_struct *tsk)
 		free_task(tsk);
 }
 
+/*
+ * macro override instead of weak attribute alias, to workaround
+ * gcc 4.1.0 and 4.1.1 bugs with weak attribute and empty functions.
+ */
+#ifndef arch_task_cache_init
+#define arch_task_cache_init()
+#endif
+
 void __init fork_init(unsigned long mempages)
 {
 #ifndef __HAVE_ARCH_TASK_STRUCT_ALLOCATOR
@@ -141,6 +152,9 @@ void __init fork_init(unsigned long mempages)
 		kmem_cache_create("task_struct", sizeof(struct task_struct),
 			ARCH_MIN_TASKALIGN, SLAB_PANIC, NULL);
 #endif
+
+	/* do the arch specific task caches init */
+	arch_task_cache_init();
 
 	/*
 	 * The default maximum number of threads is set to a safe
@@ -161,6 +175,13 @@ void __init fork_init(unsigned long mempages)
 		init_task.signal->rlim[RLIMIT_NPROC];
 }
 
+int __attribute__((weak)) arch_dup_task_struct(struct task_struct *dst,
+					       struct task_struct *src)
+{
+	*dst = *src;
+	return 0;
+}
+
 static struct task_struct *dup_task_struct(struct task_struct *orig)
 {
 	struct task_struct *tsk;
@@ -179,15 +200,15 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 		return NULL;
 	}
 
-	*tsk = *orig;
+ 	err = arch_dup_task_struct(tsk, orig);
+	if (err)
+		goto out;
+
 	tsk->stack = ti;
 
 	err = prop_local_init_single(&tsk->dirties);
-	if (err) {
-		free_thread_info(ti);
-		free_task_struct(tsk);
-		return NULL;
-	}
+	if (err)
+		goto out;
 
 	setup_thread_stack(tsk, orig);
 
@@ -203,6 +224,11 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 #endif
 	tsk->splice_pipe = NULL;
 	return tsk;
+
+out:
+	free_thread_info(ti);
+	free_task_struct(tsk);
+	return NULL;
 }
 
 #ifdef CONFIG_MMU
@@ -254,7 +280,7 @@ static int dup_mmap(struct mm_struct *mm, struct mm_struct *oldmm)
 		if (!tmp)
 			goto fail_nomem;
 		*tmp = *mpnt;
-		pol = mpol_copy(vma_policy(mpnt));
+		pol = mpol_dup(vma_policy(mpnt));
 		retval = PTR_ERR(pol);
 		if (IS_ERR(pol))
 			goto fail_nomem_policy;
@@ -324,7 +350,7 @@ static inline int mm_alloc_pgd(struct mm_struct * mm)
 
 static inline void mm_free_pgd(struct mm_struct * mm)
 {
-	pgd_free(mm->pgd);
+	pgd_free(mm, mm->pgd);
 }
 #else
 #define dup_mmap(mm, oldmm)	(0)
@@ -339,7 +365,7 @@ __cacheline_aligned_in_smp DEFINE_SPINLOCK(mmlist_lock);
 
 #include <linux/init_task.h>
 
-static struct mm_struct * mm_init(struct mm_struct * mm)
+static struct mm_struct * mm_init(struct mm_struct * mm, struct task_struct *p)
 {
 	atomic_set(&mm->mm_users, 1);
 	atomic_set(&mm->mm_count, 1);
@@ -356,11 +382,13 @@ static struct mm_struct * mm_init(struct mm_struct * mm)
 	mm->ioctx_list = NULL;
 	mm->free_area_cache = TASK_UNMAPPED_BASE;
 	mm->cached_hole_size = ~0UL;
+	mm_init_owner(mm, p);
 
 	if (likely(!mm_alloc_pgd(mm))) {
 		mm->def_flags = 0;
 		return mm;
 	}
+
 	free_mm(mm);
 	return NULL;
 }
@@ -375,7 +403,7 @@ struct mm_struct * mm_alloc(void)
 	mm = allocate_mm();
 	if (mm) {
 		memset(mm, 0, sizeof(*mm));
-		mm = mm_init(mm);
+		mm = mm_init(mm, current);
 	}
 	return mm;
 }
@@ -385,13 +413,14 @@ struct mm_struct * mm_alloc(void)
  * is dropped: either by a lazy thread or by
  * mmput. Free the page directory and the mm.
  */
-void fastcall __mmdrop(struct mm_struct *mm)
+void __mmdrop(struct mm_struct *mm)
 {
 	BUG_ON(mm == &init_mm);
 	mm_free_pgd(mm);
 	destroy_context(mm);
 	free_mm(mm);
 }
+EXPORT_SYMBOL_GPL(__mmdrop);
 
 /*
  * Decrement the use count and release all resources for an mm.
@@ -403,6 +432,7 @@ void mmput(struct mm_struct *mm)
 	if (atomic_dec_and_test(&mm->mm_users)) {
 		exit_aio(mm);
 		exit_mmap(mm);
+		set_mm_exe_file(mm, NULL);
 		if (!list_empty(&mm->mmlist)) {
 			spin_lock(&mmlist_lock);
 			list_del(&mm->mmlist);
@@ -491,7 +521,7 @@ void mm_release(struct task_struct *tsk, struct mm_struct *mm)
  * Allocate a new mm structure and copy contents from the
  * mm structure of the passed in task structure.
  */
-static struct mm_struct *dup_mm(struct task_struct *tsk)
+struct mm_struct *dup_mm(struct task_struct *tsk)
 {
 	struct mm_struct *mm, *oldmm = current->mm;
 	int err;
@@ -509,11 +539,13 @@ static struct mm_struct *dup_mm(struct task_struct *tsk)
 	mm->token_priority = 0;
 	mm->last_interval = 0;
 
-	if (!mm_init(mm))
+	if (!mm_init(mm, tsk))
 		goto fail_nomem;
 
 	if (init_new_context(tsk, mm))
 		goto fail_nocontext;
+
+	dup_mm_exe_file(oldmm, mm);
 
 	err = dup_mmap(mm, oldmm);
 	if (err)
@@ -593,16 +625,16 @@ static struct fs_struct *__copy_fs_struct(struct fs_struct *old)
 		rwlock_init(&fs->lock);
 		fs->umask = old->umask;
 		read_lock(&old->lock);
-		fs->rootmnt = mntget(old->rootmnt);
-		fs->root = dget(old->root);
-		fs->pwdmnt = mntget(old->pwdmnt);
-		fs->pwd = dget(old->pwd);
-		if (old->altroot) {
-			fs->altrootmnt = mntget(old->altrootmnt);
-			fs->altroot = dget(old->altroot);
+		fs->root = old->root;
+		path_get(&old->root);
+		fs->pwd = old->pwd;
+		path_get(&old->pwd);
+		if (old->altroot.dentry) {
+			fs->altroot = old->altroot;
+			path_get(&old->altroot);
 		} else {
-			fs->altrootmnt = NULL;
-			fs->altroot = NULL;
+			fs->altroot.mnt = NULL;
+			fs->altroot.dentry = NULL;
 		}
 		read_unlock(&old->lock);
 	}
@@ -628,136 +660,6 @@ static int copy_fs(unsigned long clone_flags, struct task_struct *tsk)
 	return 0;
 }
 
-static int count_open_files(struct fdtable *fdt)
-{
-	int size = fdt->max_fds;
-	int i;
-
-	/* Find the last open fd */
-	for (i = size/(8*sizeof(long)); i > 0; ) {
-		if (fdt->open_fds->fds_bits[--i])
-			break;
-	}
-	i = (i+1) * 8 * sizeof(long);
-	return i;
-}
-
-static struct files_struct *alloc_files(void)
-{
-	struct files_struct *newf;
-	struct fdtable *fdt;
-
-	newf = kmem_cache_alloc(files_cachep, GFP_KERNEL);
-	if (!newf)
-		goto out;
-
-	atomic_set(&newf->count, 1);
-
-	spin_lock_init(&newf->file_lock);
-	newf->next_fd = 0;
-	fdt = &newf->fdtab;
-	fdt->max_fds = NR_OPEN_DEFAULT;
-	fdt->close_on_exec = (fd_set *)&newf->close_on_exec_init;
-	fdt->open_fds = (fd_set *)&newf->open_fds_init;
-	fdt->fd = &newf->fd_array[0];
-	INIT_RCU_HEAD(&fdt->rcu);
-	fdt->next = NULL;
-	rcu_assign_pointer(newf->fdt, fdt);
-out:
-	return newf;
-}
-
-/*
- * Allocate a new files structure and copy contents from the
- * passed in files structure.
- * errorp will be valid only when the returned files_struct is NULL.
- */
-static struct files_struct *dup_fd(struct files_struct *oldf, int *errorp)
-{
-	struct files_struct *newf;
-	struct file **old_fds, **new_fds;
-	int open_files, size, i;
-	struct fdtable *old_fdt, *new_fdt;
-
-	*errorp = -ENOMEM;
-	newf = alloc_files();
-	if (!newf)
-		goto out;
-
-	spin_lock(&oldf->file_lock);
-	old_fdt = files_fdtable(oldf);
-	new_fdt = files_fdtable(newf);
-	open_files = count_open_files(old_fdt);
-
-	/*
-	 * Check whether we need to allocate a larger fd array and fd set.
-	 * Note: we're not a clone task, so the open count won't change.
-	 */
-	if (open_files > new_fdt->max_fds) {
-		new_fdt->max_fds = 0;
-		spin_unlock(&oldf->file_lock);
-		spin_lock(&newf->file_lock);
-		*errorp = expand_files(newf, open_files-1);
-		spin_unlock(&newf->file_lock);
-		if (*errorp < 0)
-			goto out_release;
-		new_fdt = files_fdtable(newf);
-		/*
-		 * Reacquire the oldf lock and a pointer to its fd table
-		 * who knows it may have a new bigger fd table. We need
-		 * the latest pointer.
-		 */
-		spin_lock(&oldf->file_lock);
-		old_fdt = files_fdtable(oldf);
-	}
-
-	old_fds = old_fdt->fd;
-	new_fds = new_fdt->fd;
-
-	memcpy(new_fdt->open_fds->fds_bits,
-		old_fdt->open_fds->fds_bits, open_files/8);
-	memcpy(new_fdt->close_on_exec->fds_bits,
-		old_fdt->close_on_exec->fds_bits, open_files/8);
-
-	for (i = open_files; i != 0; i--) {
-		struct file *f = *old_fds++;
-		if (f) {
-			get_file(f);
-		} else {
-			/*
-			 * The fd may be claimed in the fd bitmap but not yet
-			 * instantiated in the files array if a sibling thread
-			 * is partway through open().  So make sure that this
-			 * fd is available to the new process.
-			 */
-			FD_CLR(open_files - i, new_fdt->open_fds);
-		}
-		rcu_assign_pointer(*new_fds++, f);
-	}
-	spin_unlock(&oldf->file_lock);
-
-	/* compute the remainder to be cleared */
-	size = (new_fdt->max_fds - open_files) * sizeof(struct file *);
-
-	/* This is long word aligned thus could use a optimized version */
-	memset(new_fds, 0, size);
-
-	if (new_fdt->max_fds > open_files) {
-		int left = (new_fdt->max_fds-open_files)/8;
-		int start = open_files / (8 * sizeof(unsigned long));
-
-		memset(&new_fdt->open_fds->fds_bits[start], 0, left);
-		memset(&new_fdt->close_on_exec->fds_bits[start], 0, left);
-	}
-
-	return newf;
-
-out_release:
-	kmem_cache_free(files_cachep, newf);
-out:
-	return NULL;
-}
-
 static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 {
 	struct files_struct *oldf, *newf;
@@ -775,12 +677,6 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 		goto out;
 	}
 
-	/*
-	 * Note: we may be using current for both targets (See exec.c)
-	 * This works because we cache current->files (old) as oldf. Don't
-	 * break this.
-	 */
-	tsk->files = NULL;
 	newf = dup_fd(oldf, &error);
 	if (!newf)
 		goto out;
@@ -791,33 +687,30 @@ out:
 	return error;
 }
 
-/*
- *	Helper to unshare the files of the current task.
- *	We don't want to expose copy_files internals to
- *	the exec layer of the kernel.
- */
-
-int unshare_files(void)
+static int copy_io(unsigned long clone_flags, struct task_struct *tsk)
 {
-	struct files_struct *files  = current->files;
-	int rc;
+#ifdef CONFIG_BLOCK
+	struct io_context *ioc = current->io_context;
 
-	BUG_ON(!files);
-
-	/* This can race but the race causes us to copy when we don't
-	   need to and drop the copy */
-	if(atomic_read(&files->count) == 1)
-	{
-		atomic_inc(&files->count);
+	if (!ioc)
 		return 0;
-	}
-	rc = copy_files(0, current);
-	if(rc)
-		current->files = files;
-	return rc;
-}
+	/*
+	 * Share io context with parent, if CLONE_IO is set
+	 */
+	if (clone_flags & CLONE_IO) {
+		tsk->io_context = ioc_task_link(ioc);
+		if (unlikely(!tsk->io_context))
+			return -ENOMEM;
+	} else if (ioprio_valid(ioc->ioprio)) {
+		tsk->io_context = alloc_io_context(GFP_KERNEL, -1);
+		if (unlikely(!tsk->io_context))
+			return -ENOMEM;
 
-EXPORT_SYMBOL(unshare_files);
+		tsk->io_context->ioprio = ioc->ioprio;
+	}
+#endif
+	return 0;
+}
 
 static int copy_sighand(unsigned long clone_flags, struct task_struct *tsk)
 {
@@ -870,14 +763,13 @@ static int copy_signal(unsigned long clone_flags, struct task_struct *tsk)
 	sig->group_exit_code = 0;
 	sig->group_exit_task = NULL;
 	sig->group_stop_count = 0;
-	sig->curr_target = NULL;
+	sig->curr_target = tsk;
 	init_sigpending(&sig->shared_pending);
 	INIT_LIST_HEAD(&sig->posix_timers);
 
 	hrtimer_init(&sig->real_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	sig->it_real_incr.tv64 = 0;
 	sig->real_timer.function = it_real_fn;
-	sig->tsk = tsk;
 
 	sig->it_virt_expires = cputime_zero;
 	sig->it_virt_incr = cputime_zero;
@@ -962,6 +854,13 @@ static void rt_mutex_init_task(struct task_struct *p)
 #endif
 }
 
+#ifdef CONFIG_MM_OWNER
+void mm_init_owner(struct mm_struct *mm, struct task_struct *p)
+{
+	mm->owner = p;
+}
+#endif /* CONFIG_MM_OWNER */
+
 /*
  * This creates a new process as a copy of the old one,
  * but does not actually start it yet.
@@ -1045,6 +944,10 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	copy_flags(clone_flags, p);
 	INIT_LIST_HEAD(&p->children);
 	INIT_LIST_HEAD(&p->sibling);
+#ifdef CONFIG_PREEMPT_RCU
+	p->rcu_read_lock_nesting = 0;
+	p->rcu_flipctr_idx = 0;
+#endif /* #ifdef CONFIG_PREEMPT_RCU */
 	p->vfork_done = NULL;
 	spin_lock_init(&p->alloc_lock);
 
@@ -1058,6 +961,11 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->stimescaled = cputime_zero;
 	p->prev_utime = cputime_zero;
 	p->prev_stime = cputime_zero;
+
+#ifdef CONFIG_DETECT_SOFTLOCKUP
+	p->last_switch_count = 0;
+	p->last_switch_timestamp = 0;
+#endif
 
 #ifdef CONFIG_TASK_XACCT
 	p->rchar = 0;		/* I/O counter: bytes read */
@@ -1082,11 +990,12 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 #ifdef CONFIG_SECURITY
 	p->security = NULL;
 #endif
+	p->cap_bset = current->cap_bset;
 	p->io_context = NULL;
 	p->audit_context = NULL;
 	cgroup_fork(p);
 #ifdef CONFIG_NUMA
- 	p->mempolicy = mpol_copy(p->mempolicy);
+	p->mempolicy = mpol_dup(p->mempolicy);
  	if (IS_ERR(p->mempolicy)) {
  		retval = PTR_ERR(p->mempolicy);
  		p->mempolicy = NULL;
@@ -1147,15 +1056,17 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 		goto bad_fork_cleanup_mm;
 	if ((retval = copy_namespaces(clone_flags, p)))
 		goto bad_fork_cleanup_keys;
+	if ((retval = copy_io(clone_flags, p)))
+		goto bad_fork_cleanup_namespaces;
 	retval = copy_thread(0, clone_flags, stack_start, stack_size, p, regs);
 	if (retval)
-		goto bad_fork_cleanup_namespaces;
+		goto bad_fork_cleanup_io;
 
 	if (pid != &init_struct_pid) {
 		retval = -ENOMEM;
 		pid = alloc_pid(task_active_pid_ns(p));
 		if (!pid)
-			goto bad_fork_cleanup_namespaces;
+			goto bad_fork_cleanup_io;
 
 		if (clone_flags & CLONE_NEWPID) {
 			retval = pid_ns_prepare_proc(task_active_pid_ns(p));
@@ -1196,6 +1107,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 #ifdef TIF_SYSCALL_EMU
 	clear_tsk_thread_flag(p, TIF_SYSCALL_EMU);
 #endif
+	clear_all_latency_tracing(p);
 
 	/* Our parent execution domain becomes current domain
 	   These must match for thread signalling to apply */
@@ -1224,9 +1136,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	/* Need tasklist lock for parent etc handling! */
 	write_lock_irq(&tasklist_lock);
 
-	/* for sys_ioprio_set(IOPRIO_WHO_PGRP) */
-	p->ioprio = current->ioprio;
-
 	/*
 	 * The task hasn't been attached yet, so its cpus_allowed mask will
 	 * not be changed, nor will its assigned CPU.
@@ -1237,6 +1146,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	 * parent's CPU). This avoids alot of nasty races.
 	 */
 	p->cpus_allowed = current->cpus_allowed;
+	p->rt.nr_cpus_allowed = current->rt.nr_cpus_allowed;
 	if (unlikely(!cpu_isset(task_cpu(p), p->cpus_allowed) ||
 			!cpu_online(task_cpu(p))))
 		set_task_cpu(p, smp_processor_id());
@@ -1295,6 +1205,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 			if (clone_flags & CLONE_NEWPID)
 				p->nsproxy->pid_ns->child_reaper = p;
 
+			p->signal->leader_pid = pid;
 			p->signal->tty = current->signal->tty;
 			set_task_pgrp(p, task_pgrp_nr(current));
 			set_task_session(p, task_session_nr(current));
@@ -1317,6 +1228,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 bad_fork_free_pid:
 	if (pid != &init_struct_pid)
 		free_pid(pid);
+bad_fork_cleanup_io:
+	put_io_context(p->io_context);
 bad_fork_cleanup_namespaces:
 	exit_task_namespaces(p);
 bad_fork_cleanup_keys:
@@ -1340,7 +1253,7 @@ bad_fork_cleanup_security:
 	security_task_free(p);
 bad_fork_cleanup_policy:
 #ifdef CONFIG_NUMA
-	mpol_free(p->mempolicy);
+	mpol_put(p->mempolicy);
 bad_fork_cleanup_cgroup:
 #endif
 	cgroup_exit(p, cgroup_callbacks_done);
@@ -1359,7 +1272,7 @@ fork_out:
 	return ERR_PTR(retval);
 }
 
-noinline struct pt_regs * __devinit __attribute__((weak)) idle_regs(struct pt_regs *regs)
+noinline struct pt_regs * __cpuinit __attribute__((weak)) idle_regs(struct pt_regs *regs)
 {
 	memset(regs, 0, sizeof(struct pt_regs));
 	return regs;
@@ -1411,6 +1324,23 @@ long do_fork(unsigned long clone_flags,
 	int trace = 0;
 	long nr;
 
+	/*
+	 * We hope to recycle these flags after 2.6.26
+	 */
+	if (unlikely(clone_flags & CLONE_STOPPED)) {
+		static int __read_mostly count = 100;
+
+		if (count > 0 && printk_ratelimit()) {
+			char comm[TASK_COMM_LEN];
+
+			count--;
+			printk(KERN_INFO "fork(): process `%s' used deprecated "
+					"clone flags 0x%lx\n",
+				get_task_comm(comm, current),
+				clone_flags & CLONE_STOPPED);
+		}
+	}
+
 	if (unlikely(current->ptrace)) {
 		trace = fork_traceflag (clone_flags);
 		if (trace)
@@ -1426,13 +1356,7 @@ long do_fork(unsigned long clone_flags,
 	if (!IS_ERR(p)) {
 		struct completion vfork;
 
-		/*
-		 * this is enough to call pid_nr_ns here, but this if
-		 * improves optimisation of regular fork()
-		 */
-		nr = (clone_flags & CLONE_NEWPID) ?
-			task_pid_nr_ns(p, current->nsproxy->pid_ns) :
-				task_pid_vnr(p);
+		nr = task_pid_vnr(p);
 
 		if (clone_flags & CLONE_PARENT_SETTID)
 			put_user(nr, parent_tidptr);
@@ -1453,7 +1377,7 @@ long do_fork(unsigned long clone_flags,
 		if (!(clone_flags & CLONE_STOPPED))
 			wake_up_new_task(p, clone_flags);
 		else
-			p->state = TASK_STOPPED;
+			__set_task_state(p, TASK_STOPPED);
 
 		if (unlikely (trace)) {
 			current->ptrace_message = nr;
@@ -1619,18 +1543,6 @@ static int unshare_fd(unsigned long unshare_flags, struct files_struct **new_fdp
 }
 
 /*
- * Unsharing of semundo for tasks created with CLONE_SYSVSEM is not
- * supported yet
- */
-static int unshare_semundo(unsigned long unshare_flags, struct sem_undo_list **new_ulistp)
-{
-	if (unshare_flags & CLONE_SYSVSEM)
-		return -EINVAL;
-
-	return 0;
-}
-
-/*
  * unshare allows a process to 'unshare' part of the process
  * context which was originally shared using clone.  copy_*
  * functions used by do_fork() cannot be used here directly
@@ -1645,8 +1557,8 @@ asmlinkage long sys_unshare(unsigned long unshare_flags)
 	struct sighand_struct *new_sigh = NULL;
 	struct mm_struct *mm, *new_mm = NULL, *active_mm = NULL;
 	struct files_struct *fd, *new_fd = NULL;
-	struct sem_undo_list *new_ulist = NULL;
 	struct nsproxy *new_nsproxy = NULL;
+	int do_sysvsem = 0;
 
 	check_unshare_flags(&unshare_flags);
 
@@ -1658,6 +1570,13 @@ asmlinkage long sys_unshare(unsigned long unshare_flags)
 				CLONE_NEWNET))
 		goto bad_unshare_out;
 
+	/*
+	 * CLONE_NEWIPC must also detach from the undolist: after switching
+	 * to a new ipc namespace, the semaphore arrays from the old
+	 * namespace are unreachable.
+	 */
+	if (unshare_flags & (CLONE_NEWIPC|CLONE_SYSVSEM))
+		do_sysvsem = 1;
 	if ((err = unshare_thread(unshare_flags)))
 		goto bad_unshare_out;
 	if ((err = unshare_fs(unshare_flags, &new_fs)))
@@ -1668,13 +1587,17 @@ asmlinkage long sys_unshare(unsigned long unshare_flags)
 		goto bad_unshare_cleanup_sigh;
 	if ((err = unshare_fd(unshare_flags, &new_fd)))
 		goto bad_unshare_cleanup_vm;
-	if ((err = unshare_semundo(unshare_flags, &new_ulist)))
-		goto bad_unshare_cleanup_fd;
 	if ((err = unshare_nsproxy_namespaces(unshare_flags, &new_nsproxy,
 			new_fs)))
-		goto bad_unshare_cleanup_semundo;
+		goto bad_unshare_cleanup_fd;
 
-	if (new_fs ||  new_mm || new_fd || new_ulist || new_nsproxy) {
+	if (new_fs ||  new_mm || new_fd || do_sysvsem || new_nsproxy) {
+		if (do_sysvsem) {
+			/*
+			 * CLONE_SYSVSEM is equivalent to sys_exit().
+			 */
+			exit_sem(current);
+		}
 
 		if (new_nsproxy) {
 			switch_task_namespaces(current, new_nsproxy);
@@ -1710,7 +1633,6 @@ asmlinkage long sys_unshare(unsigned long unshare_flags)
 	if (new_nsproxy)
 		put_nsproxy(new_nsproxy);
 
-bad_unshare_cleanup_semundo:
 bad_unshare_cleanup_fd:
 	if (new_fd)
 		put_files_struct(new_fd);
@@ -1731,4 +1653,28 @@ bad_unshare_cleanup_fs:
 bad_unshare_cleanup_thread:
 bad_unshare_out:
 	return err;
+}
+
+/*
+ *	Helper to unshare the files of the current task.
+ *	We don't want to expose copy_files internals to
+ *	the exec layer of the kernel.
+ */
+
+int unshare_files(struct files_struct **displaced)
+{
+	struct task_struct *task = current;
+	struct files_struct *copy = NULL;
+	int error;
+
+	error = unshare_fd(CLONE_FILES, &copy);
+	if (error || !copy) {
+		*displaced = NULL;
+		return error;
+	}
+	*displaced = task->files;
+	task_lock(task);
+	task->files = copy;
+	task_unlock(task);
+	return 0;
 }

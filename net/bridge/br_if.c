@@ -133,7 +133,7 @@ static void del_nbp(struct net_bridge_port *p)
 	struct net_bridge *br = p->br;
 	struct net_device *dev = p->dev;
 
-	sysfs_remove_link(&br->ifobj, dev->name);
+	sysfs_remove_link(br->ifobj, dev->name);
 
 	dev_set_promiscuity(dev, -1);
 
@@ -258,12 +258,6 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br,
 	p->state = BR_STATE_DISABLED;
 	br_stp_port_timer_init(p);
 
-	kobject_init(&p->kobj);
-	kobject_set_name(&p->kobj, SYSFS_BRIDGE_PORT_ATTR);
-	p->kobj.ktype = &brport_ktype;
-	p->kobj.parent = &(dev->dev.kobj);
-	p->kobj.kset = NULL;
-
 	return p;
 }
 
@@ -279,15 +273,13 @@ int br_add_bridge(const char *name)
 	rtnl_lock();
 	if (strchr(dev->name, '%')) {
 		ret = dev_alloc_name(dev, dev->name);
-		if (ret < 0) {
-			free_netdev(dev);
-			goto out;
-		}
+		if (ret < 0)
+			goto out_free;
 	}
 
 	ret = register_netdevice(dev);
 	if (ret)
-		goto out;
+		goto out_free;
 
 	ret = br_sysfs_addbr(dev);
 	if (ret)
@@ -295,6 +287,10 @@ int br_add_bridge(const char *name)
  out:
 	rtnl_unlock();
 	return ret;
+
+out_free:
+	free_netdev(dev);
+	goto out;
 }
 
 int br_del_bridge(const char *name)
@@ -379,7 +375,8 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 	if (IS_ERR(p))
 		return PTR_ERR(p);
 
-	err = kobject_add(&p->kobj);
+	err = kobject_init_and_add(&p->kobj, &brport_ktype, &(dev->dev.kobj),
+				   SYSFS_BRIDGE_PORT_ATTR);
 	if (err)
 		goto err0;
 
@@ -416,8 +413,12 @@ err2:
 	br_fdb_delete_by_port(br, p, 1);
 err1:
 	kobject_del(&p->kobj);
+	goto put_back;
 err0:
 	kobject_put(&p->kobj);
+
+put_back:
+	dev_put(dev);
 	return err;
 }
 
@@ -441,12 +442,16 @@ int br_del_if(struct net_bridge *br, struct net_device *dev)
 
 void __exit br_cleanup_bridges(void)
 {
-	struct net_device *dev, *nxt;
+	struct net_device *dev;
 
 	rtnl_lock();
-	for_each_netdev_safe(&init_net, dev, nxt)
-		if (dev->priv_flags & IFF_EBRIDGE)
+restart:
+	for_each_netdev(&init_net, dev) {
+		if (dev->priv_flags & IFF_EBRIDGE) {
 			del_br(dev->priv);
+			goto restart;
+		}
+	}
 	rtnl_unlock();
 
 }

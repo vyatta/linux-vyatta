@@ -1772,17 +1772,36 @@
 #define                       TRP  0x3c0000   /* Pre charge-to-active command period */
 #define                      TRAS  0x3c00000  /* Min Active-to-pre charge time */
 #define                       TRC  0x3c000000 /* Active-to-active time */
+#define DDR_TRAS(x)		((x<<22)&TRAS)	/* DDR tRAS = (1~15) cycles */
+#define DDR_TRP(x)		((x<<18)&TRP)	/* DDR tRP = (1~15) cycles */
+#define DDR_TRC(x)		((x<<26)&TRC)	/* DDR tRC = (1~15) cycles */
+#define DDR_TRFC(x)		((x<<14)&TRFC)	/* DDR tRFC = (1~15) cycles */
+#define DDR_TREFI(x)		(x&TREFI)	/* DDR tRFC = (1~15) cycles */
 
 /* Bit masks for EBIU_DDRCTL1 */
 
 #define                      TRCD  0xf        /* Active-to-Read/write delay */
-#define                       MRD  0xf0       /* Mode register set to active */
+#define                      TMRD  0xf0       /* Mode register set to active */
 #define                       TWR  0x300      /* Write Recovery time */
 #define               DDRDATWIDTH  0x3000     /* DDR data width */
 #define                  EXTBANKS  0xc000     /* External banks */
 #define               DDRDEVWIDTH  0x30000    /* DDR device width */
 #define                DDRDEVSIZE  0xc0000    /* DDR device size */
-#define                     TWWTR  0xf0000000 /* Write-to-read delay */
+#define                      TWTR  0xf0000000 /* Write-to-read delay */
+#define DDR_TWTR(x)		((x<<28)&TWTR)	/* DDR tWTR = (1~15) cycles */
+#define DDR_TMRD(x)		((x<<4)&TMRD)	/* DDR tMRD = (1~15) cycles */
+#define DDR_TWR(x)		((x<<8)&TWR)	/* DDR tWR = (1~15) cycles */
+#define DDR_TRCD(x)		(x&TRCD)	/* DDR tRCD = (1~15) cycles */
+#define DDR_DATWIDTH		0x2000		/* DDR data width */
+#define EXTBANK_1		0		/* 1 external bank */
+#define EXTBANK_2		0x4000		/* 2 external banks */
+#define DEVSZ_64		0x40000		/* DDR External Bank Size = 64MB */
+#define DEVSZ_128		0x80000		/* DDR External Bank Size = 128MB */
+#define DEVSZ_256		0xc0000		/* DDR External Bank Size = 256MB */
+#define DEVSZ_512		0		/* DDR External Bank Size = 512MB */
+#define DEVWD_4			0		/* DDR Device Width = 4 Bits    */
+#define DEVWD_8			0x10000		/* DDR Device Width = 8 Bits    */
+#define DEVWD_16		0x20000		/* DDR Device Width = 16 Bits    */
 
 /* Bit masks for EBIU_DDRCTL2 */
 
@@ -1790,6 +1809,10 @@
 #define                CASLATENCY  0x70       /* CAS latency */
 #define                  DLLRESET  0x100      /* DLL Reset */
 #define                      REGE  0x1000     /* Register mode enable */
+#define CL_1_5			0x50		/* DDR CAS Latency = 1.5 cycles */
+#define CL_2			0x20		/* DDR CAS Latency = 2 cycles */
+#define CL_2_5			0x60		/* DDR CAS Latency = 2.5 cycles */
+#define CL_3			0x30		/* DDR CAS Latency = 3 cycles */
 
 /* Bit masks for EBIU_DDRCTL3 */
 
@@ -2257,6 +2280,10 @@
 
 #define                      CSEL  0x30       /* Core Select */
 #define                      SSEL  0xf        /* System Select */
+#define			CSEL_DIV1	0x0000	/* CCLK = VCO / 1 */
+#define			CSEL_DIV2	0x0010	/* CCLK = VCO / 2 */
+#define			CSEL_DIV4	0x0020	/* CCLK = VCO / 4 */
+#define			CSEL_DIV8	0x0030	/* CCLK = VCO / 8 */
 
 /* Bit masks for PLL_CTL */
 
@@ -2301,6 +2328,26 @@
 #define                     USBWE  0x800      /* USB Wake-Up Enable */
 #define                    KPADWE  0x1000     /* Keypad Wake-Up Enable */
 #define                     ROTWE  0x2000     /* Rotary Wake-Up Enable */
+
+#define	FREQ_333		0x0001	/* Switching Frequency Is 333 kHz */
+#define	FREQ_667		0x0002	/* Switching Frequency Is 667 kHz */
+#define	FREQ_1000		0x0003	/* Switching Frequency Is 1 MHz */
+
+#define	GAIN_5			0x0000	/* GAIN = 5*/
+#define	GAIN_10			0x0004	/* GAIN = 1*/
+#define	GAIN_20			0x0008	/* GAIN = 2*/
+#define	GAIN_50			0x000C	/* GAIN = 5*/
+
+#define	VLEV_085 		0x0060	/* VLEV = 0.85 V (-5% - +10% Accuracy) */
+#define	VLEV_090		0x0070	/* VLEV = 0.90 V (-5% - +10% Accuracy) */
+#define	VLEV_095		0x0080	/* VLEV = 0.95 V (-5% - +10% Accuracy) */
+#define	VLEV_100		0x0090	/* VLEV = 1.00 V (-5% - +10% Accuracy) */
+#define	VLEV_105		0x00A0	/* VLEV = 1.05 V (-5% - +10% Accuracy) */
+#define	VLEV_110		0x00B0	/* VLEV = 1.10 V (-5% - +10% Accuracy) */
+#define	VLEV_115		0x00C0	/* VLEV = 1.15 V (-5% - +10% Accuracy) */
+#define	VLEV_120		0x00D0	/* VLEV = 1.20 V (-5% - +10% Accuracy) */
+#define	VLEV_125		0x00E0	/* VLEV = 1.25 V (-5% - +10% Accuracy) */
+#define	VLEV_130		0x00F0	/* VLEV = 1.30 V (-5% - +10% Accuracy) */
 
 /* Bit masks for NFC_CTL */
 

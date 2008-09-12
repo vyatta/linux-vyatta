@@ -175,7 +175,7 @@ extern const struct inode_operations jffs2_symlink_inode_operations;
 /* fs.c */
 int jffs2_setattr (struct dentry *, struct iattr *);
 int jffs2_do_setattr (struct inode *, struct iattr *);
-void jffs2_read_inode (struct inode *);
+struct inode *jffs2_iget(struct super_block *, unsigned long);
 void jffs2_clear_inode (struct inode *);
 void jffs2_dirty_inode(struct inode *inode);
 struct inode *jffs2_new_inode (struct inode *dir_i, int mode,
@@ -187,7 +187,7 @@ int jffs2_do_fill_super(struct super_block *sb, void *data, int silent);
 void jffs2_gc_release_inode(struct jffs2_sb_info *c,
 			    struct jffs2_inode_info *f);
 struct jffs2_inode_info *jffs2_gc_fetch_inode(struct jffs2_sb_info *c,
-					      int inum, int nlink);
+					      int inum, int unlinked);
 
 unsigned char *jffs2_gc_fetch_page(struct jffs2_sb_info *c,
 				   struct jffs2_inode_info *f,

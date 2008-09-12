@@ -170,8 +170,6 @@
 
 #define VERSION  "pktgen v2.69: Packet Generator for packet performance testing.\n"
 
-/* The buckets are exponential in 'width' */
-#define LAT_BUCKETS_MAX 32
 #define IP_NAME_SZ 32
 #define MAX_MPLS_LABELS 16 /* This is the max label stack depth */
 #define MPLS_STACK_BOTTOM htonl(0x00000100)
@@ -392,66 +390,11 @@ struct pktgen_thread {
 	int cpu;
 
 	wait_queue_head_t queue;
+	struct completion start_done;
 };
 
 #define REMOVE 1
 #define FIND   0
-
-/*  This code works around the fact that do_div cannot handle two 64-bit
-    numbers, and regular 64-bit division doesn't work on x86 kernels.
-    --Ben
-*/
-
-#define PG_DIV 0
-
-/* This was emailed to LMKL by: Chris Caputo <ccaputo@alt.net>
- * Function copied/adapted/optimized from:
- *
- *  nemesis.sourceforge.net/browse/lib/static/intmath/ix86/intmath.c.html
- *
- * Copyright 1994, University of Cambridge Computer Laboratory
- * All Rights Reserved.
- *
- */
-static inline s64 divremdi3(s64 x, s64 y, int type)
-{
-	u64 a = (x < 0) ? -x : x;
-	u64 b = (y < 0) ? -y : y;
-	u64 res = 0, d = 1;
-
-	if (b > 0) {
-		while (b < a) {
-			b <<= 1;
-			d <<= 1;
-		}
-	}
-
-	do {
-		if (a >= b) {
-			a -= b;
-			res += d;
-		}
-		b >>= 1;
-		d >>= 1;
-	}
-	while (d);
-
-	if (PG_DIV == type) {
-		return (((x ^ y) & (1ll << 63)) == 0) ? res : -(s64) res;
-	} else {
-		return ((x & (1ll << 63)) == 0) ? a : -(s64) a;
-	}
-}
-
-/* End of hacks to deal with 64-bit math on x86 */
-
-/** Convert to milliseconds */
-static inline __u64 tv_to_ms(const struct timeval *tv)
-{
-	__u64 ms = tv->tv_usec / 1000;
-	ms += (__u64) tv->tv_sec * (__u64) 1000;
-	return ms;
-}
 
 /** Convert to micro-seconds */
 static inline __u64 tv_to_us(const struct timeval *tv)
@@ -461,49 +404,11 @@ static inline __u64 tv_to_us(const struct timeval *tv)
 	return us;
 }
 
-static inline __u64 pg_div(__u64 n, __u32 base)
-{
-	__u64 tmp = n;
-	do_div(tmp, base);
-	/* printk("pktgen: pg_div, n: %llu  base: %d  rv: %llu\n",
-	   n, base, tmp); */
-	return tmp;
-}
-
-static inline __u64 pg_div64(__u64 n, __u64 base)
-{
-	__u64 tmp = n;
-/*
- * How do we know if the architecture we are running on
- * supports division with 64 bit base?
- *
- */
-#if defined(__sparc_v9__) || defined(__powerpc64__) || defined(__alpha__) || defined(__x86_64__) || defined(__ia64__)
-
-	do_div(tmp, base);
-#else
-	tmp = divremdi3(n, base, PG_DIV);
-#endif
-	return tmp;
-}
-
-static inline __u64 getCurMs(void)
-{
-	struct timeval tv;
-	do_gettimeofday(&tv);
-	return tv_to_ms(&tv);
-}
-
-static inline __u64 getCurUs(void)
+static __u64 getCurUs(void)
 {
 	struct timeval tv;
 	do_gettimeofday(&tv);
 	return tv_to_us(&tv);
-}
-
-static inline __u64 tv_diff(const struct timeval *a, const struct timeval *b)
-{
-	return tv_to_us(a) - tv_to_us(b);
 }
 
 /* old include end */
@@ -1970,7 +1875,7 @@ static int pktgen_device_event(struct notifier_block *unused,
 {
 	struct net_device *dev = ptr;
 
-	if (dev->nd_net != &init_net)
+	if (dev_net(dev) != &init_net)
 		return NOTIFY_DONE;
 
 	/* It is OK that we do not hold the group lock right now,
@@ -2138,7 +2043,6 @@ static void spin(struct pktgen_dev *pkt_dev, __u64 spin_until_us)
 	__u64 now;
 
 	start = now = getCurUs();
-	printk(KERN_INFO "sleeping for %d\n", (int)(spin_until_us - now));
 	while (now < spin_until_us) {
 		/* TODO: optimize sleeping behavior */
 		if (spin_until_us - now > jiffies_to_usecs(1) + 1)
@@ -2358,9 +2262,11 @@ static void mod_cur_headers(struct pktgen_dev *pkt_dev)
 					t = random32() % (imx - imn) + imn;
 					s = htonl(t);
 
-					while (LOOPBACK(s) || MULTICAST(s)
-					       || BADCLASS(s) || ZERONET(s)
-					       || LOCAL_MCAST(s)) {
+					while (ipv4_is_loopback(s) ||
+					       ipv4_is_multicast(s) ||
+					       ipv4_is_lbcast(s) ||
+					       ipv4_is_zeronet(s) ||
+					       ipv4_is_local_multicast(s)) {
 						t = random32() % (imx - imn) + imn;
 						s = htonl(t);
 					}
@@ -3509,6 +3415,7 @@ static int pktgen_thread_worker(void *arg)
 	BUG_ON(smp_processor_id() != cpu);
 
 	init_waitqueue_head(&t->queue);
+	complete(&t->start_done);
 
 	pr_debug("pktgen: starting pktgen/%d:  pid=%d\n", cpu, task_pid_nr(current));
 
@@ -3665,15 +3572,14 @@ static int pktgen_add_device(struct pktgen_thread *t, const char *ifname)
 	if (err)
 		goto out1;
 
-	pkt_dev->entry = create_proc_entry(ifname, 0600, pg_proc_dir);
+	pkt_dev->entry = proc_create_data(ifname, 0600, pg_proc_dir,
+					  &pktgen_if_fops, pkt_dev);
 	if (!pkt_dev->entry) {
 		printk(KERN_ERR "pktgen: cannot create %s/%s procfs entry.\n",
 		       PG_PROC_DIR, ifname);
 		err = -EINVAL;
 		goto out2;
 	}
-	pkt_dev->entry->proc_fops = &pktgen_if_fops;
-	pkt_dev->entry->data = pkt_dev;
 #ifdef CONFIG_XFRM
 	pkt_dev->ipsmode = XFRM_MODE_TRANSPORT;
 	pkt_dev->ipsproto = IPPROTO_ESP;
@@ -3711,6 +3617,7 @@ static int __init pktgen_create_thread(int cpu)
 	INIT_LIST_HEAD(&t->if_list);
 
 	list_add_tail(&t->th_list, &pktgen_threads);
+	init_completion(&t->start_done);
 
 	p = kthread_create(pktgen_thread_worker, t, "kpktgend_%d", cpu);
 	if (IS_ERR(p)) {
@@ -3723,7 +3630,8 @@ static int __init pktgen_create_thread(int cpu)
 	kthread_bind(p, cpu);
 	t->tsk = p;
 
-	pe = create_proc_entry(t->tsk->comm, 0600, pg_proc_dir);
+	pe = proc_create_data(t->tsk->comm, 0600, pg_proc_dir,
+			      &pktgen_thread_fops, t);
 	if (!pe) {
 		printk(KERN_ERR "pktgen: cannot create %s/%s procfs entry.\n",
 		       PG_PROC_DIR, t->tsk->comm);
@@ -3733,10 +3641,8 @@ static int __init pktgen_create_thread(int cpu)
 		return -EINVAL;
 	}
 
-	pe->proc_fops = &pktgen_thread_fops;
-	pe->data = t;
-
 	wake_up_process(p);
+	wait_for_completion(&t->start_done);
 
 	return 0;
 }
@@ -3804,16 +3710,13 @@ static int __init pg_init(void)
 		return -ENODEV;
 	pg_proc_dir->owner = THIS_MODULE;
 
-	pe = create_proc_entry(PGCTRL, 0600, pg_proc_dir);
+	pe = proc_create(PGCTRL, 0600, pg_proc_dir, &pktgen_fops);
 	if (pe == NULL) {
 		printk(KERN_ERR "pktgen: ERROR: cannot create %s "
 		       "procfs entry.\n", PGCTRL);
 		proc_net_remove(&init_net, PG_PROC_DIR);
 		return -EINVAL;
 	}
-
-	pe->proc_fops = &pktgen_fops;
-	pe->data = NULL;
 
 	/* Register us to receive netdevice events */
 	register_netdevice_notifier(&pktgen_notifier_block);

@@ -31,7 +31,6 @@
  *      modems.
  */
 
-#include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
@@ -1076,7 +1075,7 @@ static int snd_via82xx_free(struct via82xx_modem *chip)
 	/* disable interrupts */
 	for (i = 0; i < chip->num_devs; i++)
 		snd_via82xx_channel_reset(chip, &chip->devs[i]);
-	synchronize_irq(chip->irq);
+
       __end_hw:
 	if (chip->irq >= 0)
 		free_irq(chip->irq, chip);

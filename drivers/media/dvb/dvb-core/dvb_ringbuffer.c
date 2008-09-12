@@ -90,7 +90,11 @@ void dvb_ringbuffer_flush(struct dvb_ringbuffer *rbuf)
 	rbuf->error = 0;
 }
 
-
+void dvb_ringbuffer_reset(struct dvb_ringbuffer *rbuf)
+{
+	rbuf->pread = rbuf->pwrite = 0;
+	rbuf->error = 0;
+}
 
 void dvb_ringbuffer_flush_spinlock_wakeup(struct dvb_ringbuffer *rbuf)
 {
@@ -261,11 +265,6 @@ EXPORT_SYMBOL(dvb_ringbuffer_init);
 EXPORT_SYMBOL(dvb_ringbuffer_empty);
 EXPORT_SYMBOL(dvb_ringbuffer_free);
 EXPORT_SYMBOL(dvb_ringbuffer_avail);
-EXPORT_SYMBOL(dvb_ringbuffer_flush);
 EXPORT_SYMBOL(dvb_ringbuffer_flush_spinlock_wakeup);
 EXPORT_SYMBOL(dvb_ringbuffer_read);
 EXPORT_SYMBOL(dvb_ringbuffer_write);
-EXPORT_SYMBOL(dvb_ringbuffer_pkt_write);
-EXPORT_SYMBOL(dvb_ringbuffer_pkt_read);
-EXPORT_SYMBOL(dvb_ringbuffer_pkt_dispose);
-EXPORT_SYMBOL(dvb_ringbuffer_pkt_next);

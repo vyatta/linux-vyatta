@@ -3,9 +3,9 @@
  * Purpose:	Machine check handling specific defines
  *
  * Copyright (C) 1999, 2004 Silicon Graphics, Inc.
- * Copyright (C) Vijay Chander (vijay@engr.sgi.com)
- * Copyright (C) Srinivasa Thirumalachar (sprasad@engr.sgi.com)
- * Copyright (C) Russ Anderson (rja@sgi.com)
+ * Copyright (C) Vijay Chander <vijay@engr.sgi.com>
+ * Copyright (C) Srinivasa Thirumalachar <sprasad@engr.sgi.com>
+ * Copyright (C) Russ Anderson <rja@sgi.com>
  */
 
 #ifndef _ASM_IA64_MCA_H
@@ -157,6 +157,7 @@ extern void ia64_mca_printk(const char * fmt, ...)
 struct ia64_mca_notify_die {
 	struct ia64_sal_os_state *sos;
 	int *monarch_cpu;
+	int *data;
 };
 
 DECLARE_PER_CPU(u64, ia64_mca_pal_base);

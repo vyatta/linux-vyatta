@@ -33,7 +33,6 @@
 #include <linux/console.h>
 #include <linux/timex.h>
 #include <linux/pci.h>
-#include <linux/ide.h>
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
 
@@ -91,19 +90,10 @@ extern void prep_tiger1_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi
 #define cached_21	(((char *)(ppc_cached_irq_mask))[3])
 #define cached_A1	(((char *)(ppc_cached_irq_mask))[2])
 
-#ifdef CONFIG_SOUND_CS4232
-long ppc_cs4232_dma, ppc_cs4232_dma2;
-#endif
-
 extern PTE *Hash, *Hash_end;
 extern unsigned long Hash_size, Hash_mask;
 extern int probingmem;
 extern unsigned long loops_per_jiffy;
-
-#ifdef CONFIG_SOUND_CS4232
-EXPORT_SYMBOL(ppc_cs4232_dma);
-EXPORT_SYMBOL(ppc_cs4232_dma2);
-#endif
 
 /* useful ISA ports */
 #define PREP_SYSCTL	0x81c
@@ -569,74 +559,6 @@ prep_show_percpuinfo(struct seq_file *m, int i)
 	return 0;
 }
 
-#ifdef CONFIG_SOUND_CS4232
-static long __init masktoint(unsigned int i)
-{
-	int t = -1;
-	while (i >> ++t)
-		;
-	return (t-1);
-}
-
-/*
- * ppc_cs4232_dma and ppc_cs4232_dma2 are used in include/asm/dma.h
- * to distinguish sound dma-channels from others. This is because
- * blocksize on 16 bit dma-channels 5,6,7 is 128k, but
- * the cs4232.c uses 64k like on 8 bit dma-channels 0,1,2,3
- */
-
-static void __init prep_init_sound(void)
-{
-	PPC_DEVICE *audiodevice = NULL;
-
-	/*
-	 * Get the needed resource information from residual data.
-	 *
-	 */
-	if (have_residual_data)
-		audiodevice = residual_find_device(~0, NULL,
-				MultimediaController, AudioController, -1, 0);
-
-	if (audiodevice != NULL) {
-		PnP_TAG_PACKET *pkt;
-
-		pkt = PnP_find_packet((unsigned char *)&res->DevicePnPHeap[audiodevice->AllocatedOffset],
-				S5_Packet, 0);
-		if (pkt != NULL)
-			ppc_cs4232_dma = masktoint(pkt->S5_Pack.DMAMask);
-		pkt = PnP_find_packet((unsigned char*)&res->DevicePnPHeap[audiodevice->AllocatedOffset],
-				S5_Packet, 1);
-		if (pkt != NULL)
-			ppc_cs4232_dma2 = masktoint(pkt->S5_Pack.DMAMask);
-	}
-
-	/*
-	 * These are the PReP specs' defaults for the cs4231.  We use these
-	 * as fallback incase we don't have residual data.
-	 * At least the IBM Thinkpad 850 with IDE DMA Channels at 6 and 7
-	 * will use the other values.
-	 */
-	if (audiodevice == NULL) {
-		switch (_prep_type) {
-		case _PREP_IBM:
-			ppc_cs4232_dma = 1;
-			ppc_cs4232_dma2 = -1;
-			break;
-		default:
-			ppc_cs4232_dma = 6;
-			ppc_cs4232_dma2 = 7;
-		}
-	}
-
-	/*
-	 * Find a way to push this information to the cs4232 driver
-	 * Give it out with printk, when not in cmd_line?
-	 * Append it to cmd_line and boot_command_line?
-	 * Format is cs4232=io,irq,dma,dma2
-	 */
-}
-#endif /* CONFIG_SOUND_CS4232 */
-
 /*
  * Fill out screen_info according to the residual data. This allows us to use
  * at least vesafb.
@@ -898,10 +820,6 @@ prep_setup_arch(void)
 		}
 	}
 
-#ifdef CONFIG_SOUND_CS4232
-	prep_init_sound();
-#endif /* CONFIG_SOUND_CS4232 */
-
 	prep_init_vesa();
 
 	switch (_prep_type) {
@@ -974,38 +892,6 @@ prep_init_IRQ(void)
 		 * PReP specification. */
 		i8259_init(MPC10X_MAPA_PCI_INTACK_ADDR, 0);
 }
-
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-/*
- * IDE stuff.
- */
-static int
-prep_ide_default_irq(unsigned long base)
-{
-	switch (base) {
-		case 0x1f0: return 13;
-		case 0x170: return 13;
-		case 0x1e8: return 11;
-		case 0x168: return 10;
-		case 0xfff0: return 14;		/* MCP(N)750 ide0 */
-		case 0xffe0: return 15;		/* MCP(N)750 ide1 */
-		default: return 0;
-	}
-}
-
-static unsigned long
-prep_ide_default_io_base(int index)
-{
-	switch (index) {
-		case 0: return 0x1f0;
-		case 1: return 0x170;
-		case 2: return 0x1e8;
-		case 3: return 0x168;
-		default:
-			return 0;
-	}
-}
-#endif
 
 #ifdef CONFIG_SMP
 /* PReP (MTX) support */
@@ -1150,11 +1036,6 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.get_rtc_time   = todc_get_rtc_time;
 
 	ppc_md.setup_io_mappings = prep_map_io;
-
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-	ppc_ide_md.default_irq = prep_ide_default_irq;
-	ppc_ide_md.default_io_base = prep_ide_default_io_base;
-#endif
 
 #ifdef CONFIG_SMP
 	smp_ops			 = &prep_smp_ops;

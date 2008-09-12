@@ -21,10 +21,16 @@
 
 #define ia64_invala_fr(regnum)	asm volatile ("invala.e f%0" :: "i"(regnum))
 
+#define ia64_flushrs() asm volatile ("flushrs;;":::"memory")
+
+#define ia64_loadrs() asm volatile ("loadrs;;":::"memory")
+
 extern void ia64_bad_param_for_setreg (void);
 extern void ia64_bad_param_for_getreg (void);
 
-register unsigned long ia64_r13 asm ("r13") __attribute_used__;
+#ifdef __KERNEL__
+register unsigned long ia64_r13 asm ("r13") __used;
+#endif
 
 #define ia64_setreg(regnum, val)						\
 ({										\
@@ -514,6 +520,14 @@ do {										\
 
 #define ia64_ptrd(addr, size)						\
 	asm volatile ("ptr.d %0,%1" :: "r"(addr), "r"(size) : "memory")
+
+#define ia64_ttag(addr)							\
+({									  \
+	__u64 ia64_intri_res;						   \
+	asm volatile ("ttag %0=%1" : "=r"(ia64_intri_res) : "r" (addr));   \
+	ia64_intri_res;							 \
+})
+
 
 /* Values for lfhint in ia64_lfetch and ia64_lfetch_fault */
 

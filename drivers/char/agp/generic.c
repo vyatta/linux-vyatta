@@ -80,6 +80,13 @@ static int agp_get_key(void)
 	return -1;
 }
 
+void agp_flush_chipset(struct agp_bridge_data *bridge)
+{
+	if (bridge->driver->chipset_flush)
+		bridge->driver->chipset_flush(bridge);
+}
+EXPORT_SYMBOL(agp_flush_chipset);
+
 /*
  * Use kmalloc if possible for the page list. Otherwise fall back to
  * vmalloc. This speeds things up and also saves memory for small AGP
@@ -89,13 +96,13 @@ static int agp_get_key(void)
 void agp_alloc_page_array(size_t size, struct agp_memory *mem)
 {
 	mem->memory = NULL;
-	mem->vmalloc_flag = 0;
+	mem->vmalloc_flag = false;
 
 	if (size <= 2*PAGE_SIZE)
 		mem->memory = kmalloc(size, GFP_KERNEL | __GFP_NORETRY);
 	if (mem->memory == NULL) {
 		mem->memory = vmalloc(size);
-		mem->vmalloc_flag = 1;
+		mem->vmalloc_flag = true;
 	}
 }
 EXPORT_SYMBOL(agp_alloc_page_array);
@@ -181,7 +188,7 @@ void agp_free_memory(struct agp_memory *curr)
 	if (curr == NULL)
 		return;
 
-	if (curr->is_bound == TRUE)
+	if (curr->is_bound)
 		agp_unbind_memory(curr);
 
 	if (curr->type >= AGP_USER_TYPES) {
@@ -195,11 +202,13 @@ void agp_free_memory(struct agp_memory *curr)
 	}
 	if (curr->page_count != 0) {
 		for (i = 0; i < curr->page_count; i++) {
-			curr->bridge->driver->agp_destroy_page(gart_to_virt(curr->memory[i]), AGP_PAGE_DESTROY_UNMAP);
+			curr->memory[i] = (unsigned long)gart_to_virt(curr->memory[i]);
+			curr->bridge->driver->agp_destroy_page((void *)curr->memory[i],
+							       AGP_PAGE_DESTROY_UNMAP);
 		}
-		flush_agp_mappings();
 		for (i = 0; i < curr->page_count; i++) {
-			curr->bridge->driver->agp_destroy_page(gart_to_virt(curr->memory[i]), AGP_PAGE_DESTROY_FREE);
+			curr->bridge->driver->agp_destroy_page((void *)curr->memory[i],
+							       AGP_PAGE_DESTROY_FREE);
 		}
 	}
 	agp_free_key(curr->key);
@@ -266,8 +275,6 @@ struct agp_memory *agp_allocate_memory(struct agp_bridge_data *bridge,
 		new->page_count++;
 	}
 	new->bridge = bridge;
-
-	flush_agp_mappings();
 
 	return new;
 }
@@ -407,20 +414,20 @@ int agp_bind_memory(struct agp_memory *curr, off_t pg_start)
 	if (curr == NULL)
 		return -EINVAL;
 
-	if (curr->is_bound == TRUE) {
+	if (curr->is_bound) {
 		printk(KERN_INFO PFX "memory %p is already bound!\n", curr);
 		return -EINVAL;
 	}
-	if (curr->is_flushed == FALSE) {
+	if (!curr->is_flushed) {
 		curr->bridge->driver->cache_flush();
-		curr->is_flushed = TRUE;
+		curr->is_flushed = true;
 	}
 	ret_val = curr->bridge->driver->insert_memory(curr, pg_start, curr->type);
 
 	if (ret_val != 0)
 		return ret_val;
 
-	curr->is_bound = TRUE;
+	curr->is_bound = true;
 	curr->pg_start = pg_start;
 	return 0;
 }
@@ -442,7 +449,7 @@ int agp_unbind_memory(struct agp_memory *curr)
 	if (curr == NULL)
 		return -EINVAL;
 
-	if (curr->is_bound != TRUE) {
+	if (!curr->is_bound) {
 		printk(KERN_INFO PFX "memory %p was not bound!\n", curr);
 		return -EINVAL;
 	}
@@ -452,7 +459,7 @@ int agp_unbind_memory(struct agp_memory *curr)
 	if (ret_val != 0)
 		return ret_val;
 
-	curr->is_bound = FALSE;
+	curr->is_bound = false;
 	curr->pg_start = 0;
 	return 0;
 }
@@ -750,7 +757,7 @@ u32 agp_collect_device_status(struct agp_bridge_data *bridge, u32 requested_mode
 EXPORT_SYMBOL(agp_collect_device_status);
 
 
-void agp_device_command(u32 bridge_agpstat, int agp_v3)
+void agp_device_command(u32 bridge_agpstat, bool agp_v3)
 {
 	struct pci_dev *device = NULL;
 	int mode;
@@ -814,7 +821,7 @@ void agp_generic_enable(struct agp_bridge_data *bridge, u32 requested_mode)
 			/* If we have 3.5, we can do the isoch stuff. */
 			if (bridge->minor_version >= 5)
 				agp_3_5_enable(bridge);
-			agp_device_command(bridge_agpstat, TRUE);
+			agp_device_command(bridge_agpstat, true);
 			return;
 		} else {
 		    /* Disable calibration cycle in RX91<1> when not in AGP3.0 mode of operation.*/
@@ -831,7 +838,7 @@ void agp_generic_enable(struct agp_bridge_data *bridge, u32 requested_mode)
 	}
 
 	/* AGP v<3 */
-	agp_device_command(bridge_agpstat, FALSE);
+	agp_device_command(bridge_agpstat, false);
 }
 EXPORT_SYMBOL(agp_generic_enable);
 
@@ -928,9 +935,14 @@ int agp_generic_create_gatt_table(struct agp_bridge_data *bridge)
 	agp_gatt_table = (void *)table;
 
 	bridge->driver->cache_flush();
+#ifdef CONFIG_X86
+	set_memory_uc((unsigned long)table, 1 << page_order);
+	bridge->gatt_table = (void *)table;
+#else
 	bridge->gatt_table = ioremap_nocache(virt_to_gart(table),
 					(PAGE_SIZE * (1 << page_order)));
 	bridge->driver->cache_flush();
+#endif
 
 	if (bridge->gatt_table == NULL) {
 		for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
@@ -987,7 +999,11 @@ int agp_generic_free_gatt_table(struct agp_bridge_data *bridge)
 	 * called, then all agp memory is deallocated and removed
 	 * from the table. */
 
+#ifdef CONFIG_X86
+	set_memory_wb((unsigned long)bridge->gatt_table, 1 << page_order);
+#else
 	iounmap(bridge->gatt_table);
+#endif
 	table = (char *) bridge->gatt_table_real;
 	table_end = table + ((PAGE_SIZE * (1 << page_order)) - 1);
 
@@ -1070,9 +1086,9 @@ int agp_generic_insert_memory(struct agp_memory * mem, off_t pg_start, int type)
 		j++;
 	}
 
-	if (mem->is_flushed == FALSE) {
+	if (!mem->is_flushed) {
 		bridge->driver->cache_flush();
-		mem->is_flushed = TRUE;
+		mem->is_flushed = true;
 	}
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {

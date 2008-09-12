@@ -9,16 +9,22 @@
 #include <asm/desc.h>
 #include <asm/i387.h>
 
-static inline int
-arch_prepare_suspend(void)
+static inline int arch_prepare_suspend(void)
 {
 	return 0;
 }
 
-/* Image of the saved processor state. If you touch this, fix acpi/wakeup.S. */
+/*
+ * Image of the saved processor state, used by the low level ACPI suspend to
+ * RAM code and by the low level hibernation code.
+ *
+ * If you modify it, fix arch/x86/kernel/acpi/wakeup_64.S and make sure that
+ * __save/__restore_processor_state(), defined in arch/x86/kernel/suspend_64.c,
+ * still work as required.
+ */
 struct saved_context {
 	struct pt_regs regs;
-  	u16 ds, es, fs, gs, ss;
+	u16 ds, es, fs, gs, ss;
 	unsigned long gs_base, gs_kernel_base, fs_base;
 	unsigned long cr0, cr2, cr3, cr4, cr8;
 	unsigned long efer;
@@ -37,8 +43,6 @@ struct saved_context {
 
 #define loaddebug(thread,register) \
 	set_debugreg((thread)->debugreg##register, register)
-
-extern void fix_processor_context(void);
 
 /* routines for saving/restoring kernel state */
 extern int acpi_save_state_mem(void);

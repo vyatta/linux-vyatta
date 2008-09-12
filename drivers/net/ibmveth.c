@@ -49,7 +49,6 @@
 #include <linux/in.h>
 #include <linux/ip.h>
 #include <net/net_namespace.h>
-#include <asm/semaphore.h>
 #include <asm/hvcall.h>
 #include <asm/atomic.h>
 #include <asm/vio.h>
@@ -1179,13 +1178,15 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 
 	for(i = 0; i<IbmVethNumBufferPools; i++) {
 		struct kobject *kobj = &adapter->rx_buff_pool[i].kobj;
+		int error;
+
 		ibmveth_init_buffer_pool(&adapter->rx_buff_pool[i], i,
 					 pool_count[i], pool_size[i],
 					 pool_active[i]);
-		kobj->parent = &dev->dev.kobj;
-		kobject_set_name(kobj, "pool%d", i);
-		kobj->ktype = &ktype_veth_pool;
-		kobject_register(kobj);
+		error = kobject_init_and_add(kobj, &ktype_veth_pool,
+					     &dev->dev.kobj, "pool%d", i);
+		if (!error)
+			kobject_uevent(kobj, KOBJ_ADD);
 	}
 
 	ibmveth_debug_printk("adapter @ 0x%p\n", adapter);
@@ -1234,7 +1235,7 @@ static int __devexit ibmveth_remove(struct vio_dev *dev)
 	int i;
 
 	for(i = 0; i<IbmVethNumBufferPools; i++)
-		kobject_unregister(&adapter->rx_buff_pool[i].kobj);
+		kobject_put(&adapter->rx_buff_pool[i].kobj);
 
 	unregister_netdev(netdev);
 
@@ -1257,26 +1258,7 @@ static void ibmveth_proc_unregister_driver(void)
 	remove_proc_entry(IBMVETH_PROC_DIR, init_net.proc_net);
 }
 
-static void *ibmveth_seq_start(struct seq_file *seq, loff_t *pos)
-{
-	if (*pos == 0) {
-		return (void *)1;
-	} else {
-		return NULL;
-	}
-}
-
-static void *ibmveth_seq_next(struct seq_file *seq, void *v, loff_t *pos)
-{
-	++*pos;
-	return NULL;
-}
-
-static void ibmveth_seq_stop(struct seq_file *seq, void *v)
-{
-}
-
-static int ibmveth_seq_show(struct seq_file *seq, void *v)
+static int ibmveth_show(struct seq_file *seq, void *v)
 {
 	struct ibmveth_adapter *adapter = seq->private;
 	char *current_mac = ((char*) &adapter->netdev->dev_addr);
@@ -1300,27 +1282,10 @@ static int ibmveth_seq_show(struct seq_file *seq, void *v)
 
 	return 0;
 }
-static struct seq_operations ibmveth_seq_ops = {
-	.start = ibmveth_seq_start,
-	.next  = ibmveth_seq_next,
-	.stop  = ibmveth_seq_stop,
-	.show  = ibmveth_seq_show,
-};
 
 static int ibmveth_proc_open(struct inode *inode, struct file *file)
 {
-	struct seq_file *seq;
-	struct proc_dir_entry *proc;
-	int rc;
-
-	rc = seq_open(file, &ibmveth_seq_ops);
-	if (!rc) {
-		/* recover the pointer buried in proc_dir_entry data */
-		seq = file->private_data;
-		proc = PDE(inode);
-		seq->private = proc->data;
-	}
-	return rc;
+	return single_open(file, ibmveth_show, PDE(inode)->data);
 }
 
 static const struct file_operations ibmveth_proc_fops = {
@@ -1328,7 +1293,7 @@ static const struct file_operations ibmveth_proc_fops = {
 	.open    = ibmveth_proc_open,
 	.read    = seq_read,
 	.llseek  = seq_lseek,
-	.release = seq_release,
+	.release = single_release,
 };
 
 static void ibmveth_proc_register_adapter(struct ibmveth_adapter *adapter)
@@ -1337,13 +1302,10 @@ static void ibmveth_proc_register_adapter(struct ibmveth_adapter *adapter)
 	if (ibmveth_proc_dir) {
 		char u_addr[10];
 		sprintf(u_addr, "%x", adapter->vdev->unit_address);
-		entry = create_proc_entry(u_addr, S_IFREG, ibmveth_proc_dir);
-		if (!entry) {
+		entry = proc_create_data(u_addr, S_IFREG, ibmveth_proc_dir,
+					 &ibmveth_proc_fops, adapter);
+		if (!entry)
 			ibmveth_error_printk("Cannot create adapter proc entry");
-		} else {
-			entry->data = (void *) adapter;
-			entry->proc_fops = &ibmveth_proc_fops;
-		}
 	}
 	return;
 }

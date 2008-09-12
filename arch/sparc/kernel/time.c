@@ -105,7 +105,7 @@ __volatile__ unsigned int *master_l10_limit;
 
 #define TICK_SIZE (tick_nsec / 1000)
 
-irqreturn_t timer_interrupt(int irq, void *dev_id)
+static irqreturn_t timer_interrupt(int dummy, void *dev_id)
 {
 	/* last time the cmos clock got updated */
 	static long last_rtc_update;
@@ -128,10 +128,6 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 	clear_clock_irq();
 
 	do_timer(1);
-#ifndef CONFIG_SMP
-	update_process_times(user_mode(get_irq_regs()));
-#endif
-
 
 	/* Determine when to update the Mostek clock. */
 	if (ntp_synced() &&
@@ -145,6 +141,9 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 	}
 	write_sequnlock(&xtime_lock);
 
+#ifndef CONFIG_SMP
+	update_process_times(user_mode(get_irq_regs()));
+#endif
 	return IRQ_HANDLED;
 }
 

@@ -5,6 +5,7 @@
 #include <linux/jiffies.h>
 #include <linux/init.h>
 #include <linux/dmi.h>
+#include <linux/percpu.h>
 
 #include <asm/delay.h>
 #include <asm/tsc.h>
@@ -13,7 +14,10 @@
 
 #include "mach_timer.h"
 
-static int tsc_enabled;
+/* native_sched_clock() is called before tsc_init(), so
+   we must start with the TSC soft disabled to prevent
+   erroneous rdtsc usage on !cpu_has_tsc processors */
+static int tsc_disabled = -1;
 
 /*
  * On some systems the TSC frequency does not
@@ -23,13 +27,12 @@ static int tsc_enabled;
 unsigned int tsc_khz;
 EXPORT_SYMBOL_GPL(tsc_khz);
 
-int tsc_disable;
-
 #ifdef CONFIG_X86_TSC
 static int __init tsc_setup(char *str)
 {
 	printk(KERN_WARNING "notsc: Kernel compiled with CONFIG_X86_TSC, "
-				"cannot disable TSC.\n");
+	       "cannot disable TSC completely.\n");
+	tsc_disabled = 1;
 	return 1;
 }
 #else
@@ -39,8 +42,7 @@ static int __init tsc_setup(char *str)
  */
 static int __init tsc_setup(char *str)
 {
-	tsc_disable = 1;
-
+	setup_clear_cpu_cap(X86_FEATURE_TSC);
 	return 1;
 }
 #endif
@@ -80,13 +82,30 @@ EXPORT_SYMBOL_GPL(check_tsc_unstable);
  *
  *			-johnstul@us.ibm.com "math is hard, lets go shopping!"
  */
-unsigned long cyc2ns_scale __read_mostly;
 
-#define CYC2NS_SCALE_FACTOR 10 /* 2^10, carefully chosen */
+DEFINE_PER_CPU(unsigned long, cyc2ns);
 
-static inline void set_cyc2ns_scale(unsigned long cpu_khz)
+static void set_cyc2ns_scale(unsigned long cpu_khz, int cpu)
 {
-	cyc2ns_scale = (1000000 << CYC2NS_SCALE_FACTOR)/cpu_khz;
+	unsigned long long tsc_now, ns_now;
+	unsigned long flags, *scale;
+
+	local_irq_save(flags);
+	sched_clock_idle_sleep_event();
+
+	scale = &per_cpu(cyc2ns, cpu);
+
+	rdtscll(tsc_now);
+	ns_now = __cycles_2_ns(tsc_now);
+
+	if (cpu_khz)
+		*scale = (NSEC_PER_MSEC << CYC2NS_SCALE_FACTOR)/cpu_khz;
+
+	/*
+	 * Start smoothly with the new frequency:
+	 */
+	sched_clock_idle_wakeup_event(0);
+	local_irq_restore(flags);
 }
 
 /*
@@ -104,7 +123,7 @@ unsigned long long native_sched_clock(void)
 	 *   very important for it to be as fast as the platform
 	 *   can achive it. )
 	 */
-	if (unlikely(!tsc_enabled && !tsc_unstable))
+	if (unlikely(tsc_disabled))
 		/* No locking but a rare wrong value is not a big deal: */
 		return (jiffies_64 - INITIAL_JIFFIES) * (1000000000 / HZ);
 
@@ -205,9 +224,9 @@ EXPORT_SYMBOL(recalibrate_cpu_khz);
  * if the CPU frequency is scaled, TSC-based delays will need a different
  * loops_per_jiffy value to function properly.
  */
-static unsigned int ref_freq = 0;
-static unsigned long loops_per_jiffy_ref = 0;
-static unsigned long cpu_khz_ref = 0;
+static unsigned int ref_freq;
+static unsigned long loops_per_jiffy_ref;
+static unsigned long cpu_khz_ref;
 
 static int
 time_cpufreq_notifier(struct notifier_block *nb, unsigned long val, void *data)
@@ -239,7 +258,7 @@ time_cpufreq_notifier(struct notifier_block *nb, unsigned long val, void *data)
 						ref_freq, freq->new);
 			if (!(freq->flags & CPUFREQ_CONST_LOOPS)) {
 				tsc_khz = cpu_khz;
-				set_cyc2ns_scale(cpu_khz);
+				set_cyc2ns_scale(cpu_khz, freq->cpu);
 				/*
 				 * TSC based sched_clock turns
 				 * to junk w/ cpufreq
@@ -267,15 +286,28 @@ core_initcall(cpufreq_tsc);
 
 /* clock source code */
 
-static unsigned long current_tsc_khz = 0;
+static unsigned long current_tsc_khz;
+static struct clocksource clocksource_tsc;
 
+/*
+ * We compare the TSC to the cycle_last value in the clocksource
+ * structure to avoid a nasty time-warp issue. This can be observed in
+ * a very small window right after one CPU updated cycle_last under
+ * xtime lock and the other CPU reads a TSC value which is smaller
+ * than the cycle_last reference value due to a TSC which is slighty
+ * behind. This delta is nowhere else observable, but in that case it
+ * results in a forward time jump in the range of hours due to the
+ * unsigned delta calculation of the time keeping core code, which is
+ * necessary to support wrapping clocksources like pm timer.
+ */
 static cycle_t read_tsc(void)
 {
 	cycle_t ret;
 
 	rdtscll(ret);
 
-	return ret;
+	return ret >= clocksource_tsc.cycle_last ?
+		ret : clocksource_tsc.cycle_last;
 }
 
 static struct clocksource clocksource_tsc = {
@@ -293,7 +325,6 @@ void mark_tsc_unstable(char *reason)
 {
 	if (!tsc_unstable) {
 		tsc_unstable = 1;
-		tsc_enabled = 0;
 		printk("Marking TSC unstable due to: %s.\n", reason);
 		/* Can be called before registration */
 		if (clocksource_tsc.mult)
@@ -307,7 +338,7 @@ EXPORT_SYMBOL_GPL(mark_tsc_unstable);
 static int __init dmi_mark_tsc_unstable(const struct dmi_system_id *d)
 {
 	printk(KERN_NOTICE "%s detected: marking TSC unstable.\n",
-		       d->ident);
+	       d->ident);
 	tsc_unstable = 1;
 	return 0;
 }
@@ -333,6 +364,11 @@ __cpuinit int unsynchronized_tsc(void)
 {
 	if (!cpu_has_tsc || tsc_unstable)
 		return 1;
+
+	/* Anything with constant TSC should be synchronized */
+	if (boot_cpu_has(X86_FEATURE_CONSTANT_TSC))
+		return 0;
+
 	/*
 	 * Intel systems are normally all synchronized.
 	 * Exceptions must mark TSC as unstable:
@@ -367,20 +403,35 @@ static inline void check_geode_tsc_reliable(void) { }
 
 void __init tsc_init(void)
 {
-	if (!cpu_has_tsc || tsc_disable)
-		goto out_no_tsc;
+	int cpu;
+
+	if (!cpu_has_tsc || tsc_disabled > 0)
+		return;
 
 	cpu_khz = calculate_cpu_khz();
 	tsc_khz = cpu_khz;
 
-	if (!cpu_khz)
-		goto out_no_tsc;
+	if (!cpu_khz) {
+		mark_tsc_unstable("could not calculate TSC khz");
+		return;
+	}
+
+	/* now allow native_sched_clock() to use rdtsc */
+	tsc_disabled = 0;
 
 	printk("Detected %lu.%03lu MHz processor.\n",
 				(unsigned long)cpu_khz / 1000,
 				(unsigned long)cpu_khz % 1000);
 
-	set_cyc2ns_scale(cpu_khz);
+	/*
+	 * Secondary CPUs do not run through tsc_init(), so set up
+	 * all the scale factors for all CPUs, assuming the same
+	 * speed as the bootup CPU. (cpufreq notifiers will fix this
+	 * up if their speed diverges)
+	 */
+	for_each_possible_cpu(cpu)
+		set_cyc2ns_scale(cpu_khz, cpu);
+
 	use_tsc_delay();
 
 	/* Check and install the TSC clocksource */
@@ -395,18 +446,6 @@ void __init tsc_init(void)
 	if (check_tsc_unstable()) {
 		clocksource_tsc.rating = 0;
 		clocksource_tsc.flags &= ~CLOCK_SOURCE_IS_CONTINUOUS;
-	} else
-		tsc_enabled = 1;
-
+	}
 	clocksource_register(&clocksource_tsc);
-
-	return;
-
-out_no_tsc:
-	/*
-	 * Set the tsc_disable flag if there's no TSC support, this
-	 * makes it a fast flag for the kernel to see whether it
-	 * should be using the TSC.
-	 */
-	tsc_disable = 1;
 }

@@ -18,6 +18,7 @@
 #include <linux/device.h>
 #include <linux/sysdev.h>
 #include <linux/serial_core.h>
+#include <linux/clk.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -312,7 +313,7 @@ static int osiris_pm_resume(struct sys_device *sd)
 #endif
 
 static struct sysdev_class osiris_pm_sysclass = {
-	set_kset_name("mach-osiris"),
+	.name		= "mach-osiris",
 	.suspend	= osiris_pm_suspend,
 	.resume		= osiris_pm_resume,
 };
@@ -344,10 +345,10 @@ static void __init osiris_map_io(void)
 
 	/* initialise the clocks */
 
-	s3c24xx_dclk0.parent = NULL;
+	s3c24xx_dclk0.parent = &clk_upll;
 	s3c24xx_dclk0.rate   = 12*1000*1000;
 
-	s3c24xx_dclk1.parent = NULL;
+	s3c24xx_dclk1.parent = &clk_upll;
 	s3c24xx_dclk1.rate   = 24*1000*1000;
 
 	s3c24xx_clkout0.parent  = &s3c24xx_dclk0;

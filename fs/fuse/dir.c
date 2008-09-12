@@ -132,7 +132,7 @@ static void fuse_lookup_init(struct fuse_req *req, struct inode *dir,
 	req->out.args[0].value = outarg;
 }
 
-static u64 fuse_get_attr_version(struct fuse_conn *fc)
+u64 fuse_get_attr_version(struct fuse_conn *fc)
 {
 	u64 curr_version;
 
@@ -269,12 +269,12 @@ static struct dentry *fuse_lookup(struct inode *dir, struct dentry *entry,
 
 	req = fuse_get_req(fc);
 	if (IS_ERR(req))
-		return ERR_PTR(PTR_ERR(req));
+		return ERR_CAST(req);
 
 	forget_req = fuse_get_req(fc);
 	if (IS_ERR(forget_req)) {
 		fuse_put_request(fc, req);
-		return ERR_PTR(PTR_ERR(forget_req));
+		return ERR_CAST(forget_req);
 	}
 
 	attr_version = fuse_get_attr_version(fc);
@@ -416,6 +416,7 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry, int mode,
 	fuse_put_request(fc, forget_req);
 	d_instantiate(entry, inode);
 	fuse_change_entry_timeout(entry, &outentry);
+	fuse_invalidate_attr(dir);
 	file = lookup_instantiate_filp(nd, entry, generic_file_open);
 	if (IS_ERR(file)) {
 		ff->fh = outopen.fh;
@@ -1005,7 +1006,7 @@ static char *read_link(struct dentry *dentry)
 	char *link;
 
 	if (IS_ERR(req))
-		return ERR_PTR(PTR_ERR(req));
+		return ERR_CAST(req);
 
 	link = (char *) __get_free_page(GFP_KERNEL);
 	if (!link) {
@@ -1106,6 +1107,50 @@ static void iattr_to_fattr(struct iattr *iattr, struct fuse_setattr_in *arg)
 }
 
 /*
+ * Prevent concurrent writepages on inode
+ *
+ * This is done by adding a negative bias to the inode write counter
+ * and waiting for all pending writes to finish.
+ */
+void fuse_set_nowrite(struct inode *inode)
+{
+	struct fuse_conn *fc = get_fuse_conn(inode);
+	struct fuse_inode *fi = get_fuse_inode(inode);
+
+	BUG_ON(!mutex_is_locked(&inode->i_mutex));
+
+	spin_lock(&fc->lock);
+	BUG_ON(fi->writectr < 0);
+	fi->writectr += FUSE_NOWRITE;
+	spin_unlock(&fc->lock);
+	wait_event(fi->page_waitq, fi->writectr == FUSE_NOWRITE);
+}
+
+/*
+ * Allow writepages on inode
+ *
+ * Remove the bias from the writecounter and send any queued
+ * writepages.
+ */
+static void __fuse_release_nowrite(struct inode *inode)
+{
+	struct fuse_inode *fi = get_fuse_inode(inode);
+
+	BUG_ON(fi->writectr != FUSE_NOWRITE);
+	fi->writectr = 0;
+	fuse_flush_writepages(inode);
+}
+
+void fuse_release_nowrite(struct inode *inode)
+{
+	struct fuse_conn *fc = get_fuse_conn(inode);
+
+	spin_lock(&fc->lock);
+	__fuse_release_nowrite(inode);
+	spin_unlock(&fc->lock);
+}
+
+/*
  * Set attributes, and at the same time refresh them.
  *
  * Truncation is slightly complicated, because the 'truncate' request
@@ -1121,6 +1166,8 @@ static int fuse_do_setattr(struct dentry *entry, struct iattr *attr,
 	struct fuse_req *req;
 	struct fuse_setattr_in inarg;
 	struct fuse_attr_out outarg;
+	bool is_truncate = false;
+	loff_t oldsize;
 	int err;
 
 	if (!fuse_allow_task(fc, current))
@@ -1144,11 +1191,15 @@ static int fuse_do_setattr(struct dentry *entry, struct iattr *attr,
 			send_sig(SIGXFSZ, current, 0);
 			return -EFBIG;
 		}
+		is_truncate = true;
 	}
 
 	req = fuse_get_req(fc);
 	if (IS_ERR(req))
 		return PTR_ERR(req);
+
+	if (is_truncate)
+		fuse_set_nowrite(inode);
 
 	memset(&inarg, 0, sizeof(inarg));
 	memset(&outarg, 0, sizeof(outarg));
@@ -1180,16 +1231,44 @@ static int fuse_do_setattr(struct dentry *entry, struct iattr *attr,
 	if (err) {
 		if (err == -EINTR)
 			fuse_invalidate_attr(inode);
-		return err;
+		goto error;
 	}
 
 	if ((inode->i_mode ^ outarg.attr.mode) & S_IFMT) {
 		make_bad_inode(inode);
-		return -EIO;
+		err = -EIO;
+		goto error;
 	}
 
-	fuse_change_attributes(inode, &outarg.attr, attr_timeout(&outarg), 0);
+	spin_lock(&fc->lock);
+	fuse_change_attributes_common(inode, &outarg.attr,
+				      attr_timeout(&outarg));
+	oldsize = inode->i_size;
+	i_size_write(inode, outarg.attr.size);
+
+	if (is_truncate) {
+		/* NOTE: this may release/reacquire fc->lock */
+		__fuse_release_nowrite(inode);
+	}
+	spin_unlock(&fc->lock);
+
+	/*
+	 * Only call invalidate_inode_pages2() after removing
+	 * FUSE_NOWRITE, otherwise fuse_launder_page() would deadlock.
+	 */
+	if (S_ISREG(inode->i_mode) && oldsize != outarg.attr.size) {
+		if (outarg.attr.size < oldsize)
+			fuse_truncate(inode->i_mapping, outarg.attr.size);
+		invalidate_inode_pages2(inode->i_mapping);
+	}
+
 	return 0;
+
+error:
+	if (is_truncate)
+		fuse_release_nowrite(inode);
+
+	return err;
 }
 
 static int fuse_setattr(struct dentry *entry, struct iattr *attr)

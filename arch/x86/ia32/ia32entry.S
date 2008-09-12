@@ -12,7 +12,6 @@
 #include <asm/ia32_unistd.h>	
 #include <asm/thread_info.h>	
 #include <asm/segment.h>
-#include <asm/vsyscall32.h>
 #include <asm/irqflags.h>
 #include <linux/linkage.h>
 
@@ -104,7 +103,7 @@ ENTRY(ia32_sysenter_target)
 	pushfq
 	CFI_ADJUST_CFA_OFFSET 8
 	/*CFI_REL_OFFSET rflags,0*/
-	movl	$VSYSCALL32_SYSEXIT, %r10d
+	movl	8*3-THREAD_SIZE+threadinfo_sysenter_return(%rsp), %r10d
 	CFI_REGISTER rip,r10
 	pushq	$__USER32_CS
 	CFI_ADJUST_CFA_OFFSET 8
@@ -142,6 +141,8 @@ sysenter_do_call:
 	andl    $~TS_COMPAT,threadinfo_status(%r10)
 	/* clear IF, that popfq doesn't enable interrupts early */
 	andl  $~0x200,EFLAGS-R11(%rsp) 
+	movl	RIP-R11(%rsp),%edx		/* User %eip */
+	CFI_REGISTER rip,rdx
 	RESTORE_ARGS 1,24,1,1,1,1
 	popfq
 	CFI_ADJUST_CFA_OFFSET -8
@@ -149,8 +150,6 @@ sysenter_do_call:
 	popq	%rcx				/* User %esp */
 	CFI_ADJUST_CFA_OFFSET -8
 	CFI_REGISTER rsp,rcx
-	movl	$VSYSCALL32_SYSEXIT,%edx	/* User %eip */
-	CFI_REGISTER rip,rdx
 	TRACE_IRQS_ON
 	swapgs
 	sti		/* sti only takes effect after the next instruction */
@@ -163,12 +162,14 @@ sysenter_tracesys:
 	SAVE_REST
 	CLEAR_RREGS
 	movq	%r9,R9(%rsp)
-	movq	$-ENOSYS,RAX(%rsp)	/* really needed? */
+	movq	$-ENOSYS,RAX(%rsp)/* ptrace can change this for a bad syscall */
 	movq	%rsp,%rdi        /* &pt_regs -> arg1 */
 	call	syscall_trace_enter
 	LOAD_ARGS32 ARGOFFSET  /* reload args from stack in case ptrace changed it */
 	RESTORE_REST
 	xchgl	%ebp,%r9d
+	cmpl	$(IA32_NR_syscalls-1),%eax
+	ja	int_ret_from_sys_call /* sysenter_tracesys has set RAX(%rsp) */
 	jmp	sysenter_do_call
 	CFI_ENDPROC
 ENDPROC(ia32_sysenter_target)
@@ -262,13 +263,15 @@ cstar_tracesys:
 	SAVE_REST
 	CLEAR_RREGS
 	movq %r9,R9(%rsp)
-	movq $-ENOSYS,RAX(%rsp)	/* really needed? */
+	movq $-ENOSYS,RAX(%rsp)	/* ptrace can change this for a bad syscall */
 	movq %rsp,%rdi        /* &pt_regs -> arg1 */
 	call syscall_trace_enter
 	LOAD_ARGS32 ARGOFFSET  /* reload args from stack in case ptrace changed it */
 	RESTORE_REST
 	xchgl %ebp,%r9d
 	movl RSP-ARGOFFSET(%rsp), %r8d
+	cmpl $(IA32_NR_syscalls-1),%eax
+	ja int_ret_from_sys_call /* cstar_tracesys has set RAX(%rsp) */
 	jmp cstar_do_call
 END(ia32_cstar_target)
 				
@@ -326,7 +329,7 @@ ENTRY(ia32_syscall)
 	jnz ia32_tracesys
 ia32_do_syscall:	
 	cmpl $(IA32_NR_syscalls-1),%eax
-	ja  ia32_badsys
+	ja  int_ret_from_sys_call	/* ia32_tracesys has set RAX(%rsp) */
 	IA32_ARG_FIXUP
 	call *ia32_sys_call_table(,%rax,8) # xxx: rip relative
 ia32_sysret:
@@ -336,7 +339,7 @@ ia32_sysret:
 ia32_tracesys:			 
 	SAVE_REST
 	CLEAR_RREGS
-	movq $-ENOSYS,RAX(%rsp)	/* really needed? */
+	movq $-ENOSYS,RAX(%rsp)	/* ptrace can change this for a bad syscall */
 	movq %rsp,%rdi        /* &pt_regs -> arg1 */
 	call syscall_trace_enter
 	LOAD_ARGS32 ARGOFFSET  /* reload args from stack in case ptrace changed it */
@@ -427,7 +430,7 @@ ia32_sys_call_table:
 	.quad sys_setuid16
 	.quad sys_getuid16
 	.quad compat_sys_stime	/* stime */		/* 25 */
-	.quad sys32_ptrace	/* ptrace */
+	.quad compat_sys_ptrace	/* ptrace */
 	.quad sys_alarm
 	.quad sys_fstat	/* (old)fstat */
 	.quad sys_pause
@@ -644,8 +647,8 @@ ia32_sys_call_table:
 	.quad compat_sys_futex		/* 240 */
 	.quad compat_sys_sched_setaffinity
 	.quad compat_sys_sched_getaffinity
-	.quad sys32_set_thread_area
-	.quad sys32_get_thread_area
+	.quad sys_set_thread_area
+	.quad sys_get_thread_area
 	.quad compat_sys_io_setup	/* 245 */
 	.quad sys_io_destroy
 	.quad compat_sys_io_getevents
@@ -723,7 +726,9 @@ ia32_sys_call_table:
 	.quad sys_epoll_pwait
 	.quad compat_sys_utimensat	/* 320 */
 	.quad compat_sys_signalfd
-	.quad compat_sys_timerfd
+	.quad sys_timerfd_create
 	.quad sys_eventfd
 	.quad sys32_fallocate
+	.quad compat_sys_timerfd_settime	/* 325 */
+	.quad compat_sys_timerfd_gettime
 ia32_syscall_end:

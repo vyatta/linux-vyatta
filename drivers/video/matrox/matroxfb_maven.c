@@ -220,7 +220,7 @@ static int matroxfb_PLL_mavenclock(const struct matrox_pll_features2* pll,
 	unsigned int scrlen;
 	unsigned int fmax;
 
-	DBG(__FUNCTION__)
+	DBG(__func__)
 
 	scrlen = htotal * (vtotal - 1);
 	fwant = htotal * vtotal;
@@ -1232,7 +1232,7 @@ static int maven_shutdown_client(struct i2c_client* clnt) {
 	return 0;
 }
 
-static unsigned short normal_i2c[] = { MAVEN_I2CID, I2C_CLIENT_END };
+static const unsigned short normal_i2c[] = { MAVEN_I2CID, I2C_CLIENT_END };
 I2C_CLIENT_INSMOD;
 
 static struct i2c_driver maven_driver;
@@ -1266,7 +1266,7 @@ static int maven_detect_client(struct i2c_adapter* adapter, int address, int kin
 ERROR4:;
 	i2c_detach_client(new_client);
 ERROR3:;
-	kfree(new_client);
+	kfree(data);
 ERROR0:;
 	return err;
 }

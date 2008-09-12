@@ -19,7 +19,6 @@
  *
  */
 
-#include <sound/driver.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/time.h>
@@ -72,8 +71,6 @@ static DEFINE_MUTEX(sound_mutex);
  */
 void snd_request_card(int card)
 {
-	if (! current->fs->root)
-		return;
 	if (snd_card_locked(card))
 		return;
 	if (card < 0 || card >= cards_limit)
@@ -87,8 +84,6 @@ static void snd_request_other(int minor)
 {
 	char *str;
 
-	if (! current->fs->root)
-		return;
 	switch (minor) {
 	case SNDRV_MINOR_SEQUENCER:	str = "snd-seq";	break;
 	case SNDRV_MINOR_TIMER:		str = "snd-timer";	break;
@@ -264,8 +259,9 @@ int snd_register_device_for_dev(int type, struct snd_card *card, int dev,
 		return minor;
 	}
 	snd_minors[minor] = preg;
-	preg->dev = device_create(sound_class, device, MKDEV(major, minor),
-				  "%s", name);
+	preg->dev = device_create_drvdata(sound_class, device,
+					  MKDEV(major, minor),
+					  private_data, "%s", name);
 	if (IS_ERR(preg->dev)) {
 		snd_minors[minor] = NULL;
 		mutex_unlock(&sound_mutex);
@@ -273,9 +269,6 @@ int snd_register_device_for_dev(int type, struct snd_card *card, int dev,
 		kfree(preg);
 		return minor;
 	}
-
-	if (preg->dev)
-		dev_set_drvdata(preg->dev, private_data);
 
 	mutex_unlock(&sound_mutex);
 	return 0;

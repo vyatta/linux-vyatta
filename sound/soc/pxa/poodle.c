@@ -19,7 +19,6 @@
 #include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
-#include <sound/driver.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/soc.h>
@@ -197,7 +196,8 @@ static int poodle_set_spk(struct snd_kcontrol *kcontrol,
 	return 1;
 }
 
-static int poodle_amp_event(struct snd_soc_dapm_widget *w, int event)
+static int poodle_amp_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *k, int event)
 {
 	if (SND_SOC_DAPM_EVENT_ON(event))
 		locomo_gpio_write(&poodle_locomo_device.dev,
@@ -257,21 +257,19 @@ static int poodle_wm8731_init(struct snd_soc_codec *codec)
 	/* Add poodle specific controls */
 	for (i = 0; i < ARRAY_SIZE(wm8731_poodle_controls); i++) {
 		err = snd_ctl_add(codec->card,
-			snd_soc_cnew(&wm8731_poodle_controls[i],codec, NULL));
+			snd_soc_cnew(&wm8731_poodle_controls[i], codec, NULL));
 		if (err < 0)
 			return err;
 	}
 
 	/* Add poodle specific widgets */
-	for (i = 0; i < ARRAY_SIZE(wm8731_dapm_widgets); i++) {
+	for (i = 0; i < ARRAY_SIZE(wm8731_dapm_widgets); i++)
 		snd_soc_dapm_new_control(codec, &wm8731_dapm_widgets[i]);
-	}
 
 	/* Set up poodle specific audio path audio_map */
-	for (i = 0; audio_map[i][0] != NULL; i++) {
+	for (i = 0; audio_map[i][0] != NULL; i++)
 		snd_soc_dapm_connect_input(codec, audio_map[i][0],
 			audio_map[i][1], audio_map[i][2]);
-	}
 
 	snd_soc_dapm_sync_endpoints(codec);
 	return 0;

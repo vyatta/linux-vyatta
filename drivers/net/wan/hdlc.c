@@ -1,7 +1,7 @@
 /*
  * Generic HDLC support routines for Linux
  *
- * Copyright (C) 1999 - 2006 Krzysztof Halasa <khc@pm.waw.pl>
+ * Copyright (C) 1999 - 2008 Krzysztof Halasa <khc@pm.waw.pl>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License
@@ -39,12 +39,11 @@
 #include <net/net_namespace.h>
 
 
-static const char* version = "HDLC support module revision 1.21";
+static const char* version = "HDLC support module revision 1.22";
 
 #undef DEBUG_LINK
 
-static struct hdlc_proto *first_proto = NULL;
-
+static struct hdlc_proto *first_proto;
 
 static int hdlc_change_mtu(struct net_device *dev, int new_mtu)
 {
@@ -66,19 +65,15 @@ static struct net_device_stats *hdlc_get_stats(struct net_device *dev)
 static int hdlc_rcv(struct sk_buff *skb, struct net_device *dev,
 		    struct packet_type *p, struct net_device *orig_dev)
 {
-	struct hdlc_device_desc *desc = dev_to_desc(dev);
+	struct hdlc_device *hdlc = dev_to_hdlc(dev);
 
-	if (dev->nd_net != &init_net) {
+	if (dev_net(dev) != &init_net) {
 		kfree_skb(skb);
 		return 0;
 	}
 
-	if (desc->netif_rx)
-		return desc->netif_rx(skb);
-
-	desc->stats.rx_dropped++; /* Shouldn't happen */
-	dev_kfree_skb(skb);
-	return NET_RX_DROP;
+	BUG_ON(!hdlc->proto->netif_rx);
+	return hdlc->proto->netif_rx(skb);
 }
 
 
@@ -87,7 +82,7 @@ static inline void hdlc_proto_start(struct net_device *dev)
 {
 	hdlc_device *hdlc = dev_to_hdlc(dev);
 	if (hdlc->proto->start)
-		return hdlc->proto->start(dev);
+		hdlc->proto->start(dev);
 }
 
 
@@ -96,7 +91,7 @@ static inline void hdlc_proto_stop(struct net_device *dev)
 {
 	hdlc_device *hdlc = dev_to_hdlc(dev);
 	if (hdlc->proto->stop)
-		return hdlc->proto->stop(dev);
+		hdlc->proto->stop(dev);
 }
 
 
@@ -109,7 +104,7 @@ static int hdlc_device_event(struct notifier_block *this, unsigned long event,
 	unsigned long flags;
 	int on;
  
-	if (dev->nd_net != &init_net)
+	if (dev_net(dev) != &init_net)
 		return NOTIFY_DONE;
 
 	if (dev->get_stats != hdlc_get_stats)
@@ -263,8 +258,7 @@ static void hdlc_setup(struct net_device *dev)
 struct net_device *alloc_hdlcdev(void *priv)
 {
 	struct net_device *dev;
-	dev = alloc_netdev(sizeof(struct hdlc_device_desc) +
-			   sizeof(hdlc_device), "hdlc%d", hdlc_setup);
+	dev = alloc_netdev(sizeof(struct hdlc_device), "hdlc%d", hdlc_setup);
 	if (dev)
 		dev_to_hdlc(dev)->priv = priv;
 	return dev;
@@ -281,7 +275,7 @@ void unregister_hdlc_device(struct net_device *dev)
 
 
 int attach_hdlc_protocol(struct net_device *dev, struct hdlc_proto *proto,
-			 int (*rx)(struct sk_buff *skb), size_t size)
+			 size_t size)
 {
 	detach_hdlc_protocol(dev);
 
@@ -297,7 +291,6 @@ int attach_hdlc_protocol(struct net_device *dev, struct hdlc_proto *proto,
 			return -ENOBUFS;
 		}
 	dev_to_hdlc(dev)->proto = proto;
-	dev_to_desc(dev)->netif_rx = rx;
 	return 0;
 }
 
@@ -320,21 +313,25 @@ void detach_hdlc_protocol(struct net_device *dev)
 
 void register_hdlc_protocol(struct hdlc_proto *proto)
 {
+	rtnl_lock();
 	proto->next = first_proto;
 	first_proto = proto;
+	rtnl_unlock();
 }
 
 
 void unregister_hdlc_protocol(struct hdlc_proto *proto)
 {
-	struct hdlc_proto **p = &first_proto;
-	while (*p) {
-		if (*p == proto) {
-			*p = proto->next;
-			return;
-		}
+	struct hdlc_proto **p;
+
+	rtnl_lock();
+	p = &first_proto;
+	while (*p != proto) {
+		BUG_ON(!*p);
 		p = &((*p)->next);
 	}
+	*p = proto->next;
+	rtnl_unlock();
 }
 
 

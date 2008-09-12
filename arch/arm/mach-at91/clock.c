@@ -23,7 +23,6 @@
 #include <linux/delay.h>
 #include <linux/clk.h>
 
-#include <asm/semaphore.h>
 #include <asm/io.h>
 #include <asm/mach-types.h>
 
@@ -343,7 +342,7 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
 EXPORT_SYMBOL(clk_set_parent);
 
 /* establish PCK0..PCK3 parentage and rate */
-static void init_programmable_clock(struct clk *clk)
+static void __init init_programmable_clock(struct clk *clk)
 {
 	struct clk	*parent;
 	u32		pckr;
@@ -574,6 +573,8 @@ int __init at91_clock_init(unsigned long main_clock)
 	} else if (cpu_is_at91sam9260() || cpu_is_at91sam9261() || cpu_is_at91sam9263()) {
 		uhpck.pmc_mask = AT91SAM926x_PMC_UHP;
 		udpck.pmc_mask = AT91SAM926x_PMC_UDP;
+	} else if (cpu_is_at91cap9()) {
+		uhpck.pmc_mask = AT91CAP9_PMC_UHP;
 	}
 	at91_sys_write(AT91_CKGR_PLLBR, 0);
 

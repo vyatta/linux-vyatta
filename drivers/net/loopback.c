@@ -64,8 +64,6 @@ struct pcpu_lstats {
 	unsigned long bytes;
 };
 
-#define LOOPBACK_OVERHEAD (128 + MAX_HEADER + 16 + 16)
-
 /* KISS: just allocate small chunks and copy bits.
  *
  * So, in fact, this is documentation, explaining what we expect
@@ -260,7 +258,7 @@ static __net_init int loopback_net_init(struct net *net)
 	if (!dev)
 		goto out;
 
-	dev->nd_net = net;
+	dev_net_set(dev, net);
 	err = register_netdev(dev);
 	if (err)
 		goto out_free_netdev;

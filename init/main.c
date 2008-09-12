@@ -52,11 +52,14 @@
 #include <linux/unwind.h>
 #include <linux/buffer_head.h>
 #include <linux/debug_locks.h>
+#include <linux/debugobjects.h>
 #include <linux/lockdep.h>
 #include <linux/pid_namespace.h>
 #include <linux/device.h>
 #include <linux/kthread.h>
 #include <linux/sched.h>
+#include <linux/signal.h>
+#include <linux/idr.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -83,7 +86,6 @@ extern void init_IRQ(void);
 extern void fork_init(unsigned long);
 extern void mca_init(void);
 extern void sbus_init(void);
-extern void signals_init(void);
 extern void pidhash_init(void);
 extern void pidmap_init(void);
 extern void prio_tree_init(void);
@@ -128,7 +130,7 @@ static char *ramdisk_execute_command;
 
 #ifdef CONFIG_SMP
 /* Setup configured maximum number of CPUs to activate */
-static unsigned int __initdata max_cpus = NR_CPUS;
+unsigned int __initdata setup_max_cpus = NR_CPUS;
 
 /*
  * Setup routine for controlling SMP activation
@@ -146,7 +148,7 @@ static inline void disable_ioapic_setup(void) {};
 
 static int __init nosmp(char *str)
 {
-	max_cpus = 0;
+	setup_max_cpus = 0;
 	disable_ioapic_setup();
 	return 0;
 }
@@ -155,8 +157,8 @@ early_param("nosmp", nosmp);
 
 static int __init maxcpus(char *str)
 {
-	get_option(&str, &max_cpus);
-	if (max_cpus == 0)
+	get_option(&str, &setup_max_cpus);
+	if (setup_max_cpus == 0)
 		disable_ioapic_setup();
 
 	return 0;
@@ -164,7 +166,7 @@ static int __init maxcpus(char *str)
 
 early_param("maxcpus", maxcpus);
 #else
-#define max_cpus NR_CPUS
+#define setup_max_cpus NR_CPUS
 #endif
 
 /*
@@ -232,30 +234,26 @@ EXPORT_SYMBOL(loops_per_jiffy);
 
 static int __init debug_kernel(char *str)
 {
-	if (*str)
-		return 0;
 	console_loglevel = 10;
-	return 1;
+	return 0;
 }
 
 static int __init quiet_kernel(char *str)
 {
-	if (*str)
-		return 0;
 	console_loglevel = 4;
-	return 1;
+	return 0;
 }
 
-__setup("debug", debug_kernel);
-__setup("quiet", quiet_kernel);
+early_param("debug", debug_kernel);
+early_param("quiet", quiet_kernel);
 
 static int __init loglevel(char *str)
 {
 	get_option(&str, &console_loglevel);
-	return 1;
+	return 0;
 }
 
-__setup("loglevel=", loglevel);
+early_param("loglevel", loglevel);
 
 /*
  * Unknown boot options get handed to init, unless they look like
@@ -318,6 +316,10 @@ static int __init unknown_bootoption(char *param, char *val)
 	return 0;
 }
 
+#ifdef CONFIG_DEBUG_PAGEALLOC
+int __read_mostly debug_pagealloc_enabled = 0;
+#endif
+
 static int __init init_setup(char *str)
 {
 	unsigned int i;
@@ -359,11 +361,32 @@ static void __init smp_init(void)
 #endif
 
 static inline void setup_per_cpu_areas(void) { }
+static inline void setup_nr_cpu_ids(void) { }
 static inline void smp_prepare_cpus(unsigned int maxcpus) { }
 
 #else
 
-#ifdef __GENERIC_PER_CPU
+#if NR_CPUS > BITS_PER_LONG
+cpumask_t cpu_mask_all __read_mostly = CPU_MASK_ALL;
+EXPORT_SYMBOL(cpu_mask_all);
+#endif
+
+/* Setup number of possible processor ids */
+int nr_cpu_ids __read_mostly = NR_CPUS;
+EXPORT_SYMBOL(nr_cpu_ids);
+
+/* An arch may set nr_cpu_ids earlier if needed, so this would be redundant */
+static void __init setup_nr_cpu_ids(void)
+{
+	int cpu, highest_cpu = 0;
+
+	for_each_possible_cpu(cpu)
+		highest_cpu = cpu;
+
+	nr_cpu_ids = highest_cpu + 1;
+}
+
+#ifndef CONFIG_HAVE_SETUP_PER_CPU_AREA
 unsigned long __per_cpu_offset[NR_CPUS] __read_mostly;
 
 EXPORT_SYMBOL(__per_cpu_offset);
@@ -384,7 +407,7 @@ static void __init setup_per_cpu_areas(void)
 		ptr += size;
 	}
 }
-#endif /* !__GENERIC_PER_CPU */
+#endif /* CONFIG_HAVE_SETUP_PER_CPU_AREA */
 
 /* Called by boot processor to activate the rest. */
 static void __init smp_init(void)
@@ -393,7 +416,7 @@ static void __init smp_init(void)
 
 	/* FIXME: This should be done in userspace --RR */
 	for_each_present_cpu(cpu) {
-		if (num_online_cpus() >= max_cpus)
+		if (num_online_cpus() >= setup_max_cpus)
 			break;
 		if (!cpu_online(cpu))
 			cpu_up(cpu);
@@ -401,7 +424,7 @@ static void __init smp_init(void)
 
 	/* Any cleanup work */
 	printk(KERN_INFO "Brought up %ld CPUs\n", (long)num_online_cpus());
-	smp_cpus_done(max_cpus);
+	smp_cpus_done(setup_max_cpus);
 }
 
 #endif
@@ -437,7 +460,7 @@ static void noinline __init_refok rest_init(void)
 	kernel_thread(kernel_init, NULL, CLONE_FS | CLONE_SIGHAND);
 	numa_default_policy();
 	pid = kernel_thread(kthreadd, NULL, CLONE_FS | CLONE_FILES);
-	kthreadd_task = find_task_by_pid(pid);
+	kthreadd_task = find_task_by_pid_ns(pid, &init_pid_ns);
 	unlock_kernel();
 
 	/*
@@ -500,7 +523,11 @@ static void __init boot_cpu_init(void)
 	cpu_set(cpu, cpu_possible_map);
 }
 
-void __init __attribute__((weak)) smp_setup_processor_id(void)
+void __init __weak smp_setup_processor_id(void)
+{
+}
+
+void __init __weak thread_info_cache_init(void)
 {
 }
 
@@ -517,6 +544,7 @@ asmlinkage void __init start_kernel(void)
 	 */
 	unwind_init();
 	lockdep_init();
+	debug_objects_early_init();
 	cgroup_init_early();
 
 	local_irq_disable();
@@ -534,9 +562,11 @@ asmlinkage void __init start_kernel(void)
 	printk(KERN_NOTICE);
 	printk(linux_banner);
 	setup_arch(&command_line);
+	mm_init_owner(&init_mm, &init_task);
 	setup_command_line(command_line);
 	unwind_setup();
 	setup_per_cpu_areas();
+	setup_nr_cpu_ids();
 	smp_prepare_boot_cpu();	/* arch-specific boot-cpu hooks */
 
 	/*
@@ -572,6 +602,7 @@ asmlinkage void __init start_kernel(void)
 	softirq_init();
 	timekeeping_init();
 	time_init();
+	sched_clock_init();
 	profile_init();
 	if (!irqs_disabled())
 		printk("start_kernel(): bug: interrupts were enabled early\n");
@@ -607,7 +638,11 @@ asmlinkage void __init start_kernel(void)
 	vfs_caches_init_early();
 	cpuset_init_early();
 	mem_init();
+	enable_debug_pagealloc();
+	cpu_hotplug_init();
 	kmem_cache_init();
+	debug_objects_mem_init();
+	idr_init_cache();
 	setup_per_cpu_pageset();
 	numa_policy_init();
 	if (late_time_init)
@@ -621,6 +656,7 @@ asmlinkage void __init start_kernel(void)
 	if (efi_enabled)
 		efi_enter_virtual_mode();
 #endif
+	thread_info_cache_init();
 	fork_init(num_physpages);
 	proc_caches_init();
 	buffer_init();
@@ -657,63 +693,57 @@ static int __init initcall_debug_setup(char *str)
 }
 __setup("initcall_debug", initcall_debug_setup);
 
+static void __init do_one_initcall(initcall_t fn)
+{
+	int count = preempt_count();
+	ktime_t t0, t1, delta;
+	char msgbuf[64];
+	int result;
+
+	if (initcall_debug) {
+		print_fn_descriptor_symbol("calling  %s\n", fn);
+		t0 = ktime_get();
+	}
+
+	result = fn();
+
+	if (initcall_debug) {
+		t1 = ktime_get();
+		delta = ktime_sub(t1, t0);
+
+		print_fn_descriptor_symbol("initcall %s", fn);
+		printk(" returned %d after %Ld msecs\n", result,
+			(unsigned long long) delta.tv64 >> 20);
+	}
+
+	msgbuf[0] = 0;
+
+	if (result && result != -ENODEV && initcall_debug)
+		sprintf(msgbuf, "error code %d ", result);
+
+	if (preempt_count() != count) {
+		strlcat(msgbuf, "preemption imbalance ", sizeof(msgbuf));
+		preempt_count() = count;
+	}
+	if (irqs_disabled()) {
+		strlcat(msgbuf, "disabled interrupts ", sizeof(msgbuf));
+		local_irq_enable();
+	}
+	if (msgbuf[0]) {
+		print_fn_descriptor_symbol(KERN_WARNING "initcall %s", fn);
+		printk(" returned with %s\n", msgbuf);
+	}
+}
+
+
 extern initcall_t __initcall_start[], __initcall_end[];
 
 static void __init do_initcalls(void)
 {
 	initcall_t *call;
-	int count = preempt_count();
 
-	for (call = __initcall_start; call < __initcall_end; call++) {
-		ktime_t t0, t1, delta;
-		char *msg = NULL;
-		char msgbuf[40];
-		int result;
-
-		if (initcall_debug) {
-			printk("Calling initcall 0x%p", *call);
-			print_fn_descriptor_symbol(": %s()",
-					(unsigned long) *call);
-			printk("\n");
-			t0 = ktime_get();
-		}
-
-		result = (*call)();
-
-		if (initcall_debug) {
-			t1 = ktime_get();
-			delta = ktime_sub(t1, t0);
-
-			printk("initcall 0x%p", *call);
-			print_fn_descriptor_symbol(": %s()",
-					(unsigned long) *call);
-			printk(" returned %d.\n", result);
-
-			printk("initcall 0x%p ran for %Ld msecs: ",
-				*call, (unsigned long long)delta.tv64 >> 20);
-			print_fn_descriptor_symbol("%s()\n",
-				(unsigned long) *call);
-		}
-
-		if (result && result != -ENODEV && initcall_debug) {
-			sprintf(msgbuf, "error code %d", result);
-			msg = msgbuf;
-		}
-		if (preempt_count() != count) {
-			msg = "preemption imbalance";
-			preempt_count() = count;
-		}
-		if (irqs_disabled()) {
-			msg = "disabled interrupts";
-			local_irq_enable();
-		}
-		if (msg) {
-			printk(KERN_WARNING "initcall at 0x%p", *call);
-			print_fn_descriptor_symbol(": %s()",
-					(unsigned long) *call);
-			printk(": returned with %s\n", msg);
-		}
-	}
+	for (call = __initcall_start; call < __initcall_end; call++)
+		do_one_initcall(*call);
 
 	/* Make sure there is no pending stuff from the initcall sequence */
 	flush_scheduled_work();
@@ -778,6 +808,8 @@ static int noinline init_post(void)
 	(void) sys_dup(0);
 	(void) sys_dup(0);
 
+	current->signal->flags |= SIGNAL_UNKILLABLE;
+
 	if (ramdisk_execute_command) {
 		run_init_process(ramdisk_execute_command);
 		printk(KERN_WARNING "Failed to execute %s\n",
@@ -809,7 +841,7 @@ static int __init kernel_init(void * unused)
 	/*
 	 * init can run on any cpu.
 	 */
-	set_cpus_allowed(current, CPU_MASK_ALL);
+	set_cpus_allowed_ptr(current, CPU_MASK_ALL_PTR);
 	/*
 	 * Tell the world that we're going to be the grim
 	 * reaper of innocent orphaned children.
@@ -820,10 +852,9 @@ static int __init kernel_init(void * unused)
 	 */
 	init_pid_ns.child_reaper = current;
 
-	__set_special_pids(1, 1);
 	cad_pid = task_pid(current);
 
-	smp_prepare_cpus(max_cpus);
+	smp_prepare_cpus(setup_max_cpus);
 
 	do_pre_smp_initcalls();
 

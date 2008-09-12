@@ -63,7 +63,7 @@ static inline void i8042_write_command(int val)
 	outb(val, I8042_COMMAND_REG);
 }
 
-#if defined(__i386__)
+#ifdef CONFIG_X86
 
 #include <linux/dmi.h>
 
@@ -186,6 +186,20 @@ static struct dmi_system_id __initdata i8042_dmi_nomux_table[] = {
 		},
 	},
 	{
+		.ident = "Fujitsu-Siemens Amilo Pro 2010",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "FUJITSU SIEMENS"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "AMILO Pro V2010"),
+		},
+	},
+	{
+		.ident = "Fujitsu-Siemens Amilo Pro 2030",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "FUJITSU SIEMENS"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "AMILO PRO V2030"),
+		},
+	},
+	{
 		/*
 		 * No data is coming from the touchscreen unless KBC
 		 * is in legacy mode.
@@ -270,13 +284,96 @@ static struct dmi_system_id __initdata i8042_dmi_nomux_table[] = {
 			DMI_MATCH(DMI_PRODUCT_NAME, "M636/A737 platform"),
 		},
 	},
+	{
+		.ident = "Lenovo 3000 n100",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "LENOVO"),
+			DMI_MATCH(DMI_PRODUCT_VERSION, "3000 N100"),
+		},
+	},
+	{
+		.ident = "Acer Aspire 1360",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Aspire 1360"),
+		},
+	},
 	{ }
 };
 
-
-
+#ifdef CONFIG_PNP
+static struct dmi_system_id __initdata i8042_dmi_nopnp_table[] = {
+	{
+		.ident = "Intel MBO Desktop D845PESV",
+		.matches = {
+			DMI_MATCH(DMI_BOARD_NAME, "D845PESV"),
+			DMI_MATCH(DMI_BOARD_VENDOR, "Intel Corporation"),
+		},
+	},
+	{
+		.ident = "Gericom Bellagio",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Gericom"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "N34AS6"),
+		},
+	},
+	{ }
+};
 #endif
 
+/*
+ * Some Wistron based laptops need us to explicitly enable the 'Dritek
+ * keyboard extension' to make their extra keys start generating scancodes.
+ * Originally, this was just confined to older laptops, but a few Acer laptops
+ * have turned up in 2007 that also need this again.
+ */
+static struct dmi_system_id __initdata i8042_dmi_dritek_table[] = {
+	{
+		.ident = "Acer Aspire 5630",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Aspire 5630"),
+		},
+	},
+	{
+		.ident = "Acer Aspire 5650",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Aspire 5650"),
+		},
+	},
+	{
+		.ident = "Acer Aspire 5680",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Aspire 5680"),
+		},
+	},
+	{
+		.ident = "Acer Aspire 9110",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Aspire 9110"),
+		},
+	},
+	{
+		.ident = "Acer TravelMate 660",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "TravelMate 660"),
+		},
+	},
+	{
+		.ident = "Acer TravelMate 2490",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "TravelMate 2490"),
+		},
+	},
+	{ }
+};
+
+#endif /* CONFIG_X86 */
 
 #ifdef CONFIG_PNP
 #include <linux/pnp.h>
@@ -305,10 +402,10 @@ static int i8042_pnp_kbd_probe(struct pnp_dev *dev, const struct pnp_device_id *
 	if (pnp_irq_valid(dev,0))
 		i8042_pnp_kbd_irq = pnp_irq(dev, 0);
 
-	strncpy(i8042_pnp_kbd_name, did->id, sizeof(i8042_pnp_kbd_name));
+	strlcpy(i8042_pnp_kbd_name, did->id, sizeof(i8042_pnp_kbd_name));
 	if (strlen(pnp_dev_name(dev))) {
-		strncat(i8042_pnp_kbd_name, ":", sizeof(i8042_pnp_kbd_name));
-		strncat(i8042_pnp_kbd_name, pnp_dev_name(dev), sizeof(i8042_pnp_kbd_name));
+		strlcat(i8042_pnp_kbd_name, ":", sizeof(i8042_pnp_kbd_name));
+		strlcat(i8042_pnp_kbd_name, pnp_dev_name(dev), sizeof(i8042_pnp_kbd_name));
 	}
 
 	i8042_pnp_kbd_devices++;
@@ -326,10 +423,10 @@ static int i8042_pnp_aux_probe(struct pnp_dev *dev, const struct pnp_device_id *
 	if (pnp_irq_valid(dev, 0))
 		i8042_pnp_aux_irq = pnp_irq(dev, 0);
 
-	strncpy(i8042_pnp_aux_name, did->id, sizeof(i8042_pnp_aux_name));
+	strlcpy(i8042_pnp_aux_name, did->id, sizeof(i8042_pnp_aux_name));
 	if (strlen(pnp_dev_name(dev))) {
-		strncat(i8042_pnp_aux_name, ":", sizeof(i8042_pnp_aux_name));
-		strncat(i8042_pnp_aux_name, pnp_dev_name(dev), sizeof(i8042_pnp_aux_name));
+		strlcat(i8042_pnp_aux_name, ":", sizeof(i8042_pnp_aux_name));
+		strlcat(i8042_pnp_aux_name, pnp_dev_name(dev), sizeof(i8042_pnp_aux_name));
 	}
 
 	i8042_pnp_aux_devices++;
@@ -386,6 +483,11 @@ static int __init i8042_pnp_init(void)
 	char kbd_irq_str[4] = { 0 }, aux_irq_str[4] = { 0 };
 	int pnp_data_busted = 0;
 	int err;
+
+#ifdef CONFIG_X86
+	if (dmi_check_system(i8042_dmi_nopnp_table))
+		i8042_nopnp = 1;
+#endif
 
 	if (i8042_nopnp) {
 		printk(KERN_INFO "i8042: PNP detection disabled\n");
@@ -512,13 +614,16 @@ static int __init i8042_platform_init(void)
         i8042_reset = 1;
 #endif
 
-#if defined(__i386__)
+#ifdef CONFIG_X86
 	if (dmi_check_system(i8042_dmi_noloop_table))
 		i8042_noloop = 1;
 
 	if (dmi_check_system(i8042_dmi_nomux_table))
 		i8042_nomux = 1;
-#endif
+
+	if (dmi_check_system(i8042_dmi_dritek_table))
+		i8042_dritek = 1;
+#endif /* CONFIG_X86 */
 
 	return retval;
 }

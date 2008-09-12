@@ -40,17 +40,18 @@
  * and both the standard and SIMD floating point data can be accessed via
  * the new ptrace requests.  In either case, changes to the FPU environment
  * will be reflected in the task's state as expected.
- * 
+ *
  * x86-64 support by Andi Kleen.
  */
 
 /* This matches the 64bit FXSAVE format as defined by AMD. It is the same
-   as the 32bit format defined by Intel, except that the selector:offset pairs for
-   data and eip are replaced with flat 64bit pointers. */ 
+   as the 32bit format defined by Intel, except that the selector:offset pairs
+   for data and eip are replaced with flat 64bit pointers. */
 struct user_i387_struct {
 	unsigned short	cwd;
 	unsigned short	swd;
-	unsigned short	twd; /* Note this is not the same as the 32bit/x87/FSAVE twd */
+	unsigned short	twd;	/* Note this is not the same as
+				   the 32bit/x87/FSAVE twd */
 	unsigned short	fop;
 	__u64	rip;
 	__u64	rdp;
@@ -65,24 +66,46 @@ struct user_i387_struct {
  * Segment register layout in coredumps.
  */
 struct user_regs_struct {
-	unsigned long r15,r14,r13,r12,rbp,rbx,r11,r10;
-	unsigned long r9,r8,rax,rcx,rdx,rsi,rdi,orig_rax;
-	unsigned long rip,cs,eflags;
-	unsigned long rsp,ss;
-  	unsigned long fs_base, gs_base;
-	unsigned long ds,es,fs,gs; 
-}; 
+	unsigned long	r15;
+	unsigned long	r14;
+	unsigned long	r13;
+	unsigned long	r12;
+	unsigned long	bp;
+	unsigned long	bx;
+	unsigned long	r11;
+	unsigned long	r10;
+	unsigned long	r9;
+	unsigned long	r8;
+	unsigned long	ax;
+	unsigned long	cx;
+	unsigned long	dx;
+	unsigned long	si;
+	unsigned long	di;
+	unsigned long	orig_ax;
+	unsigned long	ip;
+	unsigned long	cs;
+	unsigned long	flags;
+	unsigned long	sp;
+	unsigned long	ss;
+	unsigned long	fs_base;
+	unsigned long	gs_base;
+	unsigned long	ds;
+	unsigned long	es;
+	unsigned long	fs;
+	unsigned long	gs;
+};
 
 /* When the kernel dumps core, it starts by dumping the user struct -
    this will be used by gdb to figure out where the data and stack segments
    are within the file, and what virtual addresses to use. */
-struct user{
+
+struct user {
 /* We start with the registers, to mimic the way that "memory" is returned
    from the ptrace(3,...) function.  */
-  struct user_regs_struct regs;		/* Where the registers are actually stored */
+  struct user_regs_struct regs;	/* Where the registers are actually stored */
 /* ptrace does not yet supply these.  Someday.... */
   int u_fpvalid;		/* True if math co-processor being used. */
-                                /* for this mess. Not yet used. */
+				/* for this mess. Not yet used. */
   int pad0;
   struct user_i387_struct i387;	/* Math Co-processor registers. */
 /* The rest of this junk is to help gdb figure out what goes where */
@@ -94,12 +117,12 @@ struct user{
 				   This is actually the bottom of the stack,
 				   the top of the stack is always found in the
 				   esp register.  */
-  long int signal;     		/* Signal that caused the core dump. */
+  long int signal;		/* Signal that caused the core dump. */
   int reserved;			/* No longer used */
   int pad1;
-  struct user_pt_regs * u_ar0;	/* Used by gdb to help find the values for */
+  unsigned long u_ar0;		/* Used by gdb to help find the values for */
 				/* the registers. */
-  struct user_i387_struct* u_fpstate;	/* Math Co-processor pointer. */
+  struct user_i387_struct *u_fpstate;	/* Math Co-processor pointer. */
   unsigned long magic;		/* To uniquely identify a core file */
   char u_comm[32];		/* User command that was responsible */
   unsigned long u_debugreg[8];

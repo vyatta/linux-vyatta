@@ -491,13 +491,13 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
                     int pos;
                     int timeout = 500000;
 
-                    if(xc.data == 0x0){
+                    if (!xc.data) {
                             ret = -EINVAL;
                             break;
                     }
 
                     data = kmalloc(xc.len, GFP_KERNEL);
-                    if(data == 0x0){
+                    if (!data) {
                             printk(KERN_WARNING "%s: Failed to allocate memory for copy\n", dev->name);
                             ret = -ENOMEM;
                             break;
@@ -891,6 +891,7 @@ static int __devinit lmc_init_one(struct pci_dev *pdev,
 
     /* Initialize the sppp layer */
     /* An ioctl can cause a subsequent detach for raw frame interface */
+    dev->ml_priv = sc;
     sc->if_type = LMC_PPP;
     sc->check = 0xBEAFCAFE;
     dev->base_addr = pci_resource_start(pdev, 0);
@@ -1643,7 +1644,7 @@ static int lmc_rx (struct net_device *dev) /*fold00*/
          * just allocate an skb buff and continue.
          */
         
-        if(skb == 0x0){
+        if (!skb) {
             nsb = dev_alloc_skb (LMC_PKT_BUF_SZ + 2);
             if (nsb) {
                 sc->lmc_rxq[i] = nsb;

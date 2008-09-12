@@ -55,7 +55,14 @@ struct pt_regs {
 
 #ifdef __powerpc64__
 
+#define __ARCH_WANT_COMPAT_SYS_PTRACE
+
 #define STACK_FRAME_OVERHEAD	112	/* size of minimum stack frame */
+#define STACK_FRAME_LR_SAVE	2	/* Location of LR in stack frame */
+#define STACK_FRAME_REGS_MARKER	ASM_CONST(0x7265677368657265)
+#define STACK_INT_FRAME_SIZE	(sizeof(struct pt_regs) + \
+					STACK_FRAME_OVERHEAD + 288)
+#define STACK_FRAME_MARKER	12
 
 /* Size of dummy stack frame allocated when calling signal handler. */
 #define __SIGNAL_FRAMESIZE	128
@@ -64,6 +71,10 @@ struct pt_regs {
 #else /* __powerpc64__ */
 
 #define STACK_FRAME_OVERHEAD	16	/* size of minimum stack frame */
+#define STACK_FRAME_LR_SAVE	1	/* Location of LR in stack frame */
+#define STACK_FRAME_REGS_MARKER	ASM_CONST(0x72656773)
+#define STACK_INT_FRAME_SIZE	(sizeof(struct pt_regs) + STACK_FRAME_OVERHEAD)
+#define STACK_FRAME_MARKER	2
 
 /* Size of stack frame allocated when calling signal handler. */
 #define __SIGNAL_FRAMESIZE	64
@@ -106,7 +117,8 @@ extern int ptrace_put_reg(struct task_struct *task, int regno,
  */
 #define FULL_REGS(regs)		(((regs)->trap & 1) == 0)
 #ifndef __powerpc64__
-#define IS_CRITICAL_EXC(regs)	(((regs)->trap & 2) == 0)
+#define IS_CRITICAL_EXC(regs)	(((regs)->trap & 2) != 0)
+#define IS_MCHECK_EXC(regs)	(((regs)->trap & 4) != 0)
 #endif /* ! __powerpc64__ */
 #define TRAP(regs)		((regs)->trap & ~0xF)
 #ifdef __powerpc64__
@@ -118,6 +130,13 @@ do {									      \
 		printk(KERN_CRIT "%s: partial register set\n", __FUNCTION__); \
 } while (0)
 #endif /* __powerpc64__ */
+
+/*
+ * These are defined as per linux/ptrace.h, which see.
+ */
+#define arch_has_single_step()	(1)
+extern void user_enable_single_step(struct task_struct *);
+extern void user_disable_single_step(struct task_struct *);
 
 #endif /* __ASSEMBLY__ */
 

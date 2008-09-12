@@ -52,7 +52,7 @@
 /* serialize freq changes  */
 static DEFINE_MUTEX(fidvid_mutex);
 
-static struct powernow_k8_data *powernow_data[NR_CPUS];
+static DEFINE_PER_CPU(struct powernow_k8_data *, powernow_data);
 
 static int cpu_family = CPU_OPTERON;
 
@@ -478,12 +478,12 @@ static int core_voltage_post_transition(struct powernow_k8_data *data, u32 reqvi
 
 static int check_supported_cpu(unsigned int cpu)
 {
-	cpumask_t oldmask = CPU_MASK_ALL;
+	cpumask_t oldmask;
 	u32 eax, ebx, ecx, edx;
 	unsigned int rc = 0;
 
 	oldmask = current->cpus_allowed;
-	set_cpus_allowed(current, cpumask_of_cpu(cpu));
+	set_cpus_allowed_ptr(current, &cpumask_of_cpu(cpu));
 
 	if (smp_processor_id() != cpu) {
 		printk(KERN_ERR PFX "limiting to cpu %u failed\n", cpu);
@@ -528,7 +528,7 @@ static int check_supported_cpu(unsigned int cpu)
 	rc = 1;
 
 out:
-	set_cpus_allowed(current, oldmask);
+	set_cpus_allowed_ptr(current, &oldmask);
 	return rc;
 }
 
@@ -578,10 +578,9 @@ static void print_basics(struct powernow_k8_data *data)
 	for (j = 0; j < data->numps; j++) {
 		if (data->powernow_table[j].frequency != CPUFREQ_ENTRY_INVALID) {
 			if (cpu_family == CPU_HW_PSTATE) {
-				printk(KERN_INFO PFX "   %d : fid 0x%x did 0x%x (%d MHz)\n",
+				printk(KERN_INFO PFX "   %d : pstate %d (%d MHz)\n",
 					j,
-					(data->powernow_table[j].index & 0xff00) >> 8,
-					(data->powernow_table[j].index & 0xff0000) >> 16,
+					data->powernow_table[j].index,
 					data->powernow_table[j].frequency/1000);
 			} else {
 				printk(KERN_INFO PFX "   %d : fid 0x%x (%d MHz), vid 0x%x\n",
@@ -827,7 +826,6 @@ static int fill_powernow_table_pstate(struct powernow_k8_data *data, struct cpuf
 
 	for (i = 0; i < data->acpi_data.state_count; i++) {
 		u32 index;
-		u32 hi = 0, lo = 0;
 
 		index = data->acpi_data.states[i].control & HW_PSTATE_MASK;
 		if (index > data->max_hw_pstate) {
@@ -1017,8 +1015,8 @@ static int transition_frequency_pstate(struct powernow_k8_data *data, unsigned i
 /* Driver entry point to switch to the target frequency */
 static int powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsigned relation)
 {
-	cpumask_t oldmask = CPU_MASK_ALL;
-	struct powernow_k8_data *data = powernow_data[pol->cpu];
+	cpumask_t oldmask;
+	struct powernow_k8_data *data = per_cpu(powernow_data, pol->cpu);
 	u32 checkfid;
 	u32 checkvid;
 	unsigned int newstate;
@@ -1032,7 +1030,7 @@ static int powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsi
 
 	/* only run on specific CPU from here on */
 	oldmask = current->cpus_allowed;
-	set_cpus_allowed(current, cpumask_of_cpu(pol->cpu));
+	set_cpus_allowed_ptr(current, &cpumask_of_cpu(pol->cpu));
 
 	if (smp_processor_id() != pol->cpu) {
 		printk(KERN_ERR PFX "limiting to cpu %u failed\n", pol->cpu);
@@ -1087,14 +1085,14 @@ static int powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsi
 	ret = 0;
 
 err_out:
-	set_cpus_allowed(current, oldmask);
+	set_cpus_allowed_ptr(current, &oldmask);
 	return ret;
 }
 
 /* Driver entry point to verify the policy and range of frequencies */
 static int powernowk8_verify(struct cpufreq_policy *pol)
 {
-	struct powernow_k8_data *data = powernow_data[pol->cpu];
+	struct powernow_k8_data *data = per_cpu(powernow_data, pol->cpu);
 
 	if (!data)
 		return -EINVAL;
@@ -1106,7 +1104,7 @@ static int powernowk8_verify(struct cpufreq_policy *pol)
 static int __cpuinit powernowk8_cpu_init(struct cpufreq_policy *pol)
 {
 	struct powernow_k8_data *data;
-	cpumask_t oldmask = CPU_MASK_ALL;
+	cpumask_t oldmask;
 	int rc;
 
 	if (!cpu_online(pol->cpu))
@@ -1129,12 +1127,23 @@ static int __cpuinit powernowk8_cpu_init(struct cpufreq_policy *pol)
 		 * an UP version, and is deprecated by AMD.
 		 */
 		if (num_online_cpus() != 1) {
-			printk(KERN_ERR PFX "MP systems not supported by PSB BIOS structure\n");
+#ifndef CONFIG_ACPI_PROCESSOR
+			printk(KERN_ERR PFX "ACPI Processor support is required "
+			       "for SMP systems but is absent. Please load the "
+			       "ACPI Processor module before starting this "
+			       "driver.\n");
+#else
+			printk(KERN_ERR PFX "Your BIOS does not provide ACPI "
+			       "_PSS objects in a way that Linux understands. "
+			       "Please report this to the Linux ACPI maintainers"
+			       " and complain to your BIOS vendor.\n");
+#endif
 			kfree(data);
 			return -ENODEV;
 		}
 		if (pol->cpu != 0) {
-			printk(KERN_ERR PFX "No _PSS objects for CPU other than CPU0\n");
+			printk(KERN_ERR PFX "No ACPI _PSS objects for CPU other than "
+			       "CPU0. Complain to your BIOS vendor.\n");
 			kfree(data);
 			return -ENODEV;
 		}
@@ -1147,7 +1156,7 @@ static int __cpuinit powernowk8_cpu_init(struct cpufreq_policy *pol)
 
 	/* only run on specific CPU from here on */
 	oldmask = current->cpus_allowed;
-	set_cpus_allowed(current, cpumask_of_cpu(pol->cpu));
+	set_cpus_allowed_ptr(current, &cpumask_of_cpu(pol->cpu));
 
 	if (smp_processor_id() != pol->cpu) {
 		printk(KERN_ERR PFX "limiting to cpu %u failed\n", pol->cpu);
@@ -1166,7 +1175,7 @@ static int __cpuinit powernowk8_cpu_init(struct cpufreq_policy *pol)
 		fidvid_msr_init();
 
 	/* run on any CPU again */
-	set_cpus_allowed(current, oldmask);
+	set_cpus_allowed_ptr(current, &oldmask);
 
 	if (cpu_family == CPU_HW_PSTATE)
 		pol->cpus = cpumask_of_cpu(pol->cpu);
@@ -1202,12 +1211,12 @@ static int __cpuinit powernowk8_cpu_init(struct cpufreq_policy *pol)
 		dprintk("cpu_init done, current fid 0x%x, vid 0x%x\n",
 			data->currfid, data->currvid);
 
-	powernow_data[pol->cpu] = data;
+	per_cpu(powernow_data, pol->cpu) = data;
 
 	return 0;
 
 err_out:
-	set_cpus_allowed(current, oldmask);
+	set_cpus_allowed_ptr(current, &oldmask);
 	powernow_k8_cpu_exit_acpi(data);
 
 	kfree(data);
@@ -1216,7 +1225,7 @@ err_out:
 
 static int __devexit powernowk8_cpu_exit (struct cpufreq_policy *pol)
 {
-	struct powernow_k8_data *data = powernow_data[pol->cpu];
+	struct powernow_k8_data *data = per_cpu(powernow_data, pol->cpu);
 
 	if (!data)
 		return -EINVAL;
@@ -1236,16 +1245,19 @@ static unsigned int powernowk8_get (unsigned int cpu)
 	struct powernow_k8_data *data;
 	cpumask_t oldmask = current->cpus_allowed;
 	unsigned int khz = 0;
+	unsigned int first;
 
-	data = powernow_data[first_cpu(per_cpu(cpu_core_map, cpu))];
+	first = first_cpu(per_cpu(cpu_core_map, cpu));
+	data = per_cpu(powernow_data, first);
 
 	if (!data)
 		return -EINVAL;
 
-	set_cpus_allowed(current, cpumask_of_cpu(cpu));
+	set_cpus_allowed_ptr(current, &cpumask_of_cpu(cpu));
 	if (smp_processor_id() != cpu) {
-		printk(KERN_ERR PFX "limiting to CPU %d failed in powernowk8_get\n", cpu);
-		set_cpus_allowed(current, oldmask);
+		printk(KERN_ERR PFX
+			"limiting to CPU %d failed in powernowk8_get\n", cpu);
+		set_cpus_allowed_ptr(current, &oldmask);
 		return 0;
 	}
 
@@ -1253,13 +1265,14 @@ static unsigned int powernowk8_get (unsigned int cpu)
 		goto out;
 
 	if (cpu_family == CPU_HW_PSTATE)
-		khz = find_khz_freq_from_pstate(data->powernow_table, data->currpstate);
+		khz = find_khz_freq_from_pstate(data->powernow_table,
+						data->currpstate);
 	else
 		khz = find_khz_freq_from_fid(data->currfid);
 
 
 out:
-	set_cpus_allowed(current, oldmask);
+	set_cpus_allowed_ptr(current, &oldmask);
 	return khz;
 }
 

@@ -35,21 +35,11 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/delay.h>
-#include <linux/timer.h>
-#include <linux/mm.h>
-#include <linux/ioport.h>
-#include <linux/blkdev.h>
 #include <linux/hdreg.h>
-
-#include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/ide.h>
 #include <linux/dma-mapping.h>
-
-#include <asm/io.h>
-#include <asm/irq.h>
 
 struct pio_clocks
 {
@@ -69,9 +59,8 @@ static struct pio_clocks cs5520_pio_clocks[]={
 static void cs5520_set_pio_mode(ide_drive_t *drive, const u8 pio)
 {
 	ide_hwif_t *hwif = HWIF(drive);
-	struct pci_dev *pdev = hwif->pci_dev;
+	struct pci_dev *pdev = to_pci_dev(hwif->dev);
 	int controller = drive->dn > 1 ? 1 : 0;
-	u8 reg;
 
 	/* FIXME: if DMA = 1 do we need to set the DMA bit here ? */
 
@@ -91,11 +80,6 @@ static void cs5520_set_pio_mode(ide_drive_t *drive, const u8 pio)
 	pci_write_config_byte(pdev, 0x66 + 4*controller + (drive->dn&1),
 		(cs5520_pio_clocks[pio].recovery << 4) |
 		(cs5520_pio_clocks[pio].assert));
-		
-	/* Set the DMA enable/disable flag */
-	reg = inb(hwif->dma_base + 0x02 + 8*controller);
-	reg |= 1<<((drive->dn&1)+5);
-	outb(reg, hwif->dma_base + 0x02 + 8*controller);
 }
 
 static void cs5520_set_dma_mode(ide_drive_t *drive, const u8 speed)
@@ -109,35 +93,43 @@ static void cs5520_set_dma_mode(ide_drive_t *drive, const u8 speed)
  *	We wrap the DMA activate to set the vdma flag. This is needed
  *	so that the IDE DMA layer issues PIO not DMA commands over the
  *	DMA channel
+ *
+ *	ATAPI is harder so disable it for now using IDE_HFLAG_NO_ATAPI_DMA
  */
- 
-static int cs5520_dma_on(ide_drive_t *drive)
+
+static void cs5520_dma_host_set(ide_drive_t *drive, int on)
 {
-	/* ATAPI is harder so leave it for now */
-	drive->vdma = 1;
-	return 0;
+	drive->vdma = on;
+	ide_dma_host_set(drive, on);
 }
 
-static void __devinit init_hwif_cs5520(ide_hwif_t *hwif)
-{
-	hwif->set_pio_mode = &cs5520_set_pio_mode;
-	hwif->set_dma_mode = &cs5520_set_dma_mode;
+static const struct ide_port_ops cs5520_port_ops = {
+	.set_pio_mode		= cs5520_set_pio_mode,
+	.set_dma_mode		= cs5520_set_dma_mode,
+};
 
-	if (hwif->dma_base == 0)
-		return;
+static const struct ide_dma_ops cs5520_dma_ops = {
+	.dma_host_set		= cs5520_dma_host_set,
+	.dma_setup		= ide_dma_setup,
+	.dma_exec_cmd		= ide_dma_exec_cmd,
+	.dma_start		= ide_dma_start,
+	.dma_end		= __ide_dma_end,
+	.dma_test_irq		= ide_dma_test_irq,
+	.dma_lost_irq		= ide_dma_lost_irq,
+	.dma_timeout		= ide_dma_timeout,
+};
 
-	hwif->ide_dma_on = &cs5520_dma_on;
-}
-
+/* FIXME: VDMA is disabled because it caused system hangs */
 #define DECLARE_CS_DEV(name_str)				\
 	{							\
 		.name		= name_str,			\
-		.init_hwif	= init_hwif_cs5520,		\
+		.enablebits	= { {0x60, 0x01, 0x01}, {0x60, 0x02, 0x02} }, \
+		.port_ops	= &cs5520_port_ops,		\
+		.dma_ops	= &cs5520_dma_ops,		\
 		.host_flags	= IDE_HFLAG_ISA_PORTS |		\
 				  IDE_HFLAG_CS5520 |		\
-				  IDE_HFLAG_VDMA |		\
 				  IDE_HFLAG_NO_ATAPI_DMA |	\
-				  IDE_HFLAG_BOOTABLE,		\
+				  IDE_HFLAG_ABUSE_SET_DMA_MODE, \
 		.pio_mask	= ATA_PIO4,			\
 	}
 
@@ -160,8 +152,9 @@ static int __devinit cs5520_init_one(struct pci_dev *dev, const struct pci_devic
 	ide_setup_pci_noise(dev, d);
 
 	/* We must not grab the entire device, it has 'ISA' space in its
-	   BARS too and we will freak out other bits of the kernel */
-	if (pci_enable_device_bars(dev, 1<<2)) {
+	 * BARS too and we will freak out other bits of the kernel
+	 */
+	if (pci_enable_device_io(dev)) {
 		printk(KERN_WARNING "%s: Unable to enable 55x0.\n", d->name);
 		return -ENODEV;
 	}
@@ -178,7 +171,7 @@ static int __devinit cs5520_init_one(struct pci_dev *dev, const struct pci_devic
 
 	ide_pci_setup_ports(dev, d, 14, &idx[0]);
 
-	ide_device_add(idx);
+	ide_device_add(idx, d);
 
 	return 0;
 }

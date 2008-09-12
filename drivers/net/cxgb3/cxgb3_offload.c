@@ -403,8 +403,6 @@ static int cxgb_offload_ctl(struct t3cdev *tdev, unsigned int req, void *data)
 static int rx_offload_blackhole(struct t3cdev *dev, struct sk_buff **skbs,
 				int n)
 {
-	CH_ERR(tdev2adap(dev), "%d unexpected offload packets, first data %u\n",
-	       n, ntohl(*(__be32 *)skbs[0]->data));
 	while (n--)
 		dev_kfree_skb_any(skbs[n]);
 	return 0;
@@ -488,7 +486,7 @@ static void t3_process_tid_release_list(struct work_struct *work)
 					   tid_release_task);
 	struct sk_buff *skb;
 	struct t3cdev *tdev = td->dev;
-	
+
 
 	spin_lock_bh(&td->tid_release_lock);
 	while (td->tid_release_list) {
@@ -629,6 +627,18 @@ static int do_l2t_write_rpl(struct t3cdev *dev, struct sk_buff *skb)
 	if (rpl->status != CPL_ERR_NONE)
 		printk(KERN_ERR
 		       "Unexpected L2T_WRITE_RPL status %u for entry %u\n",
+		       rpl->status, GET_TID(rpl));
+
+	return CPL_RET_BUF_DONE;
+}
+
+static int do_rte_write_rpl(struct t3cdev *dev, struct sk_buff *skb)
+{
+	struct cpl_rte_write_rpl *rpl = cplhdr(skb);
+
+	if (rpl->status != CPL_ERR_NONE)
+		printk(KERN_ERR
+		       "Unexpected RTE_WRITE_RPL status %u for entry %u\n",
 		       rpl->status, GET_TID(rpl));
 
 	return CPL_RET_BUF_DONE;
@@ -823,10 +833,26 @@ static int do_trace(struct t3cdev *dev, struct sk_buff *skb)
 	return 0;
 }
 
+/*
+ * That skb would better have come from process_responses() where we abuse
+ * ->priority and ->csum to carry our data.  NB: if we get to per-arch
+ * ->csum, the things might get really interesting here.
+ */
+
+static inline u32 get_hwtid(struct sk_buff *skb)
+{
+	return ntohl((__force __be32)skb->priority) >> 8 & 0xfffff;
+}
+
+static inline u32 get_opcode(struct sk_buff *skb)
+{
+	return G_OPCODE(ntohl((__force __be32)skb->csum));
+}
+
 static int do_term(struct t3cdev *dev, struct sk_buff *skb)
 {
-	unsigned int hwtid = ntohl(skb->priority) >> 8 & 0xfffff;
-	unsigned int opcode = G_OPCODE(ntohl(skb->csum));
+	unsigned int hwtid = get_hwtid(skb);
+	unsigned int opcode = get_opcode(skb);
 	struct t3c_tid_entry *t3c_tid;
 
 	t3c_tid = lookup_tid(&(T3C_DATA(dev))->tid_maps, hwtid);
@@ -904,7 +930,7 @@ int process_rx(struct t3cdev *dev, struct sk_buff **skbs, int n)
 {
 	while (n--) {
 		struct sk_buff *skb = *skbs++;
-		unsigned int opcode = G_OPCODE(ntohl(skb->csum));
+		unsigned int opcode = get_opcode(skb);
 		int ret = cpl_handlers[opcode] (dev, skb);
 
 #if VALIDATE_TID
@@ -1004,7 +1030,7 @@ void cxgb_redirect(struct dst_entry *old, struct dst_entry *new)
 	if (!is_offloading(olddev))
 		return;
 	if (!is_offloading(newdev)) {
-		printk(KERN_WARNING "%s: Redirect to non-offload"
+		printk(KERN_WARNING "%s: Redirect to non-offload "
 		       "device ignored.\n", __FUNCTION__);
 		return;
 	}
@@ -1060,9 +1086,7 @@ void *cxgb_alloc_mem(unsigned long size)
  */
 void cxgb_free_mem(void *addr)
 {
-	unsigned long p = (unsigned long)addr;
-
-	if (p >= VMALLOC_START && p < VMALLOC_END)
+	if (is_vmalloc_addr(addr))
 		vfree(addr);
 	else
 		kfree(addr);
@@ -1257,6 +1281,7 @@ void __init cxgb3_offload_init(void)
 
 	t3_register_cpl_handler(CPL_SMT_WRITE_RPL, do_smt_write_rpl);
 	t3_register_cpl_handler(CPL_L2T_WRITE_RPL, do_l2t_write_rpl);
+	t3_register_cpl_handler(CPL_RTE_WRITE_RPL, do_rte_write_rpl);
 	t3_register_cpl_handler(CPL_PASS_OPEN_RPL, do_stid_rpl);
 	t3_register_cpl_handler(CPL_CLOSE_LISTSRV_RPL, do_stid_rpl);
 	t3_register_cpl_handler(CPL_PASS_ACCEPT_REQ, do_cr);
