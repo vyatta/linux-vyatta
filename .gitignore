@@ -67,6 +67,15 @@ ncscope.*
 *.orig
 *.rej
 *~
+
+/debian/build
+/debian/stamps
+/debian/files
+/debian/linux-*
+/debian/control
+/debian/control.md5sum
+/debian/rules.gen
+
 stamp-*
 conf.vars
 config.precious
