@@ -693,7 +693,9 @@ int __init mtrr_trim_uncached_memory(unsigned long end_pfn)
 		if (!kvm_para_available()) {
 			printk(KERN_WARNING
 				"WARNING: strange, CPU MTRRs all blank?\n");
+/* vyatta disabled until vmware detection fixed:
 			WARN_ON(1);
+*/
 		}
 		return 0;
 	}
