@@ -681,6 +681,7 @@ struct inode {
 	void			*i_security;
 #endif
 	void			*i_private; /* fs or device private pointer */
+	unsigned long		created_when; /* jiffies of creation time */
 };
 
 /*
