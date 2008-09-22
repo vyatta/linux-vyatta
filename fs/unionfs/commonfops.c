@@ -24,7 +24,7 @@
  * stolen from NFS's silly rename
  */
 static int copyup_deleted_file(struct file *file, struct dentry *dentry,
-			       int bstart, int bindex)
+			       struct dentry *parent, int bstart, int bindex)
 {
 	static unsigned int counter;
 	const int i_inosize = sizeof(dentry->d_inode->i_ino) * 2;
@@ -71,8 +71,7 @@ retry:
 	} while (tmp_dentry->d_inode != NULL);	/* need negative dentry */
 	dput(tmp_dentry);
 
-	err = copyup_named_file(dentry->d_parent->d_inode, file, name, bstart,
-				bindex,
+	err = copyup_named_file(parent->d_inode, file, name, bstart, bindex,
 				i_size_read(file->f_path.dentry->d_inode));
 	if (err) {
 		if (unlikely(err == -EEXIST))
@@ -181,6 +180,7 @@ static int open_all_files(struct file *file)
 				    unionfs_lower_mnt_idx(dentry, bindex),
 				    file->f_flags);
 		if (IS_ERR(lower_file)) {
+			branchput(sb, bindex);
 			err = PTR_ERR(lower_file);
 			goto out;
 		} else {
@@ -198,7 +198,8 @@ static int open_highest_file(struct file *file, bool willwrite)
 	struct file *lower_file;
 	struct dentry *lower_dentry;
 	struct dentry *dentry = file->f_path.dentry;
-	struct inode *parent_inode = dentry->d_parent->d_inode;
+	struct dentry *parent = dget_parent(dentry);
+	struct inode *parent_inode = parent->d_inode;
 	struct super_block *sb = dentry->d_sb;
 
 	bstart = dbstart(dentry);
@@ -234,15 +235,16 @@ static int open_highest_file(struct file *file, bool willwrite)
 
 	memcpy(&lower_file->f_ra, &file->f_ra, sizeof(struct file_ra_state));
 out:
+	dput(parent);
 	return err;
 }
 
 /* perform a delayed copyup of a read-write file on a read-only branch */
-static int do_delayed_copyup(struct file *file)
+static int do_delayed_copyup(struct file *file, struct dentry *parent)
 {
 	int bindex, bstart, bend, err = 0;
 	struct dentry *dentry = file->f_path.dentry;
-	struct inode *parent_inode = dentry->d_parent->d_inode;
+	struct inode *parent_inode = parent->d_inode;
 
 	bstart = fbstart(file);
 	bend = fbend(file);
@@ -256,8 +258,8 @@ static int do_delayed_copyup(struct file *file)
 					  bindex,
 					  i_size_read(dentry->d_inode));
 		else
-			err = copyup_deleted_file(file, dentry, bstart,
-						  bindex);
+			err = copyup_deleted_file(file, dentry, parent,
+						  bstart, bindex);
 		/* if succeeded, set lower open-file flags and break */
 		if (!err) {
 			struct file *lower_file;
@@ -293,6 +295,7 @@ out:
  * Expects dentry/parent to be locked already, and revalidated.
  */
 static int __unionfs_file_revalidate(struct file *file, struct dentry *dentry,
+				     struct dentry *parent,
 				     struct super_block *sb, int sbgen,
 				     int dgen, bool willwrite)
 {
@@ -374,7 +377,7 @@ out_may_copyup:
 	    is_robranch(dentry)) {
 		pr_debug("unionfs: do delay copyup of \"%s\"\n",
 			 dentry->d_name.name);
-		err = do_delayed_copyup(file);
+		err = do_delayed_copyup(file, parent);
 		/* regular files have only one open lower file */
 		if (!err && !S_ISDIR(dentry->d_inode->i_mode))
 			fbend(file) = fbstart(file);
@@ -384,8 +387,6 @@ out:
 	if (err) {
 		kfree(UNIONFS_F(file)->lower_files);
 		kfree(UNIONFS_F(file)->saved_branch_ids);
-	} else {
-		unionfs_check_file(file);
 	}
 	return err;
 }
@@ -393,10 +394,12 @@ out:
 /*
  * Revalidate the struct file
  * @file: file to revalidate
+ * @parent: parent dentry (locked by caller)
  * @willwrite: true if caller may cause changes to the file; false otherwise.
  * Caller must lock/unlock dentry's branch configuration.
  */
-int unionfs_file_revalidate(struct file *file, bool willwrite)
+int unionfs_file_revalidate(struct file *file, struct dentry *parent,
+			    bool willwrite)
 {
 	struct super_block *sb;
 	struct dentry *dentry;
@@ -406,14 +409,14 @@ int unionfs_file_revalidate(struct file *file, bool willwrite)
 	dentry = file->f_path.dentry;
 	sb = dentry->d_sb;
 	verify_locked(dentry);
+	verify_locked(parent);
 
 	/*
 	 * First revalidate the dentry inside struct file,
 	 * but not unhashed dentries.
 	 */
-reval_dentry:
 	if (!d_deleted(dentry) &&
-	    !__unionfs_d_revalidate_chain(dentry, NULL, willwrite)) {
+	    !__unionfs_d_revalidate(dentry, parent, willwrite)) {
 		err = -ESTALE;
 		goto out;
 	}
@@ -421,59 +424,14 @@ reval_dentry:
 	sbgen = atomic_read(&UNIONFS_SB(sb)->generation);
 	dgen = atomic_read(&UNIONFS_D(dentry)->generation);
 
-	if (unlikely(sbgen > dgen)) {
-		pr_debug("unionfs: retry dentry %s revalidation\n",
+	if (unlikely(sbgen > dgen)) { /* XXX: should never happen */
+		pr_debug("unionfs: failed to revalidate dentry (%s)\n",
 			 dentry->d_name.name);
-		schedule();
-		goto reval_dentry;
-	}
-	BUG_ON(sbgen > dgen);
-
-	err = __unionfs_file_revalidate(file, dentry, sb,
-					sbgen, dgen, willwrite);
-out:
-	return err;
-}
-
-/* same as unionfs_file_revalidate, but parent dentry must be locked too */
-int unionfs_file_revalidate_locked(struct file *file, bool willwrite)
-{
-	struct super_block *sb;
-	struct dentry *dentry;
-	int sbgen, dgen;
-	int err = 0, valid;
-
-	dentry = file->f_path.dentry;
-	sb = dentry->d_sb;
-	verify_locked(dentry);
-	verify_locked(dentry->d_parent);
-
-	/* first revalidate (locked) parent, then child */
-	valid = __unionfs_d_revalidate_chain(dentry->d_parent, NULL, false);
-	if (unlikely(!valid)) {
-		err = -ESTALE;	/* same as what real_lookup does */
-		goto out;
-	}
-
-reval_dentry:
-	if (!d_deleted(dentry) &&
-	    !__unionfs_d_revalidate_one_locked(dentry, NULL, willwrite)) {
 		err = -ESTALE;
 		goto out;
 	}
 
-	sbgen = atomic_read(&UNIONFS_SB(sb)->generation);
-	dgen = atomic_read(&UNIONFS_D(dentry)->generation);
-
-	if (unlikely(sbgen > dgen)) {
-		pr_debug("unionfs: retry (locked) dentry %s revalidation\n",
-			 dentry->d_name.name);
-		schedule();
-		goto reval_dentry;
-	}
-	BUG_ON(sbgen > dgen);
-
-	err = __unionfs_file_revalidate(file, dentry, sb,
+	err = __unionfs_file_revalidate(file, dentry, parent, sb,
 					sbgen, dgen, willwrite);
 out:
 	return err;
@@ -516,7 +474,8 @@ static int __open_dir(struct inode *inode, struct file *file)
 }
 
 /* unionfs_open helper function: open a file */
-static int __open_file(struct inode *inode, struct file *file)
+static int __open_file(struct inode *inode, struct file *file,
+		       struct dentry *parent)
 {
 	struct dentry *lower_dentry;
 	struct file *lower_file;
@@ -544,9 +503,8 @@ static int __open_file(struct inode *inode, struct file *file)
 
 			/* copyup the file */
 			for (bindex = bstart - 1; bindex >= 0; bindex--) {
-				err = copyup_file(
-					file->f_path.dentry->d_parent->d_inode,
-					file, bstart, bindex, size);
+				err = copyup_file(parent->d_inode, file,
+						  bstart, bindex, size);
 				if (!err)
 					break;
 			}
@@ -585,16 +543,23 @@ int unionfs_open(struct inode *inode, struct file *file)
 	int err = 0;
 	struct file *lower_file = NULL;
 	struct dentry *dentry = file->f_path.dentry;
+	struct dentry *parent;
 	int bindex = 0, bstart = 0, bend = 0;
 	int size;
 	int valid = 0;
 
 	unionfs_read_lock(inode->i_sb, UNIONFS_SMUTEX_PARENT);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
-	if (dentry != dentry->d_parent)
-		unionfs_lock_dentry(dentry->d_parent, UNIONFS_DMUTEX_PARENT);
 
-	valid = __unionfs_d_revalidate_chain(dentry->d_parent, NULL, false);
+	/* don't open unhashed/deleted files */
+	if (d_deleted(dentry)) {
+		err = -ENOENT;
+		goto out_nofree;
+	}
+
+	/* XXX: should I change 'false' below to the 'willwrite' flag? */
+	valid = __unionfs_d_revalidate(dentry, parent, false);
 	if (unlikely(!valid)) {
 		err = -ESTALE;
 		goto out_nofree;
@@ -634,7 +599,7 @@ int unionfs_open(struct inode *inode, struct file *file)
 	if (S_ISDIR(inode->i_mode))
 		err = __open_dir(inode, file);	/* open a dir */
 	else
-		err = __open_file(inode, file);	/* open a file */
+		err = __open_file(inode, file, parent);	/* open a file */
 
 	/* freeing the allocated resources, and fput the opened files */
 	if (err) {
@@ -662,9 +627,8 @@ out_nofree:
 		unionfs_check_file(file);
 		unionfs_check_inode(inode);
 	}
-	if (dentry != dentry->d_parent)
-		unionfs_unlock_dentry(dentry->d_parent);
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(inode->i_sb);
 	return err;
 }
@@ -681,21 +645,24 @@ int unionfs_file_release(struct inode *inode, struct file *file)
 	struct unionfs_inode_info *inodeinfo;
 	struct super_block *sb = inode->i_sb;
 	struct dentry *dentry = file->f_path.dentry;
+	struct dentry *parent;
 	int bindex, bstart, bend;
 	int fgen, err = 0;
 
 	unionfs_read_lock(sb, UNIONFS_SMUTEX_PARENT);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
 	/*
-	 * Yes, we have to revalidate this file even if it's being released.
-	 * This is important for open-but-unlinked files, as well as mmap
-	 * support.
+	 * We try to revalidate, but the VFS ignores return return values
+	 * from file->release, so we must always try to succeed here,
+	 * including to do the kfree and dput below.  So if revalidation
+	 * failed, all we can do is print some message and keep going.
 	 */
-	err = unionfs_file_revalidate(file, UNIONFS_F(file)->wrote_to_file);
-	if (unlikely(err))
-		goto out;
-	unionfs_check_file(file);
+	err = unionfs_file_revalidate(file, parent,
+				      UNIONFS_F(file)->wrote_to_file);
+	if (!err)
+		unionfs_check_file(file);
 	fileinfo = UNIONFS_F(file);
 	BUG_ON(file->f_path.dentry->d_inode != inode);
 	inodeinfo = UNIONFS_I(inode);
@@ -736,8 +703,8 @@ int unionfs_file_release(struct inode *inode, struct file *file)
 	}
 	kfree(fileinfo);
 
-out:
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(sb);
 	return err;
 }
@@ -773,8 +740,8 @@ out:
  * We use fd_set and therefore we are limited to the number of the branches
  * to FD_SETSIZE, which is currently 1024 - plenty for most people
  */
-static int unionfs_ioctl_queryfile(struct file *file, unsigned int cmd,
-				   unsigned long arg)
+static int unionfs_ioctl_queryfile(struct file *file, struct dentry *parent,
+				   unsigned int cmd, unsigned long arg)
 {
 	int err = 0;
 	fd_set branchlist;
@@ -786,7 +753,7 @@ static int unionfs_ioctl_queryfile(struct file *file, unsigned int cmd,
 	dentry = file->f_path.dentry;
 	orig_bstart = dbstart(dentry);
 	orig_bend = dbend(dentry);
-	err = unionfs_partial_lookup(dentry);
+	err = unionfs_partial_lookup(dentry, parent);
 	if (err)
 		goto out;
 	bstart = dbstart(dentry);
@@ -832,11 +799,13 @@ long unionfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	long err;
 	struct dentry *dentry = file->f_path.dentry;
+	struct dentry *parent;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_PARENT);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
-	err = unionfs_file_revalidate(file, true);
+	err = unionfs_file_revalidate(file, parent, true);
 	if (unlikely(err))
 		goto out;
 
@@ -851,7 +820,7 @@ long unionfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case UNIONFS_IOCTL_QUERYFILE:
 		/* Return list of branches containing the given file */
-		err = unionfs_ioctl_queryfile(file, cmd, arg);
+		err = unionfs_ioctl_queryfile(file, parent, cmd, arg);
 		break;
 
 	default:
@@ -863,6 +832,7 @@ long unionfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 out:
 	unionfs_check_file(file);
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }
@@ -872,12 +842,15 @@ int unionfs_flush(struct file *file, fl_owner_t id)
 	int err = 0;
 	struct file *lower_file = NULL;
 	struct dentry *dentry = file->f_path.dentry;
+	struct dentry *parent;
 	int bindex, bstart, bend;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_PARENT);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
-	err = unionfs_file_revalidate(file, UNIONFS_F(file)->wrote_to_file);
+	err = unionfs_file_revalidate(file, parent,
+				      UNIONFS_F(file)->wrote_to_file);
 	if (unlikely(err))
 		goto out;
 	unionfs_check_file(file);
@@ -900,6 +873,7 @@ out:
 	if (!err)
 		unionfs_check_file(file);
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }

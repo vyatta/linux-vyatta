@@ -124,7 +124,7 @@ static void unionfs_put_super(struct super_block *sb)
 			       bindex, branch_count(sb, bindex));
 			leaks = 1;
 		}
-	BUG_ON(leaks != 0);
+	WARN_ON(leaks != 0);
 
 	/* decrement lower super references */
 	for (bindex = bstart; bindex <= bend; bindex++) {
@@ -150,13 +150,17 @@ static int unionfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	int err	= 0;
 	struct super_block *sb;
 	struct dentry *lower_dentry;
+	struct dentry *parent;
+	bool valid;
 
 	sb = dentry->d_sb;
 
 	unionfs_read_lock(sb, UNIONFS_SMUTEX_CHILD);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
-	if (unlikely(!__unionfs_d_revalidate_chain(dentry, NULL, false))) {
+	valid = __unionfs_d_revalidate(dentry, parent, false);
+	if (unlikely(!valid)) {
 		err = -ESTALE;
 		goto out;
 	}
@@ -185,6 +189,7 @@ static int unionfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 out:
 	unionfs_check_dentry(dentry);
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(sb);
 	return err;
 }
