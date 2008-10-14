@@ -251,9 +251,6 @@ int init_lower_nd(struct nameidata *nd, unsigned int flags)
 		nd->intent.open.file = file;
 #endif /* ALLOC_LOWER_ND_FILE */
 		break;
-	case LOOKUP_ACCESS:
-		nd->flags = flags;
-		break;
 	default:
 		/*
 		 * We should never get here, for now.

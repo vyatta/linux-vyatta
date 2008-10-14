@@ -455,7 +455,7 @@ int delete_whiteouts(struct dentry *dentry, int bindex,
 	lower_dir = lower_dir_dentry->d_inode;
 	BUG_ON(!S_ISDIR(lower_dir->i_mode));
 
-	if (!permission(lower_dir, MAY_WRITE | MAY_EXEC, NULL)) {
+	if (!inode_permission(lower_dir, MAY_WRITE | MAY_EXEC)) {
 		err = do_delete_whiteouts(dentry, bindex, namelist);
 	} else {
 		args.deletewh.namelist = namelist;
@@ -492,7 +492,7 @@ int is_opaque_dir(struct dentry *dentry, int bindex)
 
 	mutex_lock(&lower_inode->i_mutex);
 
-	if (!permission(lower_inode, MAY_EXEC, NULL)) {
+	if (!inode_permission(lower_inode, MAY_EXEC)) {
 		wh_lower_dentry =
 			lookup_one_len(UNIONFS_DIR_OPAQUE, lower_dentry,
 				       sizeof(UNIONFS_DIR_OPAQUE) - 1);

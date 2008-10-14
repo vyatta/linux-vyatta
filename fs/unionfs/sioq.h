@@ -49,7 +49,6 @@ struct symlink_args {
 	struct inode *parent;
 	struct dentry *dentry;
 	char *symbuf;
-	umode_t mode;
 };
 
 struct unlink_args {

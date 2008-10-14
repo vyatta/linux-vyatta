@@ -394,8 +394,7 @@ static int unionfs_symlink(struct inode *dir, struct dentry *dentry,
 	}
 
 	mode = S_IALLUGO;
-	err = vfs_symlink(lower_parent_dentry->d_inode, lower_dentry,
-			  symname, mode);
+	err = vfs_symlink(lower_parent_dentry->d_inode, lower_dentry, symname);
 	if (!err) {
 		err = PTR_ERR(unionfs_interpose(dentry, dir->i_sb, 0));
 		if (!err) {
@@ -738,8 +737,7 @@ static void unionfs_put_link(struct dentry *dentry, struct nameidata *nd,
  * This is a variant of fs/namei.c:permission() or inode_permission() which
  * skips over EROFS tests (because we perform copyup on EROFS).
  */
-static int __inode_permission(struct inode *inode, int mask,
-			      struct nameidata *nd)
+static int __inode_permission(struct inode *inode, int mask)
 {
 	int retval;
 
@@ -749,7 +747,7 @@ static int __inode_permission(struct inode *inode, int mask,
 
 	/* Ordinary permission routines do not understand MAY_APPEND. */
 	if (inode->i_op && inode->i_op->permission) {
-		retval = inode->i_op->permission(inode, mask, nd);
+		retval = inode->i_op->permission(inode, mask);
 		if (!retval) {
 			/*
 			 * Exec permission on a regular file is denied if none
@@ -769,8 +767,7 @@ static int __inode_permission(struct inode *inode, int mask,
 		return retval;
 
 	return security_inode_permission(inode,
-			 mask & (MAY_READ|MAY_WRITE|MAY_EXEC|MAY_APPEND),
-			 nd);
+			mask & (MAY_READ|MAY_WRITE|MAY_EXEC|MAY_APPEND));
 }
 
 /*
@@ -781,8 +778,7 @@ static int __inode_permission(struct inode *inode, int mask,
  * unionfs_permission, or anything it calls, will use stale branch
  * information.
  */
-static int unionfs_permission(struct inode *inode, int mask,
-			      struct nameidata *nd)
+static int unionfs_permission(struct inode *inode, int mask)
 {
 	struct inode *lower_inode = NULL;
 	int err = 0;
@@ -790,9 +786,10 @@ static int unionfs_permission(struct inode *inode, int mask,
 	const int is_file = !S_ISDIR(inode->i_mode);
 	const int write_mask = (mask & MAY_WRITE) && !(mask & MAY_READ);
 	struct inode *inode_grabbed = igrab(inode);
+	struct dentry *dentry = d_find_alias(inode);
 
-	if (nd)
-		unionfs_lock_dentry(nd->path.dentry, UNIONFS_DMUTEX_CHILD);
+	if (dentry)
+		unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
 	if (!UNIONFS_I(inode)->lower_inodes) {
 		if (is_file)	/* dirs can be unlinked but chdir'ed to */
@@ -834,7 +831,7 @@ static int unionfs_permission(struct inode *inode, int mask,
 		 * copyup taking place later on.  However, if user never had
 		 * access to the file, then no copyup could ever take place.
 		 */
-		err = __inode_permission(lower_inode, mask, nd);
+		err = __inode_permission(lower_inode, mask);
 		if (err && err != -EACCES && err != EPERM && bindex > 0) {
 			umode_t mode = lower_inode->i_mode;
 			if ((is_robranch_super(inode->i_sb, bindex) ||
@@ -867,9 +864,10 @@ static int unionfs_permission(struct inode *inode, int mask,
 
 out:
 	unionfs_check_inode(inode);
-	unionfs_check_nd(nd);
-	if (nd)
-		unionfs_unlock_dentry(nd->path.dentry);
+	if (dentry) {
+		unionfs_unlock_dentry(dentry);
+		dput(dentry);
+	}
 	iput(inode_grabbed);
 	return err;
 }

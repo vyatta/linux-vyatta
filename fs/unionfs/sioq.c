@@ -87,7 +87,7 @@ void __unionfs_symlink(struct work_struct *work)
 	struct sioq_args *args = container_of(work, struct sioq_args, work);
 	struct symlink_args *s = &args->symlink;
 
-	args->err = vfs_symlink(s->parent, s->dentry, s->symbuf, s->mode);
+	args->err = vfs_symlink(s->parent, s->dentry, s->symbuf);
 	complete(&args->comp);
 }
 

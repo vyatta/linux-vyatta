@@ -184,7 +184,6 @@ static int __copyup_ndentry(struct dentry *old_lower_dentry,
 		args.symlink.parent = new_lower_parent_dentry->d_inode;
 		args.symlink.dentry = new_lower_dentry;
 		args.symlink.symbuf = symbuf;
-		args.symlink.mode = old_mode;
 
 		run_sioq(__unionfs_symlink, &args);
 		err = args.err;
