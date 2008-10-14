@@ -27,6 +27,8 @@
 #include "bitops.h"
 #include <asm/cpufeature.h>
 
+#define NCAPINTS   8
+
 /* Useful macros */
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
 

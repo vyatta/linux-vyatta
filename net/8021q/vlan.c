@@ -477,6 +477,17 @@ static int vlan_device_event(struct notifier_block *unused, unsigned long event,
 
 		break;
 
+	case NETDEV_CHANGEMTU:
+		/* Propogate MTU of underlying device */
+		for (i = 0; i < VLAN_GROUP_ARRAY_LEN; i++) {
+			vlandev = vlan_group_get_device(grp, i);
+			if (!vlandev)
+				continue;
+
+			dev_set_mtu(vlandev, dev->mtu);
+		}
+		break;
+
 	case NETDEV_DOWN:
 		/* Put all VLANs for this dev in the down state too.  */
 		for (i = 0; i < VLAN_GROUP_ARRAY_LEN; i++) {

@@ -1193,7 +1193,7 @@ static int path_lookup_create(int dfd, const char *name,
 			nd, open_flags, create_mode);
 }
 
-static struct dentry *__lookup_hash(struct qstr *name,
+struct dentry *__lookup_hash(struct qstr *name,
 		struct dentry *base, struct nameidata *nd)
 {
 	struct dentry *dentry;
