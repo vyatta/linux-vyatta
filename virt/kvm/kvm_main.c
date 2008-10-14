@@ -558,9 +558,6 @@ int __kvm_set_memory_region(struct kvm *kvm,
 	if (mem->slot >= kvm->nmemslots)
 		kvm->nmemslots = mem->slot + 1;
 
-	if (!npages)
-		kvm_arch_flush_shadow(kvm);
-
 	*memslot = new;
 	spin_unlock(&kvm->mmu_lock);
 
