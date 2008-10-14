@@ -354,6 +354,7 @@ int deny_write_access(struct file * file)
 
 	return 0;
 }
+EXPORT_SYMBOL(deny_write_access);
 
 /**
  * path_get - get a reference to a path
@@ -392,6 +393,7 @@ void release_open_intent(struct nameidata *nd)
 	else
 		fput(nd->intent.open.file);
 }
+EXPORT_SYMBOL_GPL(release_open_intent);
 
 static inline struct dentry *
 do_revalidate(struct dentry *dentry, struct nameidata *nd)
@@ -1235,6 +1237,7 @@ struct dentry *__lookup_hash(struct qstr *name,
 out:
 	return dentry;
 }
+EXPORT_SYMBOL(__lookup_hash);
 
 /*
  * Restricted form of lookup. Doesn't follow links, single-component only,
