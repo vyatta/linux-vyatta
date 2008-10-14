@@ -20,7 +20,7 @@
  * sysfs interface and lifetime management
  * they are necessary regardless sysfs is disabled.
  *
- * $Id: sysaufs.c,v 1.9 2008/07/07 01:12:39 sfjro Exp $
+ * $Id: sysaufs.c,v 1.10 2008/09/15 03:14:55 sfjro Exp $
  */
 
 #include <linux/fs.h>
@@ -43,8 +43,14 @@ struct kset *au_kset;
 }
 
 static struct au_sbi_attr au_sbi_attr_xino = AuSbiAttr(xino);
+#ifdef CONFIG_AUFS_EXPORT
+static struct au_sbi_attr au_sbi_attr_xigen = AuSbiAttr(xigen);
+#endif
 struct attribute *au_sbi_attrs[] = {
 	&au_sbi_attr_xino.attr,
+#ifdef CONFIG_AUFS_EXPORT
+	&au_sbi_attr_xigen.attr,
+#endif
 	NULL,
 };
 
@@ -55,7 +61,7 @@ static struct sysfs_ops au_sbi_ops = {
 static struct kobj_type au_sbi_ktype = {
 	.release	= au_si_free,
 	.sysfs_ops	= &au_sbi_ops,
-	.default_attrs	= au_sbi_attrs,
+	.default_attrs	= au_sbi_attrs
 };
 
 /* ---------------------------------------------------------------------- */

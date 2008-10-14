@@ -19,7 +19,7 @@
 /*
  * branch management
  *
- * $Id: branch.c,v 1.16 2008/09/08 02:39:41 sfjro Exp $
+ * $Id: branch.c,v 1.19 2008/10/13 03:09:27 sfjro Exp $
  */
 
 #include <linux/iso_fs.h>
@@ -37,12 +37,13 @@ static void au_br_do_free(struct au_branch *br)
 
 	if (br->br_xino.xi_file)
 		fput(br->br_xino.xi_file);
+	mutex_destroy(&br->br_xino.xi_nondir_mtx);
 	wbr = br->br_wbr;
 	if (wbr)
 		for (i = 0; i < AuBrWh_Last; i++)
 			dput(wbr->wbr_wh[i]);
 	/* do not call au_br_nfs_lockdep_off() here */
-	if (!au_test_nfs(br->br_mnt->mnt_sb))
+	if (br->br_mnt && !au_test_nfs(br->br_mnt->mnt_sb))
 		mntput(br->br_mnt);
 	else {
 		lockdep_off();
@@ -50,8 +51,10 @@ static void au_br_do_free(struct au_branch *br)
 		lockdep_on();
 	}
 	AuDebugOn(au_br_count(br));
-	if (wbr)
+	if (wbr) {
 		AuDebugOn(atomic_read(&wbr->wbr_wh_running));
+		au_rwsem_destroy(&wbr->wbr_wh_rwsem);
+	}
 	kfree(wbr);
 	kfree(br);
 }
@@ -200,6 +203,7 @@ static int au_br_init_wh(struct super_block *sb, aufs_bindex_t bindex,
 	struct au_wbr *wbr;
 
 	LKTRTrace("b%d, new_perm %d\n", bindex, new_perm);
+	SiMustWriteLock(sb);
 
 	wbr = br->br_wbr;
 	h_dir = h_root->d_inode;
@@ -208,7 +212,7 @@ static int au_br_init_wh(struct super_block *sb, aufs_bindex_t bindex,
 	if (wbr)
 		wbr_wh_write_lock(wbr);
 	br->br_perm = new_perm;
-	err = au_wh_init(h_root, br, au_do_nfsmnt(h_mnt), sb, bindex);
+	err = au_wh_init(h_root, br, h_mnt, sb, bindex);
 	br->br_perm = old_perm;
 	if (wbr)
 		wbr_wh_write_unlock(wbr);
@@ -458,14 +462,18 @@ static int au_br_init(struct au_branch *br, struct super_block *sb,
 	AuTraceEnter();
 
 	err = 0;
+	br->br_mnt = NULL;
+	br->br_xino.xi_file = NULL;
+	mutex_init(&br->br_xino.xi_nondir_mtx);
+	atomic_set(&br->br_xino_running, 0);
+	atomic_set(&br->br_count, 0);
+
 	if (unlikely(au_br_writable(add->perm))) {
 		err = au_wbr_init(br, sb, add->perm, &add->nd.path);
 		if (unlikely(err))
 			goto out;
 	}
 
-	br->br_xino.xi_file = NULL;
-	mutex_init(&br->br_xino.xi_nondir_mtx);
 	br->br_mnt = mntget(add->nd.path.mnt);
 	mnt_flags = au_mntflags(sb);
 	if (au_opt_test(mnt_flags, XINO)) {
@@ -488,9 +496,7 @@ static int au_br_init(struct au_branch *br, struct super_block *sb,
 
 	br->br_id = au_new_br_id(sb);
 	br->br_perm = add->perm;
-	atomic_set(&br->br_count, 0);
 	br->br_xino_upper = AUFS_XINO_TRUNC_INIT;
-	atomic_set(&br->br_xino_running, 0);
 	sysaufs_br_init(br);
 	br->br_generation = au_sigen(sb);
 	/* smp_mb(); */ /* atomic_set */
@@ -527,8 +533,10 @@ int au_br_add(struct super_block *sb, struct au_opt_add *add, int remount)
 	err = test_add(sb, add, remount);
 	if (unlikely(err < 0))
 		goto out;
-	if (err)
-		return 0; /* success */
+	if (err) {
+		err = 0;
+		goto out; /* success */
+	}
 
 	bend = au_sbend(sb);
 	add_branch = alloc_addbr(sb, bend + 2, add->perm);

@@ -19,7 +19,7 @@
 /*
  * directory operations
  *
- * $Id: dir.c,v 1.12 2008/09/08 02:39:45 sfjro Exp $
+ * $Id: dir.c,v 1.15 2008/10/06 00:30:09 sfjro Exp $
  */
 
 #include <linux/fs_stack.h>
@@ -177,6 +177,7 @@ static int fsync_dir(struct dentry *dentry, int datasync)
 		if (!h_inode)
 			continue;
 
+		/* no mnt_want_write() */
 		/* cf. fs/nsfd/vfs.c and fs/nfsd/nfs4recover.c */
 		/* todo: inotiry fired? */
 		mutex_lock(&h_inode->i_mutex);
@@ -261,7 +262,9 @@ static int aufs_fsync_dir(struct file *file, struct dentry *dentry,
 
 static int aufs_readdir(struct file *file, void *dirent, filldir_t filldir)
 {
-	int err, iflag;
+	int err;
+	const int nfsd = au_test_nfsd(current);
+	struct au_nfsd_readdir_pid pid;
 	struct dentry *dentry;
 	struct inode *inode;
 	struct super_block *sb;
@@ -271,34 +274,37 @@ static int aufs_readdir(struct file *file, void *dirent, filldir_t filldir)
 	inode = dentry->d_inode;
 	IMustLock(inode);
 
-	au_nfsd_lockdep_off();
 	sb = dentry->d_sb;
 	si_read_lock(sb, AuLock_FLUSH);
 	err = au_reval_and_lock_fdi(file, reopen_dir, /*wlock*/1, /*locked*/1);
 	if (unlikely(err))
 		goto out;
-
-	err = au_vdir_init(file);
-	if (unlikely(err)) {
-		di_write_unlock(dentry);
+	if (unlikely(nfsd && !au_ii(inode)->ii_nfsd_readdir))
+		err = au_nfsd_readdir_alloc(inode);
+	if (!err)
+		err = au_vdir_init(file);
+	di_downgrade_lock(dentry, AuLock_IR);
+	if (unlikely(err))
 		goto out_unlock;
+
+	if (!nfsd)
+		err = au_vdir_fill_de(file, dirent, filldir);
+	else {
+		au_nfsd_readdir_reg(inode, &pid);
+		/* nfsd filldir calls lookup_one_len() or others */
+		lockdep_off();
+		err = au_vdir_fill_de(file, dirent, filldir);
+		lockdep_on();
+		au_nfsd_readdir_unreg(inode, &pid);
 	}
 
-	/* nfsd filldir calls lookup_one_len(). */
-	iflag = AuLock_IW;
-	if (unlikely(au_test_nfsd(current)))
-		iflag = AuLock_IR;
-	di_downgrade_lock(dentry, iflag);
-	err = au_vdir_fill_de(file, dirent, filldir);
-
 	fsstack_copy_attr_atime(inode, au_h_iptr(inode, au_ibstart(inode)));
-	di_read_unlock(dentry, iflag);
 
  out_unlock:
+	di_read_unlock(dentry, AuLock_IR);
 	fi_write_unlock(file);
  out:
 	si_read_unlock(sb);
-	au_nfsd_lockdep_on();
 	AuTraceErr(err);
 	return err;
 }
@@ -387,8 +393,6 @@ static int do_test_empty(struct dentry *dentry, struct test_empty_arg *arg)
 		goto out_put;
 
 	dlgt = au_ftest_testempty(arg->flags, DLGT);
-	/* todo: necessary? */
-	/* h_file->f_pos = 0; */
 	do {
 		arg->err = 0;
 		au_fclr_testempty(arg->flags, CALLED);

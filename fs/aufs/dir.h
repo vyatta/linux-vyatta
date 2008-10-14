@@ -19,7 +19,7 @@
 /*
  * directory operations
  *
- * $Id: dir.h,v 1.3 2008/05/26 04:04:23 sfjro Exp $
+ * $Id: dir.h,v 1.4 2008/09/29 03:43:43 sfjro Exp $
  */
 
 #ifndef __AUFS_DIR_H__
@@ -93,6 +93,21 @@ struct au_vdir {
 	unsigned long	vd_jiffy;
 };
 
+/*
+ * very drity approach.
+ * nfsd issues some operations during readdir which breaks aufs dinfo locking
+ * order, child first.
+ * Fortunately the parent dir i_mutex is held during readdir, so aufs tries
+ * unlocking the dinfo lock temporary.
+ * todo: change the lock order, parent first?
+ */
+struct au_nfsd_readdir_pid {
+#ifdef CONFIG_AUFS_EXPORT
+	struct list_head	list;
+	pid_t			pid;
+#endif
+};
+
 /* ---------------------------------------------------------------------- */
 
 /* dir.c */
@@ -111,10 +126,57 @@ int au_nhash_test_longer_wh(struct au_nhash *whlist, aufs_bindex_t btgt,
 int au_nhash_test_known_wh(struct au_nhash *whlist, char *name, int namelen);
 int au_nhash_append_wh(struct au_nhash *whlist, char *name, int namelen,
 		       ino_t ino, unsigned int d_type, aufs_bindex_t bindex,
-		    unsigned char shwh);
+		       unsigned char shwh);
 void au_vdir_free(struct au_vdir *vdir);
 int au_vdir_init(struct file *file);
 int au_vdir_fill_de(struct file *file, void *dirent, filldir_t filldir);
+
+#ifdef CONFIG_AUFS_EXPORT
+/* export.c */
+int au_nfsd_readdir_alloc(struct inode *inode);
+void au_nfsd_readdir_free(struct inode *inode);
+void au_nfsd_readdir_reg(struct inode *inode, struct au_nfsd_readdir_pid *pid);
+void au_nfsd_readdir_unreg(struct inode *inode,
+			   struct au_nfsd_readdir_pid *pid);
+
+enum { AuNfsdRLock_AU, AuNfsdRLock_DI_PARENT };
+int au_nfsd_do_read_lock(int sw, struct dentry *dentry, unsigned int flags);
+
+static inline
+int au_nfsd_read_lock(struct dentry *dentry, unsigned int flags)
+{
+	return au_nfsd_do_read_lock(AuNfsdRLock_AU, dentry, flags);
+}
+
+static inline
+int di_nfsd_read_lock_parent(struct dentry *dentry, unsigned int flags)
+{
+	return au_nfsd_do_read_lock(AuNfsdRLock_DI_PARENT, dentry, flags);
+}
+#else
+static inline int au_nfsd_readdir_alloc(struct inode *inode)
+{
+	return 0;
+}
+
+static inline void au_nfsd_readdir_free(struct inode *inode)
+{
+	/* empty */
+}
+
+static inline
+void au_nfsd_readdir_reg(struct inode *inode, struct au_nfsd_readdir_pid *pid)
+{
+	/* empty */
+}
+
+static inline
+void au_nfsd_readdir_unreg(struct inode *inode,
+			   struct au_nfsd_readdir_pid *pid)
+{
+	/* empty */
+}
+#endif
 
 /* ---------------------------------------------------------------------- */
 

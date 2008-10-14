@@ -19,7 +19,7 @@
 /*
  * lookup and dentry operations
  *
- * $Id: dentry.c,v 1.13 2008/09/01 02:54:54 sfjro Exp $
+ * $Id: dentry.c,v 1.17 2008/10/06 00:31:01 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -210,18 +210,18 @@ int au_lkup_dentry(struct dentry *dentry, aufs_bindex_t bstart, mode_t type,
 		   struct nameidata *nd)
 {
 	int npositive, err;
-	struct dentry *parent;
+	unsigned int mnt_flags;
 	aufs_bindex_t bindex, btail, bdiropq;
 	unsigned char isdir;
-	const struct qstr *name = &dentry->d_name;
 	struct qstr whname;
-	struct super_block *sb;
-	unsigned int mnt_flags;
-	struct inode *inode;
 	struct au_do_lookup_args args = {
 		.type	= type,
 		.nd	= nd
 	};
+	const struct qstr *name = &dentry->d_name;
+	struct dentry *parent;
+	struct super_block *sb;
+	struct inode *inode;
 
 	LKTRTrace("%.*s, b%d, type 0%o\n", AuLNPair(name), bstart, type);
 	AuDebugOn(bstart < 0 || IS_ROOT(dentry));
@@ -303,6 +303,10 @@ int au_lkup_dentry(struct dentry *dentry, aufs_bindex_t bstart, mode_t type,
 		au_update_dbstart(dentry);
 	}
 	err = npositive;
+	if (unlikely(!au_opt_test(mnt_flags, UDBA_NONE)
+		     && au_dbstart(dentry) < 0))
+		/* both of real entry and whiteout found */
+		err = -EIO;
 
  out_wh:
 	au_wh_name_free(&whname);
@@ -832,11 +836,12 @@ int au_reval_dpath(struct dentry *dentry, au_gen_t sgen)
  */
 static int aufs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 {
-	int valid, err, do_udba;
-	struct super_block *sb;
+	int valid, err, no_lock;
 	au_gen_t sgen;
-	struct inode *inode;
+	unsigned char do_udba;
 	struct nameidata tmp_nd, *ndp;
+	struct super_block *sb;
+	struct inode *inode;
 
 	LKTRTrace("dentry %.*s\n", AuDLNPair(dentry));
 	if (nd && nd->path.dentry)
@@ -851,7 +856,10 @@ static int aufs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 
 	err = -EINVAL;
 	sb = dentry->d_sb;
-	aufs_read_lock(dentry, AuLock_FLUSH | AuLock_DW);
+	no_lock = au_nfsd_read_lock(dentry, AuLock_FLUSH | AuLock_DW);
+	if (unlikely(no_lock))
+		/* we cannot live without write-lock */
+		goto out;
 
 	inode = dentry->d_inode;
 	sgen = au_sigen(sb);
@@ -897,7 +905,7 @@ static int aufs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 		aufs_bindex_t bstart = au_ibstart(inode);
 		if (bstart >= 0
 		    && au_test_higen(inode, au_h_iptr(inode, bstart)))
-			goto out;
+			goto out_unlock;
 	}
 	ndp = au_dup_nd(au_sbi(sb), &tmp_nd, nd);
 #if 0
@@ -913,15 +921,17 @@ static int aufs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 	}
 #endif
 	err = h_d_revalidate(dentry, inode, ndp, do_udba);
-	goto out;
+	if (unlikely(!err && do_udba && au_dbstart(dentry) < 0))
+		/* both of real entry and whiteout found */
+		err = -EIO;
+	goto out_unlock;
 
  out_dgrade:
 	di_downgrade_lock(dentry, AuLock_IR);
-
- out:
+ out_unlock:
 	au_store_fmode_exec(nd, inode);
-
 	aufs_read_unlock(dentry, AuLock_IR);
+ out:
 	AuTraceErr(err);
 	valid = !err;
 	if (!valid)
@@ -955,6 +965,7 @@ static void aufs_d_release(struct dentry *dentry)
 		}
 	}
 	kfree(dinfo->di_hdentry);
+	au_rwsem_destroy(&dinfo->di_rwsem);
 	au_cache_free_dinfo(dinfo);
 	au_hin_di_reinit(dentry);
 }

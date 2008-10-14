@@ -19,7 +19,7 @@
 /*
  * virtual or vertical directory
  *
- * $Id: vdir.c,v 1.10 2008/08/17 23:03:45 sfjro Exp $
+ * $Id: vdir.c,v 1.11 2008/09/22 03:52:19 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -472,9 +472,9 @@ static int au_wh_ino(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,
 
 struct fillvdir_arg {
 	struct file		*file;
-	struct au_vdir 	*vdir;
-	struct au_nhash	*delist;
-	struct au_nhash	*whlist;
+	struct au_vdir		*vdir;
+	struct au_nhash		*delist;
+	struct au_nhash		*whlist;
 	aufs_bindex_t		bindex;
 	unsigned int		flags;
 	int			err;
@@ -592,12 +592,12 @@ static int au_handle_shwh(struct super_block *sb, struct au_vdir *vdir,
 static int au_do_read_vdir(struct fillvdir_arg *arg)
 {
 	int err;
+	unsigned int mnt_flags;
+	loff_t offset;
 	aufs_bindex_t bend, bindex, bstart;
 	unsigned char dlgt, shwh;
 	struct super_block *sb;
-	unsigned int mnt_flags;
 	struct file *hf;
-	loff_t offset;
 
 	AuTraceEnter();
 
@@ -664,12 +664,13 @@ static int au_do_read_vdir(struct fillvdir_arg *arg)
 
 static int read_vdir(struct file *file, int may_read)
 {
-	int err, do_read;
+	int err;
+	unsigned long expire;
+	struct fillvdir_arg arg;
+	unsigned char do_read;
 	struct dentry *dentry;
 	struct inode *inode;
 	struct au_vdir *vdir, *allocated;
-	unsigned long expire;
-	struct fillvdir_arg arg;
 	struct super_block *sb;
 
 	dentry = file->f_dentry;

@@ -19,7 +19,7 @@
 /*
  * external inode number translation table and bitmap
  *
- * $Id: xino.c,v 1.15 2008/09/08 02:40:21 sfjro Exp $
+ * $Id: xino.c,v 1.17 2008/10/06 00:30:53 sfjro Exp $
  */
 
 #include <linux/uaccess.h>
@@ -27,8 +27,8 @@
 
 /* ---------------------------------------------------------------------- */
 
-static ssize_t xino_fread(au_readf_t func, struct file *file, void *buf,
-			  size_t size, loff_t *pos)
+ssize_t xino_fread(au_readf_t func, struct file *file, void *buf, size_t size,
+		   loff_t *pos)
 {
 	ssize_t err;
 	mm_segment_t oldfs;
@@ -99,8 +99,8 @@ static void call_do_xino_fwrite(void *args)
 	*a->errp = do_xino_fwrite(a->func, a->file, a->buf, a->size, a->pos);
 }
 
-static ssize_t xino_fwrite(au_writef_t func, struct file *file, void *buf,
-			   size_t size, loff_t *pos)
+ssize_t xino_fwrite(au_writef_t func, struct file *file, void *buf, size_t size,
+		    loff_t *pos)
 {
 	ssize_t err;
 
@@ -220,8 +220,6 @@ static void xino_try_trunc(struct super_block *sb, struct au_branch *br)
 }
 
 /* ---------------------------------------------------------------------- */
-
-#define Au_LOFF_MAX	((loff_t)LLONG_MAX)
 
 static int au_xino_do_write(au_writef_t write, struct file *file,
 			    ino_t h_ino, struct au_xino_entry *xinoe)
@@ -526,6 +524,7 @@ struct file *au_xino_create(struct super_block *sb, char *fname, int silent)
 	h_parent = dget_parent(file->f_dentry);
 	h_dir = h_parent->d_inode;
 	mutex_lock_nested(&h_dir->i_mutex, AuLsc_I_PARENT);
+	/* mnt_want_write() is unnecessary here */
 	err = vfsub_unlink(h_dir, file->f_dentry, &vargs);
 	mutex_unlock(&h_dir->i_mutex);
 	dput(h_parent);
@@ -570,7 +569,6 @@ static int is_sb_shared(struct super_block *sb, aufs_bindex_t btgt,
 /*
  * create a new xinofile at the same place/path as @base_file.
  */
-static
 struct file *au_xino_create2(struct super_block *sb, struct file *base_file,
 			     struct file *copy_src)
 {
@@ -619,6 +617,7 @@ struct file *au_xino_create2(struct super_block *sb, struct file *base_file,
 	}
 	vfsub_args_init(&vargs, &ign, 0, 0);
 	vfsub_ign_hinode(&vargs, IN_CREATE, hdir);
+	/* no need to mnt_want_write() since we call dentry_open() later */
 	err = vfsub_create(dir, dentry, S_IRUGO | S_IWUGO, NULL, &vargs);
 	if (unlikely(err)) {
 		file = ERR_PTR(err);
@@ -707,6 +706,7 @@ int au_xino_br(struct super_block *sb, struct au_branch *br, ino_t h_ino,
 		parent = dget_parent(base_file->f_dentry);
 		dir = parent->d_inode;
 		mutex_lock_nested(&dir->i_mutex, AuLsc_I_PARENT);
+		/* mnt_want_write() is unnecessary here */
 		file = au_xino_create2(sb, base_file, NULL);
 		mutex_unlock(&dir->i_mutex);
 		dput(parent);
@@ -815,26 +815,30 @@ static int xib_restore(struct super_block *sb)
 int au_xib_trunc(struct super_block *sb)
 {
 	int err;
+	unsigned int mnt_flags;
+	ssize_t sz;
+	loff_t pos;
 	struct au_sbinfo *sbinfo;
 	unsigned long *p;
-	loff_t pos;
-	ssize_t sz;
 	struct dentry *parent;
 	struct inode *dir;
 	struct file *file;
-	unsigned int mnt_flags;
 
 	AuTraceEnter();
 	SiMustWriteLock(sb);
 
+	err = 0;
 	mnt_flags = au_mntflags(sb);
 	if (unlikely(!au_opt_test_xino(mnt_flags)))
-		return 0;
+		goto out;
 
 	sbinfo = au_sbi(sb);
+	if (i_size_read(sbinfo->si_xib->f_dentry->d_inode) <= PAGE_SIZE)
+		goto out;
 	parent = dget_parent(sbinfo->si_xib->f_dentry);
 	dir = parent->d_inode;
 	mutex_lock_nested(&dir->i_mutex, AuLsc_I_PARENT);
+	/* mnt_want_write() is unnecessary here */
 	file = au_xino_create2(sb, sbinfo->si_xib, NULL);
 	mutex_unlock(&dir->i_mutex);
 	dput(parent);
@@ -858,6 +862,7 @@ int au_xib_trunc(struct super_block *sb)
 
 	if (au_opt_test_xino(mnt_flags)) {
 		mutex_lock(&sbinfo->si_xib_mtx);
+		/* mnt_want_write() is unnecessary here */
 		err = xib_restore(sb);
 		mutex_unlock(&sbinfo->si_xib_mtx);
 #if 0 /* reserved for future use */
@@ -1086,6 +1091,7 @@ void au_xino_clr(struct super_block *sb)
 	AuTraceEnter();
 	SiMustWriteLock(sb);
 
+	au_xigen_clr(sb);
 	xino_clear_xib(sb);
 	xino_clear_br(sb);
 	sbinfo = au_sbi(sb);
@@ -1130,7 +1136,10 @@ int au_xino_set(struct super_block *sb, struct au_opt_xino *xino, int remount)
 	au_xino_def_br_set(NULL, sbinfo);
 	dir = parent->d_inode;
 	mutex_lock_nested(&dir->i_mutex, AuLsc_I_PARENT);
+	/* mnt_want_write() is unnecessary here */
 	err = au_xino_set_xib(sb, xino->file);
+	if (!err)
+		err = au_xigen_set(sb, xino->file);
 	if (!err)
 		err = au_xino_set_br(sb, xino->file);
 	mutex_unlock(&dir->i_mutex);
@@ -1170,6 +1179,7 @@ int au_xino_trunc(struct super_block *sb, aufs_bindex_t bindex)
 	parent = dget_parent(br->br_xino.xi_file->f_dentry);
 	dir = parent->d_inode;
 	mutex_lock_nested(&dir->i_mutex, AuLsc_I_PARENT);
+	/* mnt_want_write() is unnecessary here */
 	new_xino = au_xino_create2(sb, br->br_xino.xi_file,
 				   br->br_xino.xi_file);
 	mutex_unlock(&dir->i_mutex);

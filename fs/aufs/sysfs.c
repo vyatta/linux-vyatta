@@ -19,7 +19,7 @@
 /*
  * sysfs interface
  *
- * $Id: sysfs.c,v 1.12 2008/08/04 00:32:47 sfjro Exp $
+ * $Id: sysfs.c,v 1.15 2008/10/06 00:31:01 sfjro Exp $
  */
 
 #include <linux/fs.h>
@@ -100,14 +100,17 @@ static ssize_t config_show(struct kobject *kobj, struct kobj_attribute *attr,
 #ifdef CONFIG_AUFS_WORKAROUND_FUSE
 		conf_bool(WORKAROUND_FUSE)
 #endif
-#ifdef CONFIG_AUFS_HIN_OR_FUSE
-		conf_bool(HIN_OR_FUSE)
+#ifdef CONFIG_AUFS_GETATTR
+		conf_bool(GETATTR)
 #endif
 #ifdef CONFIG_AUFS_STAT
 		conf_bool(STAT)
 #endif
 #ifdef CONFIG_AUFS_DEBUG
 		conf_bool(DEBUG)
+#endif
+#ifdef CONFIG_AUFS_DEBUG_LOCK
+		conf_bool(DEBUG_LOCK)
 #endif
 #ifdef CONFIG_AUFS_MAGIC_SYSRQ
 		conf_bool(MAGIC_SYSRQ)
@@ -256,16 +259,42 @@ struct kobj_type *au_ktype = &au_ktype_body;
 
 /* ---------------------------------------------------------------------- */
 
+static noinline_for_stack
+int sysaufs_sbi_xi(struct seq_file *seq, struct file *xf, int dlgt,
+		   int print_path)
+{
+	int err;
+	struct kstat st;
+	struct path path;
+
+	err = vfsub_getattr(xf->f_vfsmnt, xf->f_dentry, &st, dlgt);
+	if (!err) {
+		seq_printf(seq, "%llux%lu %lld",
+			   st.blocks, st.blksize, (long long)st.size);
+		if (unlikely(print_path)) {
+			path.dentry = xf->f_dentry;
+			path.mnt = xf->f_vfsmnt;
+			seq_putc(seq, ' ');
+			seq_path(seq, &path, au_esc_chars);
+		}
+		seq_putc(seq, '\n');
+	} else
+		seq_printf(seq, "err %d\n", err);
+
+	AuTraceErr(err);
+	return err;
+}
+
 int sysaufs_sbi_xino(struct seq_file *seq, struct super_block *sb)
 {
 	int err;
-	struct au_sbinfo *sbinfo;
 	unsigned int mnt_flags;
 	aufs_bindex_t bend, bindex;
 	unsigned char dlgt, xinodir;
-	struct file *xf;
 	struct kstat st;
 	struct path path;
+	struct au_sbinfo *sbinfo;
+	struct file *xf;
 
 	AuTraceEnter();
 
@@ -284,20 +313,7 @@ int sysaufs_sbi_xino(struct seq_file *seq, struct super_block *sb)
 	}
 
 	dlgt = !!au_test_dlgt(mnt_flags);
-	xf = sbinfo->si_xib;
-	err = vfsub_getattr(xf->f_vfsmnt, xf->f_dentry, &st, dlgt);
-	if (!err) {
-		seq_printf(seq, "%llux%lu %lld",
-			   st.blocks, st.blksize, (long long)st.size);
-		if (unlikely(xinodir)) {
-			path.dentry = xf->f_dentry;
-			path.mnt = xf->f_vfsmnt;
-			seq_putc(seq, ' ');
-			seq_path(seq, &path, au_esc_chars);
-		}
-		seq_putc(seq, '\n');
-	} else
-		seq_printf(seq, "err %d\n", err);
+	err = sysaufs_sbi_xi(seq, sbinfo->si_xib, dlgt, xinodir);
 
 	bend = au_sbend(sb);
 	for (bindex = 0; !err && bindex <= bend; bindex++) {
@@ -325,6 +341,28 @@ int sysaufs_sbi_xino(struct seq_file *seq, struct super_block *sb)
 	AuTraceErr(err);
 	return err;
 }
+
+#ifdef CONFIG_AUFS_EXPORT
+int sysaufs_sbi_xigen(struct seq_file *seq, struct super_block *sb)
+{
+	int err;
+	unsigned int mnt_flags;
+	struct au_sbinfo *sbinfo;
+
+	AuTraceEnter();
+
+	err = 0;
+	sbinfo = au_sbi(sb);
+	mnt_flags = au_mntflags(sb);
+	if (au_opt_test_xino(mnt_flags))
+		err = sysaufs_sbi_xi(seq, sbinfo->si_xigen,
+				     !!au_opt_test(mnt_flags, DLGT),
+				     !!au_opt_test(mnt_flags, XINODIR));
+
+	AuTraceErr(err);
+	return err;
+}
+#endif
 
 /*
  * the lifetime of branch is independent from the entry under sysfs.

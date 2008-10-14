@@ -19,7 +19,7 @@
 /*
  * lookup and dentry operations
  *
- * $Id: dentry.h,v 1.7 2008/09/01 02:54:54 sfjro Exp $
+ * $Id: dentry.h,v 1.9 2008/10/06 00:31:01 sfjro Exp $
  */
 
 #ifndef __AUFS_DENTRY_H__
@@ -324,6 +324,16 @@ AuRWLockFuncs(parent4, PARENT4);
 } while (0)
 
 #define DiMustNoWaiters(d)	AuRwMustNoWaiters(&au_di(d)->di_rwsem)
+
+#ifndef CONFIG_AUFS_EXPORT
+/* cf. dir.h */
+static inline
+int di_nfsd_read_lock_parent(struct dentry *dentry, unsigned int flags)
+{
+	di_read_lock_parent(dentry, flags);
+	return 0;
+}
+#endif
 
 /* ---------------------------------------------------------------------- */
 

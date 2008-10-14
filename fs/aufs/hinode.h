@@ -19,7 +19,7 @@
 /*
  * lower (branch filesystem) inode and setting inotify
  *
- * $Id: hinode.h,v 1.9 2008/08/25 01:49:59 sfjro Exp $
+ * $Id: hinode.h,v 1.11 2008/10/06 00:30:02 sfjro Exp $
  */
 
 #ifndef __AUFS_HINODE_H__
@@ -37,9 +37,7 @@
 
 struct au_hinotify {
 #ifdef CONFIG_AUFS_HINOTIFY
-	spinlock_t		hin_ignore_lock;
-	struct list_head	hin_ignore_list;
-
+	struct au_splhead	hin_ignore;
 	struct inotify_watch	hin_watch;
 	struct inode		*hin_aufs_inode;	/* no get/put */
 #endif

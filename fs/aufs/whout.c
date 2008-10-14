@@ -19,7 +19,7 @@
 /*
  * whiteout for logical deletion and opaque directory
  *
- * $Id: whout.c,v 1.13 2008/09/08 02:40:12 sfjro Exp $
+ * $Id: whout.c,v 1.15 2008/10/13 03:10:00 sfjro Exp $
  */
 
 #include <linux/fs.h>
@@ -329,38 +329,48 @@ static int unlink_wh_name(struct dentry *h_parent, struct qstr *wh,
 
 /* ---------------------------------------------------------------------- */
 
-static void clean_wh(struct inode *h_dir, struct dentry *wh,
+static void clean_wh(struct inode *h_dir, struct path *whpath,
 		     struct au_hinode *hdir, struct vfsub_args *vargs)
 {
 	int err;
 
 	AuTraceEnter();
 
-	if (wh->d_inode) {
+	if (!whpath->dentry->d_inode)
+		return;
+
+	err = au_mnt_want_write(whpath->mnt);
+	if (!err) {
 		vfsub_args_reinit(vargs);
 		vfsub_ign_hinode(vargs, IN_DELETE, hdir);
-		err = vfsub_unlink(h_dir, wh, vargs);
-		if (unlikely(err))
-			AuWarn("failed unlink %.*s (%d), ignored.\n",
-			       AuDLNPair(wh), err);
+		err = vfsub_unlink(h_dir, whpath->dentry, vargs);
+		au_mnt_drop_write(whpath->mnt);
 	}
+	if (unlikely(err))
+		AuWarn("failed unlink %.*s (%d), ignored.\n",
+		       AuDLNPair(whpath->dentry), err);
 }
 
-static void au_whdir_clean(struct inode *h_dir, struct dentry *dentry,
+static void au_whdir_clean(struct inode *h_dir, struct path *whpath,
 			   struct au_hinode *hdir, struct vfsub_args *vargs)
 {
 	int err;
 
 	AuTraceEnter();
 
-	if (dentry->d_inode) {
+	if (!whpath->dentry->d_inode)
+		return;
+
+	err = au_mnt_want_write(whpath->mnt);
+	if (!err) {
 		vfsub_args_reinit(vargs);
 		vfsub_ign_hinode(vargs, IN_DELETE, hdir);
-		err = vfsub_rmdir(h_dir, dentry, vargs);
-		if (unlikely(err))
-			AuWarn("failed rmdir %.*s (%d), ignored.\n",
-			       AuDLNPair(dentry), err);
+		err = vfsub_rmdir(h_dir, whpath->dentry, vargs);
+		au_mnt_drop_write(whpath->mnt);
 	}
+	if (unlikely(err))
+		AuWarn("failed rmdir %.*s (%d), ignored.\n",
+		       AuDLNPair(whpath->dentry), err);
 }
 
 static int test_linkable(struct inode *h_dir)
@@ -371,23 +381,27 @@ static int test_linkable(struct inode *h_dir)
 }
 
 /* todo: should this mkdir be done in /sbin/mount.aufs script? */
-static int au_whdir(struct inode *h_dir, struct dentry *dentry,
+static int au_whdir(struct inode *h_dir, struct path *path,
 		    struct au_hinode *hdir, struct vfsub_args *vargs)
 {
 	int err;
 
 	err = -EEXIST;
-	if (!dentry->d_inode) {
+	if (!path->dentry->d_inode) {
 		int mode = S_IRWXU;
-		if (unlikely(au_test_nfs(dentry->d_sb)))
+		if (unlikely(au_test_nfs(path->dentry->d_sb)))
 			mode |= S_IXUGO;
-		vfsub_args_reinit(vargs);
-		vfsub_ign_hinode(vargs, IN_CREATE, hdir);
-		err = vfsub_mkdir(h_dir, dentry, mode, vargs);
-	} else if (S_ISDIR(dentry->d_inode->i_mode))
+		err = au_mnt_want_write(path->mnt);
+		if (!err) {
+			vfsub_args_reinit(vargs);
+			vfsub_ign_hinode(vargs, IN_CREATE, hdir);
+			err = vfsub_mkdir(h_dir, path->dentry, mode, vargs);
+			au_mnt_drop_write(path->mnt);
+		}
+	} else if (S_ISDIR(path->dentry->d_inode->i_mode))
 		err = 0;
 	else
-		AuErr("unknown %.*s exists\n", AuDLNPair(dentry));
+		AuErr("unknown %.*s exists\n", AuDLNPair(path->dentry));
 
 	return err;
 }
@@ -396,15 +410,22 @@ static int au_whdir(struct inode *h_dir, struct dentry *dentry,
  * initialize the whiteout base file/dir for @br.
  */
 int au_wh_init(struct dentry *h_root, struct au_branch *br,
-	       struct vfsmount *nfsmnt, struct super_block *sb,
+	       struct vfsmount *h_mnt, struct super_block *sb,
 	       aufs_bindex_t bindex)
 {
 	int err, i;
-	struct inode *h_dir;
+	const unsigned int mnt_flags = au_mntflags(sb);
+	const unsigned char do_plink = !!au_opt_test(mnt_flags, PLINK),
+		do_hinotify = au_opt_test(mnt_flags, UDBA_INOTIFY);
+	struct path path = {
+		.mnt = h_mnt
+	};
 	struct au_hin_ignore ign;
 	struct vfsub_args vargs;
+	struct inode *h_dir;
 	struct au_hinode *hdir;
 	struct au_wbr *wbr = br->br_wbr;
+	struct vfsmount *nfsmnt = au_do_nfsmnt(h_mnt);
 	static const struct qstr base_name[] = {
 		[AuBrWh_BASE] = {
 			.name	= AUFS_WH_BASENAME,
@@ -442,9 +463,6 @@ int au_wh_init(struct dentry *h_root, struct au_branch *br,
 		.nd	= NULL,
 		/* .br	= NULL */
 	};
-	const unsigned int mnt_flags = au_mntflags(sb);
-	const int do_plink = au_opt_test(mnt_flags, PLINK);
-	const int do_hinotify = au_opt_test(mnt_flags, UDBA_INOTIFY);
 
 	LKTRTrace("nfsmnt %p\n", nfsmnt);
 	WbrWhMustWriteLock(wbr);
@@ -453,10 +471,12 @@ int au_wh_init(struct dentry *h_root, struct au_branch *br,
 
 	for (i = 0; i < AuBrWh_Last; i++) {
 		/* doubly whiteouted */
-		base[i].dentry = au_wh_lkup(h_root, (void *)base[i].name, &ndx);
-		err = PTR_ERR(base[i].dentry);
-		if (IS_ERR(base[i].dentry))
+		struct dentry *d;
+		d = au_wh_lkup(h_root, (void *)base[i].name, &ndx);
+		err = PTR_ERR(d);
+		if (IS_ERR(d))
 			goto out;
+		base[i].dentry = d;
 		AuDebugOn(wbr
 			  && wbr->wbr_wh[i]
 			  && wbr->wbr_wh[i] != base[i].dentry);
@@ -479,27 +499,31 @@ int au_wh_init(struct dentry *h_root, struct au_branch *br,
 	case AuBrPerm_RO:
 	case AuBrPerm_RRWH:
 	case AuBrPerm_ROWH:
-		clean_wh(h_dir, base[AuBrWh_BASE].dentry, hdir, &vargs);
-		au_whdir_clean(h_dir, base[AuBrWh_PLINK].dentry, hdir, &vargs);
-		au_whdir_clean(h_dir, base[AuBrWh_TMP].dentry, hdir, &vargs);
+		path.dentry = base[AuBrWh_BASE].dentry;
+		clean_wh(h_dir, &path, hdir, &vargs);
+		path.dentry = base[AuBrWh_PLINK].dentry;
+		au_whdir_clean(h_dir, &path, hdir, &vargs);
+		path.dentry = base[AuBrWh_TMP].dentry;
+		au_whdir_clean(h_dir, &path, hdir, &vargs);
 		break;
 
 	case AuBrPerm_RWNoLinkWH:
-		clean_wh(h_dir, base[AuBrWh_BASE].dentry, hdir, &vargs);
+		path.dentry = base[AuBrWh_BASE].dentry;
+		clean_wh(h_dir, &path, hdir, &vargs);
+		path.dentry = base[AuBrWh_PLINK].dentry;
 		if (do_plink) {
 			err = test_linkable(h_dir);
 			if (unlikely(err))
 				goto out_nolink;
 
-			err = au_whdir(h_dir, base[AuBrWh_PLINK].dentry, hdir,
-				       &vargs);
+			err = au_whdir(h_dir, &path, hdir, &vargs);
 			if (unlikely(err))
 				goto out_err;
 			wbr->wbr_plink = dget(base[AuBrWh_PLINK].dentry);
 		} else
-			au_whdir_clean(h_dir, base[AuBrWh_PLINK].dentry, hdir,
-				       &vargs);
-		err = au_whdir(h_dir, base[AuBrWh_TMP].dentry, hdir, &vargs);
+			au_whdir_clean(h_dir, &path, hdir, &vargs);
+		path.dentry = base[AuBrWh_TMP].dentry;
+		err = au_whdir(h_dir, &path, hdir, &vargs);
 		if (unlikely(err))
 			goto out_err;
 		wbr->wbr_tmp = dget(base[AuBrWh_TMP].dentry);
@@ -524,10 +548,15 @@ int au_wh_init(struct dentry *h_root, struct au_branch *br,
 		 * in /sbin/mount.aufs script?
 		 */
 		if (!base[AuBrWh_BASE].dentry->d_inode) {
-			vfsub_args_reinit(&vargs);
-			vfsub_ign_hinode(&vargs, IN_CREATE, hdir);
-			err = au_h_create(h_dir, base[AuBrWh_BASE].dentry,
-					  WH_MASK, &vargs, /*nd*/NULL, nfsmnt);
+			err = au_mnt_want_write(h_mnt);
+			if (!err) {
+				vfsub_args_reinit(&vargs);
+				vfsub_ign_hinode(&vargs, IN_CREATE, hdir);
+				err = au_h_create(h_dir, base[AuBrWh_BASE].dentry,
+						  WH_MASK, &vargs, /*nd*/NULL,
+						  nfsmnt);
+				au_mnt_drop_write(h_mnt);
+			}
 		}
 		else if (S_ISREG(base[AuBrWh_BASE].dentry->d_inode->i_mode))
 			err = 0;
@@ -538,18 +567,18 @@ int au_wh_init(struct dentry *h_root, struct au_branch *br,
 		if (unlikely(err))
 			goto out_err;
 
+		path.dentry = base[AuBrWh_PLINK].dentry;
 		if (do_plink) {
-			err = au_whdir(h_dir, base[AuBrWh_PLINK].dentry, hdir,
-				       &vargs);
+			err = au_whdir(h_dir, &path, hdir, &vargs);
 			if (unlikely(err))
 				goto out_err;
 			wbr->wbr_plink = dget(base[AuBrWh_PLINK].dentry);
 		} else
-			au_whdir_clean(h_dir, base[AuBrWh_PLINK].dentry, hdir,
-				       &vargs);
+			au_whdir_clean(h_dir, &path, hdir, &vargs);
 		wbr->wbr_whbase = dget(base[AuBrWh_BASE].dentry);
 
-		err = au_whdir(h_dir, base[AuBrWh_TMP].dentry, hdir, &vargs);
+		path.dentry = base[AuBrWh_TMP].dentry;
+		err = au_whdir(h_dir, &path, hdir, &vargs);
 		if (unlikely(err))
 			goto out_err;
 		wbr->wbr_tmp = dget(base[AuBrWh_TMP].dentry);
@@ -614,9 +643,13 @@ static void reinit_br_wh(void *arg)
 	mutex_lock_nested(&h_dir->i_mutex, AuLsc_I_PARENT);
 	wbr_wh_write_lock(wbr);
 	if (!au_verify_parent(wbr->wbr_whbase, h_dir)) {
-		vfsub_args_init(&vargs, &ign, /*dlgt*/0, 0);
-		vfsub_ign_hinode(&vargs, IN_DELETE, au_hi(dir, bindex));
-		err = vfsub_unlink(h_dir, wbr->wbr_whbase, &vargs);
+		err = au_br_want_write(a->br);
+		if (!err) {
+			vfsub_args_init(&vargs, &ign, /*dlgt*/0, 0);
+			vfsub_ign_hinode(&vargs, IN_DELETE, au_hi(dir, bindex));
+			err = vfsub_unlink(h_dir, wbr->wbr_whbase, &vargs);
+			au_br_drop_write(a->br);
+		}
 	} else {
 		AuWarn("%.*s is moved, ignored\n", AuDLNPair(wbr->wbr_whbase));
 		err = 0;
@@ -624,8 +657,7 @@ static void reinit_br_wh(void *arg)
 	dput(wbr->wbr_whbase);
 	wbr->wbr_whbase = NULL;
 	if (!err)
-		err = au_wh_init(h_root, a->br, au_do_nfsmnt(a->br->br_mnt),
-				 a->sb, bindex);
+		err = au_wh_init(h_root, a->br, a->br->br_mnt, a->sb, bindex);
 	wbr_wh_write_unlock(wbr);
 	mutex_unlock(&h_dir->i_mutex);
 	dput(h_root);
@@ -1078,9 +1110,14 @@ static void call_rmdir_whtmp(void *args)
 	h_parent = dget_parent(a->wh_dentry);
 	h_dir = h_parent->d_inode;
 	mutex_lock_nested(&h_dir->i_mutex, AuLsc_I_PARENT);
-	if (!au_verify_parent(a->wh_dentry, h_dir))
-		err = au_whtmp_rmdir(a->dir, a->bindex, a->wh_dentry,
-				     &a->whlist);
+	if (!au_verify_parent(a->wh_dentry, h_dir)) {
+		err = au_br_want_write(au_sbr(sb, a->bindex));
+		if (!err) {
+			err = au_whtmp_rmdir(a->dir, a->bindex, a->wh_dentry,
+					     &a->whlist);
+			au_br_drop_write(au_sbr(sb, a->bindex));
+		}
+	}
 	mutex_unlock(&h_dir->i_mutex);
 	dput(h_parent);
 	ii_write_unlock(a->dir);

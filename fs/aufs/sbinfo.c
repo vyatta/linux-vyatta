@@ -19,7 +19,7 @@
 /*
  * superblock private data
  *
- * $Id: sbinfo.c,v 1.11 2008/07/27 22:49:36 sfjro Exp $
+ * $Id: sbinfo.c,v 1.13 2008/10/06 00:30:32 sfjro Exp $
  */
 
 #include <linux/smp_lock.h>
@@ -36,7 +36,7 @@ void au_si_free(struct kobject *kobj)
 	LKTRTrace("kobj %p\n", kobj);
 	sbinfo = container_of(kobj, struct au_sbinfo, si_kobj);
 	LKTRTrace("sbinfo %p\n", sbinfo);
-	AuDebugOn(!list_empty(&sbinfo->si_plink));
+	AuDebugOn(!list_empty(&sbinfo->si_plink.head));
 
 	sb = sbinfo->si_sb;
 	si_write_lock(sb);
@@ -44,7 +44,9 @@ void au_si_free(struct kobject *kobj)
 	au_br_free(sbinfo);
 	kfree(sbinfo->si_branch);
 	au_export_put(sbinfo);
+	mutex_destroy(&sbinfo->si_xib_mtx);
 	si_write_unlock(sb);
+	au_rwsem_destroy(&sbinfo->si_rwsem);
 
 	kfree(sbinfo);
 }
@@ -70,6 +72,7 @@ int au_si_alloc(struct super_block *sb)
 		goto out_br;
 
 	au_rw_init_wlock(&sbinfo->si_rwsem);
+	//au_dbg_lock_sbi_reg(sb);
 	sbinfo->si_generation = 0;
 	sbinfo->au_si_status = 0;
 	sbinfo->si_bend = -1;
@@ -95,8 +98,7 @@ int au_si_alloc(struct super_block *sb)
 	sbinfo->si_rdcache = AUFS_RDCACHE_DEF * HZ;
 	sbinfo->si_dirwh = AUFS_DIRWH_DEF;
 
-	spin_lock_init(&sbinfo->si_plink_lock);
-	INIT_LIST_HEAD(&sbinfo->si_plink);
+	au_spl_init(&sbinfo->si_plink);
 
 	au_robr_lvma_init(sbinfo);
 

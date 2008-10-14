@@ -19,7 +19,7 @@
 /*
  * mount options/flags
  *
- * $Id: opts.c,v 1.15 2008/09/01 02:55:31 sfjro Exp $
+ * $Id: opts.c,v 1.16 2008/10/06 00:29:48 sfjro Exp $
  */
 
 #include <linux/types.h> /* a distribution requires */
@@ -1386,8 +1386,8 @@ static int verify_opts(struct super_block *sb, unsigned int pending,
 		mutex_lock_nested(&h_dir->i_mutex, AuLsc_I_PARENT);
 		if (wbr)
 			wbr_wh_write_lock(wbr);
-		err = au_wh_init(au_h_dptr(root, bindex), br,
-				 au_nfsmnt(sb, bindex), sb, bindex);
+		err = au_wh_init(au_h_dptr(root, bindex), br, br->br_mnt, sb,
+				 bindex);
 		if (wbr)
 			wbr_wh_write_unlock(wbr);
 		mutex_unlock(&h_dir->i_mutex);

@@ -19,7 +19,7 @@
 /*
  * mount and super_block operations
  *
- * $Id: super.c,v 1.15 2008/09/01 02:54:41 sfjro Exp $
+ * $Id: super.c,v 1.19 2008/10/13 03:09:56 sfjro Exp $
  */
 
 #include <linux/module.h>
@@ -51,7 +51,27 @@ static struct inode *aufs_alloc_inode(struct super_block *sb)
 
 static void aufs_destroy_inode(struct inode *inode)
 {
+	int err;
+
 	LKTRTrace("i%lu\n", inode->i_ino);
+
+	if (!inode->i_nlink || IS_DEADDIR(inode)) {
+		struct super_block *sb = inode->i_sb;
+		const int do_lock = !au_test_nowait_wkq(current);
+
+		/* in nowait task, sbi is write-locked */
+		if (do_lock) {
+			si_noflush_read_lock(sb);
+			err = au_xigen_inc(inode);
+			si_read_unlock(sb);
+		} else {
+			SiMustWriteLock(sb);
+			err = au_xigen_inc(inode);
+		}
+		if (unlikely(err))
+			AuWarn1("failed resetting i_generation, %d\n", err);
+	}
+
 	au_iinfo_fin(inode);
 	au_cache_free_icntnr(container_of(inode, struct aufs_icntnr,
 					  vfs_inode));
@@ -73,7 +93,9 @@ struct inode *au_iget_locked(struct super_block *sb, ino_t ino)
 	if (unlikely(!(inode->i_state & I_NEW)))
 		goto out;
 
-	err = au_iinfo_init(inode);
+	err = au_xigen_new(inode);
+	if (!err)
+		err = au_iinfo_init(inode);
 	if (!err)
 		inode->i_version++;
 	else {
@@ -88,26 +110,29 @@ struct inode *au_iget_locked(struct super_block *sb, ino_t ino)
 	return inode;
 }
 
+/* lock free root dinfo */
 static int au_show_brs(struct seq_file *seq, struct super_block *sb)
 {
 	int err;
 	aufs_bindex_t bindex, bend;
-	struct dentry *root;
 	struct path path;
+	struct au_hdentry *hd;
 
 	AuTraceEnter();
 
 	err = 0;
-	root = sb->s_root;
 	bend = au_sbend(sb);
+	/* todo: via h_sb */
+	hd = au_di(sb->s_root)->di_hdentry;
 	for (bindex = 0; !err && bindex <= bend; bindex++) {
 		path.mnt = au_sbr_mnt(sb, bindex);
-		path.dentry = au_h_dptr(root, bindex);
+		path.dentry = hd[bindex].hd_dentry;
 		err = seq_path(seq, &path, au_esc_chars);
-		if (err > 0)
-			err = seq_printf
-				(seq, "=%s",
-				 au_optstr_br_perm(au_sbr_perm(sb, bindex)));
+		if (err > 0) {
+			const char *p = au_optstr_br_perm(au_sbr_perm(sb,
+								      bindex));
+			err = seq_printf(seq, "=%s", p);
+		}
 		if (!err && bindex != bend)
 			err = seq_putc(seq, ':');
 	}
@@ -156,21 +181,17 @@ static void au_show_wbr_create(struct seq_file *m, int v,
 static int aufs_show_options(struct seq_file *m, struct vfsmount *mnt)
 {
 	int err, n;
-	struct super_block *sb;
-	struct au_sbinfo *sbinfo;
-	struct dentry *root;
-	struct file *xino;
 	unsigned int mnt_flags, v;
 	struct path path;
+	struct super_block *sb;
+	struct au_sbinfo *sbinfo;
+	struct file *xino;
 
 	AuTraceEnter();
 
 	sb = mnt->mnt_sb;
-	root = sb->s_root;
-	if (!sysaufs_brs)
-		aufs_read_lock(root, !AuLock_IR);
-	else
-		si_noflush_read_lock(sb);
+	/* lock free root dinfo */
+	si_noflush_read_lock(sb);
 	sbinfo = au_sbi(sb);
 	seq_printf(m, ",si=%lx", au_si_mask ^ (unsigned long)sbinfo);
 	mnt_flags = au_mntflags(sb);
@@ -249,9 +270,8 @@ static int aufs_show_options(struct seq_file *m, struct vfsmount *mnt)
 	if (!sysaufs_brs) {
 		seq_puts(m, "," AuStr_BrOpt);
 		au_show_brs(m, sb);
-		aufs_read_unlock(root, !AuLock_IR);
-	} else
-		si_read_unlock(sb);
+	}
+	si_read_unlock(sb);
 	return 0;
 
 #undef AuBool
@@ -263,13 +283,16 @@ static int aufs_show_options(struct seq_file *m, struct vfsmount *mnt)
 static int aufs_statfs(struct dentry *dentry, struct kstatfs *buf)
 {
 	int err;
+	struct super_block *sb;
 
 	AuTraceEnter();
 
-	aufs_read_lock(dentry->d_sb->s_root, 0);
-	err = vfsub_statfs(au_h_dptr(dentry->d_sb->s_root, 0), buf,
-			   !!au_test_dlgt(au_mntflags(dentry->d_sb)));
-	aufs_read_unlock(dentry->d_sb->s_root, 0);
+	/* lock free root dinfo */
+	sb = dentry->d_sb;
+	si_noflush_read_lock(sb);
+	err = vfsub_statfs(au_sbr_sb(sb, 0)->s_root, buf,
+			   !!au_test_dlgt(au_mntflags(sb)));
+	si_read_unlock(sb);
 	if (!err) {
 		buf->f_type = AUFS_SUPER_MAGIC;
 		buf->f_namelen -= AUFS_WH_PFX_LEN;
@@ -747,11 +770,12 @@ static int aufs_fill_super(struct super_block *sb, void *raw_data, int silent)
 	if (unlikely(err))
 		goto out_opts;
 	SiMustWriteLock(sb);
+
 	/* all timestamps always follow the ones on the branch */
 	sb->s_flags |= MS_NOATIME | MS_NODIRATIME;
 	sb->s_op = &aufs_sop;
 	sb->s_magic = AUFS_SUPER_MAGIC;
-	au_init_export_op(sb);
+	au_export_init(sb);
 
 	err = alloc_root(sb);
 	if (unlikely(err)) {

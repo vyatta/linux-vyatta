@@ -19,7 +19,7 @@
 /*
  * magic sysrq hanlder
  *
- * $Id: sysrq.c,v 1.10 2008/09/08 02:40:48 sfjro Exp $
+ * $Id: sysrq.c,v 1.11 2008/09/29 03:45:10 sfjro Exp $
  */
 
 #include <linux/fs.h>
@@ -28,16 +28,127 @@
 /* #include <linux/sysrq.h> */
 #include "aufs.h"
 
+#ifdef CONFIG_AUFS_DEBUG_LOCK
+struct au_dbg_lock_di {
+	struct list_head list;
+	struct dentry *dentry;
+	pid_t pid;
+};
+
+static void au_dbg_di_reg(struct au_splhead *spl, struct dentry *d,
+			     int flags, unsigned int lsc)
+{
+	struct au_dbg_lock_di *p = kmalloc(sizeof(*p), GFP_NOFS);
+
+	if (p) {
+		p->dentry = d;
+		p->pid = current->pid;
+		spin_lock(&spl->spin);
+		list_add(&p->list, &spl->head);
+		spin_unlock(&spl->spin);
+	}
+	WARN_ON(!p);
+}
+
+static void au_dbg_di_unreg(struct au_splhead *spl, struct dentry *d, int flags)
+{
+	struct au_dbg_lock_di *p, *tmp, *found;
+
+	found = NULL;
+	spin_lock(&spl->spin);
+	list_for_each_entry_safe(p, tmp, &spl->head, list)
+		if (p->dentry == d && p->pid == current->pid) {
+			list_del(&p->list);
+			found = p;
+			break;
+		}
+	spin_unlock(&spl->spin);
+	kfree(found);
+	WARN_ON(!found);
+}
+
+void au_dbg_locking_di_reg(struct dentry *d, int flags, unsigned int lsc)
+{
+	au_dbg_di_reg(au_sbi(d->d_sb)->si_dbg_lock + AuDbgLock_DI_LOCKING,
+		      d, flags, lsc);
+}
+
+void au_dbg_locking_di_unreg(struct dentry *d, int flags)
+{
+	au_dbg_di_unreg(au_sbi(d->d_sb)->si_dbg_lock + AuDbgLock_DI_LOCKING,
+			d, flags);
+}
+
+void au_dbg_locked_di_reg(struct dentry *d, int flags, unsigned int lsc)
+{
+	au_dbg_di_reg(au_sbi(d->d_sb)->si_dbg_lock + AuDbgLock_DI_LOCKED,
+		      d, flags, lsc);
+}
+
+void au_dbg_locked_di_unreg(struct dentry *d, int flags)
+{
+	au_dbg_di_unreg(au_sbi(d->d_sb)->si_dbg_lock + AuDbgLock_DI_LOCKED,
+			d, flags);
+}
+
+struct au_dbg_lock_ii {
+	struct list_head list;
+	struct inode *inode;
+	pid_t pid;
+};
+
+void au_dbg_lock_ii_reg(struct inode *i, unsigned int lsc)
+{
+#if 0
+	struct au_dbg_lock_ii *p = kmalloc(sizeof(*p), GFP_NOFS);
+	struct au_splhead *spl = au_sbi(i->i_sb)->si_dbg_lock + AuDbgLock_II;
+
+	if (p) {
+		p->inode = i;
+		p->pid = current->pid;
+		spin_lock(&spl->spin);
+		list_add(&p->list, &spl->head);
+		spin_unlock(&spl->spin);
+	}
+	WARN_ON(!p);
+#endif
+}
+
+void au_dbg_lock_ii_unreg(struct inode *i)
+{
+#if 0
+	struct au_splhead *spl = au_sbi(i->i_sb)->si_dbg_lock + AuDbgLock_II;
+	struct au_dbg_lock_ii *p, *tmp, *found;
+
+	found = NULL;
+	spin_lock(&spl->spin);
+	list_for_each_entry_safe(p, tmp, &spl->head, list)
+		if (p->inode == i && p->pid == current->pid) {
+			list_del(&p->list);
+			found = p;
+			break;
+		}
+	spin_unlock(&spl->spin);
+	kfree(found);
+	WARN_ON(!found);
+#endif
+}
+#endif /* CONFIG_AUFS_DEBUG_LOCK */
+
+/* ---------------------------------------------------------------------- */
+
 static void sysrq_sb(struct super_block *sb)
 {
 	char *plevel;
 	struct inode *i;
+	struct au_sbinfo *sbinfo;
 
 	plevel = au_plevel;
 	au_plevel = KERN_WARNING;
 	au_debug_on();
 
-	pr_warning("si=%lx\n", au_si_mask ^ (unsigned long)au_sbi(sb));
+	sbinfo = au_sbi(sb);
+	pr_warning("si=%lx\n", au_si_mask ^ (unsigned long)sbinfo);
 	pr_warning(AUFS_NAME ": superblock\n");
 	au_dpri_sb(sb);
 	pr_warning(AUFS_NAME ": root dentry\n");
@@ -48,6 +159,33 @@ static void sysrq_sb(struct super_block *sb)
 	list_for_each_entry(i, &sb->s_inodes, i_sb_list)
 		if (list_empty(&i->i_dentry))
 			au_dpri_inode(i);
+
+#ifdef CONFIG_AUFS_DEBUG_LOCK
+	{
+		struct au_dbg_lock_di *ldi;
+		struct au_dbg_lock_ii *lii;
+		struct list_head *head;
+
+		pr_warning(AUFS_NAME ": locking di\n");
+		head = &sbinfo->si_dbg_lock[AuDbgLock_DI_LOCKING].head;
+		list_for_each_entry(ldi, head, list) {
+			pr_warning("pid: %d\n", ldi->pid);
+			au_dpri_dentry(ldi->dentry);
+		}
+		pr_warning(AUFS_NAME ": locked di\n");
+		head = &sbinfo->si_dbg_lock[AuDbgLock_DI_LOCKED].head;
+		list_for_each_entry(ldi, head, list) {
+			pr_warning("pid: %d\n", ldi->pid);
+			au_dpri_dentry(ldi->dentry);
+		}
+		pr_warning(AUFS_NAME ": locked ii\n");
+		head = &sbinfo->si_dbg_lock[AuDbgLock_II].head;
+		list_for_each_entry(lii, head, list) {
+			pr_warning("pid: %d\n", lii->pid);
+			au_dpri_inode(lii->inode);
+		}
+	}
+#endif
 
 	au_plevel = plevel;
 	au_debug_off();

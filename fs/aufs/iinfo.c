@@ -19,7 +19,7 @@
 /*
  * inode private data
  *
- * $Id: iinfo.c,v 1.7 2008/08/25 01:51:04 sfjro Exp $
+ * $Id: iinfo.c,v 1.10 2008/10/13 03:09:48 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -42,8 +42,14 @@ struct inode *au_h_iptr(struct inode *inode, aufs_bindex_t bindex)
 {
 	struct inode *hidden_inode;
 
-	IiMustAnyLock(inode);
-	AuDebugOn(bindex < 0 || au_ibend(inode) < bindex);
+	/* lock free root dinfo/inode */
+	if (inode->i_ino != AUFS_ROOT_INO) {
+		IiMustAnyLock(inode);
+		AuDebugOn(bindex < 0 || au_ibend(inode) < bindex);
+	} else {
+		SiMustAnyLock(inode->i_sb);
+		AuDebugOn(bindex < 0 || au_sbend(inode->i_sb) < bindex);
+	}
 	hidden_inode = au_ii(inode)->ii_hinode[0 + bindex].hi_inode;
 	AuDebugOn(hidden_inode && atomic_read(&hidden_inode->i_count) <= 0);
 	return hidden_inode;
@@ -213,6 +219,7 @@ int au_iinfo_init(struct inode *inode)
 		iinfo->ii_bstart = -1;
 		iinfo->ii_bend = -1;
 		iinfo->ii_vdir = NULL;
+		iinfo->ii_nfsd_readdir = NULL;
 		return 0;
 	}
 	return -ENOMEM;
@@ -225,7 +232,7 @@ static int au_iinfo_write0(struct super_block *sb, struct au_hinode *hinode,
 	aufs_bindex_t bindex;
 
 	err = 0;
-	locked = si_read_trylock(sb, !AuLock_FLUSH); /* crucio! */
+	locked = si_noflush_read_trylock(sb); /* crucio! */
 	bindex = au_br_index(sb, hinode->hi_id);
 	if (bindex >= 0)
 		err = au_xino_write0(sb, bindex, hinode->hi_inode->i_ino, ino);
@@ -251,6 +258,8 @@ void au_iinfo_fin(struct inode *inode)
 
 	if (unlikely(iinfo->ii_vdir))
 		au_vdir_free(iinfo->ii_vdir);
+	if (unlikely(iinfo->ii_nfsd_readdir))
+		au_nfsd_readdir_free(inode);
 
 	if (iinfo->ii_bstart >= 0) {
 		sb = inode->i_sb;
@@ -274,4 +283,5 @@ void au_iinfo_fin(struct inode *inode)
 	}
 
 	kfree(iinfo->ii_hinode);
+	au_rwsem_destroy(&iinfo->ii_rwsem);
 }

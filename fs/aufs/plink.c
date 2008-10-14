@@ -19,7 +19,7 @@
 /*
  * pseudo-link
  *
- * $Id: plink.c,v 1.9 2008/09/01 02:55:35 sfjro Exp $
+ * $Id: plink.c,v 1.11 2008/10/13 03:09:51 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -41,11 +41,11 @@ void au_plink_list(struct super_block *sb)
 	sbinfo = au_sbi(sb);
 	AuDebugOn(!au_opt_test(au_mntflags(sb), PLINK));
 
-	plink_list = &sbinfo->si_plink;
-	spin_lock(&sbinfo->si_plink_lock);
+	plink_list = &sbinfo->si_plink.head;
+	spin_lock(&sbinfo->si_plink.spin);
 	list_for_each_entry(plink, plink_list, list)
 		AuDbg("%lu\n", plink->inode->i_ino);
-	spin_unlock(&sbinfo->si_plink_lock);
+	spin_unlock(&sbinfo->si_plink.spin);
 }
 #endif
 
@@ -62,14 +62,14 @@ int au_plink_test(struct super_block *sb, struct inode *inode)
 	AuDebugOn(!au_opt_test(au_mntflags(sb), PLINK));
 
 	found = 0;
-	plink_list = &sbinfo->si_plink;
-	spin_lock(&sbinfo->si_plink_lock);
+	plink_list = &sbinfo->si_plink.head;
+	spin_lock(&sbinfo->si_plink.spin);
 	list_for_each_entry(plink, plink_list, list)
 		if (plink->inode == inode) {
 			found = 1;
 			break;
 		}
-	spin_unlock(&sbinfo->si_plink_lock);
+	spin_unlock(&sbinfo->si_plink.spin);
 	return found;
 }
 
@@ -230,6 +230,16 @@ static int whplink(struct dentry *h_dentry, struct inode *inode,
 	return err;
 }
 
+static void do_put_plink(struct pseudo_link *plink, int do_del)
+{
+	AuTraceEnter();
+
+	iput(plink->inode);
+	if (do_del)
+		list_del(&plink->list);
+	kfree(plink);
+}
+
 void au_plink_append(struct super_block *sb, struct inode *inode,
 		     struct dentry *h_dentry, aufs_bindex_t bindex)
 {
@@ -245,8 +255,8 @@ void au_plink_append(struct super_block *sb, struct inode *inode,
 
 	cnt = 0;
 	found = 0;
-	plink_list = &sbinfo->si_plink;
-	spin_lock(&sbinfo->si_plink_lock);
+	plink_list = &sbinfo->si_plink.head;
+	spin_lock(&sbinfo->si_plink.spin);
 	list_for_each_entry(plink, plink_list, list) {
 		cnt++;
 		if (plink->inode == inode) {
@@ -256,6 +266,7 @@ void au_plink_append(struct super_block *sb, struct inode *inode,
 	}
 
 	err = 0;
+	plink = NULL;
 	if (!found) {
 		plink = kmalloc(sizeof(*plink), GFP_ATOMIC);
 		if (plink) {
@@ -265,7 +276,7 @@ void au_plink_append(struct super_block *sb, struct inode *inode,
 		} else
 			err = -ENOMEM;
 	}
-	spin_unlock(&sbinfo->si_plink_lock);
+	spin_unlock(&sbinfo->si_plink.spin);
 
 #if 0 /* todo: test here */
 	if (found)
@@ -277,18 +288,11 @@ void au_plink_append(struct super_block *sb, struct inode *inode,
 
 	if (unlikely(cnt > AUFS_PLINK_WARN))
 		AuWarn1("unexpectedly many pseudo links, %d\n", cnt);
-	if (unlikely(err))
+	if (unlikely(err)) {
 		AuWarn("err %d, damaged pseudo link. ignored.\n", err);
-}
-
-static void do_put_plink(struct pseudo_link *plink, int do_del)
-{
-	AuTraceEnter();
-
-	iput(plink->inode);
-	if (do_del)
-		list_del(&plink->list);
-	kfree(plink);
+		if (!found && plink)
+			do_put_plink(plink, /*do_del*/1);
+	}
 }
 
 void au_plink_put(struct super_block *sb)
@@ -302,12 +306,12 @@ void au_plink_put(struct super_block *sb)
 	sbinfo = au_sbi(sb);
 	AuDebugOn(!au_opt_test(au_mntflags(sb), PLINK));
 
-	plink_list = &sbinfo->si_plink;
-	/* spin_lock(&sbinfo->si_plink_lock); */
+	plink_list = &sbinfo->si_plink.head;
+	/* spin_lock(&sbinfo->si_plink.spin); */
 	list_for_each_entry_safe(plink, tmp, plink_list, list)
 		do_put_plink(plink, 0);
 	INIT_LIST_HEAD(plink_list);
-	/* spin_unlock(&sbinfo->si_plink_lock); */
+	/* spin_unlock(&sbinfo->si_plink.head); */
 }
 
 void au_plink_half_refresh(struct super_block *sb, aufs_bindex_t br_id)
@@ -324,8 +328,8 @@ void au_plink_half_refresh(struct super_block *sb, aufs_bindex_t br_id)
 	sbinfo = au_sbi(sb);
 	AuDebugOn(!au_opt_test(au_mntflags(sb), PLINK));
 
-	plink_list = &sbinfo->si_plink;
-	/* spin_lock(&sbinfo->si_plink_lock); */
+	plink_list = &sbinfo->si_plink.head;
+	/* spin_lock(&sbinfo->si_plink.spin); */
 	list_for_each_entry_safe(plink, tmp, plink_list, list) {
 		do_put = 0;
 		inode = au_igrab(plink->inode);
@@ -356,5 +360,5 @@ void au_plink_half_refresh(struct super_block *sb, aufs_bindex_t br_id)
 		ii_write_unlock(inode);
 		iput(inode);
 	}
-	/* spin_unlock(&sbinfo->si_plink_lock); */
+	/* spin_unlock(&sbinfo->si_plink.spin); */
 }

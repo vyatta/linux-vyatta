@@ -19,7 +19,7 @@
 /*
  * debug print functions
  *
- * $Id: debug.c,v 1.13 2008/09/08 02:40:48 sfjro Exp $
+ * $Id: debug.c,v 1.16 2008/10/06 00:30:02 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -138,7 +138,7 @@ static int do_pri_dentry(aufs_bindex_t bindex, struct dentry *dentry,
 		return -1;
 	}
 	/* do not call dget_parent() here */
-	dpri("d%d: %.*s/%.*s, %s, cnt %d, flags 0x%x, intent %d\n",
+	dpri("d%d: %.*s?/%.*s, %s, cnt %d, flags 0x%x, intent %d\n",
 	     bindex,
 	     AuDLNPair(dentry->d_parent), AuDLNPair(dentry),
 	     dentry->d_sb ? au_sbtype(dentry->d_sb) : "??",
@@ -297,6 +297,12 @@ void au_dbg_sleep(int sec)
 	wait_event_timeout(wq, 0, sec * HZ);
 }
 
+void au_dbg_sleep_jiffy(int jiffy)
+{
+	static DECLARE_WAIT_QUEUE_HEAD(wq);
+	wait_event_timeout(wq, 0, jiffy);
+}
+
 void au_dbg_iattr(struct iattr *ia)
 {
 #define AuBit(name)	if (ia->ia_valid & ATTR_ ## name) dpri(#name "\n")
@@ -342,6 +348,14 @@ void au_debug_sbinfo_init(struct au_sbinfo *sbinfo)
 #endif
 #ifdef ForceShwh
 	au_opt_set(sbinfo->si_mntflags, SHWH);
+#endif
+
+#ifdef CONFIG_AUFS_DEBUG_LOCK
+	{
+		int i;
+		for (i = 0; i < AuDbgLock_Last; i++)
+			au_spl_init(sbinfo->si_dbg_lock + i);
+	}
 #endif
 }
 
@@ -443,7 +457,7 @@ int __init au_debug_init(void)
 			"xlast %d, xnext %d, "
 			"rdcache %d, "
 			"dirwh %d, "
-			"pl_lock %d, pl %d, "
+			"pl %d, "
 			"mnt %d, "
 			"sys %d, "
 			/* "lvma_l %d, lvma %d" */
@@ -471,7 +485,6 @@ int __init au_debug_init(void)
 			offsetof(typeof(*u.si), si_xib_next_bit),
 			offsetof(typeof(*u.si), si_rdcache),
 			offsetof(typeof(*u.si), si_dirwh),
-			offsetof(typeof(*u.si), si_plink_lock),
 			offsetof(typeof(*u.si), si_plink),
 			offsetof(typeof(*u.si), si_mnt),
 			offsetof(typeof(*u.si), si_sa),

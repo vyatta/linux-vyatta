@@ -19,7 +19,7 @@
 /*
  * inode operations (del entry)
  *
- * $Id: i_op_del.c,v 1.11 2008/08/25 01:50:19 sfjro Exp $
+ * $Id: i_op_del.c,v 1.14 2008/10/06 00:29:57 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -176,13 +176,13 @@ static struct dentry *
 lock_hdir_create_wh(struct dentry *dentry, int isdir, aufs_bindex_t *rbcpup,
 		    struct au_dtime *dt, struct au_pin *pin)
 {
-	struct dentry *wh_dentry;
-	int err, need_wh;
-	struct dentry *h_parent;
-	struct au_ndx ndx;
+	struct dentry *wh_dentry, *h_parent;
 	struct super_block *sb;
-	aufs_bindex_t bcpup;
+	int err, need_wh;
 	unsigned int mnt_flags;
+	unsigned char pin_flags;
+	aufs_bindex_t bcpup;
+	struct au_ndx ndx;
 
 	LKTRTrace("%.*s, isdir %d\n", AuDLNPair(dentry), isdir);
 
@@ -195,12 +195,14 @@ lock_hdir_create_wh(struct dentry *dentry, int isdir, aufs_bindex_t *rbcpup,
 	sb = dentry->d_sb;
 	mnt_flags = au_mntflags(sb);
 	bcpup = *rbcpup;
-	err = au_pin(pin, dentry, bcpup, /*di_locked*/1,
-		     /*do_gp*/au_opt_test(mnt_flags, UDBA_INOTIFY));
+	pin_flags = AuPin_DI_LOCKED | AuPin_MNT_WRITE;
+	if (unlikely(au_opt_test(mnt_flags, UDBA_INOTIFY)))
+		au_fset_pin(pin_flags, DO_GPARENT);
+	err = au_pin(pin, dentry, bcpup, pin_flags);
 	wh_dentry = ERR_PTR(err);
 	if (unlikely(err))
 		goto out;
-	h_parent = au_pinned_h_parent(pin, bcpup);
+	h_parent = au_pinned_h_parent(pin);
 	if (!au_opt_test(mnt_flags, UDBA_NONE) && au_dbstart(dentry) == bcpup) {
 		ndx.nfsmnt = au_nfsmnt(sb, bcpup);
 		ndx.flags = 0;
@@ -215,8 +217,8 @@ lock_hdir_create_wh(struct dentry *dentry, int isdir, aufs_bindex_t *rbcpup,
 			goto out_unpin;
 	}
 
-	au_dtime_store(dt, au_pinned_parent(pin), h_parent,
-		       au_pinned_hdir(pin, bcpup), au_pinned_hgdir(pin, bcpup));
+	au_dtime_store(dt, au_pinned_parent(pin), h_parent, au_pinned_hdir(pin),
+		       au_pinned_hgdir(pin));
 	wh_dentry = NULL;
 	if (!need_wh)
 		goto out; /* success, no need to create whiteout */
@@ -378,8 +380,7 @@ int aufs_unlink(struct inode *dir, struct dentry *dentry)
 
 	if (bindex == bstart) {
 		vfsub_args_init(&vargs, &ign, dlgt, 0);
-		vfsub_ign_hinode(&vargs, IN_DELETE, au_pinned_hdir(&pin,
-								   bstart));
+		vfsub_ign_hinode(&vargs, IN_DELETE, au_pinned_hdir(&pin));
 		h_dir = au_pinned_h_dir(&pin);
 		err = vfsub_unlink(h_dir, h_dentry, &vargs);
 	} else {
@@ -395,6 +396,7 @@ int aufs_unlink(struct inode *dir, struct dentry *dentry)
 		drop_nlink(inode);
 #if 0 /* todo: update plink? */
 		if (unlikely(!inode->i_nlink
+			     && au_opt_test(p->a.mnt_flags, PLINK)
 			     && au_plink_test(sb, inode)
 			     /* && atomic_read(&inode->i_count) == 2) */)) {
 			au_debug_on();
@@ -402,6 +404,12 @@ int aufs_unlink(struct inode *dir, struct dentry *dentry)
 			au_debug_off();
 		}
 #endif
+		/*
+		 * although this is not a dir,
+		 * set it here since we need to detect the dead inode.
+		 */
+		if (!inode->i_nlink)
+			inode->i_flags |= S_DEAD;
 		epilog(dir, dentry, bindex);
 
 		/* update target timestamps */
@@ -511,6 +519,7 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 			     && rmdir_later))
 			au_reset_hinotify(inode, /*flags*/0);
 		clear_nlink(inode);
+		inode->i_flags |= S_DEAD;
 		au_set_dbdiropq(dentry, -1);
 		epilog(dir, dentry, bindex);
 

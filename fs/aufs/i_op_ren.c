@@ -20,7 +20,7 @@
  * inode operation (rename entry)
  * todo: this is crazy monster
  *
- * $Id: i_op_ren.c,v 1.12 2008/09/01 02:55:15 sfjro Exp $
+ * $Id: i_op_ren.c,v 1.16 2008/10/06 00:30:21 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -34,6 +34,7 @@ enum { SRC, DST };
 #define AuRen_DLGT	(1 << 4)
 #define AuRen_VFSLOCK	(1 << 5)
 #define AuRen_PINNED	(1 << 6)
+#define AuRen_MNT_WRITE	(1 << 7)
 #define au_ftest_ren(flags, name)	((flags) & AuRen_##name)
 #define au_fset_ren(flags, name)	{ (flags) |= AuRen_##name; }
 #define au_fclr_ren(flags, name)	{ (flags) &= ~AuRen_##name; }
@@ -61,7 +62,11 @@ struct au_ren_args {
 	struct au_ndx ndx;
 
 	/* do_rename() only */
+#ifdef CONFIG_AUFS_BR_NFS
+	struct au_hin_ignore ign[3];
+#else
 	struct au_hin_ignore ign[2];
+#endif
 	struct vfsub_args vargs;
 	struct au_whtmp_rmdir_args *thargs;
 	struct dentry *wh_dentry[2], *h_dst, *h_src;
@@ -107,10 +112,9 @@ void au_ren_rev_rename(int err, struct au_ren_args *a)
 
 	AuDebugOn(h_d->d_inode);
 	vfsub_args_reinit(&a->vargs);
-	vfsub_ign_hinode(&a->vargs, IN_MOVED_FROM, au_pinned_hdir(a->pin + DST,
-								  a->btgt));
-	vfsub_ign_hinode(&a->vargs, IN_MOVED_TO, au_pinned_hdir(a->pin + SRC,
-								a->btgt));
+	vfsub_ign_hinode(&a->vargs, IN_MOVED_FROM,
+			 au_pinned_hdir(a->pin + DST));
+	vfsub_ign_hinode(&a->vargs, IN_MOVED_TO, au_pinned_hdir(a->pin + SRC));
 	rerr = vfsub_rename(au_pinned_h_dir(a->pin + DST),
 			    au_h_dptr(a->src_dentry, a->btgt),
 			    au_pinned_h_dir(a->pin + SRC), h_d, &a->vargs);
@@ -127,8 +131,7 @@ void au_ren_rev_cpup(int err, struct au_ren_args *a)
 	int rerr;
 
 	vfsub_args_reinit(&a->vargs);
-	vfsub_ign_hinode(&a->vargs, IN_DELETE, au_pinned_hdir(a->pin + DST,
-							      a->btgt));
+	vfsub_ign_hinode(&a->vargs, IN_DELETE, au_pinned_hdir(a->pin + DST));
 	rerr = vfsub_unlink(au_pinned_h_dir(a->pin + DST), a->h_dentry[DST],
 			    &a->vargs);
 	au_set_h_dptr(a->src_dentry, a->btgt, NULL);
@@ -163,7 +166,7 @@ void au_ren_rev_whtmp(int err, struct au_ren_args *a)
 	mutex_unlock(h_mtx);
 	vfsub_args_reinit(&a->vargs);
 	vfsub_ign_hinode(&a->vargs, IN_MOVED_TO | IN_MOVED_FROM,
-			 au_pinned_hdir(a->pin + DST, a->btgt));
+			 au_pinned_hdir(a->pin + DST));
 	rerr = vfsub_rename(au_pinned_h_dir(a->pin + DST), a->h_dst,
 			    au_pinned_h_dir(a->pin + DST), h_d, &a->vargs);
 	d_drop(h_d);
@@ -180,7 +183,7 @@ void au_ren_rev_whsrc(int err, struct au_ren_args *a)
 {
 	int rerr;
 
-	rerr = au_wh_unlink_dentry(au_pinned_hdir(a->pin + SRC, a->btgt),
+	rerr = au_wh_unlink_dentry(au_pinned_hdir(a->pin + SRC),
 				   a->wh_dentry[SRC], a->src_dentry, /*dlgt*/0);
 	if (rerr)
 		RevertFailure("unlink %.*s", AuDLNPair(a->wh_dentry[SRC]));
@@ -200,9 +203,16 @@ int au_ren_or_cpup(struct au_ren_args *a)
 		if (a->need_diropq && au_dbdiropq(a->src_dentry) == a->btgt)
 			a->need_diropq = 0;
 		vfsub_ign_hinode(&a->vargs, IN_MOVED_FROM,
-				 au_pinned_hdir(a->pin + SRC, a->btgt));
+				 au_pinned_hdir(a->pin + SRC));
 		vfsub_ign_hinode(&a->vargs, IN_MOVED_TO,
-				 au_pinned_hdir(a->pin + DST, a->btgt));
+				 au_pinned_hdir(a->pin + DST));
+		/* nfs_rename() calls d_delete() */
+		if (au_test_nfs(au_pinned_h_dir(a->pin + DST)->i_sb)
+		    && a->h_dentry[DST]->d_inode
+		    && (S_ISDIR(a->h_dentry[DST]->d_inode->i_mode)
+			|| atomic_read(&a->h_dentry[DST]->d_count) <= 2))
+			vfsub_ign_hinode(&a->vargs, IN_DELETE,
+					 au_pinned_hdir(a->pin + DST));
 		AuDebugOn(au_dbstart(a->src_dentry) != a->btgt);
 		err = vfsub_rename(au_pinned_h_dir(a->pin + SRC),
 				   au_h_dptr(a->src_dentry, a->btgt),
@@ -388,7 +398,7 @@ int do_rename(struct au_ren_args *a)
 
 	/* remove whiteout for dentry */
 	if (a->wh_dentry[DST]) {
-		err = au_wh_unlink_dentry(au_pinned_hdir(a->pin + DST, a->btgt),
+		err = au_wh_unlink_dentry(au_pinned_hdir(a->pin + DST),
 					  a->wh_dentry[DST], a->dentry,
 					  /*dlgt*/0);
 		if (unlikely(err))
@@ -609,14 +619,17 @@ static int au_may_ren(struct au_ren_args *a)
  *     of them failed, unlock all and return -EBUSY.
  */
 static void au_ren_pin_init(struct au_pin *first, struct dentry *d1,
-			    struct au_pin *next, struct dentry *d2)
+			    struct au_pin *next, struct dentry *d2,
+			    aufs_bindex_t bindex)
 {
+	AuTraceEnter();
+
 	/* AuLsc_DI_PARENT3 is for higher gparent initially */
-	au_pin_init(first, d1, /*di_locked*/1, AuLsc_DI_PARENT2,
-		    AuLsc_I_PARENT2, /*do_gp*/1);
+	au_pin_init(first, d1, bindex, AuLsc_DI_PARENT2, AuLsc_I_PARENT2,
+		    AuPin_DI_LOCKED | AuPin_DO_GPARENT);
 	/* AuLsc_DI_PARENT4 is for lower gparent initially */
-	au_pin_init(next, d2, /*di_locked*/1, AuLsc_DI_PARENT3,
-		    AuLsc_I_PARENT4, /*do_gp*/1);
+	au_pin_init(next, d2, bindex, AuLsc_DI_PARENT3, AuLsc_I_PARENT4,
+		    AuPin_DI_LOCKED | AuPin_DO_GPARENT);
 }
 
 static void au_ren_fake_pin(struct au_ren_args *a)
@@ -667,11 +680,15 @@ static int au_ren_pin4(int higher, int lower, struct au_ren_args *a)
 	p4[2] = au_pin_gp(p);
 	p4[3] = p->pin + AuPin_PARENT;
 
-	if (a->gparent[higher])
+	if (a->gparent[higher]) {
 		au_pin_do_set_parent(p4[0], a->gparent[higher]);
+		au_pin_do_set_dentry(p4[0], a->parent[higher]);
+	}
 	au_pin_do_set_parent(p4[1], a->parent[higher]);
-	if (a->gparent[lower])
+	if (a->gparent[lower]) {
 		au_pin_do_set_parent(p4[2], a->gparent[lower]);
+		au_pin_do_set_dentry(p4[2], a->parent[lower]);
+	}
 	au_pin_do_set_parent(p4[3], a->parent[lower]);
 
 	DiMustWriteLock(p4[3]->parent);
@@ -705,19 +722,19 @@ static struct dentry *au_ren_pin3(int higher, int lower, struct au_ren_args *a)
 	LKTRTrace("%d, %d\n", higher, lower);
 
 	p = a->pin + higher;
-	err = au_do_pin(p->pin + AuPin_PARENT, au_pin_gp(p), a->btgt,
-			/*do_gp*/1);
+	err = au_do_pin(p->pin + AuPin_PARENT, au_pin_gp(p));
 	h_trap = ERR_PTR(err);
 	if (unlikely(err))
 		goto out;
 	p = a->pin + lower;
-	err = au_do_pin(p->pin + AuPin_PARENT, NULL, a->btgt, /*do_gp*/0);
+	au_fclr_pin(p->pin[AuPin_PARENT].flags, DO_GPARENT);
+	err = au_do_pin(p->pin + AuPin_PARENT, NULL);
 	h_trap = ERR_PTR(err);
 	if (unlikely(err)) {
 		au_do_unpin(p->pin + AuPin_PARENT, au_pin_gp(p));
 		goto out;
 	}
-	h_trap = au_pinned_h_parent(p, a->btgt);
+	h_trap = au_pinned_h_parent(p);
 
  out:
 	AuTraceErrPtr(h_trap);
@@ -759,7 +776,7 @@ static struct dentry *au_ren_pin(struct au_ren_args *a)
 	if (a->gparent[SRC] == a->parent[DST]) {
 		LKTRLabel(here);
 		au_ren_pin_init(a->pin + DST, a->dentry, a->pin + SRC,
-				a->src_dentry);
+				a->src_dentry, a->btgt);
 		h_trap = au_ren_pin3(DST, SRC, a);
 		if (!IS_ERR(h_trap)) {
 			h_gdir = au_pinned_h_dir(a->pin + DST);
@@ -770,7 +787,7 @@ static struct dentry *au_ren_pin(struct au_ren_args *a)
 	} else if (a->parent[SRC] == a->gparent[DST] || same_gp) {
 		LKTRLabel(here);
 		au_ren_pin_init(a->pin + SRC, a->src_dentry, a->pin + DST,
-				a->dentry);
+				a->dentry, a->btgt);
 		h_trap = au_ren_pin3(SRC, DST, a);
 		if (!IS_ERR(h_trap)) {
 			if (!same_gp)
@@ -786,7 +803,7 @@ static struct dentry *au_ren_pin(struct au_ren_args *a)
 					       a->parent[DST]))) {
 		LKTRLabel(here);
 		au_ren_pin_init(a->pin + DST, a->dentry, a->pin + SRC,
-				a->src_dentry);
+				a->src_dentry, a->btgt);
 		if (a->gparent[DST]) {
 			err = au_ren_pin4(DST, SRC, a);
 			if (unlikely(err))
@@ -805,7 +822,7 @@ static struct dentry *au_ren_pin(struct au_ren_args *a)
 			h_trap = au_test_subdir(a->gparent[DST],
 						a->parent[SRC]);
 		au_ren_pin_init(a->pin + SRC, a->src_dentry, a->pin + DST,
-				a->dentry);
+				a->dentry, a->btgt);
 		err = au_ren_pin4(SRC, DST, a);
 		if (unlikely(err))
 			h_trap = ERR_PTR(err);
@@ -834,6 +851,10 @@ static void au_ren_unlock(struct au_ren_args *a)
 {
 	int i;
 
+	AuTraceEnter();
+
+	if (au_ftest_ren(a->flags, MNT_WRITE))
+		au_mnt_drop_write(au_sbr_mnt(a->dentry->d_sb, a->btgt));
 	if (a->h_locked[0])
 		vfsub_unlock_rename(a->h_locked[0], a->h_locked[1]);
 	if (au_ftest_ren(a->flags, PINNED)) {
@@ -861,7 +882,7 @@ static int au_ren_lock(struct au_ren_args *a)
 	if (!hinotify
 	    || (au_ftest_ren(a->flags, ISSAMEDIR) && IS_ROOT(a->parent[SRC]))) {
 		au_ren_pin_init(a->pin + SRC, a->src_dentry, a->pin + DST,
-				a->dentry);
+				a->dentry, a->btgt);
 		LKTRLabel(here);
 		a->h_locked[0] = a->h_parent[SRC];
 		a->h_locked[1] = a->h_parent[DST];
@@ -870,11 +891,11 @@ static int au_ren_lock(struct au_ren_args *a)
 	} else if (au_ftest_ren(a->flags, ISSAMEDIR)
 		   && !IS_ROOT(a->parent[SRC])) {
 		/* this and next block should not be compiled when
-		   hinotify is not enabled */
+		   hinotify is disabled */
 		/* irregular/tricky rename lock */
 		LKTRLabel(here);
 		au_ren_pin_init(a->pin + SRC, a->src_dentry, a->pin + DST,
-				a->dentry);
+				a->dentry, a->btgt);
 		a->gparent[SRC] = dget_parent(a->parent[SRC]);
 		di_read_lock_parent2(a->gparent[SRC], AuLock_IR);
 		a->h_locked[0] = a->h_parent[SRC];
@@ -899,10 +920,19 @@ static int au_ren_lock(struct au_ren_args *a)
 	if (!err && au_dbstart(a->dentry) == a->btgt)
 		err = au_verify_parent(a->h_dentry[DST],
 				       a->h_parent[DST]->d_inode);
-	if (unlikely(err)) {
-		err = -EBUSY;
-		au_ren_unlock(a);
+	if (!err) {
+		err = au_br_want_write(au_sbr(a->dentry->d_sb, a->btgt));
+		if (unlikely(err))
+			goto out_unlock;
+		au_fset_ren(a->flags, MNT_WRITE);
+		goto out; /* success */
 	}
+
+	err = -EBUSY;
+
+ out_unlock:
+	au_ren_unlock(a);
+ out:
 	AuTraceErr(err);
 	return err;
 }
@@ -925,7 +955,6 @@ int aufs_rename(struct inode *src_dir, struct dentry *src_dentry,
 		.flags		= AuWrDir_ADD_ENTRY
 	};
 
-	//au_debug_on();
 	//lktr_set_pid(current->pid, LktrArrayPid);
 	LKTRTrace("i%lu, %.*s, i%lu, %.*s\n",
 		  src_dir->i_ino, AuDLNPair(src_dentry),
@@ -1054,28 +1083,25 @@ int aufs_rename(struct inode *src_dir, struct dentry *src_dentry,
 
 	/* store timestamps to be revertible */
 	au_dtime_store(p->dt[PARENT] + SRC, p->a.parent[SRC],
-		       p->a.h_parent[SRC],
-		       au_pinned_hdir(p->a.pin + SRC, p->a.btgt),
-		       au_pinned_hgdir(p->a.pin + SRC, p->a.btgt)
+		       p->a.h_parent[SRC], au_pinned_hdir(p->a.pin + SRC),
+		       au_pinned_hgdir(p->a.pin + SRC)
 		       /* hgdir[SRC] */);
 	if (!au_ftest_ren(p->a.flags, ISSAMEDIR))
 		au_dtime_store(p->dt[PARENT] + DST, p->a.parent[DST],
-			       p->a.h_parent[DST],
-			       au_pinned_hdir(p->a.pin + DST, p->a.btgt),
-			       au_pinned_hgdir(p->a.pin + DST, p->a.btgt)
+			       p->a.h_parent[DST], au_pinned_hdir(p->a.pin + DST),
+			       au_pinned_hgdir(p->a.pin + DST)
 			       /* hgdir[DST] */);
 	do_dt_dstdir = 0;
 	if (au_ftest_ren(p->a.flags, ISDIR)) {
 		au_dtime_store(p->dt[CHILD] + SRC, src_dentry,
 			       p->a.h_dentry[SRC], au_hi(inode[SRC], p->a.btgt),
-			       au_pinned_hdir(p->a.pin + SRC, p->a.btgt));
+			       au_pinned_hdir(p->a.pin + SRC));
 		if (p->a.h_dentry[DST]->d_inode) {
 			do_dt_dstdir = 1;
 			au_dtime_store(p->dt[CHILD] + DST, dentry,
 				       p->a.h_dentry[DST],
 				       au_hi(inode[DST], p->a.btgt),
-				       au_pinned_hdir(p->a.pin + DST,
-						      p->a.btgt));
+				       au_pinned_hdir(p->a.pin + DST));
 		}
 	}
 
@@ -1120,6 +1146,9 @@ int aufs_rename(struct inode *src_dir, struct dentry *src_dentry,
 	}
 	au_set_dbend(src_dentry, p->a.btgt);
 
+	if (au_opt_test(p->a.mnt_flags, PLINK)
+	    && au_plink_test(src_dentry->d_sb, inode[SRC]))
+		goto out_hdir; /* success */
 	bend = au_ibend(inode[SRC]);
 	for (bindex = p->a.btgt + 1; bindex <= bend; bindex++) {
 		struct inode *hi;
@@ -1160,8 +1189,13 @@ int aufs_rename(struct inode *src_dir, struct dentry *src_dentry,
 		au_update_dbstart(dentry);
 		d_drop(dentry);
 	}
-	if (!err)
+	if (!err) {
 		d_move(src_dentry, dentry);
+		if (inode[DST]
+		    && (inode[DST]->i_nlink == 1
+			|| au_ftest_ren(p->a.flags, ISDIR)))
+				inode[DST]->i_flags |= S_DEAD;
+	}
 	if (au_ftest_ren(p->a.flags, ISSAMEDIR))
 		di_write_unlock(p->a.parent[DST]);
 	else
@@ -1173,6 +1207,5 @@ int aufs_rename(struct inode *src_dir, struct dentry *src_dentry,
 	iput(inode[DST]);
 	AuTraceErr(err);
 	//lktr_clear_pid(current->pid, LktrArrayPid);
-	//au_debug_off();
 	return err;
 }

@@ -19,7 +19,7 @@
 /*
  * internal/hidden inotify handler
  *
- * $Id: hinotify.c,v 1.16 2008/09/08 02:39:54 sfjro Exp $
+ * $Id: hinotify.c,v 1.18 2008/10/06 00:30:02 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -50,8 +50,7 @@ int au_hin_alloc(struct au_hinode *hinode, struct inode *inode,
 	if (hin) {
 		AuDebugOn(hinode->hi_notify);
 		hinode->hi_notify = hin;
-		spin_lock_init(&hin->hin_ignore_lock);
-		INIT_LIST_HEAD(&hin->hin_ignore_list);
+		au_spl_init(&hin->hin_ignore);
 		hin->hin_aufs_inode = inode;
 
 		inotify_init_watch(&hin->hin_watch);
@@ -249,9 +248,7 @@ static void au_hin_ignore(struct au_hin_ignore *ign)
 		AuDbg("hi%lu, 0x%x\n", h_inode->i_ino, events);
 #endif
 
-		spin_lock(&hin->hin_ignore_lock);
-		list_add(&ign->ign_list, &hin->hin_ignore_list);
-		spin_unlock(&hin->hin_ignore_lock);
+		au_spl_add(&ign->ign_list, &hin->hin_ignore);
 		/* AuDbg("list_add %p, 0x%x\n", ign, events); */
 	}
 #if 1 /* todo: test dlgt */
@@ -295,21 +292,23 @@ static void au_hin_unignore(struct au_hin_ignore *ign)
 	AuDbg("hi%lu, 0x%x\n", h_inode->i_ino, events);
 #endif
 
-	spin_lock(&hin->hin_ignore_lock);
+	spin_lock(&hin->hin_ignore.spin);
 	au_hin_list_del(&ign->ign_list);
-	spin_unlock(&hin->hin_ignore_lock);
+	spin_unlock(&hin->hin_ignore.spin);
 	/* AuDbg("list_del %p, 0x%x\n", ign, events); */
 }
 
 static int au_hin_test_ignore(u32 mask, struct au_hinotify *hin)
 {
 	int do_ignore;
-	struct au_hin_ignore *ign, *tmp;
 	u32 events;
+	struct au_hin_ignore *ign, *tmp;
+	struct list_head *head;
 
 	do_ignore = 0;
-	spin_lock(&hin->hin_ignore_lock);
-	list_for_each_entry_safe(ign, tmp, &hin->hin_ignore_list, ign_list) {
+	head = &hin->hin_ignore.head;
+	spin_lock(&hin->hin_ignore.spin);
+	list_for_each_entry_safe(ign, tmp, head, ign_list) {
 		/* AuDbg("ign %p\n", ign); */
 		if (ign->ign_pid == current->pid) {
 			events = (mask & ign->ign_events);
@@ -327,7 +326,7 @@ static int au_hin_test_ignore(u32 mask, struct au_hinotify *hin)
 			}
 		}
 	}
-	spin_unlock(&hin->hin_ignore_lock);
+	spin_unlock(&hin->hin_ignore.spin);
 
 	return do_ignore;
 }
@@ -937,7 +936,7 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd, u32 mask,
 		return;
 	}
 #if 0 /* tmp debug */
-	if (h_child_name && !strcmp(h_child_name, AUFS_XINO_FNAME))
+	//if (h_child_name && !strcmp(h_child_name, AUFS_XINO_FNAME))
 	{
 	AuDbg("i%lu, wd %d, mask 0x%x %s, cookie 0x%x, hcname %s, hi%lu\n",
 		  watch->inode->i_ino, wd, mask, in_name(mask), cookie,

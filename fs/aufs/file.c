@@ -19,7 +19,7 @@
 /*
  * handling file/dir, and address_space operation
  *
- * $Id: file.c,v 1.14 2008/09/01 02:55:00 sfjro Exp $
+ * $Id: file.c,v 1.17 2008/10/06 00:29:57 sfjro Exp $
  */
 
 #include <linux/pagemap.h>
@@ -124,11 +124,12 @@ out:
 static int do_coo(struct dentry *dentry, aufs_bindex_t bstart)
 {
 	int err;
-	struct dentry *parent;
 	aufs_bindex_t bcpup;
+	unsigned char pin_flags;
+	struct au_pin pin;
+	struct dentry *parent;
 	struct mutex *h_mtx;
 	struct super_block *sb;
-	struct au_pin pin;
 
 	LKTRTrace("%.*s\n", AuDLNPair(dentry));
 	AuDebugOn(IS_ROOT(dentry));
@@ -152,8 +153,10 @@ static int do_coo(struct dentry *dentry, aufs_bindex_t bstart)
 	}
 
 	di_downgrade_lock(parent, AuLock_IR);
-	err = au_pin(&pin, dentry, bcpup, /*di_locked*/1,
-		     /*do_gp*/au_opt_test(au_mntflags(sb), UDBA_INOTIFY));
+	pin_flags = AuPin_DI_LOCKED | AuPin_MNT_WRITE;
+	if (unlikely(au_opt_test(au_mntflags(sb), UDBA_INOTIFY)))
+		au_fset_pin(pin_flags, DO_GPARENT);
+	err = au_pin(&pin, dentry, bcpup, pin_flags);
 	if (unlikely(err))
 		goto out;
 	h_mtx = &au_h_dptr(dentry, bstart)->d_inode->i_mutex;
@@ -232,13 +235,14 @@ int au_do_open(struct inode *inode, struct file *file,
 int au_reopen_nondir(struct file *file)
 {
 	int err;
-	struct dentry *dentry;
 	aufs_bindex_t bstart, bindex, bend;
+	struct dentry *dentry;
 	struct file *h_file, *h_file_tmp;
 
 	dentry = file->f_dentry;
 	LKTRTrace("%.*s\n", AuDLNPair(dentry));
 	bstart = au_dbstart(dentry);
+	//bstart = au_ibstart(inode);
 	AuDebugOn(S_ISDIR(dentry->d_inode->i_mode)
 		  || !au_h_dptr(dentry, bstart)->d_inode);
 
@@ -285,14 +289,17 @@ static int au_ready_to_write_wh(struct file *file, loff_t len,
 				aufs_bindex_t bcpup)
 {
 	int err;
+	aufs_bindex_t old_bstart;
+	struct inode *inode;
 	struct dentry *dentry, *hi_wh, *old_h_dentry;
 	struct au_dinfo *dinfo;
-	aufs_bindex_t old_bstart;
+	struct super_block *sb;
 
 	AuTraceEnter();
 
 	dentry = file->f_dentry;
-	hi_wh = au_hi_wh(dentry->d_inode, bcpup);
+	inode = dentry->d_inode;
+	hi_wh = au_hi_wh(inode, bcpup);
 	if (!hi_wh)
 		err = au_sio_cpup_wh(dentry, bcpup, len, file);
 	else {
@@ -307,6 +314,10 @@ static int au_ready_to_write_wh(struct file *file, loff_t len,
 		dinfo->di_bstart = old_bstart;
 	}
 
+	sb = dentry->d_sb;
+	if (!err && inode->i_nlink > 1 && au_opt_test(au_mntflags(sb), PLINK))
+		au_plink_append(sb, inode, au_h_dptr(dentry, bcpup), bcpup);
+
 	AuTraceErr(err);
 	return err;
 }
@@ -317,10 +328,11 @@ static int au_ready_to_write_wh(struct file *file, loff_t len,
 int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin)
 {
 	int err;
+	unsigned char pin_flags;
+	aufs_bindex_t bstart, bcpup;
 	struct dentry *dentry, *parent, *h_dentry;
 	struct inode *h_inode, *inode;
 	struct super_block *sb;
-	aufs_bindex_t bstart, bcpup;
 
 	dentry = file->f_dentry;
 	LKTRTrace("%.*s, len %lld\n", AuDLNPair(dentry), len);
@@ -337,7 +349,7 @@ int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin)
 
 	err = au_test_ro(sb, bstart, inode);
 	if (!err && (au_h_fptr(file, bstart)->f_mode & FMODE_WRITE)) {
-		err = au_pin(pin, dentry, bstart, /*di_locked*/0, /*dp_gp*/0);
+		err = au_pin(pin, dentry, bstart, /*flags*/0);
 		goto out;
 	}
 
@@ -356,8 +368,10 @@ int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin)
 			goto out_dgrade;
 	}
 
-	err = au_pin(pin, dentry, bcpup, /*di_locked*/1,
-		     /*dp_gp*/au_opt_test(au_mntflags(sb), UDBA_INOTIFY));
+	pin_flags = AuPin_DI_LOCKED | AuPin_MNT_WRITE;
+	if (unlikely(au_opt_test(au_mntflags(sb), UDBA_INOTIFY)))
+		au_fset_pin(pin_flags, DO_GPARENT);
+	err = au_pin(pin, dentry, bcpup, pin_flags);
 	if (unlikely(err))
 		goto out_dgrade;
 
@@ -405,14 +419,15 @@ int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin)
 static int au_file_refresh_by_inode(struct file *file, int *need_reopen)
 {
 	int err;
+	unsigned int mnt_flags;
+	unsigned char pin_flags;
+	aufs_bindex_t bstart, new_bstart, old_bstart;
+	struct au_pin pin;
 	struct au_finfo *finfo;
 	struct dentry *dentry, *parent, *old_h_dentry, *hi_wh;
 	struct inode *inode, *dir;
-	aufs_bindex_t bstart, new_bstart, old_bstart;
 	struct super_block *sb;
 	struct au_dinfo *dinfo;
-	unsigned int mnt_flags;
-	struct au_pin pin;
 
 	dentry = file->f_dentry;
 	LKTRTrace("%.*s\n", AuDLNPair(dentry));
@@ -423,6 +438,9 @@ static int au_file_refresh_by_inode(struct file *file, int *need_reopen)
 	inode = dentry->d_inode;
 	sb = dentry->d_sb;
 	mnt_flags = au_mntflags(sb);
+	pin_flags = AuPin_DI_LOCKED | AuPin_MNT_WRITE;
+	if (unlikely(au_opt_test(mnt_flags, UDBA_INOTIFY)))
+		au_fset_pin(pin_flags, DO_GPARENT);
  again:
 	bstart = au_ibstart(inode);
 	if (bstart == finfo->fi_bstart)
@@ -460,8 +478,7 @@ static int au_file_refresh_by_inode(struct file *file, int *need_reopen)
 
 		/* always superio. */
 #if 1
-		err = au_pin(&pin, dentry, bstart, /*di_locked*/1,
-			     /*do_gp*/au_opt_test(mnt_flags, UDBA_INOTIFY));
+		err = au_pin(&pin, dentry, bstart, pin_flags);
 		if (!err)
 			err = au_sio_cpup_simple(dentry, bstart, -1, AuCpup_DTIME);
 		au_unpin(&pin);

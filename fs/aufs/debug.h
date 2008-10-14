@@ -19,7 +19,7 @@
 /*
  * debug print functions
  *
- * $Id: debug.h,v 1.7 2008/09/01 02:55:44 sfjro Exp $
+ * $Id: debug.h,v 1.9 2008/09/29 03:43:27 sfjro Exp $
  */
 
 #ifndef __AUFS_DEBUG_H__
@@ -138,6 +138,8 @@ void au_dpri_dentry(struct dentry *dentry);
 void au_dpri_file(struct file *filp);
 void au_dpri_sb(struct super_block *sb);
 void au_dbg_sleep(int sec);
+void au_dbg_sleep_jiffy(int jiffy);
+
 #ifndef ATTR_TIMES_SET
 #define ATTR_TIMES_SET 0
 #endif
@@ -179,6 +181,11 @@ void au_debug_sbinfo_init(struct au_sbinfo *sbinfo);
 	au_dbg_sleep(sec); \
 } while (0)
 
+#define AuDbgSleepJiffy(jiffy) do { \
+	AuDbg("sleep %d jiffies\n", jiffy); \
+	au_dbg_sleep_jiffy(jiffy); \
+} while (0)
+
 #define AuDbgIAttr(ia) do { \
 	AuDbg("ia_valid 0x%x\n", (ia)->ia_valid); \
 	au_dbg_iattr(ia); \
@@ -199,6 +206,7 @@ static inline void au_debug_sbinfo_init(struct au_sbinfo *sbinfo)
 #define AuDbgFile(f)		do {} while (0)
 #define AuDbgSb(sb)		do {} while (0)
 #define AuDbgSleep(sec)		do {} while (0)
+#define AuDbgSleepJiffy(jiffy)	do {} while (0)
 #define AuDbgIAttr(ia)		do {} while (0)
 #endif /* CONFIG_AUFS_DEBUG */
 
@@ -207,6 +215,8 @@ static inline void au_debug_sbinfo_init(struct au_sbinfo *sbinfo)
 #else
 #define AuDbgSleep_UdbaRace()	do {} while (0)
 #endif
+
+/* ---------------------------------------------------------------------- */
 
 #ifdef CONFIG_AUFS_MAGIC_SYSRQ
 int __init au_sysrq_init(void);
@@ -229,6 +239,47 @@ static inline int au_sysrq_init(void)
 #define au_sysrq_fin()		do {} while (0)
 #define au_dbg_blocked()	do {} while (0)
 #endif /* CONFIG_AUFS_MAGIC_SYSRQ */
+
+enum {AuDbgLock_DI_LOCKING, AuDbgLock_DI_LOCKED, AuDbgLock_II, AuDbgLock_Last};
+#ifdef CONFIG_AUFS_DEBUG_LOCK
+void au_dbg_locking_di_reg(struct dentry *d, int flags, unsigned int lsc);
+void au_dbg_locking_di_unreg(struct dentry *d, int flags);
+void au_dbg_locked_di_reg(struct dentry *d, int flags, unsigned int lsc);
+void au_dbg_locked_di_unreg(struct dentry *d, int flags);
+void au_dbg_lock_ii_reg(struct inode *i, unsigned int lsc);
+void au_dbg_lock_ii_unreg(struct inode *i);
+#else
+static inline
+void au_dbg_locking_di_reg(struct dentry *d, int flags, unsigned int lsc)
+{
+	/* empty */
+}
+static inline
+void au_dbg_locking_di_unreg(struct dentry *d, int flags)
+{
+	/* empty */
+}
+static inline
+void au_dbg_locked_di_reg(struct dentry *d, int flags, unsigned int lsc)
+{
+	/* empty */
+}
+static inline
+void au_dbg_locked_di_unreg(struct dentry *d, int flags)
+{
+	/* empty */
+}
+static inline
+void au_dbg_lock_ii_reg(struct inode *i, unsigned int lsc)
+{
+	/* empty */
+}
+static inline
+void au_dbg_lock_ii_unreg(struct inode *i)
+{
+	/* empty */
+}
+#endif /* CONFIG_AUFS_DEBUG_LOCK */
 
 #endif /* __KERNEL__ */
 #endif /* __AUFS_DEBUG_H__ */

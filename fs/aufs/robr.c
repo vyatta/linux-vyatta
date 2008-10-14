@@ -19,7 +19,7 @@
 /*
  * 'robr', aufs as readonly branch of another aufs
  *
- * $Id: robr.c,v 1.6 2008/07/21 02:53:51 sfjro Exp $
+ * $Id: robr.c,v 1.7 2008/10/06 00:30:02 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -52,6 +52,7 @@ struct file *au_robr_safe_file(struct vm_area_struct *vma)
 	struct super_block *sb = file->f_dentry->d_sb;
 	struct au_robr_lvma *lvma, *entry;
 	struct au_sbinfo *sbinfo;
+	struct list_head *head;
 	unsigned char found, warn;
 
 	AuTraceEnter();
@@ -60,8 +61,9 @@ struct file *au_robr_safe_file(struct vm_area_struct *vma)
 	warn = 0;
 	found = 0;
 	sbinfo = au_sbi(sb);
-	spin_lock(&sbinfo->si_lvma_lock);
-	list_for_each_entry(entry, &sbinfo->si_lvma, list) {
+	head = &sbinfo->si_lvma.head;
+	spin_lock(&sbinfo->si_lvma.spin);
+	list_for_each_entry(entry, head, list) {
 		found = (entry->vma == vma);
 		if (unlikely(found))
 			break;
@@ -70,14 +72,14 @@ struct file *au_robr_safe_file(struct vm_area_struct *vma)
 		lvma = kmalloc(sizeof(*lvma), GFP_ATOMIC);
 		if (lvma) {
 			lvma->vma = vma;
-			list_add(&lvma->list, &sbinfo->si_lvma);
+			list_add(&lvma->list, head);
 		} else {
 			warn = 1;
 			file = NULL;
 		}
 	} else
 		file = NULL;
-	spin_unlock(&sbinfo->si_lvma_lock);
+	spin_unlock(&sbinfo->si_lvma.spin);
 
 	if (unlikely(warn))
 		AuWarn1("no memory for lvma\n");
@@ -89,6 +91,7 @@ void au_robr_reset_file(struct vm_area_struct *vma, struct file *file)
 	struct super_block *sb = file->f_dentry->d_sb;
 	struct au_robr_lvma *entry, *found;
 	struct au_sbinfo *sbinfo;
+	struct list_head *head;
 
 	AuTraceEnter();
 	AuDebugOn(!au_test_aufs(sb));
@@ -98,14 +101,15 @@ void au_robr_reset_file(struct vm_area_struct *vma, struct file *file)
 
 	found = NULL;
 	sbinfo = au_sbi(sb);
-	spin_lock(&sbinfo->si_lvma_lock);
-	list_for_each_entry(entry, &sbinfo->si_lvma, list)
+	head = &sbinfo->si_lvma.head;
+	spin_lock(&sbinfo->si_lvma.spin);
+	list_for_each_entry(entry, head, list)
 		if (entry->vma == vma) {
 			found = entry;
 			break;
 		}
 	AuDebugOn(!found);
 	list_del(&found->list);
-	spin_unlock(&sbinfo->si_lvma_lock);
+	spin_unlock(&sbinfo->si_lvma.spin);
 	kfree(found);
 }

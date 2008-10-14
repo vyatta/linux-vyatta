@@ -19,7 +19,7 @@
 /*
  * file and vm operations
  *
- * $Id: f_op.c,v 1.11 2008/09/01 02:55:44 sfjro Exp $
+ * $Id: f_op.c,v 1.12 2008/10/06 00:29:57 sfjro Exp $
  */
 
 #include <linux/fs_stack.h>
@@ -206,8 +206,7 @@ static ssize_t aufs_write(struct file *file, const char __user *ubuf,
 		au_unpin(&pin);
 		err = vfsub_write_u(h_file, buf, count, ppos, &vargs);
 	} else {
-		vfsub_ign_hinode(&vargs, IN_MODIFY,
-				 au_pinned_hdir(&pin, bstart));
+		vfsub_ign_hinode(&vargs, IN_MODIFY, au_pinned_hdir(&pin));
 		err = vfsub_write_u(h_file, buf, count, ppos, &vargs);
 		au_unpin(&pin);
 	}
@@ -320,8 +319,7 @@ aufs_splice_write(struct pipe_inode_info *pipe, struct file *file, loff_t *ppos,
 #if 0 /* reserved for future use */
 	else {
 		struct dentry *parent = dget_parent(dentry);
-		vfsub_ign_hinode(&vargs, IN_MODIFY,
-				 au_pinned_hdir(&pin, bstart));
+		vfsub_ign_hinode(&vargs, IN_MODIFY, au_pinned_hdir(&pin));
 		err = vfsub_splice_from(pipe, h_file, ppos, len, flags, &vargs);
 		au_unpin(&pin);
 	}

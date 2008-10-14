@@ -17,7 +17,7 @@
  */
 
 /*
- * $Id: misc.c,v 1.17 2008/09/08 02:40:48 sfjro Exp $
+ * $Id: misc.c,v 1.18 2008/09/29 03:44:58 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -152,33 +152,18 @@ int au_copy_file(struct file *dst, struct file *src, loff_t len,
 #endif
 
 	err = -ENOMEM;
+	zp = page_address(ZERO_PAGE(0));
 	blksize = dst->f_dentry->d_sb->s_blocksize;
 	if (!blksize || PAGE_SIZE < blksize)
 		blksize = PAGE_SIZE;
 	LKTRTrace("blksize %lu\n", blksize);
-	/* todo: use ZERO_PAGE(0) */
-	BUILD_BUG_ON(KMALLOC_MAX_SIZE < 128 << 10);
-	do_kfree = 1;
-	if (blksize <= 64 << 10 && blksize * 2 >= sizeof(*ia)) {
-		buf = kmalloc(blksize * 2, GFP_NOFS);
-		if (unlikely(!buf))
-			goto out;
-		zp = buf + blksize;
-		memset(zp, 0, blksize);
-	} else {
-		BUILD_BUG_ON(PAGE_SIZE * 2 < sizeof(*ia));
-#if 0
-		buf = (void *)__get_free_pages(GFP_NOFS, 1);
-		zp = buf + PAGE_SIZE;
-#endif
-		do_kfree = 0;
+	do_kfree = (blksize != PAGE_SIZE && blksize >= sizeof(*ia));
+	if (do_kfree)
+		buf = kmalloc(blksize, GFP_NOFS);
+	else
 		buf = (void *)__get_free_page(GFP_NOFS);
-		if (unlikely(!buf))
-			goto out;
-		zp = (void *)get_zeroed_page(GFP_NOFS);
-		if (unlikely(!zp))
-			goto out_buf;
-	}
+	if (unlikely(!buf))
+		goto out;
 
 #ifdef CONFIG_AUFS_DEBUG
 	if (len > (1 << 22))
@@ -287,11 +272,8 @@ int au_copy_file(struct file *dst, struct file *src, loff_t len,
 	if (do_kfree)
 		kfree(buf);
 	else
-		free_page((unsigned long)zp);
-
- out_buf:
-	if (unlikely(!do_kfree))
 		free_page((unsigned long)buf);
+
  out:
 	AuTraceErr(err);
 	return err;

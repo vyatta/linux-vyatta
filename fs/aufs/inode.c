@@ -19,7 +19,7 @@
 /*
  * inode functions
  *
- * $Id: inode.c,v 1.11 2008/08/25 01:49:43 sfjro Exp $
+ * $Id: inode.c,v 1.14 2008/09/29 03:44:49 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -202,7 +202,7 @@ static int set_inode(struct inode *inode, struct dentry *dentry)
 	case S_IFLNK:
 		btail = au_dbtail(dentry);
 		inode->i_op = &aufs_symlink_iop;
-		//inode->i_fop = &aufs_file_fop;
+		/* inode->i_fop = &aufs_file_fop; */
 		break;
 	case S_IFBLK:
 	case S_IFCHR:
@@ -265,10 +265,14 @@ static int reval_inode(struct inode *inode, struct dentry *dentry, int *matched)
 	if (unlikely(inode->i_ino == parent_ino(dentry)))
 		goto out;
 
-	err = 0;
 	h_dinode = au_h_dptr(dentry, au_dbstart(dentry))->d_inode;
 	/* mutex_lock_nested(&inode->i_mutex, AuLsc_I_CHILD); */
 	ii_write_lock_new_child(inode);
+	/* it happend */
+	if (unlikely(IS_DEADDIR(inode)))
+		goto out_unlock;
+
+	err = 0;
 	bend = au_ibend(inode);
 	for (bindex = au_ibstart(inode); bindex <= bend; bindex++) {
 		h_inode = au_h_iptr(inode, bindex);
@@ -282,10 +286,11 @@ static int reval_inode(struct inode *inode, struct dentry *dentry, int *matched)
 			break;
 		}
 	}
+
+ out_unlock:
 	if (unlikely(err))
 		ii_write_unlock(inode);
 	/* mutex_unlock(&inode->i_mutex); */
-
  out:
 	AuTraceErr(err);
 	return err;
@@ -293,12 +298,12 @@ static int reval_inode(struct inode *inode, struct dentry *dentry, int *matched)
 
 /* successful returns with iinfo write_locked */
 /* todo: return with unlocked? */
-struct inode *au_new_inode(struct dentry *dentry)
+struct inode *au_new_inode(struct dentry *dentry, int must_new)
 {
 	struct inode *inode, *h_inode;
 	struct dentry *h_dentry;
-	ino_t h_ino;
 	struct super_block *sb;
+	ino_t h_ino;
 	int err, match;
 	aufs_bindex_t bstart;
 	struct au_xino_entry xinoe;
@@ -341,7 +346,7 @@ struct inode *au_new_inode(struct dentry *dentry)
 		iget_failed(inode);
 		ii_write_unlock(inode);
 		goto out_iput;
-	} else {
+	} else if (!must_new) {
 		AuDebugOn(inode->i_state & I_LOCK);
 		err = reval_inode(inode, dentry, &match);
 		if (!err)

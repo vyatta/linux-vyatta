@@ -19,7 +19,7 @@
 /*
  * file private data
  *
- * $Id: finfo.c,v 1.4 2008/06/30 03:50:21 sfjro Exp $
+ * $Id: finfo.c,v 1.5 2008/09/29 03:43:22 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -131,6 +131,7 @@ void au_finfo_fin(struct file *file)
 
 	kfree(finfo->fi_hfile);
 	fi_write_unlock(file);
+	au_rwsem_destroy(&finfo->fi_rwsem);
 	au_cache_free_finfo(finfo);
 }
 
@@ -153,6 +154,7 @@ int au_finfo_init(struct file *file)
 					  sizeof(*finfo->fi_hfile), GFP_NOFS);
 		if (finfo->fi_hfile) {
 			au_rw_init_wlock(&finfo->fi_rwsem);
+			//au_dbg_lock_fi_reg(file);
 			finfo->fi_bstart = -1;
 			finfo->fi_bend = -1;
 			atomic_set(&finfo->fi_generation, au_digen(dentry));

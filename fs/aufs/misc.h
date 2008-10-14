@@ -17,7 +17,7 @@
  */
 
 /*
- * $Id: misc.h,v 1.6 2008/07/21 02:54:04 sfjro Exp $
+ * $Id: misc.h,v 1.9 2008/10/06 00:30:28 sfjro Exp $
  */
 
 #ifndef __AUFS_MISC_H__
@@ -37,6 +37,31 @@ typedef unsigned int au_gen_t;
 #define AuGenOlder(a, b)	AufsGenYounger(b, a)
 
 /* ---------------------------------------------------------------------- */
+
+struct au_splhead {
+	spinlock_t		spin;
+	struct list_head	head;
+};
+
+static inline void au_spl_init(struct au_splhead *spl)
+{
+	spin_lock_init(&spl->spin);
+	INIT_LIST_HEAD(&spl->head);
+}
+
+static inline void au_spl_add(struct list_head *list, struct au_splhead *spl)
+{
+	spin_lock(&spl->spin);
+	list_add(list, &spl->head);
+	spin_unlock(&spl->spin);
+}
+
+static inline void au_spl_del(struct list_head *list, struct au_splhead *spl)
+{
+	spin_lock(&spl->spin);
+	list_del(list);
+	spin_unlock(&spl->spin);
+}
 
 struct au_rwsem {
 	struct rw_semaphore	rwsem;
@@ -58,6 +83,8 @@ struct au_rwsem {
 #define AuDbgRcntInc(rw)	do {} while (0)
 #define AuDbgRcntDec(rw)	do {} while (0)
 #endif /* CONFIG_AUFS_DEBUG */
+
+#define au_rwsem_destroy(rw)	AuDebugOn(rwsem_is_locked(&(rw)->rwsem))
 
 static inline void au_rw_init_nolock(struct au_rwsem *rw)
 {

@@ -19,7 +19,7 @@
 /*
  * super_block operations
  *
- * $Id: super.h,v 1.13 2008/08/25 01:50:40 sfjro Exp $
+ * $Id: super.h,v 1.16 2008/10/06 00:30:40 sfjro Exp $
  */
 
 #ifndef __AUFS_SUPER_H__
@@ -31,6 +31,7 @@
 #include <linux/cramfs_fs.h>
 #include <linux/kobject.h>
 #include <linux/magic.h>
+#include <linux/mount.h>
 #include <linux/aufs_type.h>
 #include "misc.h"
 #include "wkq.h"
@@ -120,6 +121,12 @@ struct au_sbinfo {
 	struct au_branch	*si_xino_def_br;
 #endif
 
+#ifdef CONFIG_AUFS_EXPORT
+	/* i_generation */
+	struct file		*si_xigen;
+	atomic_t		si_xigen_next;
+#endif
+
 	/* readdir cache time, max, in HZ */
 	unsigned long		si_rdcache;
 
@@ -138,8 +145,7 @@ struct au_sbinfo {
 	/* int			si_rendir; */
 
 	/* pseudo_link list */ /* todo: dirty? */
-	spinlock_t		si_plink_lock;
-	struct list_head	si_plink;
+	struct au_splhead	si_plink;
 
 #if defined(CONFIG_AUFS_EXPORT) && LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 26)
 	/* dirty, for export, async ops, and sysfs */
@@ -156,8 +162,7 @@ struct au_sbinfo {
 
 #ifdef CONFIG_AUFS_ROBR
 	/* locked vma list for mmap() */ /* todo: dirty? */
-	spinlock_t		si_lvma_lock;
-	struct list_head	si_lvma;
+	struct au_splhead	si_lvma;
 #endif
 
 #ifdef CONFIG_AUFS_EXPORT /* reserved for future use */
@@ -166,6 +171,10 @@ struct au_sbinfo {
 
 	/* dirty, necessary for unmounting, sysfs and sysrq */
 	struct super_block	*si_sb;
+
+#ifdef CONFIG_AUFS_DEBUG_LOCK
+	struct au_splhead	si_dbg_lock[AuDbgLock_Last];
+#endif
 };
 
 /* ---------------------------------------------------------------------- */
@@ -239,6 +248,30 @@ static inline void au_mnt_reset(struct au_sbinfo *sbinfo)
 	/* emptr */
 }
 #endif /* EXPORT && < 2.6.26 */
+
+/* ---------------------------------------------------------------------- */
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 26)
+static inline int au_mnt_want_write(struct vfsmount *h_mnt)
+{
+	return mnt_want_write(h_mnt);
+}
+
+static inline void au_mnt_drop_write(struct vfsmount *h_mnt)
+{
+	mnt_drop_write(h_mnt);
+}
+#else
+static inline int au_mnt_want_write(struct vfsmount *h_mnt)
+{
+	return 0;
+}
+
+static inline void au_mnt_drop_write(struct vfsmount *h_mnt)
+{
+	/* empty */
+}
+#endif
 
 /* ---------------------------------------------------------------------- */
 
@@ -322,12 +355,7 @@ static inline struct au_branch *au_xino_def_br(struct au_sbinfo *sbinfo)
 /* ---------------------------------------------------------------------- */
 
 #ifdef CONFIG_AUFS_EXPORT
-extern struct export_operations aufs_export_op;
-static inline void au_init_export_op(struct super_block *sb)
-{
-	sb->s_export_op = &aufs_export_op;
-	memset(&au_sbi(sb)->si_xinodir, 0, sizeof(struct path));
-}
+void au_export_init(struct super_block *sb);
 
 static inline int au_test_nfsd(struct task_struct *tsk)
 {
@@ -350,15 +378,21 @@ static inline void au_export_put(struct au_sbinfo *sbinfo)
 {
 	path_put(&sbinfo->si_xinodir);
 }
+
+int au_xigen_inc(struct inode *inode);
+int au_xigen_new(struct inode *inode);
+int au_xigen_set(struct super_block *sb, struct file *base);
+void au_xigen_clr(struct super_block *sb);
+
 #else
+static inline void au_export_init(struct super_block *sb)
+{
+	/* nothing */
+}
+
 static inline int au_test_nfsd(struct task_struct *tsk)
 {
 	return 0;
-}
-
-static inline void au_init_export_op(struct super_block *sb)
-{
-	/* nothing */
 }
 
 #define au_nfsd_lockdep_off()	do {} while (0)
@@ -367,6 +401,34 @@ static inline void au_init_export_op(struct super_block *sb)
 static inline void au_export_put(struct au_sbinfo *sbinfo)
 {
 	/* nothing */
+}
+
+static inline int au_xigen_inc(struct inode *inode)
+{
+	return 0;
+}
+
+static inline int au_xigen_new(struct inode *inode)
+{
+	return 0;
+}
+
+static inline int au_xigen_set(struct super_block *sb, struct file *base)
+{
+	return 0;
+}
+
+static inline void au_xigen_clr(struct super_block *sb)
+{
+	/* empty */
+}
+
+/* cf. dir.h */
+static inline
+int au_nfsd_read_lock(struct dentry *dentry, unsigned int flags)
+{
+	aufs_read_lock(dentry, flags);
+	return 0;
 }
 #endif /* CONFIG_AUFS_EXPORT */
 
@@ -378,8 +440,7 @@ static inline int au_test_nested(struct super_block *h_sb)
 
 static inline void au_robr_lvma_init(struct au_sbinfo *sbinfo)
 {
-	spin_lock_init(&sbinfo->si_lvma_lock);
-	INIT_LIST_HEAD(&sbinfo->si_lvma);
+	au_spl_init(&sbinfo->si_lvma);
 }
 #else
 static inline int au_test_nested(struct super_block *h_sb)

@@ -1,5 +1,5 @@
 # AUFS Makefile for the Linux 2.6.25 and later
-# $Id: Makefile,v 1.8 2008/08/04 00:32:21 sfjro Exp $
+# $Id: Makefile,v 1.9 2008/09/29 03:43:19 sfjro Exp $
 
 # the environment variables are not inherited since 2.6.23
 ifdef AUFS_EXTRA_CFLAGS
@@ -28,9 +28,7 @@ endif
 # defined in ${srctree}/mm/shmem.c in linux-2.6.26 and earlier
 # tristate
 ifdef CONFIG_TMPFS
-ifeq ($(shell test ${SUBLEVEL} -le 26 && echo t),t)
 ccflags-y += -DTMPFS_MAGIC=0x01021994
-endif
 endif
 
 # defined in ${srctree}fs/sysfs/mount.c
@@ -67,7 +65,7 @@ aufs-$(CONFIG_AUFS_WORKAROUND_FUSE) += br_fuse.o
 aufs-$(CONFIG_AUFS_DLGT) += dlgt.o
 aufs-$(CONFIG_AUFS_HINOTIFY) += hinotify.o
 aufs-$(CONFIG_AUFS_HIN_OR_DLGT) += hin_or_dlgt.o
-aufs-$(CONFIG_AUFS_HIN_OR_FUSE) += hin_or_fuse.o
+aufs-$(CONFIG_AUFS_GETATTR) += getattr.o
 aufs-$(CONFIG_AUFS_EXPORT) += export.o
 aufs-$(CONFIG_AUFS_ROBR) += robr.o
 # reserved for future use

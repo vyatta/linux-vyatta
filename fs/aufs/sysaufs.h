@@ -19,7 +19,7 @@
 /*
  * sysfs interface and lifetime management
  *
- * $Id: sysaufs.h,v 1.10 2008/07/07 01:12:39 sfjro Exp $
+ * $Id: sysaufs.h,v 1.11 2008/09/15 03:14:55 sfjro Exp $
  */
 
 #ifndef __SYSAUFS_H__
@@ -58,6 +58,9 @@ extern struct attribute_group *au_attr_group;
 extern struct kobj_type *au_ktype;
 
 int sysaufs_sbi_xino(struct seq_file *seq, struct super_block *sb);
+#ifdef CONFIG_AUFS_EXPORT
+int sysaufs_sbi_xigen(struct seq_file *seq, struct super_block *sb);
+#endif
 int sysaufs_sbi_mntpnt1(struct seq_file *seq, struct super_block *sb);
 ssize_t sysaufs_sbi_show(struct kobject *kobj, struct attribute *attr,
 			 char *buf);
@@ -74,6 +77,14 @@ int sysaufs_sbi_xino(struct seq_file *seq, struct super_block *sb)
 {
 	return 0;
 }
+
+#ifdef CONFIG_AUFS_EXPORT
+static inline
+int sysaufs_sbi_xigen(struct seq_file *seq, struct super_block *sb)
+{
+	return 0;
+}
+#endif
 
 static inline
 int sysaufs_sbi_mntpnt1(struct seq_file *seq, struct super_block *sb)

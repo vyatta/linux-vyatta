@@ -19,7 +19,7 @@
 /*
  * workqueue for asynchronous/super-io/delegated operations
  *
- * $Id: wkq.c,v 1.12 2008/09/08 02:40:15 sfjro Exp $
+ * $Id: wkq.c,v 1.14 2008/09/29 03:45:13 sfjro Exp $
  */
 
 #include <linux/module.h>
@@ -233,78 +233,81 @@ static void au_wkq_comp_free(struct completion *comp)
 }
 #endif /* 4KSTACKS */
 
-int au_wkq_run(au_wkq_func_t func, void *args, struct super_block *sb,
-	       unsigned int flags)
+static void au_wkq_run(struct au_wkinfo *wkinfo)
 {
-	int err;
-	AuWkqCompDeclare(comp);
-	struct au_wkinfo _wkinfo = {
-		.flags	= flags,
-		.func	= func,
-		.args	= args
-	}, *wkinfo = &_wkinfo;
-	const unsigned char do_wait = au_ftest_wkq(flags, WAIT);
-
-	LKTRTrace("0x%x\n", flags);
 #if 1 /* tmp debug */
 	if (au_test_wkq(current))
 		au_dbg_blocked();
 #endif
 	AuDebugOn(au_test_wkq(current));
 
-	if (do_wait) {
-		err = au_wkq_comp_alloc(wkinfo, &comp);
-		if (unlikely(err))
-			goto out;
-	} else {
-		AuDebugOn(!sb);
-		/*
-		 * wkq_func() must free this wkinfo.
-		 * it highly depends upon the implementation of workqueue.
-		 */
-		err = -ENOMEM;
-		wkinfo = kmalloc(sizeof(*wkinfo), GFP_NOFS);
-		if (unlikely(!wkinfo))
-			goto out;
-
-		err = 0;
-		wkinfo->sb = sb;
-		wkinfo->flags = flags;
-		wkinfo->func = func;
-		wkinfo->args = args;
-		wkinfo->comp = NULL;
-		kobject_get(&au_sbi(sb)->si_kobj);
-		__module_get(THIS_MODULE);
-	}
-
 	INIT_WORK(&wkinfo->wk, wkq_func);
-	dlgt_cred_store(flags, wkinfo);
+	dlgt_cred_store(wkinfo->flags, wkinfo);
 	do_wkq(wkinfo);
-	if (do_wait) {
+}
+
+int au_wkq_wait(au_wkq_func_t func, void *args, int dlgt)
+{
+	int err;
+	AuWkqCompDeclare(comp);
+	struct au_wkinfo wkinfo = {
+		.flags	= AuWkq_WAIT,
+		.func	= func,
+		.args	= args
+	};
+
+	LKTRTrace("dlgt %d\n", dlgt);
+
+	err = au_wkq_comp_alloc(&wkinfo, &comp);
+	if (!err) {
+		if (unlikely(dlgt))
+			au_fset_wkq(wkinfo.flags, DLGT);
+		au_wkq_run(&wkinfo);
 		/* no timeout, no interrupt */
-		wait_for_completion(wkinfo->comp);
+		wait_for_completion(wkinfo.comp);
 		au_wkq_comp_free(comp);
 	}
- out:
+
 	AuTraceErr(err);
 	return err;
+
 }
 
 int au_wkq_nowait(au_wkq_func_t func, void *args, struct super_block *sb,
 		  int dlgt)
 {
 	int err;
-	unsigned int flags = !AuWkq_WAIT;
+	struct au_wkinfo *wkinfo;
 
-	AuTraceEnter();
+	LKTRTrace("dlgt %d\n", dlgt);
+	AuDebugOn(!sb);
 
-	if (unlikely(dlgt))
-		au_fset_wkq(flags, DLGT);
 	atomic_inc_return(&au_sbi(sb)->si_nowait.nw_len);
-	err = au_wkq_run(func, args, sb, flags);
-	if (unlikely(err))
-		atomic_dec_return(&au_sbi(sb)->si_nowait.nw_len);
 
+	/*
+	 * wkq_func() must free this wkinfo.
+	 * it highly depends upon the implementation of workqueue.
+	 */
+	err = 0;
+	wkinfo = kmalloc(sizeof(*wkinfo), GFP_NOFS);
+	if (wkinfo) {
+		wkinfo->sb = sb;
+		wkinfo->flags = !AuWkq_WAIT;
+		wkinfo->func = func;
+		wkinfo->args = args;
+		wkinfo->comp = NULL;
+		if (unlikely(dlgt))
+			au_fset_wkq(wkinfo->flags, DLGT);
+		kobject_get(&au_sbi(sb)->si_kobj);
+		__module_get(THIS_MODULE);
+
+		au_wkq_run(wkinfo);
+	} else {
+		err = -ENOMEM;
+		atomic_dec_return(&au_sbi(sb)->si_nowait.nw_len);
+	}
+
+	AuTraceErr(err);
 	return err;
 }
 

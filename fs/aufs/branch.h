@@ -19,7 +19,7 @@
 /*
  * branch filesystems and xino for them
  *
- * $Id: branch.h,v 1.11 2008/09/01 02:54:41 sfjro Exp $
+ * $Id: branch.h,v 1.13 2008/10/06 00:29:52 sfjro Exp $
  */
 
 #ifndef __AUFS_BRANCH_H__
@@ -169,9 +169,15 @@ int au_br_mod(struct super_block *sb, struct au_opt_mod *mod, int remount,
 	      int *do_update);
 
 /* xino.c */
+#define Au_LOFF_MAX	((loff_t)LLONG_MAX)
 int au_xib_trunc(struct super_block *sb);
-
+ssize_t xino_fread(au_readf_t func, struct file *file, void *buf, size_t size,
+		   loff_t *pos);
+ssize_t xino_fwrite(au_writef_t func, struct file *file, void *buf, size_t size,
+		    loff_t *pos);
 struct file *au_xino_create(struct super_block *sb, char *fname, int silent);
+struct file *au_xino_create2(struct super_block *sb, struct file *base_file,
+			     struct file *copy_src);
 ino_t au_xino_new_ino(struct super_block *sb);
 int au_xino_write0(struct super_block *sb, aufs_bindex_t bindex, ino_t h_ino,
 		   ino_t ino);
@@ -290,6 +296,22 @@ static inline int au_sbr_perm(struct super_block *sb, aufs_bindex_t bindex)
 static inline int au_sbr_whable(struct super_block *sb, aufs_bindex_t bindex)
 {
 	return au_br_whable(au_sbr_perm(sb, bindex));
+}
+
+static inline int au_br_want_write(struct au_branch *br)
+{
+	int err;
+
+	AuDebugOn(!au_br_writable(br->br_perm));
+	err = au_mnt_want_write(br->br_mnt);
+	AuTraceErr(err);
+	return err;
+}
+
+static inline void au_br_drop_write(struct au_branch *br)
+{
+	AuDebugOn(!au_br_writable(br->br_perm));
+	au_mnt_drop_write(br->br_mnt);
 }
 
 static inline int au_test_trunc_xino(struct super_block *sb)
