@@ -34,7 +34,7 @@
 #include <linux/mutex.h>
 
 /* Do not scan - the MAX6875 access method will write to some EEPROM chips */
-static unsigned short normal_i2c[] = {I2C_CLIENT_END};
+static const unsigned short normal_i2c[] = { I2C_CLIENT_END };
 
 /* Insmod parameters */
 I2C_CLIENT_INSMOD_1(max6875);
@@ -206,9 +206,6 @@ static int max6875_detect(struct i2c_adapter *adapter, int address, int kind)
 	fake_client->driver = &max6875_driver;
 	fake_client->flags = 0;
 	strlcpy(fake_client->name, "max6875 subclient", I2C_NAME_SIZE);
-
-	/* Prevent 24RF08 corruption (in case of user error) */
-	i2c_smbus_write_quick(real_client, 0);
 
 	if ((err = i2c_attach_client(real_client)) != 0)
 		goto exit_kfree2;

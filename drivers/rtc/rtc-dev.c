@@ -246,6 +246,15 @@ static int rtc_dev_ioctl(struct inode *inode, struct file *file,
 	/* if the driver does not provide the ioctl interface
 	 * or if that particular ioctl was not implemented
 	 * (-ENOIOCTLCMD), we will try to emulate here.
+	 *
+	 * Drivers *SHOULD NOT* provide ioctl implementations
+	 * for these requests.  Instead, provide methods to
+	 * support the following code, so that the RTC's main
+	 * features are accessible without using ioctls.
+	 *
+	 * RTC and alarm times will be in UTC, by preference,
+	 * but dual-booting with MS-Windows implies RTCs must
+	 * use the local wall clock time.
 	 */
 
 	switch (cmd) {
@@ -392,6 +401,12 @@ static int rtc_dev_ioctl(struct inode *inode, struct file *file,
 	return err;
 }
 
+static int rtc_dev_fasync(int fd, struct file *file, int on)
+{
+	struct rtc_device *rtc = file->private_data;
+	return fasync_helper(fd, file, on, &rtc->async_queue);
+}
+
 static int rtc_dev_release(struct inode *inode, struct file *file)
 {
 	struct rtc_device *rtc = file->private_data;
@@ -402,14 +417,11 @@ static int rtc_dev_release(struct inode *inode, struct file *file)
 	if (rtc->ops->release)
 		rtc->ops->release(rtc->dev.parent);
 
+	if (file->f_flags & FASYNC)
+		rtc_dev_fasync(-1, file, 0);
+
 	clear_bit_unlock(RTC_DEV_BUSY, &rtc->flags);
 	return 0;
-}
-
-static int rtc_dev_fasync(int fd, struct file *file, int on)
-{
-	struct rtc_device *rtc = file->private_data;
-	return fasync_helper(fd, file, on, &rtc->async_queue);
 }
 
 static const struct file_operations rtc_dev_fops = {

@@ -24,7 +24,6 @@
 #include <linux/utsname.h>
 #include <linux/device.h>
 
-#include <sound/driver.h>
 #include <sound/core.h>
 #include <sound/initval.h>
 #include <sound/rawmidi.h>
@@ -230,7 +229,7 @@ static const struct usb_ac_header_descriptor_1 ac_header_desc = {
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubtype =	USB_MS_HEADER,
 	.bcdADC =		__constant_cpu_to_le16(0x0100),
-	.wTotalLength =		USB_DT_AC_HEADER_SIZE(1),
+	.wTotalLength =		__constant_cpu_to_le16(USB_DT_AC_HEADER_SIZE(1)),
 	.bInCollection =	1,
 	.baInterfaceNr = {
 		[0] =		GMIDI_MS_INTERFACE,
@@ -254,9 +253,9 @@ static const struct usb_ms_header_descriptor ms_header_desc = {
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubtype =	USB_MS_HEADER,
 	.bcdMSC =		__constant_cpu_to_le16(0x0100),
-	.wTotalLength =		USB_DT_MS_HEADER_SIZE
+	.wTotalLength =		__constant_cpu_to_le16(USB_DT_MS_HEADER_SIZE
 				+ 2*USB_DT_MIDI_IN_SIZE
-				+ 2*USB_DT_MIDI_OUT_SIZE(1),
+				+ 2*USB_DT_MIDI_OUT_SIZE(1)),
 };
 
 #define JACK_IN_EMB	1
@@ -1150,7 +1149,7 @@ fail:
 /*
  * Creates an output endpoint, and initializes output ports.
  */
-static int __devinit gmidi_bind(struct usb_gadget *gadget)
+static int __init gmidi_bind(struct usb_gadget *gadget)
 {
 	struct gmidi_device *dev;
 	struct usb_ep *in_ep, *out_ep;
@@ -1159,7 +1158,7 @@ static int __devinit gmidi_bind(struct usb_gadget *gadget)
 	/* support optional vendor/distro customization */
 	if (idVendor) {
 		if (!idProduct) {
-			printk(KERN_ERR "idVendor needs idProduct!\n");
+			pr_err("idVendor needs idProduct!\n");
 			return -ENODEV;
 		}
 		device_desc.idVendor = cpu_to_le16(idVendor);
@@ -1191,7 +1190,7 @@ static int __devinit gmidi_bind(struct usb_gadget *gadget)
 	in_ep = usb_ep_autoconfig(gadget, &bulk_in_desc);
 	if (!in_ep) {
 autoconf_fail:
-		printk(KERN_ERR "%s: can't autoconfigure on %s\n",
+		pr_err("%s: can't autoconfigure on %s\n",
 			shortname, gadget->name);
 		return -ENODEV;
 	}
@@ -1213,7 +1212,7 @@ autoconf_fail:
 		 * it SHOULD NOT have problems with bulk-capable hardware.
 		 * so warn about unrecognized controllers, don't panic.
 		 */
-		printk(KERN_WARNING "%s: controller '%s' not recognized\n",
+		pr_warning("%s: controller '%s' not recognized\n",
 			shortname, gadget->name);
 		device_desc.bcdDevice = __constant_cpu_to_le16(0x9999);
 	}

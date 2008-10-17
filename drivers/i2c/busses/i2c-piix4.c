@@ -38,7 +38,6 @@
 #include <linux/ioport.h>
 #include <linux/i2c.h>
 #include <linux/init.h>
-#include <linux/apm_bios.h>
 #include <linux/dmi.h>
 #include <asm/io.h>
 
@@ -105,10 +104,31 @@ MODULE_PARM_DESC(force_addr,
 static int piix4_transaction(void);
 
 static unsigned short piix4_smba;
+static int srvrworks_csb5_delay;
 static struct pci_driver piix4_driver;
 static struct i2c_adapter piix4_adapter;
 
-static struct dmi_system_id __devinitdata piix4_dmi_table[] = {
+static struct dmi_system_id __devinitdata piix4_dmi_blacklist[] = {
+	{
+		.ident = "Sapphire AM2RD790",
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "SAPPHIRE Inc."),
+			DMI_MATCH(DMI_BOARD_NAME, "PC-AM2RD790"),
+		},
+	},
+	{
+		.ident = "DFI Lanparty UT 790FX",
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "DFI Inc."),
+			DMI_MATCH(DMI_BOARD_NAME, "LP UT 790FX"),
+		},
+	},
+	{ }
+};
+
+/* The IBM entry is in a separate table because we only check it
+   on Intel-based systems */
+static struct dmi_system_id __devinitdata piix4_dmi_ibm[] = {
 	{
 		.ident = "IBM",
 		.matches = { DMI_MATCH(DMI_SYS_VENDOR, "IBM"), },
@@ -121,14 +141,22 @@ static int __devinit piix4_setup(struct pci_dev *PIIX4_dev,
 {
 	unsigned char temp;
 
-	/* match up the function */
-	if (PCI_FUNC(PIIX4_dev->devfn) != id->driver_data)
-		return -ENODEV;
-
 	dev_info(&PIIX4_dev->dev, "Found %s device\n", pci_name(PIIX4_dev));
 
+	if ((PIIX4_dev->vendor == PCI_VENDOR_ID_SERVERWORKS) &&
+	    (PIIX4_dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5))
+		srvrworks_csb5_delay = 1;
+
+	/* On some motherboards, it was reported that accessing the SMBus
+	   caused severe hardware problems */
+	if (dmi_check_system(piix4_dmi_blacklist)) {
+		dev_err(&PIIX4_dev->dev,
+			"Accessing the SMBus on this system is unsafe!\n");
+		return -EPERM;
+	}
+
 	/* Don't access SMBus on IBM systems which get corrupted eeproms */
-	if (dmi_check_system(piix4_dmi_table) &&
+	if (dmi_check_system(piix4_dmi_ibm) &&
 			PIIX4_dev->vendor == PCI_VENDOR_ID_INTEL) {
 		dev_err(&PIIX4_dev->dev, "IBM system detected; this module "
 			"may corrupt your serial eeprom! Refusing to load "
@@ -227,7 +255,7 @@ static int piix4_transaction(void)
 			dev_err(&piix4_adapter.dev, "Failed! (%02x)\n", temp);
 			return -1;
 		} else {
-			dev_dbg(&piix4_adapter.dev, "Successfull!\n");
+			dev_dbg(&piix4_adapter.dev, "Successful!\n");
 		}
 	}
 
@@ -235,10 +263,14 @@ static int piix4_transaction(void)
 	outb_p(inb(SMBHSTCNT) | 0x040, SMBHSTCNT);
 
 	/* We will always wait for a fraction of a second! (See PIIX4 docs errata) */
-	do {
+	if (srvrworks_csb5_delay) /* Extra delay for SERVERWORKS_CSB5 */
+		msleep(2);
+	else
 		msleep(1);
-		temp = inb_p(SMBHSTSTS);
-	} while ((temp & 0x01) && (timeout++ < MAX_TIMEOUT));
+
+	while ((timeout++ < MAX_TIMEOUT) &&
+	       ((temp = inb_p(SMBHSTSTS)) & 0x01))
+		msleep(1);
 
 	/* If the SMBus is still busy, we give up */
 	if (timeout >= MAX_TIMEOUT) {
@@ -347,12 +379,7 @@ static s32 piix4_access(struct i2c_adapter * adap, u16 addr,
 
 
 	switch (size) {
-	case PIIX4_BYTE:	/* Where is the result put? I assume here it is in
-				   SMBHSTDAT0 but it might just as well be in the
-				   SMBHSTCMD. No clue in the docs */
-
-		data->byte = inb_p(SMBHSTDAT0);
-		break;
+	case PIIX4_BYTE:
 	case PIIX4_BYTE_DATA:
 		data->byte = inb_p(SMBHSTDAT0);
 		break;
@@ -389,28 +416,21 @@ static struct i2c_adapter piix4_adapter = {
 };
 
 static struct pci_device_id piix4_ids[] = {
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371AB_3),
-	  .driver_data = 3 },
-	{ PCI_DEVICE(PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_IXP200_SMBUS),
-	  .driver_data = 0 },
-	{ PCI_DEVICE(PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_IXP300_SMBUS),
-	  .driver_data = 0 },
-	{ PCI_DEVICE(PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_IXP400_SMBUS),
-	  .driver_data = 0 },
-	{ PCI_DEVICE(PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_SBX00_SMBUS),
-	  .driver_data = 0 },
-	{ PCI_DEVICE(PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_OSB4),
-	  .driver_data = 0 },
-	{ PCI_DEVICE(PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_CSB5),
-	  .driver_data = 0 },
-	{ PCI_DEVICE(PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_CSB6),
-	  .driver_data = 0 },
-	{ PCI_DEVICE(PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_HT1000SB),
-	  .driver_data = 0 },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82443MX_3),
-	  .driver_data = 3 },
-	{ PCI_DEVICE(PCI_VENDOR_ID_EFAR, PCI_DEVICE_ID_EFAR_SLC90E66_3),
-	  .driver_data = 0 },
+	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371AB_3) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82443MX_3) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_EFAR, PCI_DEVICE_ID_EFAR_SLC90E66_3) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_IXP200_SMBUS) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_IXP300_SMBUS) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_IXP400_SMBUS) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_SBX00_SMBUS) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_SERVERWORKS,
+		     PCI_DEVICE_ID_SERVERWORKS_OSB4) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_SERVERWORKS,
+		     PCI_DEVICE_ID_SERVERWORKS_CSB5) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_SERVERWORKS,
+		     PCI_DEVICE_ID_SERVERWORKS_CSB6) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_SERVERWORKS,
+		     PCI_DEVICE_ID_SERVERWORKS_HT1000SB) },
 	{ 0, }
 };
 

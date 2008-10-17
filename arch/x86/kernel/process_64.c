@@ -3,7 +3,7 @@
  *
  *  Pentium III FXSR, SSE support
  *	Gareth Hughes <gareth@valinux.com>, May 2000
- * 
+ *
  *  X86-64 port
  *	Andi Kleen.
  *
@@ -19,24 +19,24 @@
 #include <linux/cpu.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
+#include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
-#include <linux/fs.h>
 #include <linux/elfcore.h>
 #include <linux/smp.h>
 #include <linux/slab.h>
 #include <linux/user.h>
-#include <linux/module.h>
-#include <linux/a.out.h>
 #include <linux/interrupt.h>
-#include <linux/delay.h>
-#include <linux/ptrace.h>
 #include <linux/utsname.h>
+#include <linux/delay.h>
+#include <linux/module.h>
+#include <linux/ptrace.h>
 #include <linux/random.h>
 #include <linux/notifier.h>
 #include <linux/kprobes.h>
 #include <linux/kdebug.h>
 #include <linux/tick.h>
+#include <linux/prctl.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -64,7 +64,6 @@ EXPORT_SYMBOL(boot_option_idle_override);
  */
 void (*pm_idle)(void);
 EXPORT_SYMBOL(pm_idle);
-static DEFINE_PER_CPU(unsigned int, cpu_idle_state);
 
 static ATOMIC_NOTIFIER_HEAD(idle_notifier);
 
@@ -72,13 +71,6 @@ void idle_notifier_register(struct notifier_block *n)
 {
 	atomic_notifier_chain_register(&idle_notifier, n);
 }
-EXPORT_SYMBOL_GPL(idle_notifier_register);
-
-void idle_notifier_unregister(struct notifier_block *n)
-{
-	atomic_notifier_chain_unregister(&idle_notifier, n);
-}
-EXPORT_SYMBOL(idle_notifier_unregister);
 
 void enter_idle(void)
 {
@@ -106,7 +98,7 @@ void exit_idle(void)
  * We use this if we don't have any better
  * idle routine..
  */
-static void default_idle(void)
+void default_idle(void)
 {
 	current_thread_info()->status &= ~TS_POLLING;
 	/*
@@ -114,68 +106,12 @@ static void default_idle(void)
 	 * test NEED_RESCHED:
 	 */
 	smp_mb();
-	local_irq_disable();
-	if (!need_resched()) {
-		/* Enables interrupts one instruction before HLT.
-		   x86 special cases this so there is no race. */
-		safe_halt();
-	} else
+	if (!need_resched())
+		safe_halt();	/* enables interrupts racelessly */
+	else
 		local_irq_enable();
 	current_thread_info()->status |= TS_POLLING;
 }
-
-/*
- * On SMP it's slightly faster (but much more power-consuming!)
- * to poll the ->need_resched flag instead of waiting for the
- * cross-CPU IPI to arrive. Use this option with caution.
- */
-static void poll_idle (void)
-{
-	local_irq_enable();
-	cpu_relax();
-}
-
-static void do_nothing(void *unused)
-{
-}
-
-void cpu_idle_wait(void)
-{
-	unsigned int cpu, this_cpu = get_cpu();
-	cpumask_t map, tmp = current->cpus_allowed;
-
-	set_cpus_allowed(current, cpumask_of_cpu(this_cpu));
-	put_cpu();
-
-	cpus_clear(map);
-	for_each_online_cpu(cpu) {
-		per_cpu(cpu_idle_state, cpu) = 1;
-		cpu_set(cpu, map);
-	}
-
-	__get_cpu_var(cpu_idle_state) = 0;
-
-	wmb();
-	do {
-		ssleep(1);
-		for_each_online_cpu(cpu) {
-			if (cpu_isset(cpu, map) &&
-					!per_cpu(cpu_idle_state, cpu))
-				cpu_clear(cpu, map);
-		}
-		cpus_and(map, map, cpu_online_map);
-		/*
-		 * We waited 1 sec, if a CPU still did not call idle
-		 * it may be because it is in idle and not waking up
-		 * because it has nothing to do.
-		 * Give all the remaining CPUS a kick.
-		 */
-		smp_call_function_mask(map, do_nothing, 0, 0);
-	} while (!cpus_empty(map));
-
-	set_cpus_allowed(current, tmp);
-}
-EXPORT_SYMBOL_GPL(cpu_idle_wait);
 
 #ifdef CONFIG_HOTPLUG_CPU
 DECLARE_PER_CPU(int, cpu_state);
@@ -207,7 +143,7 @@ static inline void play_dead(void)
  * low exit latency (ie sit in a loop waiting for
  * somebody to say that they'd like to reschedule)
  */
-void cpu_idle (void)
+void cpu_idle(void)
 {
 	current_thread_info()->status |= TS_POLLING;
 	/* endless idle loop with no priority at all */
@@ -215,9 +151,6 @@ void cpu_idle (void)
 		tick_nohz_stop_sched_tick();
 		while (!need_resched()) {
 			void (*idle)(void);
-
-			if (__get_cpu_var(cpu_idle_state))
-				__get_cpu_var(cpu_idle_state) = 0;
 
 			rmb();
 			idle = pm_idle;
@@ -246,81 +179,13 @@ void cpu_idle (void)
 	}
 }
 
-/*
- * This uses new MONITOR/MWAIT instructions on P4 processors with PNI,
- * which can obviate IPI to trigger checking of need_resched.
- * We execute MONITOR against need_resched and enter optimized wait state
- * through MWAIT. Whenever someone changes need_resched, we would be woken
- * up from MWAIT (without an IPI).
- *
- * New with Core Duo processors, MWAIT can take some hints based on CPU
- * capability.
- */
-void mwait_idle_with_hints(unsigned long eax, unsigned long ecx)
-{
-	if (!need_resched()) {
-		__monitor((void *)&current_thread_info()->flags, 0, 0);
-		smp_mb();
-		if (!need_resched())
-			__mwait(eax, ecx);
-	}
-}
-
-/* Default MONITOR/MWAIT with no hints, used for default C1 state */
-static void mwait_idle(void)
-{
-	if (!need_resched()) {
-		__monitor((void *)&current_thread_info()->flags, 0, 0);
-		smp_mb();
-		if (!need_resched())
-			__sti_mwait(0, 0);
-		else
-			local_irq_enable();
-	} else {
-		local_irq_enable();
-	}
-}
-
-void __cpuinit select_idle_routine(const struct cpuinfo_x86 *c)
-{
-	static int printed;
-	if (cpu_has(c, X86_FEATURE_MWAIT)) {
-		/*
-		 * Skip, if setup has overridden idle.
-		 * One CPU supports mwait => All CPUs supports mwait
-		 */
-		if (!pm_idle) {
-			if (!printed) {
-				printk(KERN_INFO "using mwait in idle threads.\n");
-				printed = 1;
-			}
-			pm_idle = mwait_idle;
-		}
-	}
-}
-
-static int __init idle_setup (char *str)
-{
-	if (!strcmp(str, "poll")) {
-		printk("using polling idle threads.\n");
-		pm_idle = poll_idle;
-	} else if (!strcmp(str, "mwait"))
-		force_mwait = 1;
-	else
-		return -1;
-
-	boot_option_idle_override = 1;
-	return 0;
-}
-early_param("idle", idle_setup);
-
-/* Prints also some state that isn't saved in the pt_regs */ 
+/* Prints also some state that isn't saved in the pt_regs */
 void __show_regs(struct pt_regs * regs)
 {
 	unsigned long cr0 = 0L, cr2 = 0L, cr3 = 0L, cr4 = 0L, fs, gs, shadowgs;
 	unsigned long d0, d1, d2, d3, d6, d7;
-	unsigned int fsindex,gsindex;
-	unsigned int ds,cs,es; 
+	unsigned int fsindex, gsindex;
+	unsigned int ds, cs, es;
 
 	printk("\n");
 	print_modules();
@@ -329,16 +194,16 @@ void __show_regs(struct pt_regs * regs)
 		init_utsname()->release,
 		(int)strcspn(init_utsname()->version, " "),
 		init_utsname()->version);
-	printk("RIP: %04lx:[<%016lx>] ", regs->cs & 0xffff, regs->rip);
-	printk_address(regs->rip); 
-	printk("RSP: %04lx:%016lx  EFLAGS: %08lx\n", regs->ss, regs->rsp,
-		regs->eflags);
+	printk("RIP: %04lx:[<%016lx>] ", regs->cs & 0xffff, regs->ip);
+	printk_address(regs->ip, 1);
+	printk("RSP: %04lx:%016lx  EFLAGS: %08lx\n", regs->ss, regs->sp,
+		regs->flags);
 	printk("RAX: %016lx RBX: %016lx RCX: %016lx\n",
-	       regs->rax, regs->rbx, regs->rcx);
+	       regs->ax, regs->bx, regs->cx);
 	printk("RDX: %016lx RSI: %016lx RDI: %016lx\n",
-	       regs->rdx, regs->rsi, regs->rdi); 
+	       regs->dx, regs->si, regs->di);
 	printk("RBP: %016lx R08: %016lx R09: %016lx\n",
-	       regs->rbp, regs->r8, regs->r9); 
+	       regs->bp, regs->r8, regs->r9);
 	printk("R10: %016lx R11: %016lx R12: %016lx\n",
 	       regs->r10, regs->r11, regs->r12); 
 	printk("R13: %016lx R14: %016lx R15: %016lx\n",
@@ -378,7 +243,7 @@ void show_regs(struct pt_regs *regs)
 {
 	printk("CPU %d:", smp_processor_id());
 	__show_regs(regs);
-	show_trace(NULL, regs, (void *)(regs + 1));
+	show_trace(NULL, regs, (void *)(regs + 1), regs->bp);
 }
 
 /*
@@ -389,7 +254,7 @@ void exit_thread(void)
 	struct task_struct *me = current;
 	struct thread_struct *t = &me->thread;
 
-	if (me->thread.io_bitmap_ptr) { 
+	if (me->thread.io_bitmap_ptr) {
 		struct tss_struct *tss = &per_cpu(init_tss, get_cpu());
 
 		kfree(t->io_bitmap_ptr);
@@ -425,10 +290,11 @@ void flush_thread(void)
 	tsk->thread.debugreg3 = 0;
 	tsk->thread.debugreg6 = 0;
 	tsk->thread.debugreg7 = 0;
-	memset(tsk->thread.tls_array, 0, sizeof(tsk->thread.tls_array));	
+	memset(tsk->thread.tls_array, 0, sizeof(tsk->thread.tls_array));
 	/*
 	 * Forget coprocessor state..
 	 */
+	tsk->fpu_counter = 0;
 	clear_fpu(tsk);
 	clear_used_math();
 }
@@ -448,26 +314,21 @@ void release_thread(struct task_struct *dead_task)
 
 static inline void set_32bit_tls(struct task_struct *t, int tls, u32 addr)
 {
-	struct user_desc ud = { 
+	struct user_desc ud = {
 		.base_addr = addr,
 		.limit = 0xfffff,
 		.seg_32bit = 1,
 		.limit_in_pages = 1,
 		.useable = 1,
 	};
-	struct n_desc_struct *desc = (void *)t->thread.tls_array;
+	struct desc_struct *desc = t->thread.tls_array;
 	desc += tls;
-	desc->a = LDT_entry_a(&ud); 
-	desc->b = LDT_entry_b(&ud); 
+	fill_ldt(desc, &ud);
 }
 
 static inline u32 read_32bit_tls(struct task_struct *t, int tls)
 {
-	struct desc_struct *desc = (void *)t->thread.tls_array;
-	desc += tls;
-	return desc->base0 | 
-		(((u32)desc->base1) << 16) | 
-		(((u32)desc->base2) << 24);
+	return get_desc_base(&t->thread.tls_array[tls]);
 }
 
 /*
@@ -479,7 +340,7 @@ void prepare_to_copy(struct task_struct *tsk)
 	unlazy_fpu(tsk);
 }
 
-int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp, 
+int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 		unsigned long unused,
 	struct task_struct * p, struct pt_regs * regs)
 {
@@ -491,14 +352,14 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 			(THREAD_SIZE + task_stack_page(p))) - 1;
 	*childregs = *regs;
 
-	childregs->rax = 0;
-	childregs->rsp = rsp;
-	if (rsp == ~0UL)
-		childregs->rsp = (unsigned long)childregs;
+	childregs->ax = 0;
+	childregs->sp = sp;
+	if (sp == ~0UL)
+		childregs->sp = (unsigned long)childregs;
 
-	p->thread.rsp = (unsigned long) childregs;
-	p->thread.rsp0 = (unsigned long) (childregs+1);
-	p->thread.userrsp = me->thread.userrsp; 
+	p->thread.sp = (unsigned long) childregs;
+	p->thread.sp0 = (unsigned long) (childregs+1);
+	p->thread.usersp = me->thread.usersp;
 
 	set_tsk_thread_flag(p, TIF_FORK);
 
@@ -519,7 +380,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 		memcpy(p->thread.io_bitmap_ptr, me->thread.io_bitmap_ptr,
 				IO_BITMAP_BYTES);
 		set_tsk_thread_flag(p, TIF_IO_BITMAP);
-	} 
+	}
 
 	/*
 	 * Set a new TLS for the child thread?
@@ -527,7 +388,8 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 	if (clone_flags & CLONE_SETTLS) {
 #ifdef CONFIG_IA32_EMULATION
 		if (test_thread_flag(TIF_IA32))
-			err = ia32_child_tls(p, childregs); 
+			err = do_set_thread_area(p, -1,
+				(struct user_desc __user *)childregs->si, 0);
 		else 			
 #endif	 
 			err = do_arch_prctl(p, ARCH_SET_FS, childregs->r8); 
@@ -543,19 +405,109 @@ out:
 	return err;
 }
 
+void
+start_thread(struct pt_regs *regs, unsigned long new_ip, unsigned long new_sp)
+{
+	asm volatile("movl %0, %%fs; movl %0, %%es; movl %0, %%ds" :: "r"(0));
+	load_gs_index(0);
+	regs->ip		= new_ip;
+	regs->sp		= new_sp;
+	write_pda(oldrsp, new_sp);
+	regs->cs		= __USER_CS;
+	regs->ss		= __USER_DS;
+	regs->flags		= 0x200;
+	set_fs(USER_DS);
+	/*
+	 * Free the old FP and other extended state
+	 */
+	free_thread_xstate(current);
+}
+EXPORT_SYMBOL_GPL(start_thread);
+
+static void hard_disable_TSC(void)
+{
+	write_cr4(read_cr4() | X86_CR4_TSD);
+}
+
+void disable_TSC(void)
+{
+	preempt_disable();
+	if (!test_and_set_thread_flag(TIF_NOTSC))
+		/*
+		 * Must flip the CPU state synchronously with
+		 * TIF_NOTSC in the current running context.
+		 */
+		hard_disable_TSC();
+	preempt_enable();
+}
+
+static void hard_enable_TSC(void)
+{
+	write_cr4(read_cr4() & ~X86_CR4_TSD);
+}
+
+static void enable_TSC(void)
+{
+	preempt_disable();
+	if (test_and_clear_thread_flag(TIF_NOTSC))
+		/*
+		 * Must flip the CPU state synchronously with
+		 * TIF_NOTSC in the current running context.
+		 */
+		hard_enable_TSC();
+	preempt_enable();
+}
+
+int get_tsc_mode(unsigned long adr)
+{
+	unsigned int val;
+
+	if (test_thread_flag(TIF_NOTSC))
+		val = PR_TSC_SIGSEGV;
+	else
+		val = PR_TSC_ENABLE;
+
+	return put_user(val, (unsigned int __user *)adr);
+}
+
+int set_tsc_mode(unsigned int val)
+{
+	if (val == PR_TSC_SIGSEGV)
+		disable_TSC();
+	else if (val == PR_TSC_ENABLE)
+		enable_TSC();
+	else
+		return -EINVAL;
+
+	return 0;
+}
+
 /*
  * This special macro can be used to load a debugging register
  */
-#define loaddebug(thread,r) set_debugreg(thread->debugreg ## r, r)
+#define loaddebug(thread, r) set_debugreg(thread->debugreg ## r, r)
 
 static inline void __switch_to_xtra(struct task_struct *prev_p,
-			     	    struct task_struct *next_p,
-			     	    struct tss_struct *tss)
+				    struct task_struct *next_p,
+				    struct tss_struct *tss)
 {
 	struct thread_struct *prev, *next;
+	unsigned long debugctl;
 
 	prev = &prev_p->thread,
 	next = &next_p->thread;
+
+	debugctl = prev->debugctlmsr;
+	if (next->ds_area_msr != prev->ds_area_msr) {
+		/* we clear debugctl to make sure DS
+		 * is not in use when we change it */
+		debugctl = 0;
+		update_debugctlmsr(0);
+		wrmsrl(MSR_IA32_DS_AREA, next->ds_area_msr);
+	}
+
+	if (next->debugctlmsr != debugctl)
+		update_debugctlmsr(next->debugctlmsr);
 
 	if (test_tsk_thread_flag(next_p, TIF_DEBUG)) {
 		loaddebug(next, 0);
@@ -565,6 +517,15 @@ static inline void __switch_to_xtra(struct task_struct *prev_p,
 		/* no 4 and 5 */
 		loaddebug(next, 6);
 		loaddebug(next, 7);
+	}
+
+	if (test_tsk_thread_flag(prev_p, TIF_NOTSC) ^
+	    test_tsk_thread_flag(next_p, TIF_NOTSC)) {
+		/* prev and next are different */
+		if (test_tsk_thread_flag(next_p, TIF_NOTSC))
+			hard_disable_TSC();
+		else
+			hard_enable_TSC();
 	}
 
 	if (test_tsk_thread_flag(next_p, TIF_IO_BITMAP)) {
@@ -580,12 +541,20 @@ static inline void __switch_to_xtra(struct task_struct *prev_p,
 		 */
 		memset(tss->io_bitmap, 0xff, prev->io_bitmap_max);
 	}
+
+#ifdef X86_BTS
+	if (test_tsk_thread_flag(prev_p, TIF_BTS_TRACE_TS))
+		ptrace_bts_take_timestamp(prev_p, BTS_TASK_DEPARTS);
+
+	if (test_tsk_thread_flag(next_p, TIF_BTS_TRACE_TS))
+		ptrace_bts_take_timestamp(next_p, BTS_TASK_ARRIVES);
+#endif
 }
 
 /*
  *	switch_to(x,y) should switch tasks from x to y.
  *
- * This could still be optimized: 
+ * This could still be optimized:
  * - fold all the options into a flag word and test it with a single test.
  * - could test fs/gs bitsliced
  *
@@ -596,17 +565,17 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
 	struct thread_struct *prev = &prev_p->thread,
 				 *next = &next_p->thread;
-	int cpu = smp_processor_id();  
+	int cpu = smp_processor_id();
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
 
 	/* we're going to use this soon, after a few expensive things */
 	if (next_p->fpu_counter>5)
-		prefetch(&next->i387.fxsave);
+		prefetch(next->xstate);
 
 	/*
 	 * Reload esp0, LDT and the page table pointer:
 	 */
-	tss->rsp0 = next->rsp0;
+	load_sp0(tss, next);
 
 	/* 
 	 * Switch DS and ES.
@@ -665,8 +634,8 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	/* 
 	 * Switch the PDA and FPU contexts.
 	 */
-	prev->userrsp = read_pda(oldrsp); 
-	write_pda(oldrsp, next->userrsp); 
+	prev->usersp = read_pda(oldrsp);
+	write_pda(oldrsp, next->usersp);
 	write_pda(pcurrent, next_p); 
 
 	write_pda(kernelstack,
@@ -683,15 +652,18 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	/*
 	 * Now maybe reload the debug registers and handle I/O bitmaps
 	 */
-	if (unlikely((task_thread_info(next_p)->flags & _TIF_WORK_CTXSW))
-	    || test_tsk_thread_flag(prev_p, TIF_IO_BITMAP))
+	if (unlikely(task_thread_info(next_p)->flags & _TIF_WORK_CTXSW_NEXT ||
+		     task_thread_info(prev_p)->flags & _TIF_WORK_CTXSW_PREV))
 		__switch_to_xtra(prev_p, next_p, tss);
 
 	/* If the task has used fpu the last 5 timeslices, just do a full
 	 * restore of the math state immediately to avoid the trap; the
 	 * chances of needing FPU soon are obviously high now
+	 *
+	 * tsk_used_math() checks prevent calling math_state_restore(),
+	 * which can sleep in the case of !tsk_used_math()
 	 */
-	if (next_p->fpu_counter>5)
+	if (tsk_used_math(next_p) && next_p->fpu_counter > 5)
 		math_state_restore();
 	return prev_p;
 }
@@ -699,23 +671,18 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 /*
  * sys_execve() executes a new program.
  */
-asmlinkage 
+asmlinkage
 long sys_execve(char __user *name, char __user * __user *argv,
-		char __user * __user *envp, struct pt_regs regs)
+		char __user * __user *envp, struct pt_regs *regs)
 {
 	long error;
 	char * filename;
 
 	filename = getname(name);
 	error = PTR_ERR(filename);
-	if (IS_ERR(filename)) 
+	if (IS_ERR(filename))
 		return error;
-	error = do_execve(filename, argv, envp, &regs); 
-	if (error == 0) {
-		task_lock(current);
-		current->ptrace &= ~PT_DTRACE;
-		task_unlock(current);
-	}
+	error = do_execve(filename, argv, envp, regs);
 	putname(filename);
 	return error;
 }
@@ -725,18 +692,18 @@ void set_personality_64bit(void)
 	/* inherit personality from parent */
 
 	/* Make sure to be in 64bit mode */
-	clear_thread_flag(TIF_IA32); 
+	clear_thread_flag(TIF_IA32);
 
 	/* TBD: overwrites user setup. Should have two bits.
 	   But 64bit processes have always behaved this way,
 	   so it's not too bad. The main problem is just that
-   	   32bit childs are affected again. */
+	   32bit childs are affected again. */
 	current->personality &= ~READ_IMPLIES_EXEC;
 }
 
 asmlinkage long sys_fork(struct pt_regs *regs)
 {
-	return do_fork(SIGCHLD, regs->rsp, regs, 0, NULL, NULL);
+	return do_fork(SIGCHLD, regs->sp, regs, 0, NULL, NULL);
 }
 
 asmlinkage long
@@ -744,7 +711,7 @@ sys_clone(unsigned long clone_flags, unsigned long newsp,
 	  void __user *parent_tid, void __user *child_tid, struct pt_regs *regs)
 {
 	if (!newsp)
-		newsp = regs->rsp;
+		newsp = regs->sp;
 	return do_fork(clone_flags, newsp, regs, 0, parent_tid, child_tid);
 }
 
@@ -760,29 +727,29 @@ sys_clone(unsigned long clone_flags, unsigned long newsp,
  */
 asmlinkage long sys_vfork(struct pt_regs *regs)
 {
-	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->rsp, regs, 0,
+	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->sp, regs, 0,
 		    NULL, NULL);
 }
 
 unsigned long get_wchan(struct task_struct *p)
 {
 	unsigned long stack;
-	u64 fp,rip;
+	u64 fp,ip;
 	int count = 0;
 
 	if (!p || p == current || p->state==TASK_RUNNING)
 		return 0; 
 	stack = (unsigned long)task_stack_page(p);
-	if (p->thread.rsp < stack || p->thread.rsp > stack+THREAD_SIZE)
+	if (p->thread.sp < stack || p->thread.sp > stack+THREAD_SIZE)
 		return 0;
-	fp = *(u64 *)(p->thread.rsp);
+	fp = *(u64 *)(p->thread.sp);
 	do { 
 		if (fp < (unsigned long)stack ||
 		    fp > (unsigned long)stack+THREAD_SIZE)
 			return 0; 
-		rip = *(u64 *)(fp+8); 
-		if (!in_sched_functions(rip))
-			return rip; 
+		ip = *(u64 *)(fp+8);
+		if (!in_sched_functions(ip))
+			return ip;
 		fp = *(u64 *)fp; 
 	} while (count++ < 16); 
 	return 0;
@@ -823,19 +790,19 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 		/* Not strictly needed for fs, but do it for symmetry
 		   with gs */
 		if (addr >= TASK_SIZE_OF(task))
-			return -EPERM; 
+			return -EPERM;
 		cpu = get_cpu();
-		/* handle small bases via the GDT because that's faster to 
+		/* handle small bases via the GDT because that's faster to
 		   switch. */
-		if (addr <= 0xffffffff) { 
+		if (addr <= 0xffffffff) {
 			set_32bit_tls(task, FS_TLS, addr);
-			if (doit) { 
-				load_TLS(&task->thread, cpu); 
+			if (doit) {
+				load_TLS(&task->thread, cpu);
 				asm volatile("movl %0,%%fs" :: "r"(FS_TLS_SEL));
 			}
 			task->thread.fsindex = FS_TLS_SEL;
 			task->thread.fs = 0;
-		} else { 
+		} else {
 			task->thread.fsindex = 0;
 			task->thread.fs = addr;
 			if (doit) {
@@ -847,24 +814,24 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 		}
 		put_cpu();
 		break;
-	case ARCH_GET_FS: { 
-		unsigned long base; 
+	case ARCH_GET_FS: {
+		unsigned long base;
 		if (task->thread.fsindex == FS_TLS_SEL)
 			base = read_32bit_tls(task, FS_TLS);
 		else if (doit)
 			rdmsrl(MSR_FS_BASE, base);
 		else
 			base = task->thread.fs;
-		ret = put_user(base, (unsigned long __user *)addr); 
-		break; 
+		ret = put_user(base, (unsigned long __user *)addr);
+		break;
 	}
-	case ARCH_GET_GS: { 
+	case ARCH_GET_GS: {
 		unsigned long base;
 		unsigned gsindex;
 		if (task->thread.gsindex == GS_TLS_SEL)
 			base = read_32bit_tls(task, GS_TLS);
 		else if (doit) {
- 			asm("movl %%gs,%0" : "=r" (gsindex));
+			asm("movl %%gs,%0" : "=r" (gsindex));
 			if (gsindex)
 				rdmsrl(MSR_KERNEL_GS_BASE, base);
 			else
@@ -872,39 +839,21 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 		}
 		else
 			base = task->thread.gs;
-		ret = put_user(base, (unsigned long __user *)addr); 
+		ret = put_user(base, (unsigned long __user *)addr);
 		break;
 	}
 
 	default:
 		ret = -EINVAL;
 		break;
-	} 
+	}
 
-	return ret;	
-} 
+	return ret;
+}
 
 long sys_arch_prctl(int code, unsigned long addr)
 {
 	return do_arch_prctl(current, code, addr);
-} 
-
-/* 
- * Capture the user space registers if the task is not running (in user space)
- */
-int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
-{
-	struct pt_regs *pp, ptregs;
-
-	pp = task_pt_regs(tsk);
-
-	ptregs = *pp; 
-	ptregs.cs &= 0xffff;
-	ptregs.ss &= 0xffff;
-
-	elf_core_copy_regs(regs, &ptregs);
- 
-	return 1;
 }
 
 unsigned long arch_align_stack(unsigned long sp)
@@ -912,4 +861,10 @@ unsigned long arch_align_stack(unsigned long sp)
 	if (!(current->personality & ADDR_NO_RANDOMIZE) && randomize_va_space)
 		sp -= get_random_int() % 8192;
 	return sp & ~0xf;
+}
+
+unsigned long arch_randomize_brk(struct mm_struct *mm)
+{
+	unsigned long range_end = mm->brk + 0x02000000;
+	return randomize_range(mm->brk, range_end, 0) ? : mm->brk;
 }

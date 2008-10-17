@@ -28,7 +28,7 @@ u8 sleep_states[ACPI_S_STATE_COUNT];
 static u32 acpi_target_sleep_state = ACPI_STATE_S0;
 #endif
 
-int acpi_sleep_prepare(u32 acpi_state)
+static int acpi_sleep_prepare(u32 acpi_state)
 {
 #ifdef CONFIG_ACPI_SLEEP
 	/* do we have a wakeup address for S2 and S3? */
@@ -36,20 +36,21 @@ int acpi_sleep_prepare(u32 acpi_state)
 		if (!acpi_wakeup_address) {
 			return -EFAULT;
 		}
-		acpi_set_firmware_waking_vector((acpi_physical_address)
-						virt_to_phys((void *)
-							     acpi_wakeup_address));
+		acpi_set_firmware_waking_vector(
+				(acpi_physical_address)acpi_wakeup_address);
 
 	}
 	ACPI_FLUSH_CPU_CACHE();
 	acpi_enable_wakeup_device_prep(acpi_state);
 #endif
+	printk(KERN_INFO PREFIX "Preparing to enter system sleep state S%d\n",
+		acpi_state);
 	acpi_enter_sleep_state_prep(acpi_state);
 	return 0;
 }
 
 #ifdef CONFIG_SUSPEND
-static struct platform_suspend_ops acpi_pm_ops;
+static struct platform_suspend_ops acpi_suspend_ops;
 
 extern void do_suspend_lowlevel(void);
 
@@ -63,11 +64,11 @@ static u32 acpi_suspend_states[] = {
 static int init_8259A_after_S1;
 
 /**
- *	acpi_pm_set_target - Set the target system sleep state to the state
+ *	acpi_suspend_begin - Set the target system sleep state to the state
  *		associated with given @pm_state, if supported.
  */
 
-static int acpi_pm_set_target(suspend_state_t pm_state)
+static int acpi_suspend_begin(suspend_state_t pm_state)
 {
 	u32 acpi_state = acpi_suspend_states[pm_state];
 	int error = 0;
@@ -83,24 +84,26 @@ static int acpi_pm_set_target(suspend_state_t pm_state)
 }
 
 /**
- *	acpi_pm_prepare - Do preliminary suspend work.
+ *	acpi_suspend_prepare - Do preliminary suspend work.
  *
  *	If necessary, set the firmware waking vector and do arch-specific
  *	nastiness to get the wakeup code to the waking vector.
  */
 
-static int acpi_pm_prepare(void)
+static int acpi_suspend_prepare(void)
 {
 	int error = acpi_sleep_prepare(acpi_target_sleep_state);
 
-	if (error)
+	if (error) {
 		acpi_target_sleep_state = ACPI_STATE_S0;
+		return error;
+	}
 
-	return error;
+	return ACPI_SUCCESS(acpi_hw_disable_all_gpes()) ? 0 : -EFAULT;
 }
 
 /**
- *	acpi_pm_enter - Actually enter a sleep state.
+ *	acpi_suspend_enter - Actually enter a sleep state.
  *	@pm_state: ignored
  *
  *	Flush caches and go to sleep. For STR we have to call arch-specific
@@ -108,7 +111,7 @@ static int acpi_pm_prepare(void)
  *	It's unfortunate, but it works. Please fix if you're feeling frisky.
  */
 
-static int acpi_pm_enter(suspend_state_t pm_state)
+static int acpi_suspend_enter(suspend_state_t pm_state)
 {
 	acpi_status status = AE_OK;
 	unsigned long flags = 0;
@@ -120,10 +123,8 @@ static int acpi_pm_enter(suspend_state_t pm_state)
 	if (acpi_state == ACPI_STATE_S3) {
 		int error = acpi_save_state_mem();
 
-		if (error) {
-			acpi_target_sleep_state = ACPI_STATE_S0;
+		if (error)
 			return error;
-		}
 	}
 
 	local_irq_save(flags);
@@ -139,12 +140,22 @@ static int acpi_pm_enter(suspend_state_t pm_state)
 		break;
 	}
 
-	/* ACPI 3.0 specs (P62) says that it's the responsabilty
+	/* Reprogram control registers and execute _BFS */
+	acpi_leave_sleep_state_prep(acpi_state);
+
+	/* ACPI 3.0 specs (P62) says that it's the responsibility
 	 * of the OSPM to clear the status bit [ implying that the
 	 * POWER_BUTTON event should not reach userspace ]
 	 */
 	if (ACPI_SUCCESS(status) && (acpi_state == ACPI_STATE_S3))
 		acpi_clear_event(ACPI_EVENT_POWER_BUTTON);
+
+	/*
+	 * Disable and clear GPE status before interrupt is enabled. Some GPEs
+	 * (like wakeup GPE) haven't handler, this can avoid such GPE misfire.
+	 * acpi_leave_sleep_state will reenable specific GPEs later
+	 */
+	acpi_hw_disable_all_gpes();
 
 	local_irq_restore(flags);
 	printk(KERN_DEBUG "Back to C!\n");
@@ -157,13 +168,13 @@ static int acpi_pm_enter(suspend_state_t pm_state)
 }
 
 /**
- *	acpi_pm_finish - Finish up suspend sequence.
+ *	acpi_suspend_finish - Instruct the platform to leave a sleep state.
  *
  *	This is called after we wake back up (or if entering the sleep state
  *	failed). 
  */
 
-static void acpi_pm_finish(void)
+static void acpi_suspend_finish(void)
 {
 	u32 acpi_state = acpi_target_sleep_state;
 
@@ -183,7 +194,20 @@ static void acpi_pm_finish(void)
 #endif
 }
 
-static int acpi_pm_state_valid(suspend_state_t pm_state)
+/**
+ *	acpi_suspend_end - Finish up suspend sequence.
+ */
+
+static void acpi_suspend_end(void)
+{
+	/*
+	 * This is necessary in case acpi_suspend_finish() is not called during a
+	 * failing transition to a sleep state.
+	 */
+	acpi_target_sleep_state = ACPI_STATE_S0;
+}
+
+static int acpi_suspend_state_valid(suspend_state_t pm_state)
 {
 	u32 acpi_state;
 
@@ -199,12 +223,13 @@ static int acpi_pm_state_valid(suspend_state_t pm_state)
 	}
 }
 
-static struct platform_suspend_ops acpi_pm_ops = {
-	.valid = acpi_pm_state_valid,
-	.set_target = acpi_pm_set_target,
-	.prepare = acpi_pm_prepare,
-	.enter = acpi_pm_enter,
-	.finish = acpi_pm_finish,
+static struct platform_suspend_ops acpi_suspend_ops = {
+	.valid = acpi_suspend_state_valid,
+	.begin = acpi_suspend_begin,
+	.prepare = acpi_suspend_prepare,
+	.enter = acpi_suspend_enter,
+	.finish = acpi_suspend_finish,
+	.end = acpi_suspend_end,
 };
 
 /*
@@ -229,15 +254,23 @@ static struct dmi_system_id __initdata acpisleep_dmi_table[] = {
 #endif /* CONFIG_SUSPEND */
 
 #ifdef CONFIG_HIBERNATION
-static int acpi_hibernation_start(void)
+static int acpi_hibernation_begin(void)
 {
 	acpi_target_sleep_state = ACPI_STATE_S4;
+
 	return 0;
 }
 
 static int acpi_hibernation_prepare(void)
 {
-	return acpi_sleep_prepare(ACPI_STATE_S4);
+	int error = acpi_sleep_prepare(ACPI_STATE_S4);
+
+	if (error) {
+		acpi_target_sleep_state = ACPI_STATE_S0;
+		return error;
+	}
+
+	return ACPI_SUCCESS(acpi_hw_disable_all_gpes()) ? 0 : -EFAULT;
 }
 
 static int acpi_hibernation_enter(void)
@@ -251,6 +284,8 @@ static int acpi_hibernation_enter(void)
 	acpi_enable_wakeup_device(ACPI_STATE_S4);
 	/* This shouldn't return.  If it returns, we have a problem */
 	status = acpi_enter_sleep_state(ACPI_STATE_S4);
+	/* Reprogram control registers and execute _BFS */
+	acpi_leave_sleep_state_prep(ACPI_STATE_S4);
 	local_irq_restore(flags);
 
 	return ACPI_SUCCESS(status) ? 0 : -EFAULT;
@@ -263,21 +298,27 @@ static void acpi_hibernation_leave(void)
 	 * enable it here.
 	 */
 	acpi_enable();
+	/* Reprogram control registers and execute _BFS */
+	acpi_leave_sleep_state_prep(ACPI_STATE_S4);
 }
 
 static void acpi_hibernation_finish(void)
 {
-	/*
-	 * If ACPI is not enabled by the BIOS and the boot kernel, we need to
-	 * enable it here.
-	 */
-	acpi_enable();
 	acpi_disable_wakeup_device(ACPI_STATE_S4);
 	acpi_leave_sleep_state(ACPI_STATE_S4);
 
 	/* reset firmware waking vector */
 	acpi_set_firmware_waking_vector((acpi_physical_address) 0);
 
+	acpi_target_sleep_state = ACPI_STATE_S0;
+}
+
+static void acpi_hibernation_end(void)
+{
+	/*
+	 * This is necessary in case acpi_hibernation_finish() is not called
+	 * during a failing transition to the sleep state.
+	 */
 	acpi_target_sleep_state = ACPI_STATE_S0;
 }
 
@@ -296,7 +337,8 @@ static void acpi_hibernation_restore_cleanup(void)
 }
 
 static struct platform_hibernation_ops acpi_hibernation_ops = {
-	.start = acpi_hibernation_start,
+	.begin = acpi_hibernation_begin,
+	.end = acpi_hibernation_end,
 	.pre_snapshot = acpi_hibernation_prepare,
 	.finish = acpi_hibernation_finish,
 	.prepare = acpi_hibernation_prepare,
@@ -386,11 +428,20 @@ int acpi_pm_device_sleep_state(struct device *dev, int wake, int *d_min_p)
 	if (acpi_target_sleep_state == ACPI_STATE_S0 ||
 	    (wake && adev->wakeup.state.enabled &&
 	     adev->wakeup.sleep_state <= acpi_target_sleep_state)) {
+		acpi_status status;
+
 		acpi_method[3] = 'W';
-		acpi_evaluate_integer(handle, acpi_method, NULL, &d_max);
-		/* Sanity check */
-		if (d_max < d_min)
+		status = acpi_evaluate_integer(handle, acpi_method, NULL,
+						&d_max);
+		if (ACPI_FAILURE(status)) {
+			d_max = d_min;
+		} else if (d_max < d_min) {
+			/* Warn the user of the broken DSDT */
+			printk(KERN_WARNING "ACPI: Wrong value from %s\n",
+				acpi_method);
+			/* Sanitize it */
 			d_min = d_max;
+		}
 	}
 
 	if (d_min_p)
@@ -403,12 +454,13 @@ static void acpi_power_off_prepare(void)
 {
 	/* Prepare to power off the system */
 	acpi_sleep_prepare(ACPI_STATE_S5);
+	acpi_hw_disable_all_gpes();
 }
 
 static void acpi_power_off(void)
 {
 	/* acpi_sleep_prepare(ACPI_STATE_S5) should have already been called */
-	printk("%s called\n", __FUNCTION__);
+	printk("%s called\n", __func__);
 	local_irq_disable();
 	acpi_enable_wakeup_device(ACPI_STATE_S5);
 	acpi_enter_sleep_state(ACPI_STATE_S5);
@@ -439,7 +491,7 @@ int __init acpi_sleep_init(void)
 		}
 	}
 
-	suspend_set_ops(&acpi_pm_ops);
+	suspend_set_ops(&acpi_suspend_ops);
 #endif
 
 #ifdef CONFIG_HIBERNATION

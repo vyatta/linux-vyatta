@@ -384,7 +384,7 @@ static void reset_phy(struct net_device *dev)
 	/* Wait until PHY reset is complete */
 	do {
 		read_phy(lp->phy_address, MII_BMCR, &bmcr);
-	} while (!(bmcr && BMCR_RESET));
+	} while (!(bmcr & BMCR_RESET));
 
 	disable_mdi();
 	spin_unlock_irq(&lp->lock);
@@ -1043,7 +1043,9 @@ static int __init at91ether_setup(unsigned long phy_type, unsigned short phy_add
 	} else if (machine_is_csb337()) {
 		/* mix link activity status into LED2 link state */
 		write_phy(phy_address, MII_LEDCTRL_REG, 0x0d22);
-	}
+	} else if (machine_is_ecbat91())
+		write_phy(phy_address, MII_LEDCTRL_REG, 0x156A);
+
 	disable_mdi();
 	spin_unlock_irq(&lp->lock);
 
@@ -1246,3 +1248,4 @@ module_exit(at91ether_exit)
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("AT91RM9200 EMAC Ethernet driver");
 MODULE_AUTHOR("Andrew Victor");
+MODULE_ALIAS("platform:" DRV_NAME);

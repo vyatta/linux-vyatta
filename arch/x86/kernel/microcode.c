@@ -244,8 +244,8 @@ static int microcode_sanity_check(void *mc)
 		return 0;
 	/* check extended signature checksum */
 	for (i = 0; i < ext_sigcount; i++) {
-		ext_sig = (struct extended_signature *)((void *)ext_header
-			+ EXT_HEADER_SIZE + EXT_SIGNATURE_SIZE * i);
+		ext_sig = (void *)ext_header + EXT_HEADER_SIZE +
+			  EXT_SIGNATURE_SIZE * i;
 		sum = orig_sum
 			- (mc_header->sig + mc_header->pf + mc_header->cksum)
 			+ (ext_sig->sig + ext_sig->pf + ext_sig->cksum);
@@ -279,11 +279,9 @@ static int get_maching_microcode(void *mc, int cpu)
 	if (total_size <= get_datasize(mc_header) + MC_HEADER_SIZE)
 		return 0;
 
-	ext_header = (struct extended_sigtable *)(mc +
-			get_datasize(mc_header) + MC_HEADER_SIZE);
+	ext_header = mc + get_datasize(mc_header) + MC_HEADER_SIZE;
 	ext_sigcount = ext_header->count;
-	ext_sig = (struct extended_signature *)((void *)ext_header
-			+ EXT_HEADER_SIZE);
+	ext_sig = (void *)ext_header + EXT_HEADER_SIZE;
 	for (i = 0; i < ext_sigcount; i++) {
 		if (microcode_update_match(cpu, mc_header,
 				ext_sig->sig, ext_sig->pf))
@@ -292,7 +290,7 @@ static int get_maching_microcode(void *mc, int cpu)
 	}
 	return 0;
 find:
-	pr_debug("microcode: CPU %d found a matching microcode update with"
+	pr_debug("microcode: CPU%d found a matching microcode update with"
 		" version 0x%x (current=0x%x)\n", cpu, mc_header->rev,uci->rev);
 	new_mc = vmalloc(total_size);
 	if (!new_mc) {
@@ -338,11 +336,11 @@ static void apply_microcode(int cpu)
 
 	spin_unlock_irqrestore(&microcode_update_lock, flags);
 	if (val[1] != uci->mc->hdr.rev) {
-		printk(KERN_ERR "microcode: CPU%d updated from revision "
+		printk(KERN_ERR "microcode: CPU%d update from revision "
 			"0x%x to 0x%x failed\n", cpu_num, uci->rev, val[1]);
 		return;
 	}
-	pr_debug("microcode: CPU%d updated from revision "
+	printk(KERN_INFO "microcode: CPU%d updated from revision "
 	       "0x%x to 0x%x, date = %08x \n", 
 	       cpu_num, uci->rev, val[1], uci->mc->hdr.date);
 	uci->rev = val[1];
@@ -404,7 +402,7 @@ static int do_microcode_update (void)
 
 			if (!uci->valid)
 				continue;
-			set_cpus_allowed(current, cpumask_of_cpu(cpu));
+			set_cpus_allowed_ptr(current, &cpumask_of_cpu(cpu));
 			error = get_maching_microcode(new_mc, cpu);
 			if (error < 0)
 				goto out;
@@ -418,7 +416,7 @@ out:
 		vfree(new_mc);
 	if (cursor < 0)
 		error = cursor;
-	set_cpus_allowed(current, old);
+	set_cpus_allowed_ptr(current, &old);
 	return error;
 }
 
@@ -436,7 +434,7 @@ static ssize_t microcode_write (struct file *file, const char __user *buf, size_
 		return -EINVAL;
 	}
 
-	lock_cpu_hotplug();
+	get_online_cpus();
 	mutex_lock(&microcode_mutex);
 
 	user_buffer = (void __user *) buf;
@@ -447,7 +445,7 @@ static ssize_t microcode_write (struct file *file, const char __user *buf, size_
 		ret = (ssize_t)len;
 
 	mutex_unlock(&microcode_mutex);
-	unlock_cpu_hotplug();
+	put_online_cpus();
 
 	return ret;
 }
@@ -536,10 +534,10 @@ static int cpu_request_microcode(int cpu)
 		c->x86, c->x86_model, c->x86_mask);
 	error = request_firmware(&firmware, name, &microcode_pdev->dev);
 	if (error) {
-		pr_debug("ucode data file %s load failed\n", name);
+		pr_debug("microcode: ucode data file %s load failed\n", name);
 		return error;
 	}
-	buf = (void *)firmware->data;
+	buf = firmware->data;
 	size = firmware->size;
 	while ((offset = get_next_ucode_from_buffer(&mc, buf, size, offset))
 			> 0) {
@@ -581,7 +579,7 @@ static int apply_microcode_check_cpu(int cpu)
 		return 0;
 
 	old = current->cpus_allowed;
-	set_cpus_allowed(current, cpumask_of_cpu(cpu));
+	set_cpus_allowed_ptr(current, &cpumask_of_cpu(cpu));
 
 	/* Check if the microcode we have in memory matches the CPU */
 	if (c->x86_vendor != X86_VENDOR_INTEL || c->x86 < 6 ||
@@ -612,7 +610,7 @@ static int apply_microcode_check_cpu(int cpu)
 			" sig=0x%x, pf=0x%x, rev=0x%x\n",
 			cpu, uci->sig, uci->pf, uci->rev);
 
-	set_cpus_allowed(current, old);
+	set_cpus_allowed_ptr(current, &old);
 	return err;
 }
 
@@ -623,13 +621,13 @@ static void microcode_init_cpu(int cpu, int resume)
 
 	old = current->cpus_allowed;
 
-	set_cpus_allowed(current, cpumask_of_cpu(cpu));
+	set_cpus_allowed_ptr(current, &cpumask_of_cpu(cpu));
 	mutex_lock(&microcode_mutex);
 	collect_cpu_info(cpu);
 	if (uci->valid && system_state == SYSTEM_RUNNING && !resume)
 		cpu_request_microcode(cpu);
 	mutex_unlock(&microcode_mutex);
-	set_cpus_allowed(current, old);
+	set_cpus_allowed_ptr(current, &old);
 }
 
 static void microcode_fini_cpu(int cpu)
@@ -658,15 +656,15 @@ static ssize_t reload_store(struct sys_device *dev, const char *buf, size_t sz)
 
 		old = current->cpus_allowed;
 
-		lock_cpu_hotplug();
-		set_cpus_allowed(current, cpumask_of_cpu(cpu));
+		get_online_cpus();
+		set_cpus_allowed_ptr(current, &cpumask_of_cpu(cpu));
 
 		mutex_lock(&microcode_mutex);
 		if (uci->valid)
 			err = cpu_request_microcode(cpu);
 		mutex_unlock(&microcode_mutex);
-		unlock_cpu_hotplug();
-		set_cpus_allowed(current, old);
+		put_online_cpus();
+		set_cpus_allowed_ptr(current, &old);
 	}
 	if (err)
 		return err;
@@ -711,7 +709,7 @@ static int __mc_sysdev_add(struct sys_device *sys_dev, int resume)
 	if (!cpu_online(cpu))
 		return 0;
 
-	pr_debug("Microcode:CPU %d added\n", cpu);
+	pr_debug("microcode: CPU%d added\n", cpu);
 	memset(uci, 0, sizeof(*uci));
 
 	err = sysfs_create_group(&sys_dev->kobj, &mc_attr_group);
@@ -735,7 +733,7 @@ static int mc_sysdev_remove(struct sys_device *sys_dev)
 	if (!cpu_online(cpu))
 		return 0;
 
-	pr_debug("Microcode:CPU %d removed\n", cpu);
+	pr_debug("microcode: CPU%d removed\n", cpu);
 	microcode_fini_cpu(cpu);
 	sysfs_remove_group(&sys_dev->kobj, &mc_attr_group);
 	return 0;
@@ -747,7 +745,7 @@ static int mc_sysdev_resume(struct sys_device *dev)
 
 	if (!cpu_online(cpu))
 		return 0;
-	pr_debug("Microcode:CPU %d resumed\n", cpu);
+	pr_debug("microcode: CPU%d resumed\n", cpu);
 	/* only CPU 0 will apply ucode here */
 	apply_microcode(0);
 	return 0;
@@ -785,7 +783,7 @@ mc_cpu_callback(struct notifier_block *nb, unsigned long action, void *hcpu)
 		}
 	case CPU_DOWN_FAILED_FROZEN:
 		if (sysfs_create_group(&sys_dev->kobj, &mc_attr_group))
-			printk(KERN_ERR "Microcode: Failed to create the sysfs "
+			printk(KERN_ERR "microcode: Failed to create the sysfs "
 				"group for CPU%d\n", cpu);
 		break;
 	case CPU_DOWN_PREPARE:
@@ -799,7 +797,7 @@ mc_cpu_callback(struct notifier_block *nb, unsigned long action, void *hcpu)
 	return NOTIFY_OK;
 }
 
-static struct notifier_block __cpuinitdata mc_cpu_notifier = {
+static struct notifier_block __refdata mc_cpu_notifier = {
 	.notifier_call = mc_cpu_callback,
 };
 
@@ -817,9 +815,9 @@ static int __init microcode_init (void)
 		return PTR_ERR(microcode_pdev);
 	}
 
-	lock_cpu_hotplug();
+	get_online_cpus();
 	error = sysdev_driver_register(&cpu_sysdev_class, &mc_sysdev_driver);
-	unlock_cpu_hotplug();
+	put_online_cpus();
 	if (error) {
 		microcode_dev_exit();
 		platform_device_unregister(microcode_pdev);
@@ -839,9 +837,9 @@ static void __exit microcode_exit (void)
 
 	unregister_hotcpu_notifier(&mc_cpu_notifier);
 
-	lock_cpu_hotplug();
+	get_online_cpus();
 	sysdev_driver_unregister(&cpu_sysdev_class, &mc_sysdev_driver);
-	unlock_cpu_hotplug();
+	put_online_cpus();
 
 	platform_device_unregister(microcode_pdev);
 }

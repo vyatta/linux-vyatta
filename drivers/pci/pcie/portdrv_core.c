@@ -150,7 +150,7 @@ static int assign_interrupt_mode(struct pci_dev *dev, int *vectors, int mask)
 	if (pos) {
 		struct msix_entry msix_entries[PCIE_PORT_DEVICE_MAXSERVICES] = 
 			{{0, 0}, {0, 1}, {0, 2}, {0, 3}};
-		printk("%s Found MSIX capability\n", __FUNCTION__);
+		printk("%s Found MSIX capability\n", __func__);
 		status = pci_enable_msix(dev, msix_entries, nvec);
 		if (!status) {
 			int j = 0;
@@ -165,7 +165,7 @@ static int assign_interrupt_mode(struct pci_dev *dev, int *vectors, int mask)
 	if (status) {
 		pos = pci_find_capability(dev, PCI_CAP_ID_MSI);
 		if (pos) {
-			printk("%s Found MSI capability\n", __FUNCTION__);
+			printk("%s Found MSI capability\n", __func__);
 			status = pci_enable_msi(dev);
 			if (!status) {
 				interrupt_mode = PCIE_PORT_MSI_MODE;
@@ -192,9 +192,8 @@ static int get_port_device_capability(struct pci_dev *dev)
 		if (reg32 & SLOT_HP_CAPABLE_MASK)
 			services |= PCIE_PORT_SERVICE_HP;
 	} 
-	/* PME Capable */
-	pos = pci_find_capability(dev, PCI_CAP_ID_PME);
-	if (pos) 
+	/* PME Capable - root port capability */
+	if (((reg16 >> 4) & PORT_TYPE_MASK) == PCIE_RC_PORT)
 		services |= PCIE_PORT_SERVICE_PME;
 	
 	pos = PCI_CFG_SPACE_SIZE;

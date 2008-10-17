@@ -42,8 +42,9 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/types.h>
-#include <asm/of_device.h>
-#include <asm/of_platform.h>
+#include <linux/of_device.h>
+#include <linux/of_platform.h>
+
 #include <asm/page.h>
 #include <asm/prom.h>
 
@@ -142,7 +143,7 @@ axon_ram_make_request(struct request_queue *queue, struct bio *bio)
  */
 static int
 axon_ram_direct_access(struct block_device *device, sector_t sector,
-		       unsigned long *data)
+		       void **kaddr, unsigned long *pfn)
 {
 	struct axon_ram_bank *bank = device->bd_disk->private_data;
 	loff_t offset;
@@ -153,7 +154,8 @@ axon_ram_direct_access(struct block_device *device, sector_t sector,
 		return -ERANGE;
 	}
 
-	*data = bank->ph_addr + offset;
+	*kaddr = (void *)(bank->ph_addr + offset);
+	*pfn = virt_to_phys(kaddr) >> PAGE_SHIFT;
 
 	return 0;
 }

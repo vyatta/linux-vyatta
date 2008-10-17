@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2006-2007 Erez Zadok
+ * Copyright (c) 2006-2008 Erez Zadok
  * Copyright (c) 2006      Charles P. Wright
  * Copyright (c) 2006-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2006      Junjiro Okajima
  * Copyright (c) 2006      David P. Quigley
- * Copyright (c) 2006-2007 Stony Brook University
- * Copyright (c) 2006-2007 The Research Foundation of SUNY
+ * Copyright (c) 2006-2008 Stony Brook University
+ * Copyright (c) 2006-2008 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -97,23 +97,5 @@ void __unionfs_unlink(struct work_struct *work)
 	struct unlink_args *u = &args->unlink;
 
 	args->err = vfs_unlink(u->parent, u->dentry);
-	complete(&args->comp);
-}
-
-void __delete_whiteouts(struct work_struct *work)
-{
-	struct sioq_args *args = container_of(work, struct sioq_args, work);
-	struct deletewh_args *d = &args->deletewh;
-
-	args->err = do_delete_whiteouts(d->dentry, d->bindex, d->namelist);
-	complete(&args->comp);
-}
-
-void __is_opaque_dir(struct work_struct *work)
-{
-	struct sioq_args *args = container_of(work, struct sioq_args, work);
-
-	args->ret = lookup_one_len(UNIONFS_DIR_OPAQUE, args->is_opaque.dentry,
-				   sizeof(UNIONFS_DIR_OPAQUE) - 1);
 	complete(&args->comp);
 }

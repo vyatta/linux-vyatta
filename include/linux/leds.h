@@ -35,8 +35,16 @@ struct led_classdev {
 #define LED_SUSPENDED		(1 << 0)
 
 	/* Set LED brightness level */
+	/* Must not sleep, use a workqueue if needed */
 	void		(*brightness_set)(struct led_classdev *led_cdev,
 					  enum led_brightness brightness);
+	/* Get LED brightness level */
+	enum led_brightness (*brightness_get)(struct led_classdev *led_cdev);
+
+	/* Activate hardware accelerated blink */
+	int		(*blink_set)(struct led_classdev *led_cdev,
+				     unsigned long *delay_on,
+				     unsigned long *delay_off);
 
 	struct device		*dev;
 	struct list_head	 node;			/* LED Device list */
@@ -54,7 +62,7 @@ struct led_classdev {
 
 extern int led_classdev_register(struct device *parent,
 				 struct led_classdev *led_cdev);
-extern void led_classdev_unregister(struct led_classdev *led_cdev);
+extern void led_classdev_unregister(struct led_classdev *lcd);
 extern void led_classdev_suspend(struct led_classdev *led_cdev);
 extern void led_classdev_resume(struct led_classdev *led_cdev);
 
@@ -121,6 +129,9 @@ struct gpio_led {
 struct gpio_led_platform_data {
 	int 		num_leds;
 	struct gpio_led *leds;
+	int		(*gpio_blink_set)(unsigned gpio,
+					unsigned long *delay_on,
+					unsigned long *delay_off);
 };
 
 

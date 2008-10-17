@@ -68,6 +68,7 @@
 #define MIPS_REVISION_CORID_CORE_FPGA3     9
 #define MIPS_REVISION_CORID_CORE_24K       10
 #define MIPS_REVISION_CORID_CORE_FPGA4     11
+#define MIPS_REVISION_CORID_CORE_FPGA5     12
 
 /**** Artificial corid defines ****/
 /*
@@ -97,10 +98,16 @@ extern int mips_revision_corid;
 
 extern int mips_revision_sconid;
 
+extern void mips_reboot_setup(void);
+
 #ifdef CONFIG_PCI
 extern void mips_pcibios_init(void);
 #else
 #define mips_pcibios_init() do { } while (0)
+#endif
+
+#ifdef CONFIG_KGDB
+extern void kgdb_config(void);
 #endif
 
 #endif  /* __ASM_MIPS_BOARDS_GENERIC_H */

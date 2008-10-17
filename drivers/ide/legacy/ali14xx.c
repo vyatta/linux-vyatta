@@ -1,6 +1,4 @@
 /*
- *  linux/drivers/ide/legacy/ali14xx.c		Version 0.03	Feb 09, 1996
- *
  *  Copyright (C) 1996  Linus Torvalds & author (see below)
  */
 
@@ -51,6 +49,8 @@
 
 #include <asm/io.h>
 
+#define DRV_NAME "ali14xx"
+
 /* port addresses for auto-detection */
 #define ALI_NUM_PORTS 4
 static const int ports[ALI_NUM_PORTS] __initdata =
@@ -88,7 +88,7 @@ static u8 regOff;	/* output to base port to close registers */
 /*
  * Read a controller register.
  */
-static inline u8 inReg (u8 reg)
+static inline u8 inReg(u8 reg)
 {
 	outb_p(reg, regPort);
 	return inb(dataPort);
@@ -97,7 +97,7 @@ static inline u8 inReg (u8 reg)
 /*
  * Write a controller register.
  */
-static void outReg (u8 data, u8 reg)
+static void outReg(u8 data, u8 reg)
 {
 	outb_p(reg, regPort);
 	outb_p(data, dataPort);
@@ -116,7 +116,7 @@ static void ali14xx_set_pio_mode(ide_drive_t *drive, const u8 pio)
 	int time1, time2;
 	u8 param1, param2, param3, param4;
 	unsigned long flags;
-	int bus_speed = system_bus_clock();
+	int bus_speed = ide_vlb_clk ? ide_vlb_clk : system_bus_clock();
 
 	/* calculate timing, according to PIO mode */
 	time1 = ide_pio_cycle_time(drive, pio);
@@ -145,7 +145,7 @@ static void ali14xx_set_pio_mode(ide_drive_t *drive, const u8 pio)
 /*
  * Auto-detect the IDE controller port.
  */
-static int __init findPort (void)
+static int __init findPort(void)
 {
 	int i;
 	u8 t;
@@ -177,7 +177,8 @@ static int __init findPort (void)
 /*
  * Initialize controller registers with default values.
  */
-static int __init initRegisters (void) {
+static int __init initRegisters(void)
+{
 	const RegInitializer *p;
 	u8 t;
 	unsigned long flags;
@@ -193,11 +194,20 @@ static int __init initRegisters (void) {
 	return t;
 }
 
+static const struct ide_port_ops ali14xx_port_ops = {
+	.set_pio_mode		= ali14xx_set_pio_mode,
+};
+
+static const struct ide_port_info ali14xx_port_info = {
+	.name			= DRV_NAME,
+	.chipset		= ide_ali14xx,
+	.port_ops		= &ali14xx_port_ops,
+	.host_flags		= IDE_HFLAG_NO_DMA,
+	.pio_mask		= ATA_PIO4,
+};
+
 static int __init ali14xx_probe(void)
 {
-	ide_hwif_t *hwif, *mate;
-	static u8 idx[4] = { 0, 1, 0xff, 0xff };
-
 	printk(KERN_DEBUG "ali14xx: base=0x%03x, regOn=0x%02x.\n",
 			  basePort, regOn);
 
@@ -207,32 +217,15 @@ static int __init ali14xx_probe(void)
 		return 1;
 	}
 
-	hwif = &ide_hwifs[0];
-	mate = &ide_hwifs[1];
-
-	hwif->chipset = ide_ali14xx;
-	hwif->pio_mask = ATA_PIO4;
-	hwif->set_pio_mode = &ali14xx_set_pio_mode;
-	hwif->mate = mate;
-
-	mate->chipset = ide_ali14xx;
-	mate->pio_mask = ATA_PIO4;
-	mate->set_pio_mode = &ali14xx_set_pio_mode;
-	mate->mate = hwif;
-	mate->channel = 1;
-
-	ide_device_add(idx);
-
-	return 0;
+	return ide_legacy_device_add(&ali14xx_port_info, 0);
 }
 
-int probe_ali14xx = 0;
+static int probe_ali14xx;
 
 module_param_named(probe, probe_ali14xx, bool, 0);
 MODULE_PARM_DESC(probe, "probe for ALI M14xx chipsets");
 
-/* Can be called directly from ide.c. */
-int __init ali14xx_init(void)
+static int __init ali14xx_init(void)
 {
 	if (probe_ali14xx == 0)
 		goto out;
@@ -248,9 +241,7 @@ out:
 	return -ENODEV;
 }
 
-#ifdef MODULE
 module_init(ali14xx_init);
-#endif
 
 MODULE_AUTHOR("see local file");
 MODULE_DESCRIPTION("support of ALI 14XX IDE chipsets");

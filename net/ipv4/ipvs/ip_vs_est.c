@@ -18,6 +18,7 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/interrupt.h>
+#include <linux/sysctl.h>
 
 #include <net/ip_vs.h>
 
@@ -146,9 +147,8 @@ int ip_vs_new_estimator(struct ip_vs_stats *stats)
 	write_lock_bh(&est_lock);
 	est->next = est_list;
 	if (est->next == NULL) {
-		init_timer(&est_timer);
+		setup_timer(&est_timer, estimation_timer, 0);
 		est_timer.expires = jiffies + 2*HZ;
-		est_timer.function = estimation_timer;
 		add_timer(&est_timer);
 	}
 	est_list = est;
@@ -172,8 +172,11 @@ void ip_vs_kill_estimator(struct ip_vs_stats *stats)
 		kfree(est);
 		killed++;
 	}
-	if (killed && est_list == NULL)
-		del_timer_sync(&est_timer);
+	while (killed && !est_list && try_to_del_timer_sync(&est_timer) < 0) {
+		write_unlock_bh(&est_lock);
+		cpu_relax();
+		write_lock_bh(&est_lock);
+	}
 	write_unlock_bh(&est_lock);
 }
 

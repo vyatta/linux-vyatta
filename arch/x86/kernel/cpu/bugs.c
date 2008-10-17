@@ -11,6 +11,7 @@
 #include <linux/utsname.h>
 #include <asm/bugs.h>
 #include <asm/processor.h>
+#include <asm/processor-flags.h>
 #include <asm/i387.h>
 #include <asm/msr.h>
 #include <asm/paravirt.h>
@@ -24,18 +25,10 @@ static int __init no_halt(char *s)
 
 __setup("no-hlt", no_halt);
 
-static int __init mca_pentium(char *s)
-{
-	mca_pentium_flag = 1;
-	return 1;
-}
-
-__setup("mca-pentium", mca_pentium);
-
 static int __init no_387(char *s)
 {
 	boot_cpu_data.hard_math = 0;
-	write_cr0(0xE | read_cr0());
+	write_cr0(X86_CR0_TS | X86_CR0_EM | X86_CR0_MP | read_cr0());
 	return 1;
 }
 
@@ -57,6 +50,8 @@ static double __initdata y = 3145727.0;
  */
 static void __init check_fpu(void)
 {
+	s32 fdiv_bug;
+
 	if (!boot_cpu_data.hard_math) {
 #ifndef CONFIG_MATH_EMULATION
 		printk(KERN_EMERG "No coprocessor found and no math emulation present.\n");
@@ -77,8 +72,10 @@ static void __init check_fpu(void)
 		"fistpl %0\n\t"
 		"fwait\n\t"
 		"fninit"
-		: "=m" (*&boot_cpu_data.fdiv_bug)
+		: "=m" (*&fdiv_bug)
 		: "m" (*&x), "m" (*&y));
+
+	boot_cpu_data.fdiv_bug = fdiv_bug;
 	if (boot_cpu_data.fdiv_bug)
 		printk("Hmm, FPU with FDIV bug.\n");
 }
@@ -147,14 +144,6 @@ static void __init check_config(void)
 #if defined(CONFIG_X86_WP_WORKS_OK) || defined(CONFIG_X86_INVLPG) || defined(CONFIG_X86_BSWAP)
 	if (boot_cpu_data.x86 == 3)
 		panic("Kernel requires i486+ for 'invlpg' and other features");
-#endif
-
-/*
- * If we configured ourselves for a TSC, we'd better have one!
- */
-#ifdef CONFIG_X86_TSC
-	if (!cpu_has_tsc && !tsc_disable)
-		panic("Kernel compiled for Pentium+, requires TSC feature!");
 #endif
 
 /*

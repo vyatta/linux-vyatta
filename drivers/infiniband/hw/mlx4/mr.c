@@ -132,7 +132,8 @@ struct ib_mr *mlx4_ib_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
 	if (!mr)
 		return ERR_PTR(-ENOMEM);
 
-	mr->umem = ib_umem_get(pd->uobject->context, start, length, access_flags);
+	mr->umem = ib_umem_get(pd->uobject->context, start, length,
+			       access_flags, 0);
 	if (IS_ERR(mr->umem)) {
 		err = PTR_ERR(mr->umem);
 		goto err_free;
@@ -199,7 +200,7 @@ struct ib_fmr *mlx4_ib_fmr_alloc(struct ib_pd *pd, int acc,
 	if (err)
 		goto err_free;
 
-	err = mlx4_mr_enable(to_mdev(pd->device)->dev, &fmr->mfmr.mr);
+	err = mlx4_fmr_enable(to_mdev(pd->device)->dev, &fmr->mfmr);
 	if (err)
 		goto err_mr;
 

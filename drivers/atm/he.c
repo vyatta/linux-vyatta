@@ -1,5 +1,3 @@
-/* $Id: he.c,v 1.18 2003/05/06 22:57:15 chas Exp $ */
-
 /*
 
   he.c
@@ -98,10 +96,6 @@
 #else /* !HE_DEBUG */
 #define HPRINTK(fmt,args...)	do { } while (0)
 #endif /* HE_DEBUG */
-
-/* version definition */
-
-static char *version = "$Id: he.c,v 1.18 2003/05/06 22:57:15 chas Exp $";
 
 /* declarations */
 
@@ -366,7 +360,7 @@ he_init_one(struct pci_dev *pci_dev, const struct pci_device_id *pci_ent)
 	struct he_dev *he_dev = NULL;
 	int err = 0;
 
-	printk(KERN_INFO "he: %s\n", version);
+	printk(KERN_INFO "ATM he driver\n");
 
 	if (pci_enable_device(pci_dev))
 		return -EIO;
@@ -1548,7 +1542,8 @@ he_start(struct atm_dev *dev)
 	/* initialize framer */
 
 #ifdef CONFIG_ATM_HE_USE_SUNI
-	suni_init(he_dev->atm_dev);
+	if (he_isMM(he_dev))
+		suni_init(he_dev->atm_dev);
 	if (he_dev->atm_dev->phy && he_dev->atm_dev->phy->start)
 		he_dev->atm_dev->phy->start(he_dev->atm_dev);
 #endif /* CONFIG_ATM_HE_USE_SUNI */
@@ -1560,6 +1555,7 @@ he_start(struct atm_dev *dev)
 		val = he_phy_get(he_dev->atm_dev, SUNI_TPOP_APM);
 		val = (val & ~SUNI_TPOP_APM_S) | (SUNI_TPOP_S_SDH << SUNI_TPOP_APM_S_SHIFT);
 		he_phy_put(he_dev->atm_dev, val, SUNI_TPOP_APM);
+		he_phy_put(he_dev->atm_dev, SUNI_TACP_IUCHP_CLP, SUNI_TACP_IUCHP);
 	}
 
 	/* 5.1.12 enable transmit and receive */
@@ -1643,6 +1639,8 @@ he_stop(struct he_dev *he_dev)
 
 	if (he_dev->rbpl_base) {
 #ifdef USE_RBPL_POOL
+		int i;
+
 		for (i = 0; i < CONFIG_RBPL_SIZE; ++i) {
 			void *cpuaddr = he_dev->rbpl_virt[i].virt;
 			dma_addr_t dma_handle = he_dev->rbpl_base[i].phys;
@@ -1665,6 +1663,8 @@ he_stop(struct he_dev *he_dev)
 #ifdef USE_RBPS
 	if (he_dev->rbps_base) {
 #ifdef USE_RBPS_POOL
+		int i;
+
 		for (i = 0; i < CONFIG_RBPS_SIZE; ++i) {
 			void *cpuaddr = he_dev->rbps_virt[i].virt;
 			dma_addr_t dma_handle = he_dev->rbps_base[i].phys;
@@ -2846,10 +2846,15 @@ he_ioctl(struct atm_dev *atm_dev, unsigned int cmd, void __user *arg)
 			if (copy_from_user(&reg, arg,
 					   sizeof(struct he_ioctl_reg)))
 				return -EFAULT;
-			
+
 			spin_lock_irqsave(&he_dev->global_lock, flags);
 			switch (reg.type) {
 				case HE_REGTYPE_PCI:
+					if (reg.addr < 0 || reg.addr >= HE_REGMAP_SIZE) {
+						err = -EINVAL;
+						break;
+					}
+
 					reg.val = he_readl(he_dev, reg.addr);
 					break;
 				case HE_REGTYPE_RCM:
@@ -2933,7 +2938,7 @@ he_proc_read(struct atm_dev *dev, loff_t *pos, char *page)
 
 	left = *pos;
 	if (!left--)
-		return sprintf(page, "%s\n", version);
+		return sprintf(page, "ATM he driver\n");
 
 	if (!left--)
 		return sprintf(page, "%s%s\n\n",
@@ -3002,8 +3007,7 @@ he_proc_read(struct atm_dev *dev, loff_t *pos, char *page)
 
 /* eeprom routines  -- see 4.7 */
 
-u8
-read_prom_byte(struct he_dev *he_dev, int addr)
+static u8 read_prom_byte(struct he_dev *he_dev, int addr)
 {
 	u32 val = 0, tmp_read = 0;
 	int i, j = 0;

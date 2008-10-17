@@ -7,7 +7,7 @@
 
 #ifdef CONFIG_NUMA
 
-#define VIRTUAL_BUG_ON(x) 
+#define VIRTUAL_BUG_ON(x)
 
 #include <asm/smp.h>
 
@@ -15,9 +15,9 @@
 struct memnode {
 	int shift;
 	unsigned int mapsize;
-	u8 *map;
-	u8 embedded_map[64-16];
-} ____cacheline_aligned; /* total size = 64 bytes */
+	s16 *map;
+	s16 embedded_map[64 - 8];
+} ____cacheline_aligned; /* total size = 128 bytes */
 extern struct memnode memnode;
 #define memnode_shift memnode.shift
 #define memnodemap memnode.map
@@ -25,31 +25,27 @@ extern struct memnode memnode;
 
 extern struct pglist_data *node_data[];
 
-static inline __attribute__((pure)) int phys_to_nid(unsigned long addr) 
-{ 
-	unsigned nid; 
+static inline __attribute__((pure)) int phys_to_nid(unsigned long addr)
+{
+	unsigned nid;
 	VIRTUAL_BUG_ON(!memnodemap);
 	VIRTUAL_BUG_ON((addr >> memnode_shift) >= memnodemapsize);
-	nid = memnodemap[addr >> memnode_shift]; 
-	VIRTUAL_BUG_ON(nid >= MAX_NUMNODES || !node_data[nid]); 
-	return nid; 
-} 
+	nid = memnodemap[addr >> memnode_shift];
+	VIRTUAL_BUG_ON(nid >= MAX_NUMNODES || !node_data[nid]);
+	return nid;
+}
 
 #define NODE_DATA(nid)		(node_data[nid])
 
 #define node_start_pfn(nid)	(NODE_DATA(nid)->node_start_pfn)
-#define node_end_pfn(nid)       (NODE_DATA(nid)->node_start_pfn + \
+#define node_end_pfn(nid)       (NODE_DATA(nid)->node_start_pfn +	\
 				 NODE_DATA(nid)->node_spanned_pages)
 
-#ifdef CONFIG_DISCONTIGMEM
-#define pfn_to_nid(pfn) phys_to_nid((unsigned long)(pfn) << PAGE_SHIFT)
-
-extern int pfn_valid(unsigned long pfn);
-#endif
+extern int early_pfn_to_nid(unsigned long pfn);
 
 #ifdef CONFIG_NUMA_EMU
-#define FAKE_NODE_MIN_SIZE	(64*1024*1024)
-#define FAKE_NODE_MIN_HASH_MASK	(~(FAKE_NODE_MIN_SIZE - 1uL))
+#define FAKE_NODE_MIN_SIZE	(64 * 1024 * 1024)
+#define FAKE_NODE_MIN_HASH_MASK	(~(FAKE_NODE_MIN_SIZE - 1UL))
 #endif
 
 #endif

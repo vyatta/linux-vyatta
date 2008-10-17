@@ -308,7 +308,8 @@ static void veth_complete_allocation(void *parm, int number)
 
 static int veth_allocate_events(HvLpIndex rlp, int number)
 {
-	struct veth_allocation vc = { COMPLETION_INITIALIZER(vc.c), 0 };
+	struct veth_allocation vc =
+		{ COMPLETION_INITIALIZER_ONSTACK(vc.c), 0 };
 
 	mf_allocate_lp_events(rlp, HvLpEvent_Type_VirtualLan,
 			    sizeof(struct veth_lpevent), number,
@@ -815,7 +816,7 @@ static int veth_init_connection(u8 rlp)
 {
 	struct veth_lpar_connection *cnx;
 	struct veth_msg *msgs;
-	int i, rc;
+	int i;
 
 	if ( (rlp == this_lp)
 	     || ! HvLpConfig_doLpsCommunicateOnVirtualLan(this_lp, rlp) )
@@ -844,11 +845,7 @@ static int veth_init_connection(u8 rlp)
 
 	/* This gets us 1 reference, which is held on behalf of the driver
 	 * infrastructure. It's released at module unload. */
-	kobject_init(&cnx->kobject);
-	cnx->kobject.ktype = &veth_lpar_connection_ktype;
-	rc = kobject_set_name(&cnx->kobject, "cnx%.2d", rlp);
-	if (rc != 0)
-		return rc;
+	kobject_init(&cnx->kobject, &veth_lpar_connection_ktype);
 
 	msgs = kcalloc(VETH_NUMBUFFERS, sizeof(struct veth_msg), GFP_KERNEL);
 	if (! msgs) {
@@ -1024,7 +1021,7 @@ static const struct ethtool_ops ops = {
 	.get_link = veth_get_link,
 };
 
-static struct net_device * __init veth_probe_one(int vlan,
+static struct net_device *veth_probe_one(int vlan,
 		struct vio_dev *vio_dev)
 {
 	struct net_device *dev;
@@ -1087,11 +1084,8 @@ static struct net_device * __init veth_probe_one(int vlan,
 		return NULL;
 	}
 
-	kobject_init(&port->kobject);
-	port->kobject.parent = &dev->dev.kobj;
-	port->kobject.ktype  = &veth_port_ktype;
-	kobject_set_name(&port->kobject, "veth_port");
-	if (0 != kobject_add(&port->kobject))
+	kobject_init(&port->kobject, &veth_port_ktype);
+	if (0 != kobject_add(&port->kobject, &dev->dev.kobj, "veth_port"))
 		veth_error("Failed adding port for %s to sysfs.\n", dev->name);
 
 	veth_info("%s attached to iSeries vlan %d (LPAR map = 0x%.4X)\n",
@@ -1711,9 +1705,9 @@ static int __init veth_module_init(void)
 			continue;
 
 		kobj = &veth_cnx[i]->kobject;
-		kobj->parent = &veth_driver.driver.kobj;
 		/* If the add failes, complain but otherwise continue */
-		if (0 != kobject_add(kobj))
+		if (0 != driver_add_kobj(&veth_driver.driver, kobj,
+					"cnx%.2d", veth_cnx[i]->remote_lp))
 			veth_error("cnx %d: Failed adding to sysfs.\n", i);
 	}
 

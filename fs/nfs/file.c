@@ -64,7 +64,11 @@ const struct file_operations nfs_file_operations = {
 	.write		= do_sync_write,
 	.aio_read	= nfs_file_read,
 	.aio_write	= nfs_file_write,
+#ifdef CONFIG_MMU
 	.mmap		= nfs_file_mmap,
+#else
+	.mmap		= generic_file_mmap,
+#endif
 	.open		= nfs_file_open,
 	.flush		= nfs_file_flush,
 	.release	= nfs_file_release,
@@ -234,10 +238,8 @@ nfs_file_read(struct kiocb *iocb, const struct iovec *iov,
 	ssize_t result;
 	size_t count = iov_length(iov, nr_segs);
 
-#ifdef CONFIG_NFS_DIRECTIO
 	if (iocb->ki_filp->f_flags & O_DIRECT)
 		return nfs_file_direct_read(iocb, iov, nr_segs, pos);
-#endif
 
 	dfprintk(VFS, "nfs: read(%s/%s, %lu@%lu)\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name,
@@ -349,7 +351,9 @@ static int nfs_write_end(struct file *file, struct address_space *mapping,
 	unlock_page(page);
 	page_cache_release(page);
 
-	return status < 0 ? status : copied;
+	if (status < 0)
+		return status;
+	return copied;
 }
 
 static void nfs_invalidate_page(struct page *page, unsigned long offset)
@@ -381,9 +385,7 @@ const struct address_space_operations nfs_file_aops = {
 	.write_end = nfs_write_end,
 	.invalidatepage = nfs_invalidate_page,
 	.releasepage = nfs_release_page,
-#ifdef CONFIG_NFS_DIRECTIO
 	.direct_IO = nfs_direct_IO,
-#endif
 	.launder_page = nfs_launder_page,
 };
 
@@ -392,35 +394,27 @@ static int nfs_vm_page_mkwrite(struct vm_area_struct *vma, struct page *page)
 	struct file *filp = vma->vm_file;
 	unsigned pagelen;
 	int ret = -EINVAL;
-	void *fsdata;
 	struct address_space *mapping;
-	loff_t offset;
 
 	lock_page(page);
 	mapping = page->mapping;
-	if (mapping != vma->vm_file->f_path.dentry->d_inode->i_mapping) {
-		unlock_page(page);
-		return -EINVAL;
-	}
+	if (mapping != vma->vm_file->f_path.dentry->d_inode->i_mapping)
+		goto out_unlock;
+
+	ret = 0;
 	pagelen = nfs_page_length(page);
-	offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
+	if (pagelen == 0)
+		goto out_unlock;
+
+	ret = nfs_flush_incompatible(filp, page);
+	if (ret != 0)
+		goto out_unlock;
+
+	ret = nfs_updatepage(filp, page, 0, pagelen);
+	if (ret == 0)
+		ret = pagelen;
+out_unlock:
 	unlock_page(page);
-
-	/*
-	 * we can use mapping after releasing the page lock, because:
-	 * we hold mmap_sem on the fault path, which should pin the vma
-	 * which should pin the file, which pins the dentry which should
-	 * hold a reference on inode.
-	 */
-
-	if (pagelen) {
-		struct page *page2 = NULL;
-		ret = nfs_write_begin(filp, mapping, offset, pagelen,
-			       	0, &page2, &fsdata);
-		if (!ret)
-			ret = nfs_write_end(filp, mapping, offset, pagelen,
-				       	pagelen, page2, fsdata);
-	}
 	return ret;
 }
 
@@ -449,10 +443,8 @@ static ssize_t nfs_file_write(struct kiocb *iocb, const struct iovec *iov,
 	ssize_t result;
 	size_t count = iov_length(iov, nr_segs);
 
-#ifdef CONFIG_NFS_DIRECTIO
 	if (iocb->ki_filp->f_flags & O_DIRECT)
 		return nfs_file_direct_write(iocb, iov, nr_segs, pos);
-#endif
 
 	dfprintk(VFS, "nfs: write(%s/%s(%ld), %lu@%Ld)\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name,
@@ -534,7 +526,7 @@ static int do_vfs_lock(struct file *file, struct file_lock *fl)
 	if (res < 0)
 		dprintk(KERN_WARNING "%s: VFS is out of sync with lock manager"
 			" - error %d!\n",
-				__FUNCTION__, res);
+				__func__, res);
 	return res;
 }
 
@@ -578,17 +570,9 @@ static int do_setlk(struct file *filp, int cmd, struct file_lock *fl)
 
 	lock_kernel();
 	/* Use local locking if mounted with "-onolock" */
-	if (!(NFS_SERVER(inode)->flags & NFS_MOUNT_NONLM)) {
+	if (!(NFS_SERVER(inode)->flags & NFS_MOUNT_NONLM))
 		status = NFS_PROTO(inode)->lock(filp, cmd, fl);
-		/* If we were signalled we still need to ensure that
-		 * we clean up any state on the server. We therefore
-		 * record the lock call as having succeeded in order to
-		 * ensure that locks_remove_posix() cleans it out when
-		 * the process exits.
-		 */
-		if (status == -EINTR || status == -ERESTARTSYS)
-			do_vfs_lock(filp, fl);
-	} else
+	else
 		status = do_vfs_lock(filp, fl);
 	unlock_kernel();
 	if (status < 0)

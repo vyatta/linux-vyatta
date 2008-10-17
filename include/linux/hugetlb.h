@@ -8,6 +8,7 @@
 #include <linux/mempolicy.h>
 #include <linux/shm.h>
 #include <asm/tlbflush.h>
+#include <asm/hugetlb.h>
 
 struct ctl_table;
 
@@ -33,8 +34,8 @@ int hugetlb_reserve_pages(struct inode *inode, long from, long to);
 void hugetlb_unreserve_pages(struct inode *inode, long offset, long freed);
 
 extern unsigned long max_huge_pages;
+extern unsigned long sysctl_overcommit_huge_pages;
 extern unsigned long hugepages_treat_as_movable;
-extern unsigned long nr_overcommit_huge_pages;
 extern const unsigned long hugetlb_zero, hugetlb_infinity;
 extern int sysctl_hugetlb_shm_group;
 
@@ -50,51 +51,6 @@ struct page *follow_huge_pmd(struct mm_struct *mm, unsigned long address,
 int pmd_huge(pmd_t pmd);
 void hugetlb_change_protection(struct vm_area_struct *vma,
 		unsigned long address, unsigned long end, pgprot_t newprot);
-
-#ifndef ARCH_HAS_HUGEPAGE_ONLY_RANGE
-#define is_hugepage_only_range(mm, addr, len)	0
-#endif
-
-#ifndef ARCH_HAS_HUGETLB_FREE_PGD_RANGE
-#define hugetlb_free_pgd_range	free_pgd_range
-#else
-void hugetlb_free_pgd_range(struct mmu_gather **tlb, unsigned long addr,
-			    unsigned long end, unsigned long floor,
-			    unsigned long ceiling);
-#endif
-
-#ifndef ARCH_HAS_PREPARE_HUGEPAGE_RANGE
-/*
- * If the arch doesn't supply something else, assume that hugepage
- * size aligned regions are ok without further preparation.
- */
-static inline int prepare_hugepage_range(unsigned long addr, unsigned long len)
-{
-	if (len & ~HPAGE_MASK)
-		return -EINVAL;
-	if (addr & ~HPAGE_MASK)
-		return -EINVAL;
-	return 0;
-}
-#else
-int prepare_hugepage_range(unsigned long addr, unsigned long len);
-#endif
-
-#ifndef ARCH_HAS_SETCLEAR_HUGE_PTE
-#define set_huge_pte_at(mm, addr, ptep, pte)	set_pte_at(mm, addr, ptep, pte)
-#define huge_ptep_get_and_clear(mm, addr, ptep) ptep_get_and_clear(mm, addr, ptep)
-#else
-void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
-		     pte_t *ptep, pte_t pte);
-pte_t huge_ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
-			      pte_t *ptep);
-#endif
-
-#ifndef ARCH_HAS_HUGETLB_PREFAULT_HOOK
-#define hugetlb_prefault_arch_hook(mm)		do { } while (0)
-#else
-void hugetlb_prefault_arch_hook(struct mm_struct *mm);
-#endif
 
 #else /* !CONFIG_HUGETLB_PAGE */
 

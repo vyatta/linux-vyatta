@@ -55,7 +55,8 @@ struct cpuinfo_mips {
 	struct cache_desc	scache;	/* Secondary cache */
 	struct cache_desc	tcache;	/* Tertiary/split secondary cache */
 	int			srsets;	/* Shadow register sets */
-#if defined(CONFIG_MIPS_MT_SMTC)
+	int			core;	/* physical core number */
+#if defined(CONFIG_MIPS_MT_SMP) || defined(CONFIG_MIPS_MT_SMTC)
 	/*
 	 * In the MIPS MT "SMTC" model, each TC is considered
 	 * to be a "CPU" for the purposes of scheduling, but
@@ -63,8 +64,10 @@ struct cpuinfo_mips {
 	 * to all TCs within the same VPE.
 	 */
 	int			vpe_id;  /* Virtual Processor number */
+#endif
+#ifdef CONFIG_MIPS_MT_SMTC
 	int			tc_id;   /* Thread Context number */
-#endif /* CONFIG_MIPS_MT */
+#endif
 	void 			*data;	/* Additional data */
 } __attribute__((aligned(SMP_CACHE_BYTES)));
 

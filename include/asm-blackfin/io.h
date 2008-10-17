@@ -117,10 +117,12 @@ static inline unsigned int readl(const volatile void __iomem *addr)
 
 extern void outsb(unsigned long port, const void *addr, unsigned long count);
 extern void outsw(unsigned long port, const void *addr, unsigned long count);
+extern void outsw_8(unsigned long port, const void *addr, unsigned long count);
 extern void outsl(unsigned long port, const void *addr, unsigned long count);
 
 extern void insb(unsigned long port, void *addr, unsigned long count);
 extern void insw(unsigned long port, void *addr, unsigned long count);
+extern void insw_8(unsigned long port, void *addr, unsigned long count);
 extern void insl(unsigned long port, void *addr, unsigned long count);
 extern void insl_16(unsigned long port, void *addr, unsigned long count);
 
@@ -188,8 +190,6 @@ extern void blkfin_inv_cache_all(void);
 #define page_to_phys(page)      ((page - mem_map) << PAGE_SHIFT)
 #define page_to_bus(page)       ((page - mem_map) << PAGE_SHIFT)
 
-#define mm_ptov(vaddr)		((void *) (vaddr))
-#define mm_vtop(vaddr)		((unsigned long) (vaddr))
 #define phys_to_virt(vaddr)	((void *) (vaddr))
 #define virt_to_phys(vaddr)	((unsigned long) (vaddr))
 

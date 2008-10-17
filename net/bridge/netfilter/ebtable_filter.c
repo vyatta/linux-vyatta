@@ -55,7 +55,7 @@ static struct ebt_table frame_filter =
 	.name		= "filter",
 	.table		= &initial_table,
 	.valid_hooks	= FILTER_VALID_HOOKS,
-	.lock		= RW_LOCK_UNLOCKED,
+	.lock		= __RW_LOCK_UNLOCKED(frame_filter.lock),
 	.check		= check,
 	.me		= THIS_MODULE,
 };
@@ -67,7 +67,7 @@ ebt_hook(unsigned int hook, struct sk_buff *skb, const struct net_device *in,
 	return ebt_do_table(hook, skb, in, out, &frame_filter);
 }
 
-static struct nf_hook_ops ebt_ops_filter[] = {
+static struct nf_hook_ops ebt_ops_filter[] __read_mostly = {
 	{
 		.hook		= ebt_hook,
 		.owner		= THIS_MODULE,

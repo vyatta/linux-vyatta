@@ -41,7 +41,6 @@
 /* #define LPARCFG_DEBUG */
 
 static struct proc_dir_entry *proc_ppc64_lparcfg;
-#define LPARCFG_BUFF_SIZE 4096
 
 /*
  * Track sum of all purrs across all processors. This is used to further
@@ -227,7 +226,7 @@ static void parse_system_parameter_string(struct seq_file *m)
 	unsigned char *local_buffer = kmalloc(SPLPAR_MAXLENGTH, GFP_KERNEL);
 	if (!local_buffer) {
 		printk(KERN_ERR "%s %s kmalloc failure at line %d \n",
-		       __FILE__, __FUNCTION__, __LINE__);
+		       __FILE__, __func__, __LINE__);
 		return;
 	}
 
@@ -244,14 +243,14 @@ static void parse_system_parameter_string(struct seq_file *m)
 	if (call_status != 0) {
 		printk(KERN_INFO
 		       "%s %s Error calling get-system-parameter (0x%x)\n",
-		       __FILE__, __FUNCTION__, call_status);
+		       __FILE__, __func__, call_status);
 	} else {
 		int splpar_strlen;
 		int idx, w_idx;
 		char *workbuffer = kzalloc(SPLPAR_MAXLENGTH, GFP_KERNEL);
 		if (!workbuffer) {
 			printk(KERN_ERR "%s %s kmalloc failure at line %d \n",
-			       __FILE__, __FUNCTION__, __LINE__);
+			       __FILE__, __func__, __LINE__);
 			kfree(local_buffer);
 			return;
 		}
@@ -485,10 +484,10 @@ static ssize_t lparcfg_write(struct file *file, const char __user * buf,
 	current_weight = (resource >> 5 * 8) & 0xFF;
 
 	pr_debug("%s: current_entitled = %lu, current_weight = %u\n",
-		 __FUNCTION__, current_entitled, current_weight);
+		 __func__, current_entitled, current_weight);
 
 	pr_debug("%s: new_entitled = %lu, new_weight = %u\n",
-		 __FUNCTION__, *new_entitled_ptr, *new_weight_ptr);
+		 __func__, *new_entitled_ptr, *new_weight_ptr);
 
 	retval = plpar_hcall_norets(H_SET_PPP, *new_entitled_ptr,
 				    *new_weight_ptr);
@@ -503,7 +502,7 @@ static ssize_t lparcfg_write(struct file *file, const char __user * buf,
 		retval = -EINVAL;
 	} else {
 		printk(KERN_WARNING "%s: received unknown hv return code %ld",
-		       __FUNCTION__, retval);
+		       __func__, retval);
 		retval = -EIO;
 	}
 
@@ -592,17 +591,8 @@ int __init lparcfg_init(void)
 			!firmware_has_feature(FW_FEATURE_ISERIES))
 		mode |= S_IWUSR;
 
-	ent = create_proc_entry("ppc64/lparcfg", mode, NULL);
-	if (ent) {
-		ent->proc_fops = &lparcfg_fops;
-		ent->data = kmalloc(LPARCFG_BUFF_SIZE, GFP_KERNEL);
-		if (!ent->data) {
-			printk(KERN_ERR
-			       "Failed to allocate buffer for lparcfg\n");
-			remove_proc_entry("lparcfg", ent->parent);
-			return -ENOMEM;
-		}
-	} else {
+	ent = proc_create("ppc64/lparcfg", mode, NULL, &lparcfg_fops);
+	if (!ent) {
 		printk(KERN_ERR "Failed to create ppc64/lparcfg\n");
 		return -EIO;
 	}
@@ -613,10 +603,8 @@ int __init lparcfg_init(void)
 
 void __exit lparcfg_cleanup(void)
 {
-	if (proc_ppc64_lparcfg) {
-		kfree(proc_ppc64_lparcfg->data);
+	if (proc_ppc64_lparcfg)
 		remove_proc_entry("lparcfg", proc_ppc64_lparcfg->parent);
-	}
 }
 
 module_init(lparcfg_init);

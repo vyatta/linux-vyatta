@@ -263,7 +263,7 @@ static struct resource vr1000_dm9k0_resource[] = {
 	[2] = {
 		.start = IRQ_VR1000_DM9000A,
 		.end   = IRQ_VR1000_DM9000A,
-		.flags = IORESOURCE_IRQ
+		.flags = IORESOURCE_IRQ | IRQF_TRIGGER_HIGH,
 	}
 
 };
@@ -282,7 +282,7 @@ static struct resource vr1000_dm9k1_resource[] = {
 	[2] = {
 		.start = IRQ_VR1000_DM9000N,
 		.end   = IRQ_VR1000_DM9000N,
-		.flags = IORESOURCE_IRQ
+		.flags = IORESOURCE_IRQ | IRQF_TRIGGER_HIGH,
 	}
 };
 
@@ -365,7 +365,6 @@ static struct platform_device *vr1000_devices[] __initdata = {
 	&s3c_device_lcd,
 	&s3c_device_wdt,
 	&s3c_device_i2c,
-	&s3c_device_iis,
 	&s3c_device_adc,
 	&serial_device,
 	&vr1000_nor,
@@ -394,7 +393,7 @@ static void __init vr1000_map_io(void)
 {
 	/* initialise clock sources */
 
-	s3c24xx_dclk0.parent = NULL;
+	s3c24xx_dclk0.parent = &clk_upll;
 	s3c24xx_dclk0.rate   = 12*1000*1000;
 
 	s3c24xx_dclk1.parent = NULL;

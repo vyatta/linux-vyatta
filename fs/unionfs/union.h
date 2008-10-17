@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2007 Erez Zadok
+ * Copyright (c) 2003-2008 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005      Arun M. Krishnakumar
@@ -7,8 +7,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2007 Stony Brook University
- * Copyright (c) 2003-2007 The Research Foundation of SUNY
+ * Copyright (c) 2003-2008 Stony Brook University
+ * Copyright (c) 2003-2008 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -88,10 +88,6 @@ extern struct vm_operations_struct unionfs_vm_ops;
 # define unionfs_rw_semaphore	rw_semaphore
 #endif /* not CONFIG_PREEMPT_RT */
 
-#ifndef noinline_for_stack
-# define noinline_for_stack noinline
-#endif /* not noinline_for_stack */
-
 /* file private data. */
 struct unionfs_file_info {
 	int bstart;
@@ -110,7 +106,6 @@ struct unionfs_inode_info {
 	int bstart;
 	int bend;
 	atomic_t generation;
-	int stale;
 	/* Stuff for readdir over NFS. */
 	spinlock_t rdlock;
 	struct list_head readdircache;
@@ -306,6 +301,7 @@ static inline void unionfs_double_lock_dentry(struct dentry *d1,
 }
 
 extern int new_dentry_private_data(struct dentry *dentry, int subclass);
+extern int realloc_dentry_private_data(struct dentry *dentry);
 extern void free_dentry_private_data(struct dentry *dentry);
 extern void update_bstart(struct dentry *dentry);
 extern int init_lower_nd(struct nameidata *nd, unsigned int flags);
@@ -318,18 +314,13 @@ extern void release_lower_nd(struct nameidata *nd, int err);
 /* replicates the directory structure up to given dentry in given branch */
 extern struct dentry *create_parents(struct inode *dir, struct dentry *dentry,
 				     const char *name, int bindex);
-extern int make_dir_opaque(struct dentry *dir, int bindex);
 
 /* partial lookup */
 extern int unionfs_partial_lookup(struct dentry *dentry);
+extern struct dentry *unionfs_lookup_full(struct dentry *dentry,
+					  struct nameidata *nd_unused,
+					  int lookupmode);
 
-/*
- * Pass an unionfs dentry and an index and it will try to create a whiteout
- * in branch 'index'.
- *
- * On error, it will proceed to a branch to the left
- */
-extern int create_whiteout(struct dentry *dentry, int start);
 /* copies a file from dbstart to newbindex branch */
 extern int copyup_file(struct inode *dir, struct file *file, int bstart,
 		       int newbindex, loff_t size);
@@ -344,21 +335,25 @@ extern int copyup_dentry(struct inode *dir, struct dentry *dentry,
 extern void unionfs_postcopyup_setmnt(struct dentry *dentry);
 extern void unionfs_postcopyup_release(struct dentry *dentry);
 
-extern int remove_whiteouts(struct dentry *dentry,
-			    struct dentry *lower_dentry, int bindex);
-
-extern int do_delete_whiteouts(struct dentry *dentry, int bindex,
-			       struct unionfs_dir_state *namelist);
-
 /* Is this directory empty: 0 if it is empty, -ENOTEMPTY if not. */
 extern int check_empty(struct dentry *dentry,
 		       struct unionfs_dir_state **namelist);
-/* Delete whiteouts from this directory in branch bindex. */
+/* whiteout and opaque directory helpers */
+extern char *alloc_whname(const char *name, int len);
+extern bool is_whiteout_name(char **namep, int *namelenp);
+extern bool is_validname(const char *name);
+extern struct dentry *lookup_whiteout(const char *name,
+				      struct dentry *lower_parent);
+extern struct dentry *find_first_whiteout(struct dentry *dentry);
+extern int unlink_whiteout(struct dentry *wh_dentry);
+extern int check_unlink_whiteout(struct dentry *dentry,
+				 struct dentry *lower_dentry, int bindex);
+extern int create_whiteout(struct dentry *dentry, int start);
 extern int delete_whiteouts(struct dentry *dentry, int bindex,
 			    struct unionfs_dir_state *namelist);
-
-/* Re-lookup a lower dentry. */
-extern int unionfs_refresh_lower_dentry(struct dentry *dentry, int bindex);
+extern int is_opaque_dir(struct dentry *dentry, int bindex);
+extern int make_dir_opaque(struct dentry *dir, int bindex);
+extern void unionfs_set_max_namelen(long *namelen);
 
 extern void unionfs_reinterpose(struct dentry *this_dentry);
 extern struct super_block *unionfs_duplicate_super(struct super_block *sb);
@@ -380,6 +375,7 @@ extern int unionfs_fsync(struct file *file, struct dentry *dentry,
 extern int unionfs_fasync(int fd, struct file *file, int flag);
 
 /* Inode operations */
+extern struct inode *unionfs_iget(struct super_block *sb, unsigned long ino);
 extern int unionfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			  struct inode *new_dir, struct dentry *new_dentry);
 extern int unionfs_unlink(struct inode *dir, struct dentry *dentry);
@@ -390,6 +386,7 @@ extern bool __unionfs_d_revalidate_one_locked(struct dentry *dentry,
 					      bool willwrite);
 extern bool __unionfs_d_revalidate_chain(struct dentry *dentry,
 					 struct nameidata *nd, bool willwrite);
+extern bool is_negative_lower(const struct dentry *dentry);
 extern bool is_newer_lower(const struct dentry *dentry);
 extern void purge_sb_data(struct super_block *sb);
 
@@ -424,9 +421,6 @@ static inline int d_deleted(struct dentry *d)
 {
 	return d_unhashed(d) && (d != d->d_sb->s_root);
 }
-
-struct dentry *unionfs_lookup_backend(struct dentry *dentry,
-				      struct nameidata *nd, int lookupmode);
 
 /* unionfs_permission, check if we should bypass error to facilitate copyup */
 #define IS_COPYUP_ERR(err) ((err) == -EROFS)
@@ -489,20 +483,9 @@ static inline int is_robranch(const struct dentry *dentry)
 	return is_robranch_idx(dentry, index);
 }
 
-/* What do we use for whiteouts. */
-#define UNIONFS_WHPFX ".wh."
-#define UNIONFS_WHLEN 4
-/*
- * If a directory contains this file, then it is opaque.  We start with the
- * .wh. flag so that it is blocked by lookup.
- */
-#define UNIONFS_DIR_OPAQUE_NAME "__dir_opaque"
-#define UNIONFS_DIR_OPAQUE UNIONFS_WHPFX UNIONFS_DIR_OPAQUE_NAME
-
 /*
  * EXTERNALS:
  */
-extern char *alloc_whname(const char *name, int len);
 extern int check_branch(struct nameidata *nd);
 extern int parse_branch_mode(const char *name, int *perms);
 

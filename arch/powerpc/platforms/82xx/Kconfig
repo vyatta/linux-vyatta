@@ -11,7 +11,6 @@ config MPC8272_ADS
 	select 8260
 	select FSL_SOC
 	select PQ2_ADS_PCI_PIC if PCI
-	select PPC_CPM_NEW_BINDING
 	help
 	  This option enables support for the MPC8272 ADS board
 
@@ -22,9 +21,20 @@ config PQ2FADS
 	select 8260
 	select FSL_SOC
 	select PQ2_ADS_PCI_PIC if PCI
-	select PPC_CPM_NEW_BINDING
 	help
 	  This option enables support for the PQ2FADS board
+
+config EP8248E
+	bool "Embedded Planet EP8248E (a.k.a. CWH-PPC-8248N-VE)"
+	select 8272
+	select 8260
+	select FSL_SOC
+	select MDIO_BITBANG
+	help
+	  This enables support for the Embedded Planet EP8248E board.
+
+	  This board is also resold by Freescale as the QUICCStart
+	  MPC8248 Evaluation System and/or the CWH-PPC-8248N-VE.
 
 endchoice
 

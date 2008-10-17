@@ -143,6 +143,18 @@ config MEMORY_HOTREMOVE
 	depends on MEMORY_HOTPLUG && ARCH_ENABLE_MEMORY_HOTREMOVE
 	depends on MIGRATION
 
+#
+# If we have space for more page flags then we can enable additional
+# optimizations and functionality.
+#
+# Regular Sparsemem takes page flag bits for the sectionid if it does not
+# use a virtual memmap. Disable extended page flags for 32 bit platforms
+# that require the use of a sectionid in the page flags.
+#
+config PAGEFLAGS_EXTENDED
+	def_bool y
+	depends on 64BIT || SPARSEMEM_VMEMMAP || !NUMA || !SPARSEMEM
+
 # Heavily threaded applications may benefit from splitting the mm-wide
 # page_table_lock, so that faults on different parts of the user address
 # space can be handled with less contention: split it at this NR_CPUS.
@@ -187,7 +199,7 @@ config BOUNCE
 config NR_QUICK
 	int
 	depends on QUICKLIST
-	default "2" if (SUPERH && !SUPERH64)
+	default "2" if SUPERH
 	default "1"
 
 config VIRT_TO_BUS

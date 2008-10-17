@@ -16,6 +16,7 @@
 #include <asm/ptrace.h>
 #include <asm/setup.h>
 #include <asm/processor.h>
+#include <asm/lowcore.h>
 
 #ifdef __KERNEL__
 
@@ -115,6 +116,12 @@ extern void pfault_fini(void);
 #define pfault_fini()		do { } while (0)
 #endif /* CONFIG_PFAULT */
 
+#ifdef CONFIG_PAGE_STATES
+extern void cmma_init(void);
+#else
+static inline void cmma_init(void) { }
+#endif
+
 #define finish_arch_switch(prev) do {					     \
 	set_fs(current->thread.mm_segment);				     \
 	account_vtime(prev);						     \
@@ -201,9 +208,9 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 
 #define __HAVE_ARCH_CMPXCHG 1
 
-#define cmpxchg(ptr,o,n)\
-	((__typeof__(*(ptr)))__cmpxchg((ptr),(unsigned long)(o),\
-					(unsigned long)(n),sizeof(*(ptr))))
+#define cmpxchg(ptr, o, n)						\
+	((__typeof__(*(ptr)))__cmpxchg((ptr), (unsigned long)(o),	\
+					(unsigned long)(n), sizeof(*(ptr))))
 
 extern void __cmpxchg_called_with_bad_pointer(void);
 
@@ -308,14 +315,14 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 	asm volatile(						\
 		"	lctlg	%1,%2,0(%0)\n"			\
 		: : "a" (&array), "i" (low), "i" (high),	\
-		    "m" (*(addrtype *)(array)));		\
+		    "m" (*(addrtype *)(&array)));		\
 	})
 
 #define __ctl_store(array, low, high) ({			\
 	typedef struct { char _[sizeof(array)]; } addrtype;	\
 	asm volatile(						\
 		"	stctg	%2,%3,0(%1)\n"			\
-		: "=m" (*(addrtype *)(array))			\
+		: "=m" (*(addrtype *)(&array))			\
 		: "a" (&array), "i" (low), "i" (high));		\
 	})
 
@@ -326,14 +333,14 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 	asm volatile(						\
 		"	lctl	%1,%2,0(%0)\n"			\
 		: : "a" (&array), "i" (low), "i" (high),	\
-		    "m" (*(addrtype *)(array)));		\
+		    "m" (*(addrtype *)(&array)));		\
 })
 
 #define __ctl_store(array, low, high) ({			\
 	typedef struct { char _[sizeof(array)]; } addrtype;	\
 	asm volatile(						\
 		"	stctl	%2,%3,0(%1)\n"			\
-		: "=m" (*(addrtype *)(array))			\
+		: "=m" (*(addrtype *)(&array))			\
 		: "a" (&array), "i" (low), "i" (high));		\
 	})
 
@@ -355,6 +362,44 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 
 #include <linux/irqflags.h>
 
+#include <asm-generic/cmpxchg-local.h>
+
+static inline unsigned long __cmpxchg_local(volatile void *ptr,
+				      unsigned long old,
+				      unsigned long new, int size)
+{
+	switch (size) {
+	case 1:
+	case 2:
+	case 4:
+#ifdef __s390x__
+	case 8:
+#endif
+		return __cmpxchg(ptr, old, new, size);
+	default:
+		return __cmpxchg_local_generic(ptr, old, new, size);
+	}
+
+	return old;
+}
+
+/*
+ * cmpxchg_local and cmpxchg64_local are atomic wrt current CPU. Always make
+ * them available.
+ */
+#define cmpxchg_local(ptr, o, n)					\
+	((__typeof__(*(ptr)))__cmpxchg_local((ptr), (unsigned long)(o),	\
+			(unsigned long)(n), sizeof(*(ptr))))
+#ifdef __s390x__
+#define cmpxchg64_local(ptr, o, n)					\
+  ({									\
+	BUILD_BUG_ON(sizeof(*(ptr)) != 8);				\
+	cmpxchg_local((ptr), (o), (n));					\
+  })
+#else
+#define cmpxchg64_local(ptr, o, n) __cmpxchg64_local_generic((ptr), (o), (n))
+#endif
+
 /*
  * Use to set psw mask except for the first byte which
  * won't be changed by this function.
@@ -367,6 +412,8 @@ __set_psw_mask(unsigned long mask)
 
 #define local_mcck_enable()  __set_psw_mask(psw_kernel_bits)
 #define local_mcck_disable() __set_psw_mask(psw_kernel_bits & ~PSW_MASK_MCHECK)
+
+int stfle(unsigned long long *list, int doublewords);
 
 #ifdef CONFIG_SMP
 
@@ -381,6 +428,23 @@ extern void smp_ctl_clear_bit(int cr, int bit);
 #define ctl_clear_bit(cr, bit) __ctl_clear_bit(cr, bit)
 
 #endif /* CONFIG_SMP */
+
+static inline unsigned int stfl(void)
+{
+	asm volatile(
+		"	.insn	s,0xb2b10000,0(0)\n" /* stfl */
+		"0:\n"
+		EX_TABLE(0b,0b));
+	return S390_lowcore.stfl_fac_list;
+}
+
+static inline unsigned short stap(void)
+{
+	unsigned short cpu_address;
+
+	asm volatile("stap %0" : "=m" (cpu_address));
+	return cpu_address;
+}
 
 extern void (*_machine_restart)(char *command);
 extern void (*_machine_halt)(void);

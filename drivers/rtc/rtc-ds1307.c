@@ -99,45 +99,38 @@ struct ds1307 {
 };
 
 struct chip_desc {
-	char			name[9];
 	unsigned		nvram56:1;
 	unsigned		alarm:1;
-	enum ds_type		type;
 };
 
-static const struct chip_desc chips[] = { {
-	.name		= "ds1307",
-	.type		= ds_1307,
+static const struct chip_desc chips[] = {
+[ds_1307] = {
 	.nvram56	= 1,
-}, {
-	.name		= "ds1337",
-	.type		= ds_1337,
+},
+[ds_1337] = {
 	.alarm		= 1,
-}, {
-	.name		= "ds1338",
-	.type		= ds_1338,
+},
+[ds_1338] = {
 	.nvram56	= 1,
-}, {
-	.name		= "ds1339",
-	.type		= ds_1339,
+},
+[ds_1339] = {
 	.alarm		= 1,
-}, {
-	.name		= "ds1340",
-	.type		= ds_1340,
-}, {
-	.name		= "m41t00",
-	.type		= m41t00,
+},
+[ds_1340] = {
+},
+[m41t00] = {
 }, };
 
-static inline const struct chip_desc *find_chip(const char *s)
-{
-	unsigned i;
-
-	for (i = 0; i < ARRAY_SIZE(chips); i++)
-		if (strnicmp(s, chips[i].name, sizeof chips[i].name) == 0)
-			return &chips[i];
-	return NULL;
-}
+static const struct i2c_device_id ds1307_id[] = {
+	{ "ds1307", ds_1307 },
+	{ "ds1337", ds_1337 },
+	{ "ds1338", ds_1338 },
+	{ "ds1339", ds_1339 },
+	{ "ds1340", ds_1340 },
+	{ "m41t00", m41t00 },
+	{ }
+};
+MODULE_DEVICE_TABLE(i2c, ds1307_id);
 
 static int ds1307_get_time(struct device *dev, struct rtc_time *t)
 {
@@ -256,7 +249,7 @@ ds1307_nvram_read(struct kobject *kobj, struct bin_attribute *attr,
 	struct i2c_msg		msg[2];
 	int			result;
 
-	client = to_i2c_client(container_of(kobj, struct device, kobj));
+	client = kobj_to_i2c_client(kobj);
 	ds1307 = i2c_get_clientdata(client);
 
 	if (unlikely(off >= NVRAM_SIZE))
@@ -294,7 +287,7 @@ ds1307_nvram_write(struct kobject *kobj, struct bin_attribute *attr,
 	u8			buffer[NVRAM_SIZE + 1];
 	int			ret;
 
-	client = to_i2c_client(container_of(kobj, struct device, kobj));
+	client = kobj_to_i2c_client(kobj);
 
 	if (unlikely(off >= NVRAM_SIZE))
 		return -EFBIG;
@@ -326,20 +319,14 @@ static struct bin_attribute nvram = {
 
 static struct i2c_driver ds1307_driver;
 
-static int __devinit ds1307_probe(struct i2c_client *client)
+static int __devinit ds1307_probe(struct i2c_client *client,
+				  const struct i2c_device_id *id)
 {
 	struct ds1307		*ds1307;
 	int			err = -ENODEV;
 	int			tmp;
-	const struct chip_desc	*chip;
+	const struct chip_desc	*chip = &chips[id->driver_data];
 	struct i2c_adapter	*adapter = to_i2c_adapter(client->dev.parent);
-
-	chip = find_chip(client->name);
-	if (!chip) {
-		dev_err(&client->dev, "unknown chip type '%s'\n",
-				client->name);
-		return -ENODEV;
-	}
 
 	if (!i2c_check_functionality(adapter,
 			I2C_FUNC_I2C | I2C_FUNC_SMBUS_WRITE_BYTE_DATA))
@@ -361,7 +348,7 @@ static int __devinit ds1307_probe(struct i2c_client *client)
 	ds1307->msg[1].len = sizeof(ds1307->regs);
 	ds1307->msg[1].buf = ds1307->regs;
 
-	ds1307->type = chip->type;
+	ds1307->type = id->driver_data;
 
 	switch (ds1307->type) {
 	case ds_1337:
@@ -412,11 +399,6 @@ read_rtc:
 	 */
 	tmp = ds1307->regs[DS1307_REG_SECS];
 	switch (ds1307->type) {
-	case ds_1340:
-		/* FIXME read register with DS1340_BIT_OSF, use that to
-		 * trigger the "set time" warning (*after* restarting the
-		 * oscillator!) instead of this weaker ds1307/m41t00 test.
-		 */
 	case ds_1307:
 	case m41t00:
 		/* clock halted?  turn it on, so clock can tick. */
@@ -438,6 +420,24 @@ read_rtc:
 					& ~DS1338_BIT_OSF);
 			dev_warn(&client->dev, "SET TIME!\n");
 			goto read_rtc;
+		}
+		break;
+	case ds_1340:
+		/* clock halted?  turn it on, so clock can tick. */
+		if (tmp & DS1340_BIT_nEOSC)
+			i2c_smbus_write_byte_data(client, DS1307_REG_SECS, 0);
+
+		tmp = i2c_smbus_read_byte_data(client, DS1340_REG_FLAG);
+		if (tmp < 0) {
+			pr_debug("read error %d\n", tmp);
+			err = -EIO;
+			goto exit_free;
+		}
+
+		/* oscillator fault?  clear flag, and warn */
+		if (tmp & DS1340_BIT_OSF) {
+			i2c_smbus_write_byte_data(client, DS1340_REG_FLAG, 0);
+			dev_warn(&client->dev, "SET TIME!\n");
 		}
 		break;
 	case ds_1337:
@@ -537,6 +537,7 @@ static struct i2c_driver ds1307_driver = {
 	},
 	.probe		= ds1307_probe,
 	.remove		= __devexit_p(ds1307_remove),
+	.id_table	= ds1307_id,
 };
 
 static int __init ds1307_init(void)

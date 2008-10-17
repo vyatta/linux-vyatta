@@ -2,6 +2,7 @@
 #define _S390_TLBFLUSH_H
 
 #include <linux/mm.h>
+#include <linux/sched.h>
 #include <asm/processor.h>
 #include <asm/pgalloc.h>
 
@@ -13,12 +14,14 @@ static inline void __tlb_flush_local(void)
 	asm volatile("ptlb" : : : "memory");
 }
 
+#ifdef CONFIG_SMP
 /*
  * Flush all tlb entries on all cpus.
  */
+void smp_ptlb_all(void);
+
 static inline void __tlb_flush_global(void)
 {
-	extern void smp_ptlb_all(void);
 	register unsigned long reg2 asm("2");
 	register unsigned long reg3 asm("3");
 	register unsigned long reg4 asm("4");
@@ -39,35 +42,10 @@ static inline void __tlb_flush_global(void)
 		: : "d" (reg2), "d" (reg3), "d" (reg4), "m" (dummy) : "cc" );
 }
 
-/*
- * Flush all tlb entries of a page table on all cpus.
- */
-static inline void __tlb_flush_idte(pgd_t *pgd)
-{
-	asm volatile(
-		"	.insn	rrf,0xb98e0000,0,%0,%1,0"
-		: : "a" (2048), "a" (__pa(pgd) & PAGE_MASK) : "cc" );
-}
-
-static inline void __tlb_flush_mm(struct mm_struct * mm)
+static inline void __tlb_flush_full(struct mm_struct *mm)
 {
 	cpumask_t local_cpumask;
 
-	if (unlikely(cpus_empty(mm->cpu_vm_mask)))
-		return;
-	/*
-	 * If the machine has IDTE we prefer to do a per mm flush
-	 * on all cpus instead of doing a local flush if the mm
-	 * only ran on the local cpu.
-	 */
-	if (MACHINE_HAS_IDTE) {
-		pgd_t *shadow_pgd = get_shadow_table(mm->pgd);
-
-		if (shadow_pgd)
-			__tlb_flush_idte(shadow_pgd);
-		__tlb_flush_idte(mm->pgd);
-		return;
-	}
 	preempt_disable();
 	/*
 	 * If the process only ran on the local cpu, do a local flush.
@@ -78,6 +56,40 @@ static inline void __tlb_flush_mm(struct mm_struct * mm)
 	else
 		__tlb_flush_global();
 	preempt_enable();
+}
+#else
+#define __tlb_flush_full(mm)	__tlb_flush_local()
+#endif
+
+/*
+ * Flush all tlb entries of a page table on all cpus.
+ */
+static inline void __tlb_flush_idte(unsigned long asce)
+{
+	asm volatile(
+		"	.insn	rrf,0xb98e0000,0,%0,%1,0"
+		: : "a" (2048), "a" (asce) : "cc" );
+}
+
+static inline void __tlb_flush_mm(struct mm_struct * mm)
+{
+	if (unlikely(cpus_empty(mm->cpu_vm_mask)))
+		return;
+	/*
+	 * If the machine has IDTE we prefer to do a per mm flush
+	 * on all cpus instead of doing a local flush if the mm
+	 * only ran on the local cpu.
+	 */
+	if (MACHINE_HAS_IDTE) {
+		if (mm->context.noexec)
+			__tlb_flush_idte((unsigned long)
+					 get_shadow_table(mm->pgd) |
+					 mm->context.asce_bits);
+		__tlb_flush_idte((unsigned long) mm->pgd |
+				 mm->context.asce_bits);
+		return;
+	}
+	__tlb_flush_full(mm);
 }
 
 static inline void __tlb_flush_mm_cond(struct mm_struct * mm)
@@ -106,9 +118,23 @@ static inline void __tlb_flush_mm_cond(struct mm_struct * mm)
  */
 #define flush_tlb()				do { } while (0)
 #define flush_tlb_all()				do { } while (0)
-#define flush_tlb_mm(mm)			__tlb_flush_mm_cond(mm)
 #define flush_tlb_page(vma, addr)		do { } while (0)
-#define flush_tlb_range(vma, start, end)	__tlb_flush_mm_cond(mm)
-#define flush_tlb_kernel_range(start, end)	__tlb_flush_mm(&init_mm)
+
+static inline void flush_tlb_mm(struct mm_struct *mm)
+{
+	__tlb_flush_mm_cond(mm);
+}
+
+static inline void flush_tlb_range(struct vm_area_struct *vma,
+				   unsigned long start, unsigned long end)
+{
+	__tlb_flush_mm_cond(vma->vm_mm);
+}
+
+static inline void flush_tlb_kernel_range(unsigned long start,
+					  unsigned long end)
+{
+	__tlb_flush_mm(&init_mm);
+}
 
 #endif /* _S390_TLBFLUSH_H */

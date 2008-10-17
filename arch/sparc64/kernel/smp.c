@@ -1,6 +1,6 @@
 /* smp.c: Sparc64 SMP support.
  *
- * Copyright (C) 1997, 2007 David S. Miller (davem@davemloft.net)
+ * Copyright (C) 1997, 2007, 2008 David S. Miller (davem@davemloft.net)
  */
 
 #include <linux/module.h>
@@ -20,7 +20,7 @@
 #include <linux/cache.h>
 #include <linux/jiffies.h>
 #include <linux/profile.h>
-#include <linux/bootmem.h>
+#include <linux/lmb.h>
 
 #include <asm/head.h>
 #include <asm/ptrace.h>
@@ -30,6 +30,7 @@
 #include <asm/cpudata.h>
 #include <asm/hvtramp.h>
 #include <asm/io.h>
+#include <asm/timer.h>
 
 #include <asm/irq.h>
 #include <asm/irq_regs.h>
@@ -37,7 +38,6 @@
 #include <asm/pgtable.h>
 #include <asm/oplib.h>
 #include <asm/uaccess.h>
-#include <asm/timer.h>
 #include <asm/starfire.h>
 #include <asm/tlb.h>
 #include <asm/sections.h>
@@ -45,8 +45,6 @@
 #include <asm/mdesc.h>
 #include <asm/ldc.h>
 #include <asm/hypervisor.h>
-
-extern void calibrate_delay(void);
 
 int sparc64_multi_core __read_mostly;
 
@@ -88,7 +86,7 @@ extern void setup_sparc64_timer(void);
 
 static volatile unsigned long callin_flag = 0;
 
-void __devinit smp_callin(void)
+void __cpuinit smp_callin(void)
 {
 	int cpuid = hard_smp_processor_id();
 
@@ -286,14 +284,17 @@ static void ldom_startcpu_cpuid(unsigned int cpu, unsigned long thread_reg)
 {
 	extern unsigned long sparc64_ttable_tl0;
 	extern unsigned long kern_locked_tte_data;
-	extern int bigkernel;
 	struct hvtramp_descr *hdesc;
 	unsigned long trampoline_ra;
 	struct trap_per_cpu *tb;
 	u64 tte_vaddr, tte_data;
 	unsigned long hv_err;
+	int i;
 
-	hdesc = kzalloc(sizeof(*hdesc), GFP_KERNEL);
+	hdesc = kzalloc(sizeof(*hdesc) +
+			(sizeof(struct hvtramp_mapping) *
+			 num_kernel_image_mappings - 1),
+			GFP_KERNEL);
 	if (!hdesc) {
 		printk(KERN_ERR "ldom_startcpu_cpuid: Cannot allocate "
 		       "hvtramp_descr.\n");
@@ -301,7 +302,7 @@ static void ldom_startcpu_cpuid(unsigned int cpu, unsigned long thread_reg)
 	}
 
 	hdesc->cpu = cpu;
-	hdesc->num_mappings = (bigkernel ? 2 : 1);
+	hdesc->num_mappings = num_kernel_image_mappings;
 
 	tb = &trap_block[cpu];
 	tb->hdesc = hdesc;
@@ -314,13 +315,11 @@ static void ldom_startcpu_cpuid(unsigned int cpu, unsigned long thread_reg)
 	tte_vaddr = (unsigned long) KERNBASE;
 	tte_data = kern_locked_tte_data;
 
-	hdesc->maps[0].vaddr = tte_vaddr;
-	hdesc->maps[0].tte   = tte_data;
-	if (bigkernel) {
+	for (i = 0; i < hdesc->num_mappings; i++) {
+		hdesc->maps[i].vaddr = tte_vaddr;
+		hdesc->maps[i].tte   = tte_data;
 		tte_vaddr += 0x400000;
 		tte_data  += 0x400000;
-		hdesc->maps[1].vaddr = tte_vaddr;
-		hdesc->maps[1].tte   = tte_data;
 	}
 
 	trampoline_ra = kimage_addr_to_ra(hv_cpu_startup);
@@ -901,8 +900,14 @@ extern unsigned long xcall_flush_tlb_mm;
 extern unsigned long xcall_flush_tlb_pending;
 extern unsigned long xcall_flush_tlb_kernel_range;
 extern unsigned long xcall_report_regs;
+#ifdef CONFIG_MAGIC_SYSRQ
+extern unsigned long xcall_fetch_glob_regs;
+#endif
 extern unsigned long xcall_receive_signal;
 extern unsigned long xcall_new_mmu_context_version;
+#ifdef CONFIG_KGDB
+extern unsigned long xcall_kgdb_capture;
+#endif
 
 #ifdef DCACHE_ALIASING_POSSIBLE
 extern unsigned long xcall_flush_dcache_page_cheetah;
@@ -1066,10 +1071,24 @@ void smp_new_mmu_context_version(void)
 	smp_cross_call(&xcall_new_mmu_context_version, 0, 0, 0);
 }
 
+#ifdef CONFIG_KGDB
+void kgdb_roundup_cpus(unsigned long flags)
+{
+	smp_cross_call(&xcall_kgdb_capture, 0, 0, 0);
+}
+#endif
+
 void smp_report_regs(void)
 {
 	smp_cross_call(&xcall_report_regs, 0, 0, 0);
 }
+
+#ifdef CONFIG_MAGIC_SYSRQ
+void smp_fetch_global_regs(void)
+{
+	smp_cross_call(&xcall_fetch_glob_regs, 0, 0, 0);
+}
+#endif
 
 /* We know that the window frames of the user have been flushed
  * to the stack before we get here because all callers of us
@@ -1431,7 +1450,7 @@ EXPORT_SYMBOL(__per_cpu_shift);
 
 void __init real_setup_per_cpu_areas(void)
 {
-	unsigned long goal, size, i;
+	unsigned long paddr, goal, size, i;
 	char *ptr;
 
 	/* Copy section for each CPU (we discard the original) */
@@ -1441,8 +1460,13 @@ void __init real_setup_per_cpu_areas(void)
 	for (size = PAGE_SIZE; size < goal; size <<= 1UL)
 		__per_cpu_shift++;
 
-	ptr = alloc_bootmem_pages(size * NR_CPUS);
+	paddr = lmb_alloc(size * NR_CPUS, PAGE_SIZE);
+	if (!paddr) {
+		prom_printf("Cannot allocate per-cpu memory.\n");
+		prom_halt();
+	}
 
+	ptr = __va(paddr);
 	__per_cpu_base = ptr - __per_cpu_start;
 
 	for (i = 0; i < NR_CPUS; i++, ptr += size)

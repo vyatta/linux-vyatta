@@ -68,13 +68,15 @@ _ENTRY(_start);
 	mr	r29,r5
 	mr	r28,r6
 	mr	r27,r7
+	li	r25,0		/* phys kernel start (low) */
 	li	r24,0		/* CPU number */
+	li	r23,0		/* phys kernel start (high) */
 
 /* We try to not make any assumptions about how the boot loader
  * setup or used the TLBs.  We invalidate all mappings from the
  * boot loader and load a single entry in TLB1[0] to map the
- * first 16M of kernel memory.  Any boot info passed from the
- * bootloader needs to live in this first 16M.
+ * first 64M of kernel memory.  Any boot info passed from the
+ * bootloader needs to live in this first 64M.
  *
  * Requirement on bootloader:
  *  - The page we're executing in needs to reside in TLB1 and
@@ -167,6 +169,27 @@ skpinv:	addi	r6,r6,1				/* Increment */
 	mtspr	SPRN_MAS0,r7
 	tlbre
 
+	/* grab and fixup the RPN */
+	mfspr	r6,SPRN_MAS1	/* extract MAS1[SIZE] */
+	rlwinm	r6,r6,25,27,30
+	li	r8,-1
+	addi	r6,r6,10
+	slw	r6,r8,r6	/* convert to mask */
+
+	bl	1f		/* Find our address */
+1:	mflr	r7
+
+	mfspr	r8,SPRN_MAS3
+#ifdef CONFIG_PHYS_64BIT
+	mfspr	r23,SPRN_MAS7
+#endif
+	and	r8,r6,r8
+	subfic	r9,r6,-4096
+	and	r9,r9,r7
+
+	or	r25,r8,r9
+	ori	r8,r25,(MAS3_SX|MAS3_SW|MAS3_SR)
+
 	/* Just modify the entry ID and EPN for the temp mapping */
 	lis	r7,0x1000	/* Set MAS0(TLBSEL) = 1 */
 	rlwimi	r7,r5,16,4,15	/* Setup MAS0 = TLBSEL | ESEL(r5) */
@@ -180,6 +203,7 @@ skpinv:	addi	r6,r6,1				/* Increment */
 	li	r7,0		/* temp EPN = 0 */
 	rlwimi	r7,r6,0,20,31
 	mtspr	SPRN_MAS2,r7
+	mtspr	SPRN_MAS3,r8
 	tlbwe
 
 	xori	r6,r4,1
@@ -222,18 +246,20 @@ skpinv:	addi	r6,r6,1				/* Increment */
 	lis	r6,0x1000		/* Set MAS0(TLBSEL) = TLB1(1), ESEL = 0 */
 	mtspr	SPRN_MAS0,r6
 	lis	r6,(MAS1_VALID|MAS1_IPROT)@h
-	ori	r6,r6,(MAS1_TSIZE(BOOKE_PAGESZ_16M))@l
+	ori	r6,r6,(MAS1_TSIZE(BOOKE_PAGESZ_64M))@l
 	mtspr	SPRN_MAS1,r6
 	li	r7,0
-	lis	r6,KERNELBASE@h
-	ori	r6,r6,KERNELBASE@l
+	lis	r6,PAGE_OFFSET@h
+	ori	r6,r6,PAGE_OFFSET@l
 	rlwimi	r6,r7,0,20,31
 	mtspr	SPRN_MAS2,r6
-	li	r7,(MAS3_SX|MAS3_SW|MAS3_SR)
-	mtspr	SPRN_MAS3,r7
+	mtspr	SPRN_MAS3,r8
 	tlbwe
 
 /* 7. Jump to KERNELBASE mapping */
+	lis	r6,KERNELBASE@h
+	ori	r6,r6,KERNELBASE@l
+	rlwimi	r6,r7,0,20,31
 	lis	r7,MSR_KERNEL@h
 	ori	r7,r7,MSR_KERNEL@l
 	bl	1f			/* Find our address */
@@ -277,7 +303,10 @@ skpinv:	addi	r6,r6,1				/* Increment */
 	SET_IVOR(12, WatchdogTimer);
 	SET_IVOR(13, DataTLBError);
 	SET_IVOR(14, InstructionTLBError);
-	SET_IVOR(15, Debug);
+	SET_IVOR(15, DebugDebug);
+#if defined(CONFIG_E500)
+	SET_IVOR(15, DebugCrit);
+#endif
 	SET_IVOR(32, SPEUnavailable);
 	SET_IVOR(33, SPEFloatingPointData);
 	SET_IVOR(34, SPEFloatingPointRound);
@@ -341,6 +370,17 @@ skpinv:	addi	r6,r6,1				/* Increment */
 	stwu	r0,THREAD_SIZE-STACK_FRAME_OVERHEAD(r1)
 
 	bl	early_init
+
+#ifdef CONFIG_RELOCATABLE
+	lis	r3,kernstart_addr@ha
+	la	r3,kernstart_addr@l(r3)
+#ifdef CONFIG_PHYS_64BIT
+	stw	r23,0(r3)
+	stw	r25,4(r3)
+#else
+	stw	r25,0(r3)
+#endif
+#endif
 
 	mfspr	r3,SPRN_TLB1CFG
 	andi.	r3,r3,0xfff
@@ -712,7 +752,10 @@ interrupt_base:
 
 
 	/* Debug Interrupt */
-	DEBUG_EXCEPTION
+	DEBUG_DEBUG_EXCEPTION
+#if defined(CONFIG_E500)
+	DEBUG_CRIT_EXCEPTION
+#endif
 
 /*
  * Local functions

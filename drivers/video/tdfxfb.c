@@ -70,7 +70,7 @@
 
 #include <video/tdfx.h>
 
-#define DPRINTK(a, b...) pr_debug("fb: %s: " a, __FUNCTION__ , ## b)
+#define DPRINTK(a, b...) pr_debug("fb: %s: " a, __func__ , ## b)
 
 #ifdef CONFIG_MTRR
 #include <asm/mtrr.h>
@@ -1342,7 +1342,7 @@ out_err:
 }
 
 #ifndef MODULE
-static void tdfxfb_setup(char *options)
+static void __init tdfxfb_setup(char *options)
 {
 	char *this_opt;
 

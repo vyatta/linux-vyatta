@@ -27,23 +27,11 @@
 
 	.text
 
-_GLOBAL(get_msr)
-	mfmsr	r3
-	blr
-
-_GLOBAL(get_srr0)
-	mfsrr0  r3
-	blr
-
-_GLOBAL(get_srr1)
-	mfsrr1  r3
-	blr
-
 #ifdef CONFIG_IRQSTACKS
 _GLOBAL(call_do_softirq)
 	mflr	r0
 	std	r0,16(r1)
-	stdu	r1,THREAD_SIZE-112(r3)
+	stdu	r1,THREAD_SIZE-STACK_FRAME_OVERHEAD(r3)
 	mr	r1,r3
 	bl	.__do_softirq
 	ld	r1,0(r1)
@@ -56,7 +44,7 @@ _GLOBAL(call_handle_irq)
 	mflr	r0
 	std	r0,16(r1)
 	mtctr	r8
-	stdu	r1,THREAD_SIZE-112(r5)
+	stdu	r1,THREAD_SIZE-STACK_FRAME_OVERHEAD(r5)
 	mr	r1,r5
 	bctrl
 	ld	r1,0(r1)
@@ -518,13 +506,6 @@ _GLOBAL(giveup_altivec)
 
 #endif /* CONFIG_ALTIVEC */
 
-_GLOBAL(kernel_execve)
-	li	r0,__NR_execve
-	sc
-	bnslr
-	neg	r3,r3
-	blr
-
 /* kexec_wait(phys_cpu)
  *
  * wait for the flag to change, indicating this kernel is going away but
@@ -606,7 +587,7 @@ _GLOBAL(kexec_sequence)
 	std	r0,16(r1)
 
 	/* switch stacks to newstack -- &kexec_stack.stack */
-	stdu	r1,THREAD_SIZE-112(r3)
+	stdu	r1,THREAD_SIZE-STACK_FRAME_OVERHEAD(r3)
 	mr	r1,r3
 
 	li	r0,0
@@ -623,7 +604,7 @@ _GLOBAL(kexec_sequence)
 	std	r26,-48(r1)
 	std	r25,-56(r1)
 
-	stdu	r1,-112-64(r1)
+	stdu	r1,-STACK_FRAME_OVERHEAD-64(r1)
 
 	/* save args into preserved regs */
 	mr	r31,r3			/* newstack (both) */

@@ -25,8 +25,7 @@
 
 struct proc_dir_entry *de_get(struct proc_dir_entry *de)
 {
-	if (de)
-		atomic_inc(&de->count);
+	atomic_inc(&de->count);
 	return de;
 }
 
@@ -35,18 +34,16 @@ struct proc_dir_entry *de_get(struct proc_dir_entry *de)
  */
 void de_put(struct proc_dir_entry *de)
 {
-	if (de) {	
-		lock_kernel();		
-		if (!atomic_read(&de->count)) {
-			printk("de_put: entry %s already free!\n", de->name);
-			unlock_kernel();
-			return;
-		}
-
-		if (atomic_dec_and_test(&de->count))
-			free_proc_entry(de);
+	lock_kernel();
+	if (!atomic_read(&de->count)) {
+		printk("de_put: entry %s already free!\n", de->name);
 		unlock_kernel();
+		return;
 	}
+
+	if (atomic_dec_and_test(&de->count))
+		free_proc_entry(de);
+	unlock_kernel();
 }
 
 /*
@@ -72,11 +69,6 @@ static void proc_delete_inode(struct inode *inode)
 }
 
 struct vfsmount *proc_mnt;
-
-static void proc_read_inode(struct inode * inode)
-{
-	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
-}
 
 static struct kmem_cache * proc_inode_cachep;
 
@@ -128,7 +120,6 @@ static int proc_remount(struct super_block *sb, int *flags, char *data)
 static const struct super_operations proc_sops = {
 	.alloc_inode	= proc_alloc_inode,
 	.destroy_inode	= proc_destroy_inode,
-	.read_inode	= proc_read_inode,
 	.drop_inode	= generic_delete_inode,
 	.delete_inode	= proc_delete_inode,
 	.statfs		= simple_statfs,
@@ -398,16 +389,17 @@ struct inode *proc_get_inode(struct super_block *sb, unsigned int ino,
 {
 	struct inode * inode;
 
-	if (de != NULL && !try_module_get(de->owner))
+	if (!try_module_get(de->owner))
 		goto out_mod;
 
-	inode = iget(sb, ino);
+	inode = iget_locked(sb, ino);
 	if (!inode)
 		goto out_ino;
+	if (inode->i_state & I_NEW) {
+		inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+		PROC_I(inode)->fd = 0;
+		PROC_I(inode)->pde = de;
 
-	PROC_I(inode)->fd = 0;
-	PROC_I(inode)->pde = de;
-	if (de) {
 		if (de->mode) {
 			inode->i_mode = de->mode;
 			inode->i_uid = de->uid;
@@ -428,17 +420,17 @@ struct inode *proc_get_inode(struct super_block *sb, unsigned int ino,
 				else
 #endif
 					inode->i_fop = &proc_reg_file_ops;
-			}
-			else
+			} else {
 				inode->i_fop = de->proc_fops;
+			}
 		}
-	}
-
+		unlock_new_inode(inode);
+	} else
+	       module_put(de->owner);
 	return inode;
 
 out_ino:
-	if (de != NULL)
-		module_put(de->owner);
+	module_put(de->owner);
 out_mod:
 	return NULL;
 }			
@@ -471,4 +463,3 @@ out_no_root:
 	de_put(&proc_root);
 	return -ENOMEM;
 }
-MODULE_LICENSE("GPL");

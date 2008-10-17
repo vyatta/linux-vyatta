@@ -35,60 +35,98 @@
   *  - Arnaldo Carvalho de Melo <acme@conectiva.com.br>
   */
 
-#define __SLOW_DOWN_IO "\noutb %%al,$0x80"
+extern void native_io_delay(void);
 
-#ifdef REALLY_SLOW_IO
-#define __FULL_SLOW_DOWN_IO __SLOW_DOWN_IO __SLOW_DOWN_IO __SLOW_DOWN_IO __SLOW_DOWN_IO
+extern int io_delay_type;
+extern void io_delay_init(void);
+
+#if defined(CONFIG_PARAVIRT)
+#include <asm/paravirt.h>
 #else
-#define __FULL_SLOW_DOWN_IO __SLOW_DOWN_IO
+
+static inline void slow_down_io(void)
+{
+	native_io_delay();
+#ifdef REALLY_SLOW_IO
+	native_io_delay();
+	native_io_delay();
+	native_io_delay();
+#endif
+}
 #endif
 
 /*
  * Talk about misusing macros..
  */
-#define __OUT1(s,x) \
+#define __OUT1(s, x)							\
 static inline void out##s(unsigned x value, unsigned short port) {
 
-#define __OUT2(s,s1,s2) \
-__asm__ __volatile__ ("out" #s " %" s1 "0,%" s2 "1"
+#define __OUT2(s, s1, s2)				\
+asm volatile ("out" #s " %" s1 "0,%" s2 "1"
 
-#define __OUT(s,s1,x) \
-__OUT1(s,x) __OUT2(s,s1,"w") : : "a" (value), "Nd" (port)); } \
-__OUT1(s##_p,x) __OUT2(s,s1,"w") __FULL_SLOW_DOWN_IO : : "a" (value), "Nd" (port));} \
+#ifndef REALLY_SLOW_IO
+#define REALLY_SLOW_IO
+#define UNSET_REALLY_SLOW_IO
+#endif
 
-#define __IN1(s) \
-static inline RETURN_TYPE in##s(unsigned short port) { RETURN_TYPE _v;
+#define __OUT(s, s1, x)							\
+	__OUT1(s, x) __OUT2(s, s1, "w") : : "a" (value), "Nd" (port));	\
+	}								\
+	__OUT1(s##_p, x) __OUT2(s, s1, "w") : : "a" (value), "Nd" (port)); \
+	slow_down_io();							\
+}
 
-#define __IN2(s,s1,s2) \
-__asm__ __volatile__ ("in" #s " %" s2 "1,%" s1 "0"
+#define __IN1(s)							\
+static inline RETURN_TYPE in##s(unsigned short port)			\
+{									\
+	RETURN_TYPE _v;
 
-#define __IN(s,s1,i...) \
-__IN1(s) __IN2(s,s1,"w") : "=a" (_v) : "Nd" (port) ,##i ); return _v; } \
-__IN1(s##_p) __IN2(s,s1,"w") __FULL_SLOW_DOWN_IO : "=a" (_v) : "Nd" (port) ,##i ); return _v; } \
+#define __IN2(s, s1, s2)						\
+	asm volatile ("in" #s " %" s2 "1,%" s1 "0"
 
-#define __INS(s) \
-static inline void ins##s(unsigned short port, void * addr, unsigned long count) \
-{ __asm__ __volatile__ ("rep ; ins" #s \
-: "=D" (addr), "=c" (count) : "d" (port),"0" (addr),"1" (count)); }
+#define __IN(s, s1, i...)						\
+	__IN1(s) __IN2(s, s1, "w") : "=a" (_v) : "Nd" (port), ##i);	\
+	return _v;							\
+	}								\
+	__IN1(s##_p) __IN2(s, s1, "w") : "=a" (_v) : "Nd" (port), ##i);	\
+	slow_down_io(); \
+	return _v; }
 
-#define __OUTS(s) \
-static inline void outs##s(unsigned short port, const void * addr, unsigned long count) \
-{ __asm__ __volatile__ ("rep ; outs" #s \
-: "=S" (addr), "=c" (count) : "d" (port),"0" (addr),"1" (count)); }
+#ifdef UNSET_REALLY_SLOW_IO
+#undef REALLY_SLOW_IO
+#endif
+
+#define __INS(s)							\
+static inline void ins##s(unsigned short port, void *addr,		\
+			  unsigned long count)				\
+{									\
+	asm volatile ("rep ; ins" #s					\
+		      : "=D" (addr), "=c" (count)			\
+		      : "d" (port), "0" (addr), "1" (count));		\
+}
+
+#define __OUTS(s)							\
+static inline void outs##s(unsigned short port, const void *addr,	\
+			   unsigned long count)				\
+{									\
+	asm volatile ("rep ; outs" #s					\
+		      : "=S" (addr), "=c" (count)			\
+		      : "d" (port), "0" (addr), "1" (count));		\
+}
 
 #define RETURN_TYPE unsigned char
-__IN(b,"")
+__IN(b, "")
 #undef RETURN_TYPE
 #define RETURN_TYPE unsigned short
-__IN(w,"")
+__IN(w, "")
 #undef RETURN_TYPE
 #define RETURN_TYPE unsigned int
-__IN(l,"")
+__IN(l, "")
 #undef RETURN_TYPE
 
-__OUT(b,"b",char)
-__OUT(w,"w",short)
-__OUT(l,,int)
+__OUT(b, "b", char)
+__OUT(w, "w", short)
+__OUT(l, , int)
 
 __INS(b)
 __INS(w)
@@ -109,12 +147,12 @@ __OUTS(l)
  * Change virtual addresses to physical addresses and vv.
  * These are pretty trivial
  */
-static inline unsigned long virt_to_phys(volatile void * address)
+static inline unsigned long virt_to_phys(volatile void *address)
 {
 	return __pa(address);
 }
 
-static inline void * phys_to_virt(unsigned long address)
+static inline void *phys_to_virt(unsigned long address)
 {
 	return __va(address);
 }
@@ -127,13 +165,6 @@ static inline void * phys_to_virt(unsigned long address)
 
 #include <asm-generic/iomap.h>
 
-extern void __iomem *__ioremap(unsigned long offset, unsigned long size, unsigned long flags);
-
-static inline void __iomem * ioremap (unsigned long offset, unsigned long size)
-{
-	return __ioremap(offset, size, 0);
-}
-
 extern void *early_ioremap(unsigned long addr, unsigned long size);
 extern void early_iounmap(void *addr, unsigned long size);
 
@@ -142,8 +173,19 @@ extern void early_iounmap(void *addr, unsigned long size);
  * it's useful if some control registers are in such an area and write combining
  * or read caching is not desirable:
  */
-extern void __iomem * ioremap_nocache (unsigned long offset, unsigned long size);
+extern void __iomem *ioremap_nocache(resource_size_t offset, unsigned long size);
+extern void __iomem *ioremap_cache(resource_size_t offset, unsigned long size);
+
+/*
+ * The default ioremap() behavior is non-cached:
+ */
+static inline void __iomem *ioremap(resource_size_t offset, unsigned long size)
+{
+	return ioremap_nocache(offset, size);
+}
+
 extern void iounmap(volatile void __iomem *addr);
+
 extern void __iomem *fix_ioremap(unsigned idx, unsigned long phys);
 
 /*
@@ -173,18 +215,22 @@ static inline __u8 __readb(const volatile void __iomem *addr)
 {
 	return *(__force volatile __u8 *)addr;
 }
+
 static inline __u16 __readw(const volatile void __iomem *addr)
 {
 	return *(__force volatile __u16 *)addr;
 }
+
 static __always_inline __u32 __readl(const volatile void __iomem *addr)
 {
 	return *(__force volatile __u32 *)addr;
 }
+
 static inline __u64 __readq(const volatile void __iomem *addr)
 {
 	return *(__force volatile __u64 *)addr;
 }
+
 #define readb(x) __readb(x)
 #define readw(x) __readw(x)
 #define readl(x) __readl(x)
@@ -204,37 +250,44 @@ static inline void __writel(__u32 b, volatile void __iomem *addr)
 {
 	*(__force volatile __u32 *)addr = b;
 }
+
 static inline void __writeq(__u64 b, volatile void __iomem *addr)
 {
 	*(__force volatile __u64 *)addr = b;
 }
+
 static inline void __writeb(__u8 b, volatile void __iomem *addr)
 {
 	*(__force volatile __u8 *)addr = b;
 }
+
 static inline void __writew(__u16 b, volatile void __iomem *addr)
 {
 	*(__force volatile __u16 *)addr = b;
 }
-#define writeq(val,addr) __writeq((val),(addr))
-#define writel(val,addr) __writel((val),(addr))
-#define writew(val,addr) __writew((val),(addr))
-#define writeb(val,addr) __writeb((val),(addr))
+
+#define writeq(val, addr) __writeq((val), (addr))
+#define writel(val, addr) __writel((val), (addr))
+#define writew(val, addr) __writew((val), (addr))
+#define writeb(val, addr) __writeb((val), (addr))
 #define __raw_writeb writeb
 #define __raw_writew writew
 #define __raw_writel writel
 #define __raw_writeq writeq
 
-void __memcpy_fromio(void*,unsigned long,unsigned);
-void __memcpy_toio(unsigned long,const void*,unsigned);
+void __memcpy_fromio(void *, unsigned long, unsigned);
+void __memcpy_toio(unsigned long, const void *, unsigned);
 
-static inline void memcpy_fromio(void *to, const volatile void __iomem *from, unsigned len)
+static inline void memcpy_fromio(void *to, const volatile void __iomem *from,
+				 unsigned len)
 {
-	__memcpy_fromio(to,(unsigned long)from,len);
+	__memcpy_fromio(to, (unsigned long)from, len);
 }
-static inline void memcpy_toio(volatile void __iomem *to, const void *from, unsigned len)
+
+static inline void memcpy_toio(volatile void __iomem *to, const void *from,
+			       unsigned len)
 {
-	__memcpy_toio((unsigned long)to,from,len);
+	__memcpy_toio((unsigned long)to, from, len);
 }
 
 void memset_io(volatile void __iomem *a, int b, size_t c);
@@ -249,16 +302,10 @@ void memset_io(volatile void __iomem *a, int b, size_t c);
  */
 #define __ISA_IO_base ((char __iomem *)(PAGE_OFFSET))
 
-#define flush_write_buffers() 
+#define flush_write_buffers()
 
 extern int iommu_bio_merge;
 #define BIO_VMERGE_BOUNDARY iommu_bio_merge
-
-/*
- * Convert a physical pointer to a virtual kernel pointer for /dev/mem
- * access
- */
-#define xlate_dev_mem_ptr(p)	__va(p)
 
 /*
  * Convert a virtual cached pointer to an uncached pointer

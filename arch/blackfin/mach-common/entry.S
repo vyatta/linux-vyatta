@@ -38,6 +38,7 @@
 #include <linux/unistd.h>
 #include <asm/blackfin.h>
 #include <asm/errno.h>
+#include <asm/fixed_code.h>
 #include <asm/thread_info.h>  /* TIF_NEED_RESCHED */
 #include <asm/asm-offsets.h>
 #include <asm/trace.h>
@@ -50,15 +51,6 @@
 # define EX_SCRATCH_REG RETE
 #else
 # define EX_SCRATCH_REG CYCLES
-#endif
-
-#if ANOMALY_05000281
-ENTRY(_safe_speculative_execution)
-	NOP;
-	NOP;
-	NOP;
-	jump _safe_speculative_execution;
-ENDPROC(_safe_speculative_execution)
 #endif
 
 #ifdef CONFIG_EXCPT_IRQ_SYSC_L1
@@ -95,6 +87,9 @@ ENTRY(_ex_workaround_261)
 	R6 = 0x26;	/* Data CPLB Miss */
 	cc = R6 == R7;
 	if cc jump _ex_dcplb_miss (BP);
+	R6 = 0x23;	/* Data CPLB Miss */
+	cc = R6 == R7;
+	if cc jump _ex_dcplb_viol (BP);
 	/* Handle 0x23 Data CPLB Protection Violation
 	 * and Data CPLB Multiple Hits - Linux Trap Zero
 	 */
@@ -102,25 +97,45 @@ ENTRY(_ex_workaround_261)
 ENDPROC(_ex_workaround_261)
 
 #else
+#ifdef CONFIG_MPU
+#define _ex_dviol _ex_dcplb_viol
+#else
 #define _ex_dviol _ex_trap_c
+#endif
 #define _ex_dmiss _ex_dcplb_miss
 #define _ex_dmult _ex_trap_c
 #endif
 
+
+ENTRY(_ex_dcplb_viol)
 ENTRY(_ex_dcplb_miss)
 ENTRY(_ex_icplb_miss)
 	(R7:6,P5:4) = [sp++];
 	ASTAT = [sp++];
 	SAVE_ALL_SYS
+#ifdef CONFIG_MPU
+	/* We must load R1 here, _before_ DEBUG_HWTRACE_SAVE, since that
+	 * will change the stack pointer.  */
+	R0 = SEQSTAT;
+	R1 = SP;
+#endif
+	DEBUG_HWTRACE_SAVE(p5, r7)
+#ifdef CONFIG_MPU
+	sp += -12;
+	call _cplb_hdr;
+	sp += 12;
+	CC = R0 == 0;
+	IF !CC JUMP _handle_bad_cplb;
+#else
 	call __cplb_hdr;
-	DEBUG_START_HWTRACE(p5, r7)
+#endif
+	DEBUG_HWTRACE_RESTORE(p5, r7)
 	RESTORE_ALL_SYS
 	SP = EX_SCRATCH_REG;
 	rtx;
 ENDPROC(_ex_icplb_miss)
 
 ENTRY(_ex_syscall)
-	DEBUG_START_HWTRACE(p5, r7)
 	(R7:6,P5:4) = [sp++];
 	ASTAT = [sp++];
 	raise 15;		/* invoked by TRAP #0, for sys call */
@@ -136,30 +151,65 @@ ENTRY(_ex_soft_bp)
 ENDPROC(_ex_soft_bp)
 
 ENTRY(_ex_single_step)
+	/* If we just returned from an interrupt, the single step event is
+	   for the RTI instruction.  */
 	r7 = retx;
 	r6 = reti;
 	cc = r7 == r6;
-	if cc jump _bfin_return_from_exception
+	if cc jump _bfin_return_from_exception;
+
+	/* If we were in user mode, do the single step normally.  */
+	p5.l = lo(IPEND);
+	p5.h = hi(IPEND);
+	r6 = [p5];
+	r7 = 0xffe0 (z);
+	r7 = r7 & r6;
+	cc = r7 == 0;
+	if !cc jump 1f;
+
+	/* Single stepping only a single instruction, so clear the trace
+	 * bit here.  */
+	r7 = syscfg;
+	bitclr (r7, 0);
+	syscfg = R7;
+	jump _ex_trap_c;
+
+1:
+	/*
+	 * We were in an interrupt handler.  By convention, all of them save
+	 * SYSCFG with their first instruction, so by checking whether our
+	 * RETX points at the entry point, we can determine whether to allow
+	 * a single step, or whether to clear SYSCFG.
+	 *
+	 * First, find out the interrupt level and the event vector for it.
+	 */
+	p5.l = lo(EVT0);
+	p5.h = hi(EVT0);
+	p5 += -4;
+2:
+	r7 = rot r7 by -1;
+	p5 += 4;
+	if !cc jump 2b;
+
+	/* What we actually do is test for the _second_ instruction in the
+	 * IRQ handler.  That way, if there are insns following the restore
+	 * of SYSCFG after leaving the handler, we will not turn off SYSCFG
+	 * for them.  */
+
+	r7 = [p5];
+	r7 += 2;
+	r6 = RETX;
+	cc = R7 == R6;
+	if !cc jump _bfin_return_from_exception;
+
 	r7 = syscfg;
 	bitclr (r7, 0);
 	syscfg = R7;
 
-	p5.l = lo(IPEND);
-	p5.h = hi(IPEND);
-	r6 = [p5];
-	cc = bittst(r6, 5);
-	if !cc jump _ex_trap_c;
-	p4.l = lo(EVT5);
-	p4.h = hi(EVT5);
-	r6.h = _exception_to_level5;
-	r6.l = _exception_to_level5;
-	r7 = [p4];
-	cc = r6 == r7;
-	if !cc jump _ex_trap_c;
+	/* Fall through to _bfin_return_from_exception.  */
 ENDPROC(_ex_single_step)
 
 ENTRY(_bfin_return_from_exception)
-	DEBUG_START_HWTRACE(p5, r7)
 #if ANOMALY_05000257
 	R7=LC0;
 	LC0=R7;
@@ -173,6 +223,7 @@ ENTRY(_bfin_return_from_exception)
 ENDPROC(_bfin_return_from_exception)
 
 ENTRY(_handle_bad_cplb)
+	DEBUG_HWTRACE_RESTORE(p5, r7)
 	/* To get here, we just tried and failed to change a CPLB
 	 * so, handle things in trap_c (C code), by lowering to
 	 * IRQ5, just like we normally do. Since this is not a
@@ -181,10 +232,9 @@ ENTRY(_handle_bad_cplb)
 	 * need to make a CPLB exception look like a normal exception
 	 */
 
-	DEBUG_START_HWTRACE(p5, r7)
 	RESTORE_ALL_SYS
 	[--sp] = ASTAT;
-	[--sp] = (R7:6, P5:4);
+	[--sp] = (R7:6,P5:4);
 
 ENTRY(_ex_replaceable)
 	nop;
@@ -208,33 +258,41 @@ ENTRY(_ex_trap_c)
 	[p4] = p5;
 	csync;
 
+	p4.l = lo(DCPLB_FAULT_ADDR);
+	p4.h = hi(DCPLB_FAULT_ADDR);
+	r7 = [p4];
+	p5.h = _saved_dcplb_fault_addr;
+	p5.l = _saved_dcplb_fault_addr;
+	[p5] = r7;
+
+	r7 = [p4 + (ICPLB_FAULT_ADDR - DCPLB_FAULT_ADDR)];
+	p5.h = _saved_icplb_fault_addr;
+	p5.l = _saved_icplb_fault_addr;
+	[p5] = r7;
+
+	p4.l = _excpt_saved_stuff;
+	p4.h = _excpt_saved_stuff;
+
+	r6 = retx;
+	[p4] = r6;
+
+	r6 = SYSCFG;
+	[p4 + 4] = r6;
+	BITCLR(r6, 0);
+	SYSCFG = r6;
+
 	/* Disable all interrupts, but make sure level 5 is enabled so
 	 * we can switch to that level.  Save the old mask.  */
 	cli r6;
-	p4.l = _excpt_saved_imask;
-	p4.h = _excpt_saved_imask;
-	[p4] = r6;
+	[p4 + 8] = r6;
+
+	p4.l = lo(SAFE_USER_INSTRUCTION);
+	p4.h = hi(SAFE_USER_INSTRUCTION);
+	retx = p4;
+
 	r6 = 0x3f;
 	sti r6;
 
-	/* Save the excause into a circular buffer, in case the instruction
-	 * which caused this excecptions causes others.
-	 */
-	P5.l = _in_ptr_excause;
-	P5.h = _in_ptr_excause;
-	R7 = [P5];
-	R7 += 4;
-	R6 = 0xF;
-	R7 = R7 & R6;
-	[P5] = R7;
-	R6.l = _excause_circ_buf;
-	R6.h = _excause_circ_buf;
-	R7 = R7 + R6;
-	p5 = R7;
-	R6 = SEQSTAT;
-	[P5] = R6;
-
-	DEBUG_START_HWTRACE(p5, r7)
 	(R7:6,P5:4) = [sp++];
 	ASTAT = [sp++];
 	SP = EX_SCRATCH_REG;
@@ -279,6 +337,11 @@ ENTRY(_double_fault)
          */
         SAVE_ALL_SYS
 
+	/* The dumping functions expect the return address in the RETI
+	 * slot.  */
+	r6 = retx;
+	[sp + PT_PC] = r6;
+
         r0 = sp;        /* stack frame pt_regs pointer argument ==> r0 */
         SP += -12;
         call _double_fault_c;
@@ -291,11 +354,17 @@ ENDPROC(_double_fault)
 ENTRY(_exception_to_level5)
 	SAVE_ALL_SYS
 
+	p4.l = _excpt_saved_stuff;
+	p4.h = _excpt_saved_stuff;
+	r6 = [p4];
+	[sp + PT_PC] = r6;
+
+	r6 = [p4 + 4];
+	[sp + PT_SYSCFG] = r6;
+
 	/* Restore interrupt mask.  We haven't pushed RETI, so this
 	 * doesn't enable interrupts until we return from this handler.  */
-	p4.l = _excpt_saved_imask;
-	p4.h = _excpt_saved_imask;
-	r6 = [p4];
+	r6 = [p4 + 8];
 	sti r6;
 
 	/* Restore the hardware error vector.  */
@@ -312,41 +381,10 @@ ENTRY(_exception_to_level5)
 	r0 = [p2];              /* Read current IPEND */
 	[sp + PT_IPEND] = r0;   /* Store IPEND */
 
-	/* Pop the excause from the circular buffer and push it on the stack
-	 * (in the right place - if you change the location of SEQSTAT, you
-	 * must change this offset.
-	 */
-.L_excep_to_5_again:
-	P5.l = _out_ptr_excause;
-	P5.h = _out_ptr_excause;
-	R7 = [P5];
-	R7 += 4;
-	R6 = 0xF;
-	R7 = R7 & R6;
-	[P5] = R7;
-	R6.l = _excause_circ_buf;
-	R6.h = _excause_circ_buf;
-	R7 = R7 + R6;
-	P5 = R7;
-	R1 = [P5];
-	[SP + 8] = r1;
-
 	r0 = sp; 	/* stack frame pt_regs pointer argument ==> r0 */
 	SP += -12;
 	call _trap_c;
 	SP += 12;
-
-	/* See if anything else is in the exception buffer
-	 * if there is, process it
-	 */
-	P5.l = _out_ptr_excause;
-	P5.h = _out_ptr_excause;
-	P4.l = _in_ptr_excause;
-	P4.h = _in_ptr_excause;
-	R6 = [P5];
-	R7 = [P4];
-	CC = R6 == R7;
-	if ! CC JUMP .L_excep_to_5_again
 
 	call _ret_from_exception;
 	RESTORE_ALL_SYS
@@ -363,8 +401,7 @@ ENTRY(_trap) /* Exception: 4th entry into system event table(supervisor mode)*/
 	sp.h = _exception_stack_top;
 	/* Try to deal with syscalls quickly.  */
 	[--sp] = ASTAT;
-	[--sp] = (R7:6, P5:4);
-	DEBUG_STOP_HWTRACE(p5, r7)
+	[--sp] = (R7:6,P5:4);
 	r7 = SEQSTAT;		/* reason code is in bit 5:0 */
 	r6.l = lo(SEQSTAT_EXCAUSE);
 	r6.h = hi(SEQSTAT_EXCAUSE);
@@ -633,9 +670,7 @@ ENTRY(_ret_from_exception)
 	[sp + PT_IPEND] = r0;
 
 1:
-	r1 = 0x37(Z);
-	r2 = ~r1;
-	r2.h = 0;
+	r2 = LO(~0x37) (Z);
 	r0 = r2 & r0;
 	cc = r0 == 0;
 	if !cc jump 4f;	/* if not return to user mode, get out */
@@ -714,8 +749,8 @@ ENTRY(_return_from_int)
 	[p0] = p1;
 	csync;
 #if ANOMALY_05000281
-	r0.l = _safe_speculative_execution;
-	r0.h = _safe_speculative_execution;
+	r0.l = lo(SAFE_USER_INSTRUCTION);
+	r0.h = hi(SAFE_USER_INSTRUCTION);
 	reti = r0;
 #endif
 	r0 = 0x801f (z);
@@ -728,8 +763,8 @@ ENDPROC(_return_from_int)
 
 ENTRY(_lower_to_irq14)
 #if ANOMALY_05000281
-	r0.l = _safe_speculative_execution;
-	r0.h = _safe_speculative_execution;
+	r0.l = lo(SAFE_USER_INSTRUCTION);
+	r0.h = hi(SAFE_USER_INSTRUCTION);
 	reti = r0;
 #endif
 	r0 = 0x401f;
@@ -795,20 +830,6 @@ _schedule_and_signal:
 	RESTORE_CONTEXT
 	rti;
 ENDPROC(_lower_to_irq14)
-
-/* Make sure when we start, that the circular buffer is initialized properly
- * R0 and P0 are call clobbered, so we can use them here.
- */
-ENTRY(_init_exception_buff)
-	r0 = 0;
-	p0.h = _in_ptr_excause;
-	p0.l = _in_ptr_excause;
-	[p0] = r0;
-	p0.h = _out_ptr_excause;
-	p0.l = _out_ptr_excause;
-	[p0] = r0;
-	rts;
-ENDPROC(_init_exception_buff)
 
 /* We handle this 100% in exception space - to reduce overhead
  * Only potiential problem is if the software buffer gets swapped out of the
@@ -1356,7 +1377,7 @@ ENTRY(_sys_call_table)
 	.long _sys_epoll_pwait
 	.long _sys_utimensat
 	.long _sys_signalfd
-	.long _sys_timerfd
+	.long _sys_timerfd_create
 	.long _sys_eventfd	/* 350 */
 	.long _sys_pread64
 	.long _sys_pwrite64
@@ -1364,10 +1385,21 @@ ENTRY(_sys_call_table)
 	.long _sys_set_robust_list
 	.long _sys_get_robust_list	/* 355 */
 	.long _sys_fallocate
+	.long _sys_semtimedop
+	.long _sys_timerfd_settime
+	.long _sys_timerfd_gettime
+
 	.rept NR_syscalls-(.-_sys_call_table)/4
 	.long _sys_ni_syscall
 	.endr
-_excpt_saved_imask:
+
+	/*
+	 * Used to save the real RETX, IMASK and SYSCFG when temporarily
+	 * storing safe values across the transition from exception to IRQ5.
+	 */
+_excpt_saved_stuff:
+	.long 0;
+	.long 0;
 	.long 0;
 
 _exception_stack:
@@ -1381,17 +1413,3 @@ _exception_stack_top:
 _last_cplb_fault_retx:
 	.long 0;
 #endif
-/*
- * Single instructions can have multiple faults, which need to be
- * handled by traps.c, in irq5. We store the exception cause to ensure
- * we don't miss a double fault condition
- */
-ENTRY(_in_ptr_excause)
-	.long 0;
-ENTRY(_out_ptr_excause)
-	.long 0;
-ALIGN
-ENTRY(_excause_circ_buf)
-	.rept 4
-	.long 0
-	.endr

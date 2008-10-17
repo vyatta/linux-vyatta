@@ -1,5 +1,4 @@
-/* linux/drivers/ide/arm/bast-ide.c
- *
+/*
  * Copyright (c) 2003-2004 Simtec Electronics
  *  Ben Dooks <ben@simtec.co.uk>
  *
@@ -22,36 +21,50 @@
 #include <asm/arch/bast-map.h>
 #include <asm/arch/bast-irq.h>
 
-/* list of registered interfaces */
-static ide_hwif_t *ifs[2];
+#define DRV_NAME "bast-ide"
 
-static int __init
-bastide_register(unsigned int base, unsigned int aux, int irq,
-		 ide_hwif_t **hwif)
+static int __init bastide_register(unsigned int base, unsigned int aux, int irq)
 {
+	ide_hwif_t *hwif;
 	hw_regs_t hw;
 	int i;
+	u8 idx[4] = { 0xff, 0xff, 0xff, 0xff };
 
 	memset(&hw, 0, sizeof(hw));
 
 	base += BAST_IDE_CS;
 	aux  += BAST_IDE_CS;
 
-	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
-		hw.io_ports[i] = (unsigned long)base;
+	for (i = 0; i <= 7; i++) {
+		hw.io_ports_array[i] = (unsigned long)base;
 		base += 0x20;
 	}
 
-	hw.io_ports[IDE_CONTROL_OFFSET] = aux + (6 * 0x20);
+	hw.io_ports.ctl_addr = aux + (6 * 0x20);
 	hw.irq = irq;
+	hw.chipset = ide_generic;
 
-	ide_register_hw(&hw, NULL, 0, hwif);
+	hwif = ide_find_port();
+	if (hwif == NULL)
+		goto out;
 
+	i = hwif->index;
+
+	ide_init_port_data(hwif, i);
+	ide_init_port_hw(hwif, &hw);
+	hwif->port_ops = NULL;
+
+	idx[0] = i;
+
+	ide_device_add(idx, NULL);
+out:
 	return 0;
 }
 
 static int __init bastide_init(void)
 {
+	unsigned long base = BAST_VA_IDEPRI + BAST_IDE_CS;
+
 	/* we can treat the VR1000 and the BAST the same */
 
 	if (!(machine_is_bast() || machine_is_vr1000()))
@@ -59,8 +72,14 @@ static int __init bastide_init(void)
 
 	printk("BAST: IDE driver, (c) 2003-2004 Simtec Electronics\n");
 
-	bastide_register(BAST_VA_IDEPRI, BAST_VA_IDEPRIAUX, IRQ_IDE0, &ifs[0]);
-	bastide_register(BAST_VA_IDESEC, BAST_VA_IDESECAUX, IRQ_IDE1, &ifs[1]);
+	if (!request_mem_region(base, 0x400000, DRV_NAME)) {
+		printk(KERN_ERR "%s: resources busy\n", DRV_NAME);
+		return -EBUSY;
+	}
+
+	bastide_register(BAST_VA_IDEPRI, BAST_VA_IDEPRIAUX, IRQ_IDE0);
+	bastide_register(BAST_VA_IDESEC, BAST_VA_IDESECAUX, IRQ_IDE1);
+
 	return 0;
 }
 

@@ -242,7 +242,8 @@ u32 tipc_createport_raw(void *usr_handle,
 	p_ptr->publ.max_pkt = MAX_PKT_DEFAULT;
 	p_ptr->publ.ref = ref;
 	msg = &p_ptr->publ.phdr;
-	msg_init(msg, DATA_LOW, TIPC_NAMED_MSG, TIPC_OK, LONG_H_SIZE, 0);
+	msg_init(msg, TIPC_LOW_IMPORTANCE, TIPC_NAMED_MSG, TIPC_OK, LONG_H_SIZE,
+		 0);
 	msg_set_orignode(msg, tipc_own_addr);
 	msg_set_prevnode(msg, tipc_own_addr);
 	msg_set_origport(msg, ref);
@@ -340,7 +341,7 @@ int tipc_portunreliable(u32 ref, unsigned int *isunreliable)
 	if (!p_ptr)
 		return -EINVAL;
 	*isunreliable = port_unreliable(p_ptr);
-	spin_unlock_bh(p_ptr->publ.lock);
+	tipc_port_unlock(p_ptr);
 	return TIPC_OK;
 }
 
@@ -369,7 +370,7 @@ int tipc_portunreturnable(u32 ref, unsigned int *isunrejectable)
 	if (!p_ptr)
 		return -EINVAL;
 	*isunrejectable = port_unreturnable(p_ptr);
-	spin_unlock_bh(p_ptr->publ.lock);
+	tipc_port_unlock(p_ptr);
 	return TIPC_OK;
 }
 
@@ -411,13 +412,6 @@ static struct sk_buff *port_build_proto_msg(u32 destport, u32 destnode,
 		msg_dbg(msg, "PORT>SEND>:");
 	}
 	return buf;
-}
-
-int tipc_set_msg_option(struct tipc_port *tp_ptr, const char *opt, const u32 sz)
-{
-	msg_expand(&tp_ptr->phdr, msg_destnode(&tp_ptr->phdr));
-	msg_set_options(&tp_ptr->phdr, opt, sz);
-	return TIPC_OK;
 }
 
 int tipc_reject_msg(struct sk_buff *buf, u32 err)
@@ -632,7 +626,7 @@ void tipc_port_recv_proto_msg(struct sk_buff *buf)
 					     msg_orignode(msg),
 					     msg_destport(msg),
 					     tipc_own_addr,
-					     DATA_HIGH,
+					     TIPC_HIGH_IMPORTANCE,
 					     TIPC_CONN_MSG,
 					     err,
 					     0,
@@ -843,7 +837,7 @@ static void port_dispatcher_sigh(void *dummy)
 				u32 peer_port = port_peerport(p_ptr);
 				u32 peer_node = port_peernode(p_ptr);
 
-				spin_unlock_bh(p_ptr->publ.lock);
+				tipc_port_unlock(p_ptr);
 				if (unlikely(!connected)) {
 					if (unlikely(published))
 						goto reject;
@@ -867,7 +861,7 @@ static void port_dispatcher_sigh(void *dummy)
 		case TIPC_DIRECT_MSG:{
 				tipc_msg_event cb = up_ptr->msg_cb;
 
-				spin_unlock_bh(p_ptr->publ.lock);
+				tipc_port_unlock(p_ptr);
 				if (unlikely(connected))
 					goto reject;
 				if (unlikely(!cb))
@@ -882,7 +876,7 @@ static void port_dispatcher_sigh(void *dummy)
 		case TIPC_NAMED_MSG:{
 				tipc_named_msg_event cb = up_ptr->named_msg_cb;
 
-				spin_unlock_bh(p_ptr->publ.lock);
+				tipc_port_unlock(p_ptr);
 				if (unlikely(connected))
 					goto reject;
 				if (unlikely(!cb))
@@ -913,7 +907,7 @@ err:
 				u32 peer_port = port_peerport(p_ptr);
 				u32 peer_node = port_peernode(p_ptr);
 
-				spin_unlock_bh(p_ptr->publ.lock);
+				tipc_port_unlock(p_ptr);
 				if (!connected || !cb)
 					break;
 				if (msg_origport(msg) != peer_port)
@@ -929,7 +923,7 @@ err:
 		case TIPC_DIRECT_MSG:{
 				tipc_msg_err_event cb = up_ptr->err_cb;
 
-				spin_unlock_bh(p_ptr->publ.lock);
+				tipc_port_unlock(p_ptr);
 				if (connected || !cb)
 					break;
 				skb_pull(buf, msg_hdr_sz(msg));
@@ -942,7 +936,7 @@ err:
 				tipc_named_msg_err_event cb =
 					up_ptr->named_err_cb;
 
-				spin_unlock_bh(p_ptr->publ.lock);
+				tipc_port_unlock(p_ptr);
 				if (connected || !cb)
 					break;
 				dseq.type =  msg_nametype(msg);
@@ -1107,7 +1101,7 @@ int tipc_portimportance(u32 ref, unsigned int *importance)
 	if (!p_ptr)
 		return -EINVAL;
 	*importance = (unsigned int)msg_importance(&p_ptr->publ.phdr);
-	spin_unlock_bh(p_ptr->publ.lock);
+	tipc_port_unlock(p_ptr);
 	return TIPC_OK;
 }
 
@@ -1122,7 +1116,7 @@ int tipc_set_portimportance(u32 ref, unsigned int imp)
 	if (!p_ptr)
 		return -EINVAL;
 	msg_set_importance(&p_ptr->publ.phdr, (u32)imp);
-	spin_unlock_bh(p_ptr->publ.lock);
+	tipc_port_unlock(p_ptr);
 	return TIPC_OK;
 }
 
@@ -1246,6 +1240,28 @@ exit:
 	return res;
 }
 
+/**
+ * tipc_disconnect_port - disconnect port from peer
+ *
+ * Port must be locked.
+ */
+
+int tipc_disconnect_port(struct tipc_port *tp_ptr)
+{
+	int res;
+
+	if (tp_ptr->connected) {
+		tp_ptr->connected = 0;
+		/* let timer expire on it's own to avoid deadlock! */
+		tipc_nodesub_unsubscribe(
+			&((struct port *)tp_ptr)->subscription);
+		res = TIPC_OK;
+	} else {
+		res = -ENOTCONN;
+	}
+	return res;
+}
+
 /*
  * tipc_disconnect(): Disconnect port form peer.
  *                    This is a node local operation.
@@ -1254,17 +1270,12 @@ exit:
 int tipc_disconnect(u32 ref)
 {
 	struct port *p_ptr;
-	int res = -ENOTCONN;
+	int res;
 
 	p_ptr = tipc_port_lock(ref);
 	if (!p_ptr)
 		return -EINVAL;
-	if (p_ptr->publ.connected) {
-		p_ptr->publ.connected = 0;
-		/* let timer expire on it's own to avoid deadlock! */
-		tipc_nodesub_unsubscribe(&p_ptr->subscription);
-		res = TIPC_OK;
-	}
+	res = tipc_disconnect_port((struct tipc_port *)p_ptr);
 	tipc_port_unlock(p_ptr);
 	return res;
 }

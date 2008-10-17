@@ -93,6 +93,7 @@ struct acpi_power_resource {
 static struct list_head acpi_power_resource_list;
 
 static const struct file_operations acpi_power_fops = {
+	.owner = THIS_MODULE,
 	.open = acpi_power_open_fs,
 	.read = seq_read,
 	.llseek = seq_lseek,
@@ -121,7 +122,7 @@ acpi_power_get_context(acpi_handle handle,
 	}
 
 	*resource = acpi_driver_data(device);
-	if (!resource)
+	if (!*resource)
 		return -ENODEV;
 
 	return 0;
@@ -458,11 +459,9 @@ int acpi_power_transition(struct acpi_device *device, int state)
 	}
 
      end:
-	if (result) {
+	if (result)
 		device->power.state = ACPI_STATE_UNKNOWN;
-		printk(KERN_WARNING PREFIX "Transitioning device [%s] to D%d\n",
-			      device->pnp.bus_id, state);
-	} else {
+	else {
 	/* We shouldn't change the state till all above operations succeed */
 		device->power.state = state;
 	}
@@ -545,15 +544,11 @@ static int acpi_power_add_fs(struct acpi_device *device)
 	}
 
 	/* 'status' [R] */
-	entry = create_proc_entry(ACPI_POWER_FILE_STATUS,
-				  S_IRUGO, acpi_device_dir(device));
+	entry = proc_create_data(ACPI_POWER_FILE_STATUS,
+				 S_IRUGO, acpi_device_dir(device),
+				 &acpi_power_fops, acpi_driver_data(device));
 	if (!entry)
 		return -EIO;
-	else {
-		entry->proc_fops = &acpi_power_fops;
-		entry->data = acpi_driver_data(device);
-	}
-
 	return 0;
 }
 

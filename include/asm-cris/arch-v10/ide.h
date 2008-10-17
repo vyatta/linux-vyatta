@@ -59,22 +59,19 @@ static inline void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port, u
 	int i;
 
 	/* fill in ports for ATA addresses 0 to 7 */
-
-	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
-		hw->io_ports[i] = data_port |
+	for (i = 0; i <= 7; i++) {
+		hw->io_ports_array[i] = data_port |
 			IO_FIELD(R_ATA_CTRL_DATA, addr, i) |
 			IO_STATE(R_ATA_CTRL_DATA, cs0, active);
 	}
 
 	/* the IDE control register is at ATA address 6, with CS1 active instead of CS0 */
-
-	hw->io_ports[IDE_CONTROL_OFFSET] = data_port |
+	hw->io_ports.ctl_addr = data_port |
 			IO_FIELD(R_ATA_CTRL_DATA, addr, 6) |
 			IO_STATE(R_ATA_CTRL_DATA, cs1, active);
 
 	/* whats this for ? */
-
-	hw->io_ports[IDE_IRQ_OFFSET] = 0;
+	hw->io_ports.irq_addr = 0;
 }
 
 static inline void ide_init_default_hwifs(void)
@@ -88,11 +85,6 @@ static inline void ide_init_default_hwifs(void)
 		ide_register_hw(&hw, NULL);
 	}
 }
-
-/* some configuration options we don't need */
-
-#undef SUPPORT_VLB_SYNC
-#define SUPPORT_VLB_SYNC 0
 
 #endif /* __KERNEL__ */
 

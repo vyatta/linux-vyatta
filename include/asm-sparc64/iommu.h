@@ -26,6 +26,7 @@ struct iommu_arena {
 struct iommu {
 	spinlock_t		lock;
 	struct iommu_arena	arena;
+	void			(*flush_all)(struct iommu *);
 	iopte_t			*page_table;
 	u32			page_table_map_base;
 	unsigned long		iommu_control;
@@ -55,6 +56,7 @@ struct strbuf {
 };
 
 extern int iommu_table_init(struct iommu *iommu, int tsbsize,
-			    u32 dma_offset, u32 dma_addr_mask);
+			    u32 dma_offset, u32 dma_addr_mask,
+			    int numa_node);
 
 #endif /* !(_SPARC64_IOMMU_H) */

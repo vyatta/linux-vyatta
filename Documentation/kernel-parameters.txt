@@ -34,6 +34,7 @@ parameter is applicable:
 	ALSA	ALSA sound support is enabled.
 	APIC	APIC support is enabled.
 	APM	Advanced Power Management support is enabled.
+	AVR32	AVR32 architecture is enabled.
 	AX25	Appropriate AX.25 support is enabled.
 	BLACKFIN Blackfin architecture is enabled.
 	DRM	Direct Rendering Management support is enabled.
@@ -137,7 +138,7 @@ and is between 256 and 4096 characters. It is defined in the file
 			strict -- Be less tolerant of platforms that are not
 				strictly ACPI specification compliant.
 
-			See also Documentation/pm.txt, pci=noacpi
+			See also Documentation/power/pm.txt, pci=noacpi
 
 	acpi_apic_instance=	[ACPI, IOAPIC]
 			Format: <int>
@@ -146,8 +147,10 @@ and is between 256 and 4096 characters. It is defined in the file
 			default: 0
 
 	acpi_sleep=	[HW,ACPI] Sleep options
-			Format: { s3_bios, s3_mode }
-			See Documentation/power/video.txt
+			Format: { s3_bios, s3_mode, s3_beep }
+			See Documentation/power/video.txt for s3_bios and s3_mode.
+			s3_beep is for debugging; it makes the PC's speaker beep
+			as soon as the kernel's real-mode entry point is called.
 
 	acpi_sci=	[HW,ACPI] ACPI System Control Interrupt trigger mode
 			Format: { level | edge | high | low }
@@ -292,7 +295,7 @@ and is between 256 and 4096 characters. It is defined in the file
 			when initialising the APIC and IO-APIC components.
 
 	apm=		[APM] Advanced Power Management
-			See header of arch/i386/kernel/apm.c.
+			See header of arch/x86/kernel/apm_32.c.
 
 	arcrimi=	[HW,NET] ARCnet - "RIM I" (entirely mem-mapped) cards
 			Format: <io>,<irq>,<nodeID>
@@ -363,13 +366,24 @@ and is between 256 and 4096 characters. It is defined in the file
 			possible to determine what the correct size should be.
 			This option provides an override for these situations.
 
+	security=	[SECURITY] Choose a security module to enable at boot.
+			If this boot parameter is not specified, only the first
+			security module asking for security registration will be
+			loaded. An invalid security module name will be treated
+			as if no module has been chosen.
+
 	capability.disable=
 			[SECURITY] Disable capabilities.  This would normally
 			be used only if an alternative security model is to be
 			configured.  Potentially dangerous and should only be
 			used if you are entirely sure of the consequences.
 
-	chandev=	[HW,NET] Generic channel device initialisation
+	ccw_timeout_log [S390]
+			See Documentation/s390/CommonIO for details.
+
+	cgroup_disable= [KNL] Disable a particular controller
+			Format: {name of the controller(s) to disable}
+				{Currently supported controllers - "memory"}
 
 	checkreqprot	[SELINUX] Set initial checkreqprot flag value.
 			Format: { "0" | "1" }
@@ -380,6 +394,9 @@ and is between 256 and 4096 characters. It is defined in the file
 			Default value is set via a kernel config option.
 			Value can be changed at runtime via
 				/selinux/checkreqprot.
+
+	cio_ignore=	[S390]
+			See Documentation/s390/CommonIO for details.
 
 	clock=		[BUGS=X86-32, HW] gettimeofday clocksource override.
 			[Deprecated]
@@ -408,8 +425,21 @@ and is between 256 and 4096 characters. It is defined in the file
 			[SPARC64] tick
 			[X86-64] hpet,tsc
 
-	code_bytes	[IA32] How many bytes of object code to print in an
-			oops report.
+	clearcpuid=BITNUM [X86]
+			Disable CPUID feature X for the kernel. See
+			include/asm-x86/cpufeature.h for the valid bit numbers.
+			Note the Linux specific bits are not necessarily
+			stable over kernel options, but the vendor specific
+			ones should be.
+			Also note that user programs calling CPUID directly
+			or using the feature without checking anything
+			will still see it. This just prevents it from
+			being used by the kernel or shown in /proc/cpuinfo.
+			Also note the kernel might malfunction if you disable
+			some critical bits.
+
+	code_bytes	[IA32/X86_64] How many bytes of object code to print
+			in an oops report.
 			Range: 0 - 8192
 			Default: 64
 
@@ -462,6 +492,11 @@ and is between 256 and 4096 characters. It is defined in the file
 			UART at the specified I/O port or MMIO address,
 			switching to the matching ttyS device later.  The
 			options are the same as for ttyS, above.
+
+                If the device connected to the port is not a TTY but a braille
+                device, prepend "brl," before the device type, for instance
+			console=brl,ttyS0
+		For now, only VisioBraille is supported.
 
 	earlycon=	[KNL] Output early console device and options.
 		uart[8250],io,<addr>[,options]
@@ -523,7 +558,9 @@ and is between 256 and 4096 characters. It is defined in the file
 			1 will print _a lot_ more information - normally
 			only useful to kernel developers.
 
-	decnet=		[HW,NET]
+	debug_objects	[KNL] Enable object debugging
+
+	decnet.addr=	[HW,NET]
 			Format: <area>[,<node>]
 			See also Documentation/networking/decnet.txt.
 
@@ -562,6 +599,12 @@ and is between 256 and 4096 characters. It is defined in the file
 			See drivers/char/README.epca and
 			Documentation/digiepca.txt.
 
+	disable_mtrr_trim [X86, Intel and AMD only]
+			By default the kernel will trim any uncacheable
+			memory out of your available memory pool based on
+			MTRR settings.  This parameter disables that behavior,
+			possibly causing your machine to run very slowly.
+
 	dmasound=	[HW,OSS] Sound subsystem buffers
 
 	dscc4.setup=	[NET]
@@ -588,15 +631,14 @@ and is between 256 and 4096 characters. It is defined in the file
 	eata=		[HW,SCSI]
 
 	edd=		[EDD]
-			Format: {"of[f]" | "sk[ipmbr]"}
-			See comment in arch/i386/boot/edd.S
+			Format: {"off" | "on" | "skip[mbr]"}
 
 	eisa_irq_edge=	[PARISC,HW]
 			See header of drivers/parisc/eisa.c.
 
 	elanfreq=	[X86-32]
 			See comment before function elanfreq_setup() in
-			arch/i386/kernel/cpu/cpufreq/elanfreq.c.
+			arch/x86/kernel/cpu/cpufreq/elanfreq.c.
 
 	elevator=	[IOSCHED]
 			Format: {"anticipatory" | "cfq" | "deadline" | "noop"}
@@ -644,6 +686,12 @@ and is between 256 and 4096 characters. It is defined in the file
 	floppy=		[HW]
 			See Documentation/floppy.txt.
 
+	force_pal_cache_flush
+			[IA-64] Avoid check_sal_cache_flush which may hang on
+			buggy SAL_CACHE_FLUSH implementations. Using this
+			parameter will force ia64_sal_cache_flush to call
+			ia64_pal_cache_flush instead of SAL_CACHE_FLUSH.
+
 	gamecon.map[2|3]=
 			[HW,JOY] Multisystem joystick and NES/SNES/PSX pad
 			support via parallel port (up to 5 devices per port)
@@ -651,6 +699,10 @@ and is between 256 and 4096 characters. It is defined in the file
 			See also Documentation/input/joystick-parport.txt
 
 	gamma=		[HW,DRM]
+
+	gart_fix_e820=  [X86_64] disable the fix e820 for K8 GART
+			Format: off | on
+			default: on
 
 	gdth=		[HW,SCSI]
 			See header of drivers/scsi/gdth.c.
@@ -671,7 +723,7 @@ and is between 256 and 4096 characters. It is defined in the file
 			Format: <cyl>,<head>,<sect>
 
 	hd?=		[HW] (E)IDE subsystem
-	hd?lun=		See Documentation/ide.txt.
+	hd?lun=		See Documentation/ide/ide.txt.
 
 	highmem=nn[KMG]	[KNL,BOOT] forces the highmem zone to have an exact
 			size of <nn>. This works even on boxes that have no
@@ -686,6 +738,7 @@ and is between 256 and 4096 characters. It is defined in the file
 			See Documentation/isdn/README.HiSax.
 
 	hugepages=	[HW,X86-32,IA-64] Maximal number of HugeTLB pages.
+	hugepagesz=	[HW,IA-64,PPC] The size of the HugeTLB pages.
 
 	i8042.direct	[HW] Put keyboard port into non-translated mode
 	i8042.dumbkbd	[HW] Pretend that controller can only read data from
@@ -693,6 +746,8 @@ and is between 256 and 4096 characters. It is defined in the file
 			     (Don't attempt to blink the leds)
 	i8042.noaux	[HW] Don't check for auxiliary (== mouse) port
 	i8042.nokbd	[HW] Don't check/create keyboard port
+	i8042.noloop	[HW] Disable the AUX Loopback command while probing
+			     for the AUX port
 	i8042.nomux	[HW] Don't check presence of an active multiplexing
 			     controller
 	i8042.nopnp	[HW] Don't use ACPIPnP / PnPBIOS to discover KBD/AUX
@@ -723,15 +778,11 @@ and is between 256 and 4096 characters. It is defined in the file
 			Format: <io>[,<membase>[,<icn_id>[,<icn_id2>]]]
 
 	ide=		[HW] (E)IDE subsystem
-			Format: ide=nodma or ide=doubler or ide=reverse
-			See Documentation/ide.txt.
-
-	ide?=		[HW] (E)IDE subsystem
-			Format: ide?=noprobe or chipset specific parameters.
-			See Documentation/ide.txt.
+			Format: ide=nodma or ide=doubler
+			See Documentation/ide/ide.txt.
 
 	idebus=		[HW] (E)IDE subsystem - VLB/PCI bus speed
-			See Documentation/ide.txt.
+			See Documentation/ide/ide.txt.
 
 	idle=		[X86]
 			Format: idle=poll or idle=mwait
@@ -742,6 +793,9 @@ and is between 256 and 4096 characters. It is defined in the file
 			to not use it because it doesn't save as much power as a normal idle
 			loop use the MONITOR/MWAIT idle loop anyways. Performance should be the same
 			as idle=poll.
+
+	ide-pci-generic.all-generic-ide [HW] (E)IDE subsystem
+			Claim all unknown PCI IDE storage controllers.
 
 	ignore_loglevel	[KNL]
 			Ignore loglevel setting - this will print /all/
@@ -769,6 +823,19 @@ and is between 256 and 4096 characters. It is defined in the file
 
 	inttest=	[IA64]
 
+	iommu=		[x86]
+		off
+		force
+		noforce
+		biomerge
+		panic
+		nopanic
+		merge
+		nomerge
+		forcesac
+		soft
+
+
 	intel_iommu=	[DMAR] Intel IOMMU driver (DMAR) option
 		off
 			Disable intel iommu driver.
@@ -785,13 +852,27 @@ and is between 256 and 4096 characters. It is defined in the file
 			than 32 bit addressing. The default is to look
 			for translation below 32 bit and if not available
 			then look in the higher range.
+		strict [Default Off]
+			With this option on every unmap_single operation will
+			result in a hardware IOTLB flush operation as opposed
+			to batching them for performance.
+
+	io_delay=	[X86-32,X86-64] I/O delay method
+		0x80
+			Standard port 0x80 based delay
+		0xed
+			Alternate port 0xed based delay (needed on some systems)
+		udelay
+			Simple two microseconds delay
+		none
+			No delay
 
 	io7=		[HW] IO7 for Marvel based alpha systems
 			See comment before marvel_specify_io7 in
 			arch/alpha/kernel/core_marvel.c.
 
 	ip=		[IP_PNP]
-			See Documentation/nfsroot.txt.
+			See Documentation/filesystems/nfsroot.txt.
 
 	ip2=		[HW] Set IO/IRQ pairs for up to 4 IntelliPort boards
 			See comment before ip2_setup() in
@@ -875,7 +956,14 @@ and is between 256 and 4096 characters. It is defined in the file
 	kstack=N	[X86-32,X86-64] Print N words from the kernel stack
 			in oops dumps.
 
+	kgdboc=		[HW] kgdb over consoles.
+			Requires a tty driver that supports console polling.
+			(only serial suported for now)
+			Format: <serial_device>[,baud]
+
 	l2cr=		[PPC]
+
+	l3cr=		[PPC]
 
 	lapic		[X86-32,APIC] Enable the local APIC even if BIOS
 			disabled it.
@@ -894,6 +982,41 @@ and is between 256 and 4096 characters. It is defined in the file
 	libata.noacpi	[LIBATA] Disables use of ACPI in libata suspend/resume
 			when set.
 			Format: <int>
+
+	libata.force=	[LIBATA] Force configurations.  The format is comma
+			separated list of "[ID:]VAL" where ID is
+			PORT[:DEVICE].  PORT and DEVICE are decimal numbers
+			matching port, link or device.  Basically, it matches
+			the ATA ID string printed on console by libata.  If
+			the whole ID part is omitted, the last PORT and DEVICE
+			values are used.  If ID hasn't been specified yet, the
+			configuration applies to all ports, links and devices.
+
+			If only DEVICE is omitted, the parameter applies to
+			the port and all links and devices behind it.  DEVICE
+			number of 0 either selects the first device or the
+			first fan-out link behind PMP device.  It does not
+			select the host link.  DEVICE number of 15 selects the
+			host link and device attached to it.
+
+			The VAL specifies the configuration to force.  As long
+			as there's no ambiguity shortcut notation is allowed.
+			For example, both 1.5 and 1.5G would work for 1.5Gbps.
+			The following configurations can be forced.
+
+			* Cable type: 40c, 80c, short40c, unk, ign or sata.
+			  Any ID with matching PORT is used.
+
+			* SATA link speed limit: 1.5Gbps or 3.0Gbps.
+
+			* Transfer mode: pio[0-7], mwdma[0-4] and udma[0-7].
+			  udma[/][16,25,33,44,66,100,133] notation is also
+			  allowed.
+
+			* [no]ncq: Turn on or off NCQ.
+
+			If there are multiple matching configurations changing
+			the same attribute, the last one is used.
 
 	load_ramdisk=	[RAM] List of ramdisks to load from floppy
 			See Documentation/ramdisk.txt.
@@ -974,9 +1097,6 @@ and is between 256 and 4096 characters. It is defined in the file
 	mac5380=	[HW,SCSI] Format:
 			<can_queue>,<cmd_per_lun>,<sg_tablesize>,<hostid>,<use_tags>
 
-	mac53c9x=	[HW,SCSI] Format:
-			<num_esps>,<disconnect>,<nosync>,<can_queue>,<cmd_per_lun>,<sg_tablesize>,<hostid>,<use_tags>
-
 	machvec=	[IA64] Force the use of a particular machine-vector
 			(machvec) in a generic kernel.
 			Example: machvec=hpzx1_swiotlb
@@ -1000,8 +1120,6 @@ and is between 256 and 4096 characters. It is defined in the file
 	max_report_luns=
 			[SCSI] Maximum number of LUNs received.
 			Should be between 1 and 16384.
-
-	mca-pentium	[BUGS=X86-32]
 
 	mcatest=	[IA-64]
 
@@ -1043,6 +1161,15 @@ and is between 256 and 4096 characters. It is defined in the file
 	memmap=nn[KMG]$ss[KMG]
 			[KNL,ACPI] Mark specific memory as reserved.
 			Region of memory to be used, from ss to ss+nn.
+			Example: Exclude memory from 0x18690000-0x1869ffff
+			         memmap=64K$0x18690000
+			         or
+			         memmap=0x10000$0x18690000
+
+	memtest=	[KNL,X86_64] Enable memtest
+			Format: <integer>
+			range: 0,4 : pattern number
+			default : 0 <disable>
 
 	meye.*=		[HW] Set MotionEye Camera parameters
 			See Documentation/video4linux/meye.txt.
@@ -1050,6 +1177,11 @@ and is between 256 and 4096 characters. It is defined in the file
 	mfgpt_irq=	[IA-32] Specify the IRQ to use for the
 			Multi-Function General Purpose Timers on AMD Geode
 			platforms.
+
+	mfgptfix	[X86-32] Fix MFGPT timers on AMD Geode platforms when
+			the BIOS has incorrectly applied a workaround. TinyBIOS
+			version 0.98 is known to be affected, 0.99 fixes the
+			problem by letting the user disable the workaround.
 
 	mga=		[HW,DRM]
 
@@ -1103,10 +1235,10 @@ and is between 256 and 4096 characters. It is defined in the file
 			file if at all.
 
 	nfsaddrs=	[NFS]
-			See Documentation/nfsroot.txt.
+			See Documentation/filesystems/nfsroot.txt.
 
 	nfsroot=	[NFS] nfs root filesystem for disk-less boxes.
-			See Documentation/nfsroot.txt.
+			See Documentation/filesystems/nfsroot.txt.
 
 	nfs.callback_tcpport=
 			[NFS] set the TCP port on which the NFSv4 callback
@@ -1122,6 +1254,10 @@ and is between 256 and 4096 characters. It is defined in the file
 			number for the readdir() and stat() syscalls instead
 			of returning the full 64-bit number.
 			The default is to return 64-bit inode numbers.
+
+	nmi_debug=	[KNL,AVR32] Specify one or more actions to take
+			when a NMI is triggered.
+			Format: [state][,regs][,debounce][,die]
 
 	nmi_watchdog=	[KNL,BUGS=X86-32] Debugging features for SMP kernels
 
@@ -1147,15 +1283,27 @@ and is between 256 and 4096 characters. It is defined in the file
 
 	nodisconnect	[HW,SCSI,M68K] Disables SCSI disconnects.
 
+	noefi		[X86-32,X86-64] Disable EFI runtime services support.
+
 	noexec		[IA-64]
 
 	noexec		[X86-32,X86-64]
+			On X86-32 available only on PAE configured kernels.
 			noexec=on: enable non-executable mappings (default)
-			noexec=off: disable nn-executable mappings
+			noexec=off: disable non-executable mappings
+
+	noexec32	[X86-64]
+			This affects only 32-bit executables.
+			noexec32=on: enable non-executable mappings (default)
+				read doesn't imply executable mappings
+			noexec32=off: disable non-executable mappings
+				read implies executable mappings
 
 	nofxsr		[BUGS=X86-32] Disables x86 floating point extended
 			register save and restore. The kernel will only save
 			legacy floating-point registers on task switch.
+
+	noclflush	[BUGS=X86] Don't use the CLFLUSH instruction
 
 	nohlt		[BUGS=ARM]
 
@@ -1236,12 +1384,23 @@ and is between 256 and 4096 characters. It is defined in the file
 
 	nowb		[ARM]
 
+	nptcg=		[IA64] Override max number of concurrent global TLB
+			purges which is reported from either PAL_VM_SUMMARY or
+			SAL PALO.
+
 	numa_zonelist_order= [KNL, BOOT] Select zonelist order for NUMA.
 			one of ['zone', 'node', 'default'] can be specified
 			This can be set from sysctl after boot.
 			See Documentation/sysctl/vm.txt for details.
 
 	nr_uarts=	[SERIAL] maximum number of UARTs to be registered.
+
+	olpc_ec_timeout= [OLPC] ms delay when issuing EC commands
+			Rather than timing out after 20 ms if an EC
+			command is not properly ACKed, override the length
+			of the timeout.  We have interrupts disabled while
+			waiting for the ACK, so if this is set too high
+			interrupts *may* be lost!
 
 	opl3=		[HW,OSS]
 			Format: <io>
@@ -1325,10 +1484,6 @@ and is between 256 and 4096 characters. It is defined in the file
 		nomsi		[MSI] If the PCI_MSI kernel config parameter is
 				enabled, this kernel boot option can be used to
 				disable the use of MSI interrupts system-wide.
-		nosort		[X86-32] Don't sort PCI devices according to
-				order given by the PCI BIOS. This sorting is
-				done to get a device order compatible with
-				older kernels.
 		biosirq		[X86-32] Use PCI BIOS calls to get the interrupt
 				routing table. These calls are known to be buggy
 				on several machines and they hang the machine
@@ -1370,6 +1525,8 @@ and is between 256 and 4096 characters. It is defined in the file
 				This is normally done in pci_enable_device(),
 				so this option is a temporary workaround
 				for broken drivers that don't call it.
+		skip_isa_align	[X86] do not align io start addr, so can
+				handle more pci cards
 		firmware	[ARM] Do not re-enumerate the bus but instead
 				just use the configuration from the
 				bootloader. This is currently used on
@@ -1501,14 +1658,17 @@ and is between 256 and 4096 characters. It is defined in the file
 	ramdisk_size=	[RAM] Sizes of RAM disks in kilobytes
 			See Documentation/ramdisk.txt.
 
-	rcu.blimit=	[KNL,BOOT] Set maximum number of finished
-			RCU callbacks to process in one batch.
+	rcupdate.blimit=	[KNL,BOOT]
+			Set maximum number of finished RCU callbacks to process
+			in one batch.
 
-	rcu.qhimark=	[KNL,BOOT] Set threshold of queued
+	rcupdate.qhimark=	[KNL,BOOT]
+			Set threshold of queued
 			RCU callbacks over which batch limiting is disabled.
 
-	rcu.qlowmark=	[KNL,BOOT] Set threshold of queued
-			RCU callbacks below which batch limiting is re-enabled.
+	rcupdate.qlowmark=	[KNL,BOOT]
+			Set threshold of queued RCU callbacks below which
+			batch limiting is re-enabled.
 
 	rdinit=		[KNL]
 			Format: <full_path>
@@ -1518,6 +1678,10 @@ and is between 256 and 4096 characters. It is defined in the file
 	reboot=		[BUGS=X86-32,BUGS=ARM,BUGS=IA-64] Rebooting mode
 			Format: <reboot_mode>[,<reboot_mode2>[,...]]
 			See arch/*/kernel/reboot.c or arch/*/kernel/process.c			
+
+	relax_domain_level=
+			[KNL, SMP] Set scheduler's default relax_domain_level.
+			See Documentation/cpusets.txt.
 
 	reserve=	[KNL,BUGS] Force the kernel to ignore some iomem area
 
@@ -1593,7 +1757,13 @@ and is between 256 and 4096 characters. It is defined in the file
 			Format: <vendor>:<model>:<flags>
 			(flags are integer value)
 
-	scsi_logging=	[SCSI]
+	scsi_logging_level=	[SCSI] a bit mask of logging levels
+			See drivers/scsi/scsi_logging.h for bits.  Also
+			settable via sysctl at dev.scsi.logging_level
+			(/proc/sys/dev/scsi/logging_level).
+			There is also a nice 'scsi_logging_level' script in the
+			S390-tools package, available for download at
+			http://www-128.ibm.com/developerworks/linux/linux390/s390-tools-1.5.4.html
 
 	scsi_mod.scan=	[SCSI] sync (default) scans SCSI busses as they are
 			discovered.  async scans them in kernel threads,
@@ -1822,9 +1992,6 @@ and is between 256 and 4096 characters. It is defined in the file
 	st=		[HW,SCSI] SCSI tape parameters (buffers, etc.)
 			See Documentation/scsi/st.txt.
 
-	st0x=		[HW,SCSI]
-			See header of drivers/scsi/seagate.c.
-
 	sti=		[PARISC,HW]
 			Format: <num>
 			Set the STI (builtin display/keyboard on the HP-PARISC
@@ -1899,18 +2066,12 @@ and is between 256 and 4096 characters. It is defined in the file
 			<deci-seconds>: poll all this frequency
 			0: no polling (default)
 
-	time		Show timing data prefixed to each printk message line
-			[deprecated, see 'printk.time']
-
 	tipar.timeout=	[HW,PPT]
 			Set communications timeout in tenths of a second
 			(default 15).
 
 	tipar.delay=	[HW,PPT]
 			Set inter-bit delay in microseconds (default 10).
-
-	tmc8xx=		[HW,SCSI]
-			See header of drivers/scsi/seagate.c.
 
 	tmscsim=	[HW,SCSI]
 			See comment before function dc390_setup() in
@@ -1959,6 +2120,11 @@ and is between 256 and 4096 characters. It is defined in the file
 			vdso=2: enable compat VDSO (default with COMPAT_VDSO)
 			vdso=1: enable VDSO (default)
 			vdso=0: disable VDSO mapping
+
+	vdso32=		[X86-32,X86-64]
+			vdso32=2: enable compat VDSO (default with COMPAT_VDSO)
+			vdso32=1: enable 32-bit VDSO (default)
+			vdso32=0: disable 32-bit VDSO mapping
 
 	vector=		[IA-64,SMP]
 			vector=percpu: enable percpu vector domain

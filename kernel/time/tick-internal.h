@@ -17,6 +17,8 @@ extern void tick_handle_periodic(struct clock_event_device *dev);
 extern void tick_setup_oneshot(struct clock_event_device *newdev,
 			       void (*handler)(struct clock_event_device *),
 			       ktime_t nextevt);
+extern int tick_dev_program_event(struct clock_event_device *dev,
+				  ktime_t expires, int force);
 extern int tick_program_event(ktime_t expires, int force);
 extern void tick_oneshot_notify(void);
 extern int tick_switch_to_oneshot(void (*handler)(struct clock_event_device *));
@@ -70,8 +72,6 @@ static inline int tick_resume_broadcast_oneshot(struct clock_event_device *bc)
  * Broadcasting support
  */
 #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
-extern int tick_do_broadcast(cpumask_t mask);
-
 extern int tick_device_uses_broadcast(struct clock_event_device *dev, int cpu);
 extern int tick_check_broadcast_device(struct clock_event_device *dev);
 extern int tick_is_broadcast_device(struct clock_event_device *dev);

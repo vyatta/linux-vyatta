@@ -3,7 +3,7 @@
 
 #ifdef __KERNEL__
 
-/* Let gcc decide wether to inline or use the out of line functions */
+/* Let gcc decide whether to inline or use the out of line functions */
 
 #define __HAVE_ARCH_STRCPY
 extern char *strcpy(char *dest, const char *src);
@@ -213,14 +213,14 @@ static __always_inline void * __constant_c_and_count_memset(void * s, unsigned l
 		case 0:
 			return s;
 		case 1:
-			*(unsigned char *)s = pattern;
+			*(unsigned char *)s = pattern & 0xff;
 			return s;
 		case 2:
-			*(unsigned short *)s = pattern;
+			*(unsigned short *)s = pattern & 0xffff;
 			return s;
 		case 3:
-			*(unsigned short *)s = pattern;
-			*(2+(unsigned char *)s) = pattern;
+			*(unsigned short *)s = pattern & 0xffff;
+			*(2+(unsigned char *)s) = pattern & 0xff;
 			return s;
 		case 4:
 			*(unsigned long *)s = pattern;

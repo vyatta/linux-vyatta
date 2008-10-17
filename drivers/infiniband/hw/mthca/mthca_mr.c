@@ -613,8 +613,10 @@ int mthca_fmr_alloc(struct mthca_dev *dev, u32 pd,
 			sizeof *(mr->mem.tavor.mpt) * idx;
 
 	mr->mtt = __mthca_alloc_mtt(dev, list_len, dev->mr_table.fmr_mtt_buddy);
-	if (IS_ERR(mr->mtt))
+	if (IS_ERR(mr->mtt)) {
+		err = PTR_ERR(mr->mtt);
 		goto err_out_table;
+	}
 
 	mtt_seg = mr->mtt->first_seg * MTHCA_MTT_SEG_SIZE;
 
@@ -627,8 +629,10 @@ int mthca_fmr_alloc(struct mthca_dev *dev, u32 pd,
 		mr->mem.tavor.mtts = dev->mr_table.tavor_fmr.mtt_base + mtt_seg;
 
 	mailbox = mthca_alloc_mailbox(dev, GFP_KERNEL);
-	if (IS_ERR(mailbox))
+	if (IS_ERR(mailbox)) {
+		err = PTR_ERR(mailbox);
 		goto err_out_free_mtt;
+	}
 
 	mpt_entry = mailbox->buf;
 
@@ -682,7 +686,7 @@ err_out_table:
 	mthca_table_put(dev, dev->mr_table.mpt_table, key);
 
 err_out_mpt_free:
-	mthca_free(&dev->mr_table.mpt_alloc, mr->ibmr.lkey);
+	mthca_free(&dev->mr_table.mpt_alloc, key);
 	return err;
 }
 
@@ -814,14 +818,8 @@ int mthca_arbel_map_phys_fmr(struct ib_fmr *ibfmr, u64 *page_list,
 
 void mthca_tavor_fmr_unmap(struct mthca_dev *dev, struct mthca_fmr *fmr)
 {
-	u32 key;
-
 	if (!fmr->maps)
 		return;
-
-	key = tavor_key_to_hw_index(fmr->ibmr.lkey);
-	key &= dev->limits.num_mpts - 1;
-	fmr->ibmr.lkey = fmr->ibmr.rkey = tavor_hw_index_to_key(key);
 
 	fmr->maps = 0;
 
@@ -830,15 +828,8 @@ void mthca_tavor_fmr_unmap(struct mthca_dev *dev, struct mthca_fmr *fmr)
 
 void mthca_arbel_fmr_unmap(struct mthca_dev *dev, struct mthca_fmr *fmr)
 {
-	u32 key;
-
 	if (!fmr->maps)
 		return;
-
-	key = arbel_key_to_hw_index(fmr->ibmr.lkey);
-	key &= dev->limits.num_mpts - 1;
-	key = adjust_key(dev, key);
-	fmr->ibmr.lkey = fmr->ibmr.rkey = arbel_hw_index_to_key(key);
 
 	fmr->maps = 0;
 

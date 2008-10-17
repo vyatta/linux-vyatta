@@ -22,7 +22,6 @@
 #include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
-#include <sound/driver.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/soc.h>
@@ -216,7 +215,8 @@ static int spitz_set_spk(struct snd_kcontrol *kcontrol,
 	return 1;
 }
 
-static int spitz_mic_bias(struct snd_soc_dapm_widget *w, int event)
+static int spitz_mic_bias(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *k, int event)
 {
 	if (machine_is_borzoi() || machine_is_spitz()) {
 		if (SND_SOC_DAPM_EVENT_ON(event))
@@ -313,15 +313,13 @@ static int spitz_wm8750_init(struct snd_soc_codec *codec)
 	}
 
 	/* Add spitz specific widgets */
-	for (i = 0; i < ARRAY_SIZE(wm8750_dapm_widgets); i++) {
+	for (i = 0; i < ARRAY_SIZE(wm8750_dapm_widgets); i++)
 		snd_soc_dapm_new_control(codec, &wm8750_dapm_widgets[i]);
-	}
 
 	/* Set up spitz specific audio path audio_map */
-	for (i = 0; audio_map[i][0] != NULL; i++) {
+	for (i = 0; audio_map[i][0] != NULL; i++)
 		snd_soc_dapm_connect_input(codec, audio_map[i][0],
 			audio_map[i][1], audio_map[i][2]);
-	}
 
 	snd_soc_dapm_sync_endpoints(codec);
 	return 0;

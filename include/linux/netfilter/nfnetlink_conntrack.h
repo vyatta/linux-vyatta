@@ -37,6 +37,9 @@ enum ctattr_type {
 	CTA_ID,
 	CTA_NAT_DST,
 	CTA_TUPLE_MASTER,
+	CTA_NAT_SEQ_ADJ_ORIG,
+	CTA_NAT_SEQ_ADJ_REPLY,
+	CTA_SECMARK,
 	__CTA_MAX
 };
 #define CTA_MAX (__CTA_MAX - 1)
@@ -77,6 +80,7 @@ enum ctattr_l4proto {
 enum ctattr_protoinfo {
 	CTA_PROTOINFO_UNSPEC,
 	CTA_PROTOINFO_TCP,
+	CTA_PROTOINFO_DCCP,
 	__CTA_PROTOINFO_MAX
 };
 #define CTA_PROTOINFO_MAX (__CTA_PROTOINFO_MAX - 1)
@@ -91,6 +95,13 @@ enum ctattr_protoinfo_tcp {
 	__CTA_PROTOINFO_TCP_MAX
 };
 #define CTA_PROTOINFO_TCP_MAX (__CTA_PROTOINFO_TCP_MAX - 1)
+
+enum ctattr_protoinfo_dccp {
+	CTA_PROTOINFO_DCCP_UNSPEC,
+	CTA_PROTOINFO_DCCP_STATE,
+	__CTA_PROTOINFO_DCCP_MAX,
+};
+#define CTA_PROTOINFO_DCCP_MAX (__CTA_PROTOINFO_DCCP_MAX - 1)
 
 enum ctattr_counters {
 	CTA_COUNTERS_UNSPEC,
@@ -118,6 +129,14 @@ enum ctattr_protonat {
 	__CTA_PROTONAT_MAX
 };
 #define CTA_PROTONAT_MAX (__CTA_PROTONAT_MAX - 1)
+
+enum ctattr_natseq {
+	CTA_NAT_SEQ_CORRECTION_POS,
+	CTA_NAT_SEQ_OFFSET_BEFORE,
+	CTA_NAT_SEQ_OFFSET_AFTER,
+	__CTA_NAT_SEQ_MAX
+};
+#define CTA_NAT_SEQ_MAX (__CTA_NAT_SEQ_MAX - 1)
 
 enum ctattr_expect {
 	CTA_EXPECT_UNSPEC,

@@ -1,20 +1,20 @@
-/* SCTP kernel reference Implementation
+/* SCTP kernel implementation
  * (C) Copyright IBM Corp. 2002, 2004
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
  * Copyright (c) 2002-2003 Intel Corp.
  *
- * This file is part of the SCTP kernel reference Implementation
+ * This file is part of the SCTP kernel implementation
  *
  * SCTP over IPv6.
  *
- * The SCTP reference implementation is free software;
+ * This SCTP implementation is free software;
  * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
  *
- * The SCTP reference implementation is distributed in the hope that it
+ * This SCTP implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *		   ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -110,8 +110,9 @@ static int sctp_inet6addr_event(struct notifier_block *this, unsigned long ev,
 		spin_lock_bh(&sctp_local_addr_lock);
 		list_for_each_entry_safe(addr, temp,
 					&sctp_local_addr_list, list) {
-			if (ipv6_addr_equal(&addr->a.v6.sin6_addr,
-					     &ifa->addr)) {
+			if (addr->a.sa.sa_family == AF_INET6 &&
+					ipv6_addr_equal(&addr->a.v6.sin6_addr,
+						&ifa->addr)) {
 				found = 1;
 				addr->valid = 0;
 				list_del_rcu(&addr->list);
@@ -225,7 +226,7 @@ static int sctp_v6_xmit(struct sk_buff *skb, struct sctp_transport *transport,
 
 	SCTP_DEBUG_PRINTK("%s: skb:%p, len:%d, "
 			  "src:" NIP6_FMT " dst:" NIP6_FMT "\n",
-			  __FUNCTION__, skb, skb->len,
+			  __func__, skb, skb->len,
 			  NIP6(fl.fl6_src), NIP6(fl.fl6_dst));
 
 	SCTP_INC_STATS(SCTP_MIB_OUTSCTPPACKS);
@@ -250,7 +251,7 @@ static struct dst_entry *sctp_v6_get_dst(struct sctp_association *asoc,
 
 
 	SCTP_DEBUG_PRINTK("%s: DST=" NIP6_FMT " ",
-			  __FUNCTION__, NIP6(fl.fl6_dst));
+			  __func__, NIP6(fl.fl6_dst));
 
 	if (saddr) {
 		ipv6_addr_copy(&fl.fl6_src, &saddr->v6.sin6_addr);
@@ -259,7 +260,7 @@ static struct dst_entry *sctp_v6_get_dst(struct sctp_association *asoc,
 			NIP6(fl.fl6_src));
 	}
 
-	dst = ip6_route_output(NULL, &fl);
+	dst = ip6_route_output(&init_net, NULL, &fl);
 	if (!dst->error) {
 		struct rt6_info *rt;
 		rt = (struct rt6_info *)dst;
@@ -298,7 +299,8 @@ static inline int sctp_v6_addr_match_len(union sctp_addr *s1,
 /* Fills in the source address(saddr) based on the destination address(daddr)
  * and asoc's bind address list.
  */
-static void sctp_v6_get_saddr(struct sctp_association *asoc,
+static void sctp_v6_get_saddr(struct sctp_sock *sk,
+			      struct sctp_association *asoc,
 			      struct dst_entry *dst,
 			      union sctp_addr *daddr,
 			      union sctp_addr *saddr)
@@ -312,10 +314,14 @@ static void sctp_v6_get_saddr(struct sctp_association *asoc,
 
 	SCTP_DEBUG_PRINTK("%s: asoc:%p dst:%p "
 			  "daddr:" NIP6_FMT " ",
-			  __FUNCTION__, asoc, dst, NIP6(daddr->v6.sin6_addr));
+			  __func__, asoc, dst, NIP6(daddr->v6.sin6_addr));
 
 	if (!asoc) {
-		ipv6_get_saddr(dst, &daddr->v6.sin6_addr,&saddr->v6.sin6_addr);
+		ipv6_dev_get_saddr(sock_net(sctp_opt2sk(sk)),
+				   dst ? ip6_dst_idev(dst)->dev : NULL,
+				   &daddr->v6.sin6_addr,
+				   inet6_sk(&sk->inet.sk)->srcprefs,
+				   &saddr->v6.sin6_addr);
 		SCTP_DEBUG_PRINTK("saddr from ipv6_get_saddr: " NIP6_FMT "\n",
 				  NIP6(saddr->v6.sin6_addr));
 		return;
@@ -332,7 +338,7 @@ static void sctp_v6_get_saddr(struct sctp_association *asoc,
 	list_for_each_entry_rcu(laddr, &bp->address_list, list) {
 		if (!laddr->valid)
 			continue;
-		if ((laddr->use_as_src) &&
+		if ((laddr->state == SCTP_ADDR_SRC) &&
 		    (laddr->a.sa.sa_family == AF_INET6) &&
 		    (scope <= sctp_scope(&laddr->a))) {
 			bmatchlen = sctp_v6_addr_match_len(daddr, &laddr->a);
@@ -350,7 +356,7 @@ static void sctp_v6_get_saddr(struct sctp_association *asoc,
 	} else {
 		printk(KERN_ERR "%s: asoc:%p Could not find a valid source "
 		       "address for the dest:" NIP6_FMT "\n",
-		       __FUNCTION__, asoc, NIP6(daddr->v6.sin6_addr));
+		       __func__, asoc, NIP6(daddr->v6.sin6_addr));
 	}
 
 	rcu_read_unlock();
@@ -558,7 +564,7 @@ static int sctp_v6_available(union sctp_addr *addr, struct sctp_sock *sp)
 	if (!(type & IPV6_ADDR_UNICAST))
 		return 0;
 
-	return ipv6_chk_addr(in6, NULL, 0);
+	return ipv6_chk_addr(&init_net, in6, NULL, 0);
 }
 
 /* This function checks if the address is a valid address to be used for
@@ -633,7 +639,7 @@ static struct sock *sctp_v6_create_accept_sk(struct sock *sk,
 	struct ipv6_pinfo *newnp, *np = inet6_sk(sk);
 	struct sctp6_sock *newsctp6sk;
 
-	newsk = sk_alloc(sk->sk_net, PF_INET6, GFP_KERNEL, sk->sk_prot);
+	newsk = sk_alloc(sock_net(sk), PF_INET6, GFP_KERNEL, sk->sk_prot);
 	if (!newsk)
 		goto out;
 
@@ -720,6 +726,11 @@ static int sctp_v6_is_ce(const struct sk_buff *skb)
 static void sctp_v6_seq_dump_addr(struct seq_file *seq, union sctp_addr *addr)
 {
 	seq_printf(seq, NIP6_FMT " ", NIP6(addr->v6.sin6_addr));
+}
+
+static void sctp_v6_ecn_capable(struct sock *sk)
+{
+	inet6_sk(sk)->tclass |= INET_ECN_ECT_0;
 }
 
 /* Initialize a PF_INET6 socket msg_name. */
@@ -860,7 +871,8 @@ static int sctp_inet6_bind_verify(struct sctp_sock *opt, union sctp_addr *addr)
 			dev = dev_get_by_index(&init_net, addr->v6.sin6_scope_id);
 			if (!dev)
 				return 0;
-			if (!ipv6_chk_addr(&addr->v6.sin6_addr, dev, 0)) {
+			if (!ipv6_chk_addr(&init_net, &addr->v6.sin6_addr,
+					   dev, 0)) {
 				dev_put(dev);
 				return 0;
 			}
@@ -967,7 +979,7 @@ static struct inet6_protocol sctpv6_protocol = {
 	.flags        = INET6_PROTO_NOPOLICY | INET6_PROTO_FINAL,
 };
 
-static struct sctp_af sctp_ipv6_specific = {
+static struct sctp_af sctp_af_inet6 = {
 	.sa_family	   = AF_INET6,
 	.sctp_xmit	   = sctp_v6_xmit,
 	.setsockopt	   = ipv6_setsockopt,
@@ -991,6 +1003,7 @@ static struct sctp_af sctp_ipv6_specific = {
 	.skb_iif	   = sctp_v6_skb_iif,
 	.is_ce		   = sctp_v6_is_ce,
 	.seq_dump_addr	   = sctp_v6_seq_dump_addr,
+	.ecn_capable	   = sctp_v6_ecn_capable,
 	.net_header_len	   = sizeof(struct ipv6hdr),
 	.sockaddr_len	   = sizeof(struct sockaddr_in6),
 #ifdef CONFIG_COMPAT
@@ -999,7 +1012,7 @@ static struct sctp_af sctp_ipv6_specific = {
 #endif
 };
 
-static struct sctp_pf sctp_pf_inet6_specific = {
+static struct sctp_pf sctp_pf_inet6 = {
 	.event_msgname = sctp_inet6_event_msgname,
 	.skb_msgname   = sctp_inet6_skb_msgname,
 	.af_supported  = sctp_inet6_af_supported,
@@ -1009,19 +1022,28 @@ static struct sctp_pf sctp_pf_inet6_specific = {
 	.supported_addrs = sctp_inet6_supported_addrs,
 	.create_accept_sk = sctp_v6_create_accept_sk,
 	.addr_v4map    = sctp_v6_addr_v4map,
-	.af            = &sctp_ipv6_specific,
+	.af            = &sctp_af_inet6,
 };
 
 /* Initialize IPv6 support and register with socket layer.  */
-int sctp_v6_init(void)
+void sctp_v6_pf_init(void)
 {
-	int rc;
-
 	/* Register the SCTP specific PF_INET6 functions. */
-	sctp_register_pf(&sctp_pf_inet6_specific, PF_INET6);
+	sctp_register_pf(&sctp_pf_inet6, PF_INET6);
 
 	/* Register the SCTP specific AF_INET6 functions. */
-	sctp_register_af(&sctp_ipv6_specific);
+	sctp_register_af(&sctp_af_inet6);
+}
+
+void sctp_v6_pf_exit(void)
+{
+	list_del(&sctp_af_inet6.list);
+}
+
+/* Initialize IPv6 support and register with socket layer.  */
+int sctp_v6_protosw_init(void)
+{
+	int rc;
 
 	rc = proto_register(&sctpv6_prot, 1);
 	if (rc)
@@ -1034,6 +1056,14 @@ int sctp_v6_init(void)
 	return 0;
 }
 
+void sctp_v6_protosw_exit(void)
+{
+	inet6_unregister_protosw(&sctpv6_seqpacket_protosw);
+	inet6_unregister_protosw(&sctpv6_stream_protosw);
+	proto_unregister(&sctpv6_prot);
+}
+
+
 /* Register with inet6 layer. */
 int sctp_v6_add_protocol(void)
 {
@@ -1044,15 +1074,6 @@ int sctp_v6_add_protocol(void)
 		return -EAGAIN;
 
 	return 0;
-}
-
-/* IPv6 specific exit support. */
-void sctp_v6_exit(void)
-{
-	inet6_unregister_protosw(&sctpv6_seqpacket_protosw);
-	inet6_unregister_protosw(&sctpv6_stream_protosw);
-	proto_unregister(&sctpv6_prot);
-	list_del(&sctp_ipv6_specific.list);
 }
 
 /* Unregister with inet6 layer. */

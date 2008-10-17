@@ -41,6 +41,7 @@ static int amd_create_page_map(struct amd_page_map *page_map)
 	if (page_map->real == NULL)
 		return -ENOMEM;
 
+#ifndef CONFIG_X86
 	SetPageReserved(virt_to_page(page_map->real));
 	global_cache_flush();
 	page_map->remapped = ioremap_nocache(virt_to_gart(page_map->real),
@@ -52,6 +53,10 @@ static int amd_create_page_map(struct amd_page_map *page_map)
 		return -ENOMEM;
 	}
 	global_cache_flush();
+#else
+	set_memory_uc((unsigned long)page_map->real, 1);
+	page_map->remapped = page_map->real;
+#endif
 
 	for (i = 0; i < PAGE_SIZE / sizeof(unsigned long); i++) {
 		writel(agp_bridge->scratch_page, page_map->remapped+i);
@@ -63,8 +68,12 @@ static int amd_create_page_map(struct amd_page_map *page_map)
 
 static void amd_free_page_map(struct amd_page_map *page_map)
 {
+#ifndef CONFIG_X86
 	iounmap(page_map->remapped);
 	ClearPageReserved(virt_to_page(page_map->real));
+#else
+	set_memory_wb((unsigned long)page_map->real, 1);
+#endif
 	free_page((unsigned long) page_map->real);
 }
 
@@ -305,9 +314,9 @@ static int amd_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 		j++;
 	}
 
-	if (mem->is_flushed == FALSE) {
+	if (!mem->is_flushed) {
 		global_cache_flush();
-		mem->is_flushed = TRUE;
+		mem->is_flushed = true;
 	}
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
@@ -427,8 +436,9 @@ static int __devinit agp_amdk7_probe(struct pci_dev *pdev,
 	   system controller may experience noise due to strong drive strengths
 	 */
 	if (agp_bridge->dev->device == PCI_DEVICE_ID_AMD_FE_GATE_7006) {
-		u8 cap_ptr=0;
 		struct pci_dev *gfxcard=NULL;
+
+		cap_ptr = 0;
 		while (!cap_ptr) {
 			gfxcard = pci_get_class(PCI_CLASS_DISPLAY_VGA<<8, gfxcard);
 			if (!gfxcard) {
@@ -436,10 +446,6 @@ static int __devinit agp_amdk7_probe(struct pci_dev *pdev,
 				return -ENODEV;
 			}
 			cap_ptr = pci_find_capability(gfxcard, PCI_CAP_ID_AGP);
-			if (!cap_ptr) {
-				pci_dev_put(gfxcard);
-				continue;
-			}
 		}
 
 		/* With so many variants of NVidia cards, it's simpler just

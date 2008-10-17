@@ -9,8 +9,6 @@
  * ----------------------------------------------------------------------- */
 
 /*
- * arch/i386/boot/video-vesa.c
- *
  * VESA text modes
  */
 
@@ -24,7 +22,11 @@ static struct vesa_mode_info vminfo;
 
 __videocard video_vesa;
 
+#ifndef _WAKEUP
 static void vesa_store_mode_params_graphics(void);
+#else /* _WAKEUP */
+static inline void vesa_store_mode_params_graphics(void) {}
+#endif /* _WAKEUP */
 
 static int vesa_probe(void)
 {
@@ -36,8 +38,6 @@ static int vesa_probe(void)
 	int nmodes = 0;
 
 	video_vesa.modes = GET_HEAP(struct mode_info, 0);
-
-	vginfo.signature = VBE2_MAGIC;
 
 	ax = 0x4f00;
 	di = (size_t)&vginfo;
@@ -79,20 +79,28 @@ static int vesa_probe(void)
 			/* Text Mode, TTY BIOS supported,
 			   supported by hardware */
 			mi = GET_HEAP(struct mode_info, 1);
-			mi->mode = mode + VIDEO_FIRST_VESA;
-			mi->x    = vminfo.h_res;
-			mi->y    = vminfo.v_res;
+			mi->mode  = mode + VIDEO_FIRST_VESA;
+			mi->depth = 0; /* text */
+			mi->x     = vminfo.h_res;
+			mi->y     = vminfo.v_res;
 			nmodes++;
-		} else if ((vminfo.mode_attr & 0x99) == 0x99) {
+		} else if ((vminfo.mode_attr & 0x99) == 0x99 &&
+			   (vminfo.memory_layout == 4 ||
+			    vminfo.memory_layout == 6) &&
+			   vminfo.memory_planes == 1) {
 #ifdef CONFIG_FB
 			/* Graphics mode, color, linear frame buffer
-			   supported -- register the mode but hide from
-			   the menu.  Only do this if framebuffer is
-			   configured, however, otherwise the user will
-			   be left without a screen. */
+			   supported.  Only register the mode if
+			   if framebuffer is configured, however,
+			   otherwise the user will be left without a screen.
+			   We don't require CONFIG_FB_VESA, however, since
+			   some of the other framebuffer drivers can use
+			   this mode-setting, too. */
 			mi = GET_HEAP(struct mode_info, 1);
 			mi->mode = mode + VIDEO_FIRST_VESA;
-			mi->x = mi->y = 0;
+			mi->depth = vminfo.bpp;
+			mi->x = vminfo.h_res;
+			mi->y = vminfo.v_res;
 			nmodes++;
 #endif
 		}
@@ -158,6 +166,8 @@ static int vesa_set_mode(struct mode_info *mode)
 	return 0;
 }
 
+
+#ifndef _WAKEUP
 
 /* Switch DAC to 8-bit mode */
 static void vesa_dac_set_8bits(void)
@@ -281,6 +291,8 @@ void vesa_store_edid(void)
 	    : "esi");
 #endif /* CONFIG_FIRMWARE_EDID */
 }
+
+#endif /* not _WAKEUP */
 
 __videocard video_vesa =
 {

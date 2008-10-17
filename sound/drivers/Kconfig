@@ -4,6 +4,37 @@ menu "Generic devices"
 	depends on SND!=n
 
 
+config SND_PCSP
+	tristate "PC-Speaker support (READ HELP!)"
+	depends on PCSPKR_PLATFORM && X86_PC && HIGH_RES_TIMERS
+	depends on INPUT
+	depends on EXPERIMENTAL
+	depends on SND
+	select SND_PCM
+	help
+	  If you don't have a sound card in your computer, you can include a
+	  driver for the PC speaker which allows it to act like a primitive
+	  sound card.
+	  This driver also replaces the pcspkr driver for beeps.
+
+	  You can compile this as a module which will be called snd-pcsp.
+
+	  WARNING: if you already have a soundcard, enabling this
+	  driver may lead to a problem. Namely, it may get loaded
+	  before the other sound driver of yours, making the
+	  pc-speaker a default sound device. Which is likely not
+	  what you want. To make this driver play nicely with other
+	  sound driver, you can add this into your /etc/modprobe.conf:
+	  options snd-pcsp index=2
+
+	  You don't need this driver if you only want your pc-speaker to beep.
+	  You don't need this driver if you have a tablet piezo beeper
+	  in your PC instead of the real speaker.
+
+	  Say N if you have a sound card.
+	  Say M if you don't.
+	  Say Y only if you really know what you do.
+
 config SND_MPU401_UART
         tristate
         select SND_RAWMIDI
@@ -119,5 +150,17 @@ config SND_PORTMAN2X4
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called snd-portman2x4.
+
+config SND_ML403_AC97CR
+	tristate "Xilinx ML403 AC97 Controller Reference"
+	depends on SND && XILINX_VIRTEX
+	select SND_AC97_CODEC
+	help
+	  Say Y here to include support for the
+	  opb_ac97_controller_ref_v1_00_a ip core found in Xilinx' ML403
+	  reference design.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-ml403_ac97cr.
 
 endmenu

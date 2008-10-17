@@ -65,9 +65,9 @@ print_timer(struct seq_file *m, struct hrtimer *timer, int idx, u64 now)
 	SEQ_printf(m, ", %s/%d", tmp, timer->start_pid);
 #endif
 	SEQ_printf(m, "\n");
-	SEQ_printf(m, " # expires at %Lu nsecs [in %Lu nsecs]\n",
+	SEQ_printf(m, " # expires at %Lu nsecs [in %Ld nsecs]\n",
 		(unsigned long long)ktime_to_ns(timer->expires),
-		(unsigned long long)(ktime_to_ns(timer->expires) - now));
+		(long long)(ktime_to_ns(timer->expires) - now));
 }
 
 static void
@@ -166,6 +166,8 @@ static void print_cpu(struct seq_file *m, int cpu, u64 now)
 		P(idle_calls);
 		P(idle_sleeps);
 		P_ns(idle_entrytime);
+		P_ns(idle_waketime);
+		P_ns(idle_exittime);
 		P_ns(idle_sleeptime);
 		P(last_jiffies);
 		P(next_jiffies);
@@ -276,12 +278,9 @@ static int __init init_timer_list_procfs(void)
 {
 	struct proc_dir_entry *pe;
 
-	pe = create_proc_entry("timer_list", 0644, NULL);
+	pe = proc_create("timer_list", 0644, NULL, &timer_list_fops);
 	if (!pe)
 		return -ENOMEM;
-
-	pe->proc_fops = &timer_list_fops;
-
 	return 0;
 }
 __initcall(init_timer_list_procfs);

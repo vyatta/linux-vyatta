@@ -416,6 +416,16 @@ also have
      sectors in total that could need to be processed.  The two
      numbers are separated by a '/'  thus effectively showing one
      value, a fraction of the process that is complete.
+     A 'select' on this attribute will return when resync completes,
+     when it reaches the current sync_max (below) and possibly at
+     other times.
+
+   sync_max
+     This is a number of sectors at which point a resync/recovery
+     process will pause.  When a resync is active, the value can
+     only ever be increased, never decreased.  The value of 'max'
+     effectively disables the limit.
+
 
    sync_speed
      This shows the current actual speed, in K/sec, of the current
@@ -440,3 +450,9 @@ These currently include
       there are upper and lower limits (32768, 16).  Default is 128.
   strip_cache_active (currently raid5 only)
       number of active entries in the stripe cache
+  preread_bypass_threshold (currently raid5 only)
+      number of times a stripe requiring preread will be bypassed by
+      a stripe that does not require preread.  For fairness defaults
+      to 1.  Setting this to 0 disables bypass accounting and
+      requires preread stripes to wait until all full-width stripe-
+      writes are complete.  Valid values are 0 to stripe_cache_size.

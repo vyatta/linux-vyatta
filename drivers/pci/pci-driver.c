@@ -1,6 +1,11 @@
 /*
  * drivers/pci/pci-driver.c
  *
+ * (C) Copyright 2002-2004, 2007 Greg Kroah-Hartman <greg@kroah.com>
+ * (C) Copyright 2007 Novell Inc.
+ *
+ * Released under the GPL v2 only.
+ *
  */
 
 #include <linux/pci.h>
@@ -96,17 +101,21 @@ pci_create_newid_file(struct pci_driver *drv)
 {
 	int error = 0;
 	if (drv->probe != NULL)
-		error = sysfs_create_file(&drv->driver.kobj,
-					  &driver_attr_new_id.attr);
+		error = driver_create_file(&drv->driver, &driver_attr_new_id);
 	return error;
 }
 
+static void pci_remove_newid_file(struct pci_driver *drv)
+{
+	driver_remove_file(&drv->driver, &driver_attr_new_id);
+}
 #else /* !CONFIG_HOTPLUG */
 static inline void pci_free_dynids(struct pci_driver *drv) {}
 static inline int pci_create_newid_file(struct pci_driver *drv)
 {
 	return 0;
 }
+static inline void pci_remove_newid_file(struct pci_driver *drv) {}
 #endif
 
 /**
@@ -172,18 +181,19 @@ static int pci_call_probe(struct pci_driver *drv, struct pci_dev *dev,
 	   any need to change it. */
 	struct mempolicy *oldpol;
 	cpumask_t oldmask = current->cpus_allowed;
-	int node = pcibus_to_node(dev->bus);
-	if (node >= 0 && node_online(node))
-	    set_cpus_allowed(current, node_to_cpumask(node));
+	int node = dev_to_node(&dev->dev);
+
+	if (node >= 0) {
+		node_to_cpumask_ptr(nodecpumask, node);
+		set_cpus_allowed_ptr(current, nodecpumask);
+	}
 	/* And set default memory allocation policy */
 	oldpol = current->mempolicy;
-	current->mempolicy = &default_policy;
-	mpol_get(current->mempolicy);
+	current->mempolicy = NULL;	/* fall back to system default policy */
 #endif
 	error = drv->probe(dev, id);
 #ifdef CONFIG_NUMA
-	set_cpus_allowed(current, oldmask);
-	mpol_free(current->mempolicy);
+	set_cpus_allowed_ptr(current, &oldmask);
 	current->mempolicy = oldpol;
 #endif
 	return error;
@@ -350,51 +360,9 @@ static void pci_device_shutdown(struct device *dev)
 
 	if (drv && drv->shutdown)
 		drv->shutdown(pci_dev);
+	pci_msi_shutdown(pci_dev);
+	pci_msix_shutdown(pci_dev);
 }
-
-#define kobj_to_pci_driver(obj) container_of(obj, struct device_driver, kobj)
-#define attr_to_driver_attribute(obj) container_of(obj, struct driver_attribute, attr)
-
-static ssize_t
-pci_driver_attr_show(struct kobject * kobj, struct attribute *attr, char *buf)
-{
-	struct device_driver *driver = kobj_to_pci_driver(kobj);
-	struct driver_attribute *dattr = attr_to_driver_attribute(attr);
-	ssize_t ret;
-
-	if (!get_driver(driver))
-		return -ENODEV;
-
-	ret = dattr->show ? dattr->show(driver, buf) : -EIO;
-
-	put_driver(driver);
-	return ret;
-}
-
-static ssize_t
-pci_driver_attr_store(struct kobject * kobj, struct attribute *attr,
-		      const char *buf, size_t count)
-{
-	struct device_driver *driver = kobj_to_pci_driver(kobj);
-	struct driver_attribute *dattr = attr_to_driver_attribute(attr);
-	ssize_t ret;
-
-	if (!get_driver(driver))
-		return -ENODEV;
-
-	ret = dattr->store ? dattr->store(driver, buf, count) : -EIO;
-
-	put_driver(driver);
-	return ret;
-}
-
-static struct sysfs_ops pci_driver_sysfs_ops = {
-	.show = pci_driver_attr_show,
-	.store = pci_driver_attr_store,
-};
-static struct kobj_type pci_driver_kobj_type = {
-	.sysfs_ops = &pci_driver_sysfs_ops,
-};
 
 /**
  * __pci_register_driver - register a new pci driver
@@ -417,7 +385,6 @@ int __pci_register_driver(struct pci_driver *drv, struct module *owner,
 	drv->driver.bus = &pci_bus_type;
 	drv->driver.owner = owner;
 	drv->driver.mod_name = mod_name;
-	drv->driver.kobj.ktype = &pci_driver_kobj_type;
 
 	spin_lock_init(&drv->dynids.lock);
 	INIT_LIST_HEAD(&drv->dynids.list);
@@ -447,6 +414,7 @@ int __pci_register_driver(struct pci_driver *drv, struct module *owner,
 void
 pci_unregister_driver(struct pci_driver *drv)
 {
+	pci_remove_newid_file(drv);
 	driver_unregister(&drv->driver);
 	pci_free_dynids(drv);
 }

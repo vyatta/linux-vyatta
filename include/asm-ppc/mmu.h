@@ -15,10 +15,8 @@
  * physical need a larger than native word size type. -Matt
  */
 #ifndef CONFIG_PHYS_64BIT
-typedef unsigned long phys_addr_t;
 #define PHYS_FMT	"%.8lx"
 #else
-typedef unsigned long long phys_addr_t;
 extern phys_addr_t fixup_bigphys_addr(phys_addr_t, phys_addr_t);
 #define PHYS_FMT	"%16Lx"
 #endif
@@ -382,6 +380,12 @@ typedef struct _P601_BAT {
 #define BOOKE_PAGESZ_64GB	13
 #define BOOKE_PAGESZ_256GB	14
 #define BOOKE_PAGESZ_1TB	15
+
+#ifndef CONFIG_SERIAL_TEXT_DEBUG
+#define PPC44x_EARLY_TLBS	1
+#else
+#define PPC44x_EARLY_TLBS	2
+#endif
 
 /*
  * Freescale Book-E MMU support

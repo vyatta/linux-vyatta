@@ -12,11 +12,10 @@
 #ifndef __ASM_RTC_H__
 #define __ASM_RTC_H__
 
-#ifdef __KERNEL__
-
 #include <linux/mc146818rtc.h>
 #include <linux/rtc.h>
 #include <linux/bcd.h>
+#include <linux/delay.h>
 
 #define RTC_PIE 0x40		/* periodic interrupt enable */
 #define RTC_AIE 0x20		/* alarm interrupt enable */
@@ -35,36 +34,34 @@
 static inline unsigned char rtc_is_updating(void)
 {
 	unsigned char uip;
+	unsigned long flags;
 
-	spin_lock_irq(&rtc_lock);
+	spin_lock_irqsave(&rtc_lock, flags);
 	uip = (CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP);
-	spin_unlock_irq(&rtc_lock);
+	spin_unlock_irqrestore(&rtc_lock, flags);
 	return uip;
 }
 
 static inline unsigned int get_rtc_time(struct rtc_time *time)
 {
-	unsigned long uip_watchdog = jiffies;
 	unsigned char ctrl;
+	unsigned long flags;
+
 #ifdef CONFIG_MACH_DECSTATION
 	unsigned int real_year;
 #endif
 
 	/*
 	 * read RTC once any update in progress is done. The update
-	 * can take just over 2ms. We wait 10 to 20ms. There is no need to
+	 * can take just over 2ms. We wait 20ms. There is no need to
 	 * to poll-wait (up to 1s - eeccch) for the falling edge of RTC_UIP.
 	 * If you need to know *exactly* when a second has started, enable
 	 * periodic update complete interrupts, (via ioctl) and then 
 	 * immediately read /dev/rtc which will block until you get the IRQ.
 	 * Once the read clears, read the RTC time (again via ioctl). Easy.
 	 */
-
-	if (rtc_is_updating() != 0)
-		while (jiffies - uip_watchdog < 2*HZ/100) {
-			barrier();
-			cpu_relax();
-		}
+	if (rtc_is_updating())
+		mdelay(20);
 
 	/*
 	 * Only the values that we read from the RTC are set. We leave
@@ -72,7 +69,7 @@ static inline unsigned int get_rtc_time(struct rtc_time *time)
 	 * RTC has RTC_DAY_OF_WEEK, we ignore it, as it is only updated
 	 * by the RTC when initially set to a non-zero value.
 	 */
-	spin_lock_irq(&rtc_lock);
+	spin_lock_irqsave(&rtc_lock, flags);
 	time->tm_sec = CMOS_READ(RTC_SECONDS);
 	time->tm_min = CMOS_READ(RTC_MINUTES);
 	time->tm_hour = CMOS_READ(RTC_HOURS);
@@ -83,7 +80,7 @@ static inline unsigned int get_rtc_time(struct rtc_time *time)
 	real_year = CMOS_READ(RTC_DEC_YEAR);
 #endif
 	ctrl = CMOS_READ(RTC_CONTROL);
-	spin_unlock_irq(&rtc_lock);
+	spin_unlock_irqrestore(&rtc_lock, flags);
 
 	if (!(ctrl & RTC_DM_BINARY) || RTC_ALWAYS_BCD)
 	{
@@ -210,5 +207,4 @@ static inline int set_rtc_pll(struct rtc_pll_info *pll)
 	return -EINVAL;
 }
 
-#endif /* __KERNEL__ */
 #endif /* __ASM_RTC_H__ */

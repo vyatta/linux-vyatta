@@ -36,7 +36,7 @@ static int dcssblk_open(struct inode *inode, struct file *filp);
 static int dcssblk_release(struct inode *inode, struct file *filp);
 static int dcssblk_make_request(struct request_queue *q, struct bio *bio);
 static int dcssblk_direct_access(struct block_device *bdev, sector_t secnum,
-				 unsigned long *data);
+				 void **kaddr, unsigned long *pfn);
 
 static char dcssblk_segments[DCSSBLK_PARM_LEN] = "\0";
 
@@ -82,7 +82,7 @@ struct dcssblk_dev_info {
 	struct request_queue *dcssblk_queue;
 };
 
-static struct list_head dcssblk_devices = LIST_HEAD_INIT(dcssblk_devices);
+static LIST_HEAD(dcssblk_devices);
 static struct rw_semaphore dcssblk_devices_sem;
 
 /*
@@ -140,57 +140,6 @@ dcssblk_get_device_by_name(char *name)
 		}
 	}
 	return NULL;
-}
-
-/*
- * print appropriate error message for segment_load()/segment_type()
- * return code
- */
-static void
-dcssblk_segment_warn(int rc, char* seg_name)
-{
-	switch (rc) {
-	case -ENOENT:
-		PRINT_WARN("cannot load/query segment %s, does not exist\n",
-			   seg_name);
-		break;
-	case -ENOSYS:
-		PRINT_WARN("cannot load/query segment %s, not running on VM\n",
-			   seg_name);
-		break;
-	case -EIO:
-		PRINT_WARN("cannot load/query segment %s, hardware error\n",
-			   seg_name);
-		break;
-	case -ENOTSUPP:
-		PRINT_WARN("cannot load/query segment %s, is a multi-part "
-			   "segment\n", seg_name);
-		break;
-	case -ENOSPC:
-		PRINT_WARN("cannot load/query segment %s, overlaps with "
-			   "storage\n", seg_name);
-		break;
-	case -EBUSY:
-		PRINT_WARN("cannot load/query segment %s, overlaps with "
-			   "already loaded dcss\n", seg_name);
-		break;
-	case -EPERM:
-		PRINT_WARN("cannot load/query segment %s, already loaded in "
-			   "incompatible mode\n", seg_name);
-		break;
-	case -ENOMEM:
-		PRINT_WARN("cannot load/query segment %s, out of memory\n",
-			   seg_name);
-		break;
-	case -ERANGE:
-		PRINT_WARN("cannot load/query segment %s, exceeds kernel "
-			   "mapping range\n", seg_name);
-		break;
-	default:
-		PRINT_WARN("cannot load/query segment %s, return value %i\n",
-			   seg_name, rc);
-		break;
-	}
 }
 
 static void dcssblk_unregister_callback(struct device *dev)
@@ -415,13 +364,15 @@ dcssblk_add_store(struct device *dev, struct device_attribute *attr, const char 
 	dev_info->gd->queue = dev_info->dcssblk_queue;
 	dev_info->gd->private_data = dev_info;
 	dev_info->gd->driverfs_dev = &dev_info->dev;
+	blk_queue_make_request(dev_info->dcssblk_queue, dcssblk_make_request);
+	blk_queue_hardsect_size(dev_info->dcssblk_queue, 4096);
 	/*
 	 * load the segment
 	 */
 	rc = segment_load(local_buf, SEGMENT_SHARED,
 				&dev_info->start, &dev_info->end);
 	if (rc < 0) {
-		dcssblk_segment_warn(rc, dev_info->segment_name);
+		segment_warning(rc, dev_info->segment_name);
 		goto dealloc_gendisk;
 	}
 	seg_byte_size = (dev_info->end - dev_info->start + 1);
@@ -471,9 +422,6 @@ dcssblk_add_store(struct device *dev, struct device_attribute *attr, const char 
 	rc = device_create_file(&dev_info->dev, &dev_attr_save);
 	if (rc)
 		goto unregister_dev;
-
-	blk_queue_make_request(dev_info->dcssblk_queue, dcssblk_make_request);
-	blk_queue_hardsect_size(dev_info->dcssblk_queue, 4096);
 
 	add_disk(dev_info->gd);
 
@@ -667,7 +615,7 @@ dcssblk_make_request(struct request_queue *q, struct bio *bio)
 		page_addr = (unsigned long)
 			page_address(bvec->bv_page) + bvec->bv_offset;
 		source_addr = dev_info->start + (index<<12) + bytes_done;
-		if (unlikely(page_addr & 4095) != 0 || (bvec->bv_len & 4095) != 0)
+		if (unlikely((page_addr & 4095) != 0) || (bvec->bv_len & 4095) != 0)
 			// More paranoia.
 			goto fail;
 		if (bio_data_dir(bio) == READ) {
@@ -688,7 +636,7 @@ fail:
 
 static int
 dcssblk_direct_access (struct block_device *bdev, sector_t secnum,
-			unsigned long *data)
+			void **kaddr, unsigned long *pfn)
 {
 	struct dcssblk_dev_info *dev_info;
 	unsigned long pgoff;
@@ -701,7 +649,9 @@ dcssblk_direct_access (struct block_device *bdev, sector_t secnum,
 	pgoff = secnum / (PAGE_SIZE / 512);
 	if ((pgoff+1)*PAGE_SIZE-1 > dev_info->end - dev_info->start)
 		return -ERANGE;
-	*data = (unsigned long) (dev_info->start+pgoff*PAGE_SIZE);
+	*kaddr = (void *) (dev_info->start+pgoff*PAGE_SIZE);
+	*pfn = virt_to_phys(*kaddr) >> PAGE_SHIFT;
+
 	return 0;
 }
 

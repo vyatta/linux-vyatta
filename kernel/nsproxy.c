@@ -21,6 +21,7 @@
 #include <linux/utsname.h>
 #include <linux/pid_namespace.h>
 #include <net/net_namespace.h>
+#include <linux/ipc_namespace.h>
 
 static struct kmem_cache *nsproxy_cachep;
 
@@ -135,6 +136,18 @@ int copy_namespaces(unsigned long flags, struct task_struct *tsk)
 
 	if (!capable(CAP_SYS_ADMIN)) {
 		err = -EPERM;
+		goto out;
+	}
+
+	/*
+	 * CLONE_NEWIPC must detach from the undolist: after switching
+	 * to a new ipc namespace, the semaphore arrays from the old
+	 * namespace are unreachable.  In clone parlance, CLONE_SYSVSEM
+	 * means share undolist with parent, so we must forbid using
+	 * it along with CLONE_NEWIPC.
+	 */
+	if ((flags & CLONE_NEWIPC) && (flags & CLONE_SYSVSEM)) {
+		err = -EINVAL;
 		goto out;
 	}
 

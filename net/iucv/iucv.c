@@ -621,7 +621,6 @@ static int iucv_sever_pathid(u16 pathid, u8 userdata[16])
 	return iucv_call_b2f0(IUCV_SEVER, parm);
 }
 
-#ifdef CONFIG_SMP
 /**
  * __iucv_cleanup_queue
  * @dummy: unused dummy argument
@@ -632,7 +631,6 @@ static int iucv_sever_pathid(u16 pathid, u8 userdata[16])
 static void __iucv_cleanup_queue(void *dummy)
 {
 }
-#endif
 
 /**
  * iucv_cleanup_queue
@@ -693,9 +691,9 @@ int iucv_register(struct iucv_handler *handler, int smp)
 		iucv_setmask_up();
 	INIT_LIST_HEAD(&handler->paths);
 
-	spin_lock_irq(&iucv_table_lock);
+	spin_lock_bh(&iucv_table_lock);
 	list_add_tail(&handler->list, &iucv_handler_list);
-	spin_unlock_irq(&iucv_table_lock);
+	spin_unlock_bh(&iucv_table_lock);
 	rc = 0;
 out_mutex:
 	mutex_unlock(&iucv_register_mutex);
@@ -797,7 +795,6 @@ int iucv_path_connect(struct iucv_path *path, struct iucv_handler *handler,
 	union iucv_param *parm;
 	int rc;
 
-	BUG_ON(in_atomic());
 	spin_lock_bh(&iucv_table_lock);
 	iucv_cleanup_queue();
 	parm = iucv_param[smp_processor_id()];
@@ -1492,7 +1489,7 @@ static void iucv_tasklet_fn(unsigned long ignored)
 		[0x08] = iucv_message_pending,
 		[0x09] = iucv_message_pending,
 	};
-	struct list_head task_queue = LIST_HEAD_INIT(task_queue);
+	LIST_HEAD(task_queue);
 	struct iucv_irq_list *p, *n;
 
 	/* Serialize tasklet, iucv_path_sever and iucv_path_connect. */
@@ -1526,7 +1523,7 @@ static void iucv_tasklet_fn(unsigned long ignored)
 static void iucv_work_fn(struct work_struct *work)
 {
 	typedef void iucv_irq_fn(struct iucv_irq_data *);
-	struct list_head work_queue = LIST_HEAD_INIT(work_queue);
+	LIST_HEAD(work_queue);
 	struct iucv_irq_list *p, *n;
 
 	/* Serialize tasklet, iucv_path_sever and iucv_path_connect. */
@@ -1611,13 +1608,10 @@ static int __init iucv_init(void)
 	rc = register_external_interrupt(0x4000, iucv_external_interrupt);
 	if (rc)
 		goto out;
-	rc = bus_register(&iucv_bus);
-	if (rc)
-		goto out_int;
 	iucv_root = s390_root_dev_register("iucv");
 	if (IS_ERR(iucv_root)) {
 		rc = PTR_ERR(iucv_root);
-		goto out_bus;
+		goto out_int;
 	}
 
 	for_each_online_cpu(cpu) {
@@ -1637,13 +1631,20 @@ static int __init iucv_init(void)
 			goto out_free;
 		}
 	}
-	register_hotcpu_notifier(&iucv_cpu_notifier);
+	rc = register_hotcpu_notifier(&iucv_cpu_notifier);
+	if (rc)
+		goto out_free;
 	ASCEBC(iucv_error_no_listener, 16);
 	ASCEBC(iucv_error_no_memory, 16);
 	ASCEBC(iucv_error_pathid, 16);
 	iucv_available = 1;
+	rc = bus_register(&iucv_bus);
+	if (rc)
+		goto out_cpu;
 	return 0;
 
+out_cpu:
+	unregister_hotcpu_notifier(&iucv_cpu_notifier);
 out_free:
 	for_each_possible_cpu(cpu) {
 		kfree(iucv_param[cpu]);
@@ -1652,8 +1653,6 @@ out_free:
 		iucv_irq_data[cpu] = NULL;
 	}
 	s390_root_dev_unregister(iucv_root);
-out_bus:
-	bus_unregister(&iucv_bus);
 out_int:
 	unregister_external_interrupt(0x4000, iucv_external_interrupt);
 out:

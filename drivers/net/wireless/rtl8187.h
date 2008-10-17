@@ -64,14 +64,18 @@ struct rtl8187_tx_hdr {
 struct rtl8187_priv {
 	/* common between rtl818x drivers */
 	struct rtl818x_csr *map;
-	void (*rf_init)(struct ieee80211_hw *);
+	const struct rtl818x_rf_ops *rf;
+	struct ieee80211_vif *vif;
 	int mode;
-	int if_id;
+	/* The mutex protects the TX loopback state.
+	 * Any attempt to set channels concurrently locks the device.
+	 */
+	struct mutex conf_mutex;
 
 	/* rtl8187 specific */
 	struct ieee80211_channel channels[14];
 	struct ieee80211_rate rates[12];
-	struct ieee80211_hw_mode modes[2];
+	struct ieee80211_supported_band band;
 	struct usb_device *udev;
 	u32 rx_conf;
 	u16 txpwr_base;

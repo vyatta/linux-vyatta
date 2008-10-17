@@ -522,7 +522,7 @@ rpcrdma_ep_create(struct rpcrdma_ep *ep, struct rpcrdma_ia *ia,
 				struct rpcrdma_create_data_internal *cdata)
 {
 	struct ib_device_attr devattr;
-	int rc;
+	int rc, err;
 
 	rc = ib_query_device(ia->ri_id->device, &devattr);
 	if (rc) {
@@ -648,8 +648,10 @@ rpcrdma_ep_create(struct rpcrdma_ep *ep, struct rpcrdma_ia *ia,
 	return 0;
 
 out2:
-	if (ib_destroy_cq(ep->rep_cq))
-		;
+	err = ib_destroy_cq(ep->rep_cq);
+	if (err)
+		dprintk("RPC:       %s: ib_destroy_cq returned %i\n",
+			__func__, err);
 out1:
 	return rc;
 }
@@ -1571,7 +1573,6 @@ rpcrdma_ep_post(struct rpcrdma_ia *ia,
 	send_wr.sg_list = req->rl_send_iov;
 	send_wr.num_sge = req->rl_niovs;
 	send_wr.opcode = IB_WR_SEND;
-	send_wr.imm_data = 0;
 	if (send_wr.num_sge == 4)	/* no need to sync any pad (constant) */
 		ib_dma_sync_single_for_device(ia->ri_id->device,
 			req->rl_send_iov[3].addr, req->rl_send_iov[3].length,

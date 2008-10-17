@@ -5,7 +5,7 @@
   Transmission (TX/RX) related functions.
 
   Copyright (C) 2005 Martin Langer <martin-langer@gmx.de>
-  Copyright (C) 2005 Stefano Brivio <st3@riseup.net>
+  Copyright (C) 2005 Stefano Brivio <stefano.brivio@polimi.it>
   Copyright (C) 2005, 2006 Michael Buesch <mb@bu3sch.de>
   Copyright (C) 2005 Danny van Dyk <kugelfang@gentoo.org>
   Copyright (C) 2005 Andreas Jaggi <andreas.jaggi@waterwave.ch>
@@ -37,45 +37,48 @@
 
 
 /* Extract the bitrate out of a CCK PLCP header. */
-static u8 b43legacy_plcp_get_bitrate_cck(struct b43legacy_plcp_hdr6 *plcp)
+static u8 b43legacy_plcp_get_bitrate_idx_cck(struct b43legacy_plcp_hdr6 *plcp)
 {
 	switch (plcp->raw[0]) {
 	case 0x0A:
-		return B43legacy_CCK_RATE_1MB;
+		return 0;
 	case 0x14:
-		return B43legacy_CCK_RATE_2MB;
+		return 1;
 	case 0x37:
-		return B43legacy_CCK_RATE_5MB;
+		return 2;
 	case 0x6E:
-		return B43legacy_CCK_RATE_11MB;
+		return 3;
 	}
 	B43legacy_BUG_ON(1);
-	return 0;
+	return -1;
 }
 
 /* Extract the bitrate out of an OFDM PLCP header. */
-static u8 b43legacy_plcp_get_bitrate_ofdm(struct b43legacy_plcp_hdr6 *plcp)
+static u8 b43legacy_plcp_get_bitrate_idx_ofdm(struct b43legacy_plcp_hdr6 *plcp,
+					      bool aphy)
 {
+	int base = aphy ? 0 : 4;
+
 	switch (plcp->raw[0] & 0xF) {
 	case 0xB:
-		return B43legacy_OFDM_RATE_6MB;
+		return base + 0;
 	case 0xF:
-		return B43legacy_OFDM_RATE_9MB;
+		return base + 1;
 	case 0xA:
-		return B43legacy_OFDM_RATE_12MB;
+		return base + 2;
 	case 0xE:
-		return B43legacy_OFDM_RATE_18MB;
+		return base + 3;
 	case 0x9:
-		return B43legacy_OFDM_RATE_24MB;
+		return base + 4;
 	case 0xD:
-		return B43legacy_OFDM_RATE_36MB;
+		return base + 5;
 	case 0x8:
-		return B43legacy_OFDM_RATE_48MB;
+		return base + 6;
 	case 0xC:
-		return B43legacy_OFDM_RATE_54MB;
+		return base + 7;
 	}
 	B43legacy_BUG_ON(1);
-	return 0;
+	return -1;
 }
 
 u8 b43legacy_plcp_get_ratecode_cck(const u8 bitrate)
@@ -192,7 +195,7 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 	int use_encryption = (!(txctl->flags & IEEE80211_TXCTL_DO_NOT_ENCRYPT));
 	u16 fctl;
 	u8 rate;
-	u8 rate_fb;
+	struct ieee80211_rate *rate_fb;
 	int rate_ofdm;
 	int rate_fb_ofdm;
 	unsigned int plcp_fragment_len;
@@ -204,16 +207,16 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 
 	memset(txhdr, 0, sizeof(*txhdr));
 
-	rate = txctl->tx_rate;
+	rate = txctl->tx_rate->hw_value;
 	rate_ofdm = b43legacy_is_ofdm_rate(rate);
-	rate_fb = (txctl->alt_retry_rate == -1) ? rate : txctl->alt_retry_rate;
-	rate_fb_ofdm = b43legacy_is_ofdm_rate(rate_fb);
+	rate_fb = txctl->alt_retry_rate ? : txctl->tx_rate;
+	rate_fb_ofdm = b43legacy_is_ofdm_rate(rate_fb->hw_value);
 
 	txhdr->mac_frame_ctl = wlhdr->frame_control;
 	memcpy(txhdr->tx_receiver, wlhdr->addr1, 6);
 
 	/* Calculate duration for fallback rate */
-	if ((rate_fb == rate) ||
+	if ((rate_fb->hw_value == rate) ||
 	    (wlhdr->duration_id & cpu_to_le16(0x8000)) ||
 	    (wlhdr->duration_id == cpu_to_le16(0))) {
 		/* If the fallback rate equals the normal rate or the
@@ -221,11 +224,10 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 		 * use the original dur_id field. */
 		txhdr->dur_fb = wlhdr->duration_id;
 	} else {
-		int fbrate_base100kbps = B43legacy_RATE_TO_100KBPS(rate_fb);
 		txhdr->dur_fb = ieee80211_generic_frame_duration(dev->wl->hw,
-							 dev->wl->if_id,
+							 txctl->vif,
 							 fragment_len,
-							 fbrate_base100kbps);
+							 rate_fb);
 	}
 
 	plcp_fragment_len = fragment_len + FCS_LEN;
@@ -266,7 +268,7 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 				    rate);
 	b43legacy_generate_plcp_hdr((struct b43legacy_plcp_hdr4 *)
 				    (&txhdr->plcp_fb), plcp_fragment_len,
-				    rate_fb);
+				    rate_fb->hw_value);
 
 	/* PHY TX Control word */
 	if (rate_ofdm)
@@ -297,6 +299,8 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 		mac_ctl |= B43legacy_TX4_MAC_STMSDU;
 	if (rate_fb_ofdm)
 		mac_ctl |= B43legacy_TX4_MAC_FALLBACKOFDM;
+	if (txctl->flags & IEEE80211_TXCTL_LONG_RETRY_LIMIT)
+		mac_ctl |= B43legacy_TX4_MAC_LONGFRAME;
 
 	/* Generate the RTS or CTS-to-self frame */
 	if ((txctl->flags & IEEE80211_TXCTL_USE_RTS_CTS) ||
@@ -308,7 +312,7 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 		int rts_rate_ofdm;
 		int rts_rate_fb_ofdm;
 
-		rts_rate = txctl->rts_cts_rate;
+		rts_rate = txctl->rts_cts_rate->hw_value;
 		rts_rate_ofdm = b43legacy_is_ofdm_rate(rts_rate);
 		rts_rate_fb = b43legacy_calc_fallback_rate(rts_rate);
 		rts_rate_fb_ofdm = b43legacy_is_ofdm_rate(rts_rate_fb);
@@ -317,7 +321,7 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 
 		if (txctl->flags & IEEE80211_TXCTL_USE_CTS_PROTECT) {
 			ieee80211_ctstoself_get(dev->wl->hw,
-						dev->wl->if_id,
+						txctl->vif,
 						fragment_data,
 						fragment_len, txctl,
 						(struct ieee80211_cts *)
@@ -326,7 +330,7 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 			len = sizeof(struct ieee80211_cts);
 		} else {
 			ieee80211_rts_get(dev->wl->hw,
-					  dev->wl->if_id,
+					  txctl->vif,
 					  fragment_data, fragment_len, txctl,
 					  (struct ieee80211_rts *)
 					  (txhdr->rts_frame));
@@ -342,7 +346,6 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 					    len, rts_rate_fb);
 		hdr = (struct ieee80211_hdr *)(&txhdr->rts_frame);
 		txhdr->rts_dur_fb = hdr->duration_id;
-		mac_ctl |= B43legacy_TX4_MAC_LONGFRAME;
 	}
 
 	/* Magic cookie */
@@ -387,7 +390,7 @@ static s8 b43legacy_rssi_postprocess(struct b43legacy_wldev *dev,
 			else
 				tmp -= 3;
 		} else {
-			if (dev->dev->bus->sprom.r1.boardflags_lo
+			if (dev->dev->bus->sprom.boardflags_lo
 			    & B43legacy_BFL_RSSI) {
 				if (in_rssi > 63)
 					in_rssi = 63;
@@ -535,25 +538,42 @@ void b43legacy_rx(struct b43legacy_wldev *dev,
 				      (phystat3 & B43legacy_RX_PHYST3_TRSTATE));
 	status.noise = dev->stats.link_noise;
 	status.signal = (jssi * 100) / B43legacy_RX_MAX_SSI;
+	/* change to support A PHY */
 	if (phystat0 & B43legacy_RX_PHYST0_OFDM)
-		status.rate = b43legacy_plcp_get_bitrate_ofdm(plcp);
+		status.rate_idx = b43legacy_plcp_get_bitrate_idx_ofdm(plcp, false);
 	else
-		status.rate = b43legacy_plcp_get_bitrate_cck(plcp);
+		status.rate_idx = b43legacy_plcp_get_bitrate_idx_cck(plcp);
 	status.antenna = !!(phystat0 & B43legacy_RX_PHYST0_ANT);
-	status.mactime = mactime;
+
+	/*
+	 * All frames on monitor interfaces and beacons always need a full
+	 * 64-bit timestamp. Monitor interfaces need it for diagnostic
+	 * purposes and beacons for IBSS merging.
+	 * This code assumes we get to process the packet within 16 bits
+	 * of timestamp, i.e. about 65 milliseconds after the PHY received
+	 * the first symbol.
+	 */
+	if (((fctl & (IEEE80211_FCTL_FTYPE | IEEE80211_FCTL_STYPE))
+	    == (IEEE80211_FTYPE_MGMT | IEEE80211_STYPE_BEACON)) ||
+	    dev->wl->radiotap_enabled) {
+		u16 low_mactime_now;
+
+		b43legacy_tsf_read(dev, &status.mactime);
+		low_mactime_now = status.mactime;
+		status.mactime = status.mactime & ~0xFFFFULL;
+		status.mactime += mactime;
+		if (low_mactime_now <= mactime)
+			status.mactime -= 0x10000;
+		status.flag |= RX_FLAG_TSFT;
+	}
 
 	chanid = (chanstat & B43legacy_RX_CHAN_ID) >>
 		  B43legacy_RX_CHAN_ID_SHIFT;
 	switch (chanstat & B43legacy_RX_CHAN_PHYTYPE) {
 	case B43legacy_PHYTYPE_B:
-		status.phymode = MODE_IEEE80211B;
-		status.freq = chanid + 2400;
-		status.channel = b43legacy_freq_to_channel_bg(chanid + 2400);
-		break;
 	case B43legacy_PHYTYPE_G:
-		status.phymode = MODE_IEEE80211G;
+		status.band = IEEE80211_BAND_2GHZ;
 		status.freq = chanid + 2400;
-		status.channel = b43legacy_freq_to_channel_bg(chanid + 2400);
 		break;
 	default:
 		b43legacywarn(dev->wl, "Unexpected value for chanstat (0x%X)\n",

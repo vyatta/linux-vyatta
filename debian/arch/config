@@ -2,5 +2,5 @@
 # Debian toplevel config
 #
 
-# XXX we put everything in 486 for now.
+# XXX we put everything in arch-specific config for now.
 

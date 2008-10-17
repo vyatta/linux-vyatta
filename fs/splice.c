@@ -58,8 +58,8 @@ static int page_cache_pipe_buf_steal(struct pipe_inode_info *pipe,
 		 */
 		wait_on_page_writeback(page);
 
-		if (PagePrivate(page))
-			try_to_release_page(page, GFP_KERNEL);
+		if (PagePrivate(page) && !try_to_release_page(page, GFP_KERNEL))
+			goto out_unlock;
 
 		/*
 		 * If we succeeded in removing the mapping, set LRU flag
@@ -75,6 +75,7 @@ static int page_cache_pipe_buf_steal(struct pipe_inode_info *pipe,
 	 * Raced with truncate or failed to remove page from current
 	 * address space, unlock and return failure.
 	 */
+out_unlock:
 	unlock_page(page);
 	return 1;
 }
@@ -254,9 +255,14 @@ ssize_t splice_to_pipe(struct pipe_inode_info *pipe,
 	}
 
 	while (page_nr < spd_pages)
-		page_cache_release(spd->pages[page_nr++]);
+		spd->spd_release(spd, page_nr++);
 
 	return ret;
+}
+
+static void spd_release_page(struct splice_pipe_desc *spd, unsigned int i)
+{
+	page_cache_release(spd->pages[i]);
 }
 
 static int
@@ -277,6 +283,7 @@ __generic_file_splice_read(struct file *in, loff_t *ppos,
 		.partial = partial,
 		.flags = flags,
 		.ops = &page_cache_pipe_buf_ops,
+		.spd_release = spd_release_page,
 	};
 
 	index = *ppos >> PAGE_CACHE_SHIFT;
@@ -364,8 +371,10 @@ __generic_file_splice_read(struct file *in, loff_t *ppos,
 			 * for an in-flight io page
 			 */
 			if (flags & SPLICE_F_NONBLOCK) {
-				if (TestSetPageLocked(page))
+				if (TestSetPageLocked(page)) {
+					error = -EAGAIN;
 					break;
+				}
 			} else
 				lock_page(page);
 
@@ -473,9 +482,8 @@ ssize_t generic_file_splice_read(struct file *in, loff_t *ppos,
 				 struct pipe_inode_info *pipe, size_t len,
 				 unsigned int flags)
 {
-	ssize_t spliced;
-	int ret;
 	loff_t isize, left;
+	int ret;
 
 	isize = i_size_read(in->f_mapping->host);
 	if (unlikely(*ppos >= isize))
@@ -485,29 +493,9 @@ ssize_t generic_file_splice_read(struct file *in, loff_t *ppos,
 	if (unlikely(left < len))
 		len = left;
 
-	ret = 0;
-	spliced = 0;
-	while (len && !spliced) {
-		ret = __generic_file_splice_read(in, ppos, pipe, len, flags);
-
-		if (ret < 0)
-			break;
-		else if (!ret) {
-			if (spliced)
-				break;
-			if (flags & SPLICE_F_NONBLOCK) {
-				ret = -EAGAIN;
-				break;
-			}
-		}
-
+	ret = __generic_file_splice_read(in, ppos, pipe, len, flags);
+	if (ret > 0)
 		*ppos += ret;
-		len -= ret;
-		spliced += ret;
-	}
-
-	if (spliced)
-		return spliced;
 
 	return ret;
 }
@@ -824,24 +812,19 @@ generic_file_splice_write(struct pipe_inode_info *pipe, struct file *out,
 {
 	struct address_space *mapping = out->f_mapping;
 	struct inode *inode = mapping->host;
-	int killsuid, killpriv;
+	struct splice_desc sd = {
+		.total_len = len,
+		.flags = flags,
+		.pos = *ppos,
+		.u.file = out,
+	};
 	ssize_t ret;
-	int err = 0;
 
-	killpriv = security_inode_need_killpriv(out->f_path.dentry);
-	killsuid = should_remove_suid(out->f_path.dentry);
-	if (unlikely(killsuid || killpriv)) {
-		mutex_lock(&inode->i_mutex);
-		if (killpriv)
-			err = security_inode_killpriv(out->f_path.dentry);
-		if (!err && killsuid)
-			err = __remove_suid(out->f_path.dentry, killsuid);
-		mutex_unlock(&inode->i_mutex);
-		if (err)
-			return err;
-	}
-
-	ret = splice_from_pipe(pipe, out, ppos, len, flags, pipe_to_file);
+	inode_double_lock(inode, pipe->inode);
+	ret = remove_suid(out->f_path.dentry);
+	if (likely(!ret))
+		ret = __splice_from_pipe(pipe, &sd, pipe_to_file);
+	inode_double_unlock(inode, pipe->inode);
 	if (ret > 0) {
 		unsigned long nr_pages;
 
@@ -853,6 +836,8 @@ generic_file_splice_write(struct pipe_inode_info *pipe, struct file *out,
 		 * sync it.
 		 */
 		if (unlikely((out->f_flags & O_SYNC) || IS_SYNC(inode))) {
+			int err;
+
 			mutex_lock(&inode->i_mutex);
 			err = generic_osync_inode(inode, mapping,
 						  OSYNC_METADATA|OSYNC_DATA);
@@ -887,14 +872,13 @@ ssize_t generic_splice_sendpage(struct pipe_inode_info *pipe, struct file *out,
 {
 	return splice_from_pipe(pipe, out, ppos, len, flags, pipe_to_sendpage);
 }
-
 EXPORT_SYMBOL(generic_splice_sendpage);
 
 /*
  * Attempt to initiate a splice from pipe to file.
  */
 long vfs_splice_from(struct pipe_inode_info *pipe, struct file *out,
-		     loff_t *ppos, size_t len, unsigned int flags)
+		    loff_t *ppos, size_t len, unsigned int flags)
 {
 	int ret;
 
@@ -908,20 +892,16 @@ long vfs_splice_from(struct pipe_inode_info *pipe, struct file *out,
 	if (unlikely(ret < 0))
 		return ret;
 
-	ret = security_file_permission(out, MAY_WRITE);
-	if (unlikely(ret < 0))
-		return ret;
-
 	return out->f_op->splice_write(pipe, out, ppos, len, flags);
 }
-EXPORT_SYMBOL_GPL(vfs_splice_from);
+EXPORT_SYMBOL(vfs_splice_from);
 
 /*
  * Attempt to initiate a splice from a file to a pipe.
  */
 long vfs_splice_to(struct file *in, loff_t *ppos,
-		   struct pipe_inode_info *pipe, size_t len,
-		   unsigned int flags)
+		  struct pipe_inode_info *pipe, size_t len,
+		  unsigned int flags)
 {
 	int ret;
 
@@ -935,13 +915,9 @@ long vfs_splice_to(struct file *in, loff_t *ppos,
 	if (unlikely(ret < 0))
 		return ret;
 
-	ret = security_file_permission(in, MAY_READ);
-	if (unlikely(ret < 0))
-		return ret;
-
 	return in->f_op->splice_read(in, ppos, pipe, len, flags);
 }
-EXPORT_SYMBOL_GPL(vfs_splice_to);
+EXPORT_SYMBOL(vfs_splice_to);
 
 /**
  * splice_direct_to_actor - splices data directly between two non-pipes
@@ -1009,7 +985,7 @@ ssize_t splice_direct_to_actor(struct file *in, struct splice_desc *sd,
 
 	while (len) {
 		size_t read_len;
-		loff_t pos = sd->pos;
+		loff_t pos = sd->pos, prev_pos = pos;
 
 		ret = vfs_splice_to(in, &pos, pipe, len, flags);
 		if (unlikely(ret <= 0))
@@ -1024,18 +1000,24 @@ ssize_t splice_direct_to_actor(struct file *in, struct splice_desc *sd,
 		 * could get stuck data in the internal pipe:
 		 */
 		ret = actor(pipe, sd);
-		if (unlikely(ret <= 0))
+		if (unlikely(ret <= 0)) {
+			sd->pos = prev_pos;
 			goto out_release;
+		}
 
 		bytes += ret;
 		len -= ret;
 		sd->pos = pos;
 
-		if (ret < read_len)
+		if (ret < read_len) {
+			sd->pos = prev_pos + ret;
 			goto out_release;
+		}
 	}
 
+done:
 	pipe->nrbufs = pipe->curbuf = 0;
+	file_accessed(in);
 	return bytes;
 
 out_release:
@@ -1051,16 +1033,11 @@ out_release:
 			buf->ops = NULL;
 		}
 	}
-	pipe->nrbufs = pipe->curbuf = 0;
 
-	/*
-	 * If we transferred some data, return the number of bytes:
-	 */
-	if (bytes > 0)
-		return bytes;
+	if (!bytes)
+		bytes = ret;
 
-	return ret;
-
+	goto done;
 }
 EXPORT_SYMBOL(splice_direct_to_actor);
 
@@ -1101,7 +1078,7 @@ long do_splice_direct(struct file *in, loff_t *ppos, struct file *out,
 
 	ret = splice_direct_to_actor(in, &sd, direct_splice_actor);
 	if (ret > 0)
-		*ppos += ret;
+		*ppos = sd.pos;
 
 	return ret;
 }
@@ -1450,6 +1427,7 @@ static long vmsplice_to_pipe(struct file *file, const struct iovec __user *iov,
 		.partial = partial,
 		.flags = flags,
 		.ops = &user_page_pipe_buf_ops,
+		.spd_release = spd_release_page,
 	};
 
 	pipe = pipe_info(file->f_path.dentry->d_inode);
@@ -1675,6 +1653,13 @@ static int link_pipe(struct pipe_inode_info *ipipe,
 		i++;
 	} while (len);
 
+	/*
+	 * return EAGAIN if we have the potential of some data in the
+	 * future, otherwise just return 0
+	 */
+	if (!ret && ipipe->waiting_writers && (flags & SPLICE_F_NONBLOCK))
+		ret = -EAGAIN;
+
 	inode_double_unlock(ipipe->inode, opipe->inode);
 
 	/*
@@ -1715,11 +1700,8 @@ static long do_tee(struct file *in, struct file *out, size_t len,
 		ret = link_ipipe_prep(ipipe, flags);
 		if (!ret) {
 			ret = link_opipe_prep(opipe, flags);
-			if (!ret) {
+			if (!ret)
 				ret = link_pipe(ipipe, opipe, len, flags);
-				if (!ret && (flags & SPLICE_F_NONBLOCK))
-					ret = -EAGAIN;
-			}
 		}
 	}
 

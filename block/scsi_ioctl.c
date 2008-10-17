@@ -33,13 +33,12 @@
 #include <scsi/scsi_cmnd.h>
 
 /* Command group 3 is reserved and should never be used.  */
-const unsigned char scsi_command_size[8] =
+const unsigned char scsi_command_size_tbl[8] =
 {
 	6, 10, 10, 12,
 	16, 12, 10, 10
 };
-
-EXPORT_SYMBOL(scsi_command_size);
+EXPORT_SYMBOL(scsi_command_size_tbl);
 
 #include <scsi/sg.h>
 
@@ -217,8 +216,6 @@ EXPORT_SYMBOL_GPL(blk_verify_command);
 static int blk_fill_sghdr_rq(struct request_queue *q, struct request *rq,
 			     struct sg_io_hdr *hdr, int has_write_perm)
 {
-	memset(rq->cmd, 0, BLK_MAX_CDB); /* ATAPI hates garbage after CDB */
-
 	if (copy_from_user(rq->cmd, hdr->cmdp, hdr->cmd_len))
 		return -EFAULT;
 	if (blk_verify_command(rq->cmd, has_write_perm))
@@ -529,8 +526,8 @@ static int __blk_send_generic(struct request_queue *q, struct gendisk *bd_disk,
 	rq->cmd_type = REQ_TYPE_BLOCK_PC;
 	rq->data = NULL;
 	rq->data_len = 0;
+	rq->extra_len = 0;
 	rq->timeout = BLK_DEFAULT_SG_TIMEOUT;
-	memset(rq->cmd, 0, sizeof(rq->cmd));
 	rq->cmd[0] = cmd;
 	rq->cmd[4] = data;
 	rq->cmd_len = 6;
@@ -632,7 +629,7 @@ int scsi_cmd_ioctl(struct file *file, struct request_queue *q,
 			hdr.sbp = cgc.sense;
 			if (hdr.sbp)
 				hdr.mx_sb_len = sizeof(struct request_sense);
-			hdr.timeout = cgc.timeout;
+			hdr.timeout = jiffies_to_msecs(cgc.timeout);
 			hdr.cmdp = ((struct cdrom_generic_command __user*) arg)->cmd;
 			hdr.cmd_len = sizeof(cgc.cmd);
 

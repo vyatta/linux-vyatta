@@ -41,6 +41,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/kernel.h>
+#include <linux/vmalloc.h>
 
 #include <linux/if_arp.h>	/* For ARPHRD_xxx */
 
@@ -182,17 +183,20 @@ static int ipoib_change_mtu(struct net_device *dev, int new_mtu)
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 
 	/* dev->mtu > 2K ==> connected mode */
-	if (ipoib_cm_admin_enabled(dev) && new_mtu <= IPOIB_CM_MTU) {
+	if (ipoib_cm_admin_enabled(dev)) {
+		if (new_mtu > ipoib_cm_max_mtu(dev))
+			return -EINVAL;
+
 		if (new_mtu > priv->mcast_mtu)
 			ipoib_warn(priv, "mtu > %d will cause multicast packet drops.\n",
 				   priv->mcast_mtu);
+
 		dev->mtu = new_mtu;
 		return 0;
 	}
 
-	if (new_mtu > IPOIB_PACKET_SIZE - IPOIB_ENCAP_LEN) {
+	if (new_mtu > IPOIB_UD_MTU(priv->max_ib_mtu))
 		return -EINVAL;
-	}
 
 	priv->admin_mtu = new_mtu;
 
@@ -355,8 +359,7 @@ void ipoib_flush_paths(struct net_device *dev)
 	spin_lock_irq(&priv->tx_lock);
 	spin_lock(&priv->lock);
 
-	list_splice(&priv->path_list, &remove_list);
-	INIT_LIST_HEAD(&priv->path_list);
+	list_splice_init(&priv->path_list, &remove_list);
 
 	list_for_each_entry(path, &remove_list, list)
 		rb_erase(&path->rb_node, &priv->path_tree);
@@ -474,8 +477,8 @@ static struct ipoib_path *path_rec_create(struct net_device *dev, void *gid)
 	INIT_LIST_HEAD(&path->neigh_list);
 
 	memcpy(path->pathrec.dgid.raw, gid, sizeof (union ib_gid));
-	path->pathrec.sgid          = priv->local_gid;
-	path->pathrec.pkey          = cpu_to_be16(priv->pkey);
+	path->pathrec.sgid	    = priv->local_gid;
+	path->pathrec.pkey	    = cpu_to_be16(priv->pkey);
 	path->pathrec.numb_path     = 1;
 	path->pathrec.traffic_class = priv->broadcast->mcmember.traffic_class;
 
@@ -669,16 +672,6 @@ static int ipoib_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (unlikely(!spin_trylock_irqsave(&priv->tx_lock, flags)))
 		return NETDEV_TX_LOCKED;
 
-	/*
-	 * Check if our queue is stopped.  Since we have the LLTX bit
-	 * set, we can't rely on netif_stop_queue() preventing our
-	 * xmit function from being called with a full queue.
-	 */
-	if (unlikely(netif_queue_stopped(dev))) {
-		spin_unlock_irqrestore(&priv->tx_lock, flags);
-		return NETDEV_TX_BUSY;
-	}
-
 	if (likely(skb->dst && skb->dst->neighbour)) {
 		if (unlikely(!*to_ipoib_neigh(skb->dst->neighbour))) {
 			ipoib_path_lookup(skb, dev);
@@ -687,12 +680,7 @@ static int ipoib_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 		neigh = *to_ipoib_neigh(skb->dst->neighbour);
 
-		if (ipoib_cm_get(neigh)) {
-			if (ipoib_cm_up(neigh)) {
-				ipoib_cm_send(dev, skb, ipoib_cm_get(neigh));
-				goto out;
-			}
-		} else if (neigh->ah) {
+		if (neigh->ah)
 			if (unlikely((memcmp(&neigh->dgid.raw,
 					    skb->dst->neighbour->ha + 4,
 					    sizeof(union ib_gid))) ||
@@ -713,6 +701,12 @@ static int ipoib_start_xmit(struct sk_buff *skb, struct net_device *dev)
 				goto out;
 			}
 
+		if (ipoib_cm_get(neigh)) {
+			if (ipoib_cm_up(neigh)) {
+				ipoib_cm_send(dev, skb, ipoib_cm_get(neigh));
+				goto out;
+			}
+		} else if (neigh->ah) {
 			ipoib_send(dev, skb, neigh->ah, IPOIB_QPN(skb->dst->neighbour->ha));
 			goto out;
 		}
@@ -820,11 +814,9 @@ static void ipoib_neigh_cleanup(struct neighbour *n)
 	struct ipoib_ah *ah = NULL;
 
 	neigh = *to_ipoib_neigh(n);
-	if (neigh) {
+	if (neigh)
 		priv = netdev_priv(neigh->dev);
-		ipoib_dbg(priv, "neigh_destructor for bonding device: %s\n",
-			  n->dev->name);
-	} else
+	else
 		return;
 	ipoib_dbg(priv,
 		  "neigh_cleanup for %06x " IPOIB_GID_FMT "\n",
@@ -895,13 +887,13 @@ int ipoib_dev_init(struct net_device *dev, struct ib_device *ca, int port)
 		goto out;
 	}
 
-	priv->tx_ring = kzalloc(ipoib_sendq_size * sizeof *priv->tx_ring,
-				GFP_KERNEL);
+	priv->tx_ring = vmalloc(ipoib_sendq_size * sizeof *priv->tx_ring);
 	if (!priv->tx_ring) {
 		printk(KERN_WARNING "%s: failed to allocate TX ring (%d entries)\n",
 		       ca->name, ipoib_sendq_size);
 		goto out_rx_ring_cleanup;
 	}
+	memset(priv->tx_ring, 0, ipoib_sendq_size * sizeof *priv->tx_ring);
 
 	/* priv->tx_head, tx_tail & tx_outstanding are already 0 */
 
@@ -911,7 +903,7 @@ int ipoib_dev_init(struct net_device *dev, struct ib_device *ca, int port)
 	return 0;
 
 out_tx_ring_cleanup:
-	kfree(priv->tx_ring);
+	vfree(priv->tx_ring);
 
 out_rx_ring_cleanup:
 	kfree(priv->rx_ring);
@@ -936,7 +928,7 @@ void ipoib_dev_cleanup(struct net_device *dev)
 	ipoib_ib_dev_cleanup(dev);
 
 	kfree(priv->rx_ring);
-	kfree(priv->tx_ring);
+	vfree(priv->tx_ring);
 
 	priv->rx_ring = NULL;
 	priv->tx_ring = NULL;
@@ -950,34 +942,34 @@ static void ipoib_setup(struct net_device *dev)
 {
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 
-	dev->open 		 = ipoib_open;
-	dev->stop 		 = ipoib_stop;
-	dev->change_mtu 	 = ipoib_change_mtu;
-	dev->hard_start_xmit 	 = ipoib_start_xmit;
-	dev->tx_timeout 	 = ipoib_timeout;
-	dev->header_ops 	 = &ipoib_header_ops;
-	dev->set_multicast_list  = ipoib_set_mcast_list;
-	dev->neigh_setup         = ipoib_neigh_setup_dev;
+	dev->open		 = ipoib_open;
+	dev->stop		 = ipoib_stop;
+	dev->change_mtu		 = ipoib_change_mtu;
+	dev->hard_start_xmit	 = ipoib_start_xmit;
+	dev->tx_timeout		 = ipoib_timeout;
+	dev->header_ops		 = &ipoib_header_ops;
+	dev->set_multicast_list	 = ipoib_set_mcast_list;
+	dev->neigh_setup	 = ipoib_neigh_setup_dev;
+
+	ipoib_set_ethtool_ops(dev);
 
 	netif_napi_add(dev, &priv->napi, ipoib_poll, 100);
 
-	dev->watchdog_timeo 	 = HZ;
+	dev->watchdog_timeo	 = HZ;
 
-	dev->flags              |= IFF_BROADCAST | IFF_MULTICAST;
+	dev->flags		|= IFF_BROADCAST | IFF_MULTICAST;
 
 	/*
 	 * We add in INFINIBAND_ALEN to allow for the destination
 	 * address "pseudoheader" for skbs without neighbour struct.
 	 */
-	dev->hard_header_len 	 = IPOIB_ENCAP_LEN + INFINIBAND_ALEN;
-	dev->addr_len 		 = INFINIBAND_ALEN;
-	dev->type 		 = ARPHRD_INFINIBAND;
-	dev->tx_queue_len 	 = ipoib_sendq_size * 2;
-	dev->features            = NETIF_F_VLAN_CHALLENGED | NETIF_F_LLTX;
-
-	/* MTU will be reset when mcast join happens */
-	dev->mtu 		 = IPOIB_PACKET_SIZE - IPOIB_ENCAP_LEN;
-	priv->mcast_mtu 	 = priv->admin_mtu = dev->mtu;
+	dev->hard_header_len	 = IPOIB_ENCAP_LEN + INFINIBAND_ALEN;
+	dev->addr_len		 = INFINIBAND_ALEN;
+	dev->type		 = ARPHRD_INFINIBAND;
+	dev->tx_queue_len	 = ipoib_sendq_size * 2;
+	dev->features		 = (NETIF_F_VLAN_CHALLENGED	|
+				    NETIF_F_LLTX		|
+				    NETIF_F_HIGHDMA);
 
 	memcpy(dev->broadcast, ipv4_bcast_addr, INFINIBAND_ALEN);
 
@@ -1110,6 +1102,8 @@ static struct net_device *ipoib_add_port(const char *format,
 					 struct ib_device *hca, u8 port)
 {
 	struct ipoib_dev_priv *priv;
+	struct ib_device_attr *device_attr;
+	struct ib_port_attr attr;
 	int result = -ENOMEM;
 
 	priv = ipoib_intf_alloc(format);
@@ -1118,11 +1112,46 @@ static struct net_device *ipoib_add_port(const char *format,
 
 	SET_NETDEV_DEV(priv->dev, hca->dma_device);
 
+	if (!ib_query_port(hca, port, &attr))
+		priv->max_ib_mtu = ib_mtu_enum_to_int(attr.max_mtu);
+	else {
+		printk(KERN_WARNING "%s: ib_query_port %d failed\n",
+		       hca->name, port);
+		goto device_init_failed;
+	}
+
+	/* MTU will be reset when mcast join happens */
+	priv->dev->mtu  = IPOIB_UD_MTU(priv->max_ib_mtu);
+	priv->mcast_mtu  = priv->admin_mtu = priv->dev->mtu;
+
 	result = ib_query_pkey(hca, port, 0, &priv->pkey);
 	if (result) {
 		printk(KERN_WARNING "%s: ib_query_pkey port %d failed (ret = %d)\n",
 		       hca->name, port, result);
 		goto device_init_failed;
+	}
+
+	device_attr = kmalloc(sizeof *device_attr, GFP_KERNEL);
+	if (!device_attr) {
+		printk(KERN_WARNING "%s: allocation of %zu bytes failed\n",
+		       hca->name, sizeof *device_attr);
+		goto device_init_failed;
+	}
+
+	result = ib_query_device(hca, device_attr);
+	if (result) {
+		printk(KERN_WARNING "%s: ib_query_device failed (ret = %d)\n",
+		       hca->name, result);
+		kfree(device_attr);
+		goto device_init_failed;
+	}
+	priv->hca_caps = device_attr->device_cap_flags;
+
+	kfree(device_attr);
+
+	if (priv->hca_caps & IB_DEVICE_UD_IP_CSUM) {
+		set_bit(IPOIB_FLAG_CSUM, &priv->flags);
+		priv->dev->features |= NETIF_F_SG | NETIF_F_IP_CSUM;
 	}
 
 	/*
@@ -1142,7 +1171,6 @@ static struct net_device *ipoib_add_port(const char *format,
 	} else
 		memcpy(priv->dev->dev_addr + 4, priv->local_gid.raw, sizeof (union ib_gid));
 
-
 	result = ipoib_dev_init(priv->dev, hca, port);
 	if (result < 0) {
 		printk(KERN_WARNING "%s: failed to initialize port %d (ret = %d)\n",
@@ -1159,6 +1187,9 @@ static struct net_device *ipoib_add_port(const char *format,
 		       hca->name, port, result);
 		goto event_failed;
 	}
+
+	if (priv->dev->features & NETIF_F_SG && priv->hca_caps & IB_DEVICE_UD_TSO)
+		priv->dev->features |= NETIF_F_TSO;
 
 	result = register_netdev(priv->dev);
 	if (result) {
@@ -1267,7 +1298,11 @@ static int __init ipoib_init_module(void)
 
 	ipoib_sendq_size = roundup_pow_of_two(ipoib_sendq_size);
 	ipoib_sendq_size = min(ipoib_sendq_size, IPOIB_MAX_QUEUE_SIZE);
-	ipoib_sendq_size = max(ipoib_sendq_size, IPOIB_MIN_QUEUE_SIZE);
+	ipoib_sendq_size = max(ipoib_sendq_size, max(2 * MAX_SEND_CQE,
+						     IPOIB_MIN_QUEUE_SIZE));
+#ifdef CONFIG_INFINIBAND_IPOIB_CM
+	ipoib_max_conn_qp = min(ipoib_max_conn_qp, IPOIB_CM_MAX_CONN_QP);
+#endif
 
 	ret = ipoib_register_debugfs();
 	if (ret)

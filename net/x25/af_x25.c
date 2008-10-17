@@ -83,9 +83,9 @@ struct compat_x25_subscrip_struct {
 int x25_addr_ntoa(unsigned char *p, struct x25_address *called_addr,
 		  struct x25_address *calling_addr)
 {
-	int called_len, calling_len;
+	unsigned int called_len, calling_len;
 	char *called, *calling;
-	int i;
+	unsigned int i;
 
 	called_len  = (*p >> 0) & 0x0F;
 	calling_len = (*p >> 4) & 0x0F;
@@ -191,7 +191,7 @@ static int x25_device_event(struct notifier_block *this, unsigned long event,
 	struct net_device *dev = ptr;
 	struct x25_neigh *nb;
 
-	if (dev->nd_net != &init_net)
+	if (dev_net(dev) != &init_net)
 		return NOTIFY_DONE;
 
 	if (dev->type == ARPHRD_X25
@@ -549,7 +549,7 @@ static struct sock *x25_make_new(struct sock *osk)
 	if (osk->sk_type != SOCK_SEQPACKET)
 		goto out;
 
-	if ((sk = x25_alloc_socket(osk->sk_net)) == NULL)
+	if ((sk = x25_alloc_socket(sock_net(osk))) == NULL)
 		goto out;
 
 	x25 = x25_sk(sk);
@@ -1652,7 +1652,7 @@ static int __init x25_init(void)
 
 	register_netdevice_notifier(&x25_dev_notifier);
 
-	printk(KERN_INFO "X.25 for Linux. Version 0.2 for Linux 2.1.15\n");
+	printk(KERN_INFO "X.25 for Linux Version 0.2\n");
 
 #ifdef CONFIG_SYSCTL
 	x25_register_sysctl();

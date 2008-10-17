@@ -504,6 +504,10 @@ static int ivtvfb_set_var(struct ivtv *itv, struct fb_var_screeninfo *var)
 
 	ivtvfb_set_display_window(itv, &ivtv_window);
 
+	/* Pass screen size back to yuv handler */
+	itv->yuv_info.osd_full_w = ivtv_osd.pixel_stride;
+	itv->yuv_info.osd_full_h = ivtv_osd.lines;
+
 	/* Force update of yuv registers */
 	itv->yuv_info.yuv_forced_update = 1;
 
@@ -528,7 +532,7 @@ static int ivtvfb_get_fix(struct ivtv *itv, struct fb_fix_screeninfo *fix)
 
 	IVTVFB_DEBUG_INFO("ivtvfb_get_fix\n");
 	memset(fix, 0, sizeof(struct fb_fix_screeninfo));
-	strcpy(fix->id, "cx23415 TV out");
+	strlcpy(fix->id, "cx23415 TV out", sizeof(fix->id));
 	fix->smem_start = oi->video_pbase;
 	fix->smem_len = oi->video_buffer_size;
 	fix->type = FB_TYPE_PACKED_PIXELS;
@@ -944,7 +948,8 @@ static int ivtvfb_init_vidmode(struct ivtv *itv)
 	}
 
 	/* Allocate the pseudo palette */
-	oi->ivtvfb_info.pseudo_palette = kmalloc(sizeof(u32) * 16, GFP_KERNEL);
+	oi->ivtvfb_info.pseudo_palette =
+		kmalloc(sizeof(u32) * 16, GFP_KERNEL|__GFP_NOWARN);
 
 	if (!oi->ivtvfb_info.pseudo_palette) {
 		IVTVFB_ERR("abort, unable to alloc pseudo pallete\n");
@@ -1052,8 +1057,9 @@ static int ivtvfb_init_card(struct ivtv *itv)
 		return -EBUSY;
 	}
 
-	itv->osd_info = kzalloc(sizeof(struct osd_info), GFP_ATOMIC);
-	if (itv->osd_info == 0) {
+	itv->osd_info = kzalloc(sizeof(struct osd_info),
+					GFP_ATOMIC|__GFP_NOWARN);
+	if (itv->osd_info == NULL) {
 		IVTVFB_ERR("Failed to allocate memory for osd_info\n");
 		return -ENOMEM;
 	}

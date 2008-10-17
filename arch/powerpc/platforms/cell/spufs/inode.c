@@ -1,3 +1,4 @@
+
 /*
  * SPU file system
  *
@@ -22,6 +23,7 @@
 
 #include <linux/file.h>
 #include <linux/fs.h>
+#include <linux/fsnotify.h>
 #include <linux/backing-dev.h>
 #include <linux/init.h>
 #include <linux/ioctl.h>
@@ -34,7 +36,6 @@
 #include <linux/parser.h>
 
 #include <asm/prom.h>
-#include <asm/semaphore.h>
 #include <asm/spu.h>
 #include <asm/spu_priv1.h>
 #include <asm/uaccess.h>
@@ -223,7 +224,7 @@ static int spufs_dir_close(struct inode *inode, struct file *file)
 	parent = dir->d_parent->d_inode;
 	ctx = SPUFS_I(dir->d_inode)->i_ctx;
 
-	mutex_lock(&parent->i_mutex);
+	mutex_lock_nested(&parent->i_mutex, I_MUTEX_PARENT);
 	ret = spufs_rmdir(parent, dir);
 	mutex_unlock(&parent->i_mutex);
 	WARN_ON(ret);
@@ -322,7 +323,7 @@ static struct spu_context *
 spufs_assert_affinity(unsigned int flags, struct spu_gang *gang,
 						struct file *filp)
 {
-	struct spu_context *tmp, *neighbor;
+	struct spu_context *tmp, *neighbor, *err;
 	int count, node;
 	int aff_supp;
 
@@ -354,11 +355,15 @@ spufs_assert_affinity(unsigned int flags, struct spu_gang *gang,
 		if (!list_empty(&neighbor->aff_list) && !(neighbor->aff_head) &&
 		    !list_is_last(&neighbor->aff_list, &gang->aff_list_head) &&
 		    !list_entry(neighbor->aff_list.next, struct spu_context,
-		    aff_list)->aff_head)
-			return ERR_PTR(-EEXIST);
+		    aff_list)->aff_head) {
+			err = ERR_PTR(-EEXIST);
+			goto out_put_neighbor;
+		}
 
-		if (gang != neighbor->gang)
-			return ERR_PTR(-EINVAL);
+		if (gang != neighbor->gang) {
+			err = ERR_PTR(-EINVAL);
+			goto out_put_neighbor;
+		}
 
 		count = 1;
 		list_for_each_entry(tmp, &gang->aff_list_head, aff_list)
@@ -372,11 +377,17 @@ spufs_assert_affinity(unsigned int flags, struct spu_gang *gang,
 				break;
 		}
 
-		if (node == MAX_NUMNODES)
-			return ERR_PTR(-EEXIST);
+		if (node == MAX_NUMNODES) {
+			err = ERR_PTR(-EEXIST);
+			goto out_put_neighbor;
+		}
 	}
 
 	return neighbor;
+
+out_put_neighbor:
+	put_spu_context(neighbor);
+	return err;
 }
 
 static void
@@ -454,9 +465,12 @@ spufs_create_context(struct inode *inode, struct dentry *dentry,
 	if (ret)
 		goto out_aff_unlock;
 
-	if (affinity)
+	if (affinity) {
 		spufs_set_affinity(flags, SPUFS_I(dentry->d_inode)->i_ctx,
 								neighbor);
+		if (neighbor)
+			put_spu_context(neighbor);
+	}
 
 	/*
 	 * get references for dget and mntget, will be released
@@ -579,7 +593,7 @@ long spufs_create(struct nameidata *nd, unsigned int flags, mode_t mode,
 
 	ret = -EINVAL;
 	/* check if we are on spufs */
-	if (nd->dentry->d_sb->s_type != &spufs_type)
+	if (nd->path.dentry->d_sb->s_type != &spufs_type)
 		goto out;
 
 	/* don't accept undefined flags */
@@ -587,9 +601,9 @@ long spufs_create(struct nameidata *nd, unsigned int flags, mode_t mode,
 		goto out;
 
 	/* only threads can be underneath a gang */
-	if (nd->dentry != nd->dentry->d_sb->s_root) {
+	if (nd->path.dentry != nd->path.dentry->d_sb->s_root) {
 		if ((flags & SPU_CREATE_GANG) ||
-		    !SPUFS_I(nd->dentry->d_inode)->i_gang)
+		    !SPUFS_I(nd->path.dentry->d_inode)->i_gang)
 			goto out;
 	}
 
@@ -605,16 +619,20 @@ long spufs_create(struct nameidata *nd, unsigned int flags, mode_t mode,
 	mode &= ~current->fs->umask;
 
 	if (flags & SPU_CREATE_GANG)
-		return spufs_create_gang(nd->dentry->d_inode,
-					dentry, nd->mnt, mode);
+		ret = spufs_create_gang(nd->path.dentry->d_inode,
+					 dentry, nd->path.mnt, mode);
 	else
-		return spufs_create_context(nd->dentry->d_inode,
-					dentry, nd->mnt, flags, mode, filp);
+		ret = spufs_create_context(nd->path.dentry->d_inode,
+					    dentry, nd->path.mnt, flags, mode,
+					    filp);
+	if (ret >= 0)
+		fsnotify_mkdir(nd->path.dentry->d_inode, dentry);
+	return ret;
 
 out_dput:
 	dput(dentry);
 out_dir:
-	mutex_unlock(&nd->dentry->d_inode->i_mutex);
+	mutex_unlock(&nd->path.dentry->d_inode->i_mutex);
 out:
 	return ret;
 }
@@ -742,7 +760,10 @@ spufs_fill_super(struct super_block *sb, void *data, int silent)
 		.statfs = simple_statfs,
 		.delete_inode = spufs_delete_inode,
 		.drop_inode = generic_delete_inode,
+		.show_options = generic_show_options,
 	};
+
+	save_mount_options(sb, data);
 
 	sb->s_maxbytes = MAX_LFS_FILESIZE;
 	sb->s_blocksize = PAGE_CACHE_SIZE;

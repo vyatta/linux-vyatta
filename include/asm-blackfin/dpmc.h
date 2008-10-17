@@ -1,7 +1,7 @@
 /*
  * include/asm-blackfin/dpmc.h -  Miscellaneous IOCTL commands for Dynamic Power
  *   			 	Management Controller Driver.
- * Copyright (C) 2004 Analog Device Inc.
+ * Copyright (C) 2004-2008 Analog Device Inc.
  *
  */
 #ifndef _BLACKFIN_DPMC_H_
@@ -53,10 +53,10 @@ unsigned long get_pll_status(void);
 void change_baud(int baud);
 void fullon_mode(void);
 void active_mode(void);
-void sleep_mode(u32 sic_iwr);
-void deep_sleep(u32 sic_iwr);
-void hibernate_mode(u32 sic_iwr);
-void sleep_deeper(u32 sic_iwr);
+void sleep_mode(u32 sic_iwr0, u32 sic_iwr1, u32 sic_iwr2);
+void deep_sleep(u32 sic_iwr0, u32 sic_iwr1, u32 sic_iwr2);
+void hibernate_mode(u32 sic_iwr0, u32 sic_iwr1, u32 sic_iwr2);
+void sleep_deeper(u32 sic_iwr0, u32 sic_iwr1, u32 sic_iwr2);
 void program_wdog_timer(unsigned long);
 void unmask_wdog_wakeup_evt(void);
 void clear_wdog_wakeup_evt(void);
@@ -64,6 +64,14 @@ void disable_wdog_timer(void);
 
 extern unsigned long get_cclk(void);
 extern unsigned long get_sclk(void);
+
+struct bfin_dpmc_platform_data {
+	const unsigned int *tuple_tab;
+	unsigned short tabsize;
+	unsigned short vr_settling_time; /* in us */
+};
+
+#define VRPAIR(vlev, freq) (((vlev) << 16) | ((freq) >> 16))
 
 #endif	/* __KERNEL__ */
 

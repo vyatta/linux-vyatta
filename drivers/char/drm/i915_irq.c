@@ -57,9 +57,19 @@ static void i915_vblank_tasklet(struct drm_device *dev)
 				XY_SRC_COPY_BLT_WRITE_ALPHA |
 				XY_SRC_COPY_BLT_WRITE_RGB)
 			     : XY_SRC_COPY_BLT_CMD;
-	u32 pitchropcpp = (sarea_priv->pitch * cpp) | (0xcc << 16) |
-			  (cpp << 23) | (1 << 24);
+	u32 src_pitch = sarea_priv->pitch * cpp;
+	u32 dst_pitch = sarea_priv->pitch * cpp;
+	u32 ropcpp = (0xcc << 16) | ((cpp - 1) << 24);
 	RING_LOCALS;
+
+	if (IS_I965G(dev) && sarea_priv->front_tiled) {
+		cmd |= XY_SRC_COPY_BLT_DST_TILED;
+		dst_pitch >>= 2;
+	}
+	if (IS_I965G(dev) && sarea_priv->back_tiled) {
+		cmd |= XY_SRC_COPY_BLT_SRC_TILED;
+		src_pitch >>= 2;
+	}
 
 	DRM_DEBUG("\n");
 
@@ -125,16 +135,26 @@ static void i915_vblank_tasklet(struct drm_device *dev)
 
 	i915_kernel_lost_context(dev);
 
-	BEGIN_LP_RING(6);
+	if (IS_I965G(dev)) {
+		BEGIN_LP_RING(4);
 
-	OUT_RING(GFX_OP_DRAWRECT_INFO);
-	OUT_RING(0);
-	OUT_RING(0);
-	OUT_RING(sarea_priv->width | sarea_priv->height << 16);
-	OUT_RING(sarea_priv->width | sarea_priv->height << 16);
-	OUT_RING(0);
+		OUT_RING(GFX_OP_DRAWRECT_INFO_I965);
+		OUT_RING(0);
+		OUT_RING(((sarea_priv->width - 1) & 0xffff) | ((sarea_priv->height - 1) << 16));
+		OUT_RING(0);
+		ADVANCE_LP_RING();
+	} else {
+		BEGIN_LP_RING(6);
 
-	ADVANCE_LP_RING();
+		OUT_RING(GFX_OP_DRAWRECT_INFO);
+		OUT_RING(0);
+		OUT_RING(0);
+		OUT_RING(sarea_priv->width | sarea_priv->height << 16);
+		OUT_RING(sarea_priv->width | sarea_priv->height << 16);
+		OUT_RING(0);
+
+		ADVANCE_LP_RING();
+	}
 
 	sarea_priv->ctxOwner = DRM_KERNEL_CONTEXT;
 
@@ -184,12 +204,12 @@ static void i915_vblank_tasklet(struct drm_device *dev)
 				BEGIN_LP_RING(8);
 
 				OUT_RING(cmd);
-				OUT_RING(pitchropcpp);
+				OUT_RING(ropcpp | dst_pitch);
 				OUT_RING((y1 << 16) | rect->x1);
 				OUT_RING((y2 << 16) | rect->x2);
 				OUT_RING(sarea_priv->front_offset);
 				OUT_RING((y1 << 16) | rect->x1);
-				OUT_RING(pitchropcpp & 0xffff);
+				OUT_RING(src_pitch);
 				OUT_RING(sarea_priv->back_offset);
 
 				ADVANCE_LP_RING();
@@ -276,7 +296,7 @@ static int i915_emit_irq(struct drm_device * dev)
 
 	i915_kernel_lost_context(dev);
 
-	DRM_DEBUG("%s\n", __FUNCTION__);
+	DRM_DEBUG("\n");
 
 	dev_priv->sarea_priv->last_enqueue = ++dev_priv->counter;
 
@@ -291,7 +311,7 @@ static int i915_emit_irq(struct drm_device * dev)
 	OUT_RING(0);
 	OUT_RING(GFX_OP_USER_INTERRUPT);
 	ADVANCE_LP_RING();
-	
+
 	return dev_priv->counter;
 }
 
@@ -300,7 +320,7 @@ static int i915_wait_irq(struct drm_device * dev, int irq_nr)
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	int ret = 0;
 
-	DRM_DEBUG("%s irq_nr=%d breadcrumb=%d\n", __FUNCTION__, irq_nr,
+	DRM_DEBUG("irq_nr=%d breadcrumb=%d\n", irq_nr,
 		  READ_BREADCRUMB(dev_priv));
 
 	if (READ_BREADCRUMB(dev_priv) >= irq_nr)
@@ -312,8 +332,7 @@ static int i915_wait_irq(struct drm_device * dev, int irq_nr)
 		    READ_BREADCRUMB(dev_priv) >= irq_nr);
 
 	if (ret == -EBUSY) {
-		DRM_ERROR("%s: EBUSY -- rec: %d emitted: %d\n",
-			  __FUNCTION__,
+		DRM_ERROR("EBUSY -- rec: %d emitted: %d\n",
 			  READ_BREADCRUMB(dev_priv), (int)dev_priv->counter);
 	}
 
@@ -329,14 +348,14 @@ static int i915_driver_vblank_do_wait(struct drm_device *dev, unsigned int *sequ
 	int ret = 0;
 
 	if (!dev_priv) {
-		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
+		DRM_ERROR("called with no initialization\n");
 		return -EINVAL;
 	}
 
 	DRM_WAIT_ON(ret, dev->vbl_queue, 3 * DRM_HZ,
 		    (((cur_vblank = atomic_read(counter))
 			- *sequence) <= (1<<23)));
-	
+
 	*sequence = cur_vblank;
 
 	return ret;
@@ -365,7 +384,7 @@ int i915_irq_emit(struct drm_device *dev, void *data,
 	LOCK_TEST_WITH_RETURN(dev, file_priv);
 
 	if (!dev_priv) {
-		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
+		DRM_ERROR("called with no initialization\n");
 		return -EINVAL;
 	}
 
@@ -388,7 +407,7 @@ int i915_irq_wait(struct drm_device *dev, void *data,
 	drm_i915_irq_wait_t *irqwait = data;
 
 	if (!dev_priv) {
-		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
+		DRM_ERROR("called with no initialization\n");
 		return -EINVAL;
 	}
 
@@ -418,13 +437,12 @@ int i915_vblank_pipe_set(struct drm_device *dev, void *data,
 	drm_i915_vblank_pipe_t *pipe = data;
 
 	if (!dev_priv) {
-		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
+		DRM_ERROR("called with no initialization\n");
 		return -EINVAL;
 	}
 
 	if (pipe->pipe & ~(DRM_I915_VBLANK_PIPE_A|DRM_I915_VBLANK_PIPE_B)) {
-		DRM_ERROR("%s called with invalid pipe 0x%x\n", 
-			  __FUNCTION__, pipe->pipe);
+		DRM_ERROR("called with invalid pipe 0x%x\n", pipe->pipe);
 		return -EINVAL;
 	}
 
@@ -443,7 +461,7 @@ int i915_vblank_pipe_get(struct drm_device *dev, void *data,
 	u16 flag;
 
 	if (!dev_priv) {
-		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
+		DRM_ERROR("called with no initialization\n");
 		return -EINVAL;
 	}
 
@@ -555,7 +573,7 @@ int i915_vblank_swap(struct drm_device *dev, void *data,
 
 	spin_lock_irqsave(&dev_priv->swaps_lock, irqflags);
 
-	list_add_tail((struct list_head *)vbl_swap, &dev_priv->vbl_swaps.head);
+	list_add_tail(&vbl_swap->head, &dev_priv->vbl_swaps.head);
 	dev_priv->swaps_pending++;
 
 	spin_unlock_irqrestore(&dev_priv->swaps_lock, irqflags);

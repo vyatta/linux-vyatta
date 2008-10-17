@@ -1,5 +1,4 @@
 /*
- * linux/arch/i386/kernel/cpu/mcheck/therm_throt.c
  *
  * Thermal throttle event support code (such as syslog messaging and rate
  * limiting) that was factored out from x86_64 (mce_intel.c) and i386 (p4.c).
@@ -118,7 +117,7 @@ static __cpuinit int thermal_throttle_add_dev(struct sys_device *sys_dev)
 
 static __cpuinit void thermal_throttle_remove_dev(struct sys_device *sys_dev)
 {
-	return sysfs_remove_group(&sys_dev->kobj, &thermal_throttle_attr_group);
+	sysfs_remove_group(&sys_dev->kobj, &thermal_throttle_attr_group);
 }
 
 /* Mutex protecting device creation against CPU hotplug */

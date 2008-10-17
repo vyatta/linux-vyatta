@@ -53,6 +53,7 @@ struct splice_pipe_desc {
 	int nr_pages;			/* number of pages in map */
 	unsigned int flags;		/* splice flags */
 	const struct pipe_buf_operations *ops;/* ops associated with output pipe */
+	void (*spd_release)(struct splice_pipe_desc *, unsigned int);
 };
 
 typedef int (splice_actor)(struct pipe_inode_info *, struct pipe_buffer *,
@@ -74,5 +75,11 @@ extern long vfs_splice_from(struct pipe_inode_info *pipe, struct file *out,
 extern long vfs_splice_to(struct file *in, loff_t *ppos,
 			  struct pipe_inode_info *pipe, size_t len,
 			  unsigned int flags);
+
+extern long vfs_splice_from(struct pipe_inode_info *pipe, struct file *out,
+			   loff_t *ppos, size_t len, unsigned int flags);
+extern long vfs_splice_to(struct file *in, loff_t *ppos,
+			 struct pipe_inode_info *pipe, size_t len,
+			 unsigned int flags);
 
 #endif

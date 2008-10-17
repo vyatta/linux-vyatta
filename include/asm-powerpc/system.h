@@ -5,6 +5,7 @@
 #define _ASM_POWERPC_SYSTEM_H
 
 #include <linux/kernel.h>
+#include <linux/irqflags.h>
 
 #include <asm/hw_irq.h>
 
@@ -33,7 +34,7 @@
  * SMP since it is only used to order updates to system memory.
  */
 #define mb()   __asm__ __volatile__ ("sync" : : : "memory")
-#define rmb()  __asm__ __volatile__ (__stringify(LWSYNC) : : : "memory")
+#define rmb()  __asm__ __volatile__ ("sync" : : : "memory")
 #define wmb()  __asm__ __volatile__ ("sync" : : : "memory")
 #define read_barrier_depends()  do { } while(0)
 
@@ -65,7 +66,7 @@
 struct task_struct;
 struct pt_regs;
 
-#ifdef CONFIG_DEBUGGER
+#if defined(CONFIG_DEBUGGER) || defined(CONFIG_KEXEC)
 
 extern int (*__debugger)(struct pt_regs *regs);
 extern int (*__debugger_ipi)(struct pt_regs *regs);
@@ -169,6 +170,8 @@ extern int do_page_fault(struct pt_regs *, unsigned long, unsigned long);
 extern void bad_page_fault(struct pt_regs *, unsigned long, int);
 extern int die(const char *, struct pt_regs *, long);
 extern void _exception(int, struct pt_regs *, int, unsigned long);
+extern void _nmask_and_or_msr(unsigned long nmask, unsigned long or_val);
+
 #ifdef CONFIG_BOOKE_WDT
 extern u32 booke_wdt_enabled;
 extern u32 booke_wdt_period;
@@ -201,7 +204,7 @@ extern int powersave_nap;	/* set if nap mode can be used in idle loop */
  * Changes the memory location '*ptr' to be val and returns
  * the previous value stored there.
  */
-static __inline__ unsigned long
+static __always_inline unsigned long
 __xchg_u32(volatile void *p, unsigned long val)
 {
 	unsigned long prev;
@@ -226,7 +229,7 @@ __xchg_u32(volatile void *p, unsigned long val)
  * Changes the memory location '*ptr' to be val and returns
  * the previous value stored there.
  */
-static __inline__ unsigned long
+static __always_inline unsigned long
 __xchg_u32_local(volatile void *p, unsigned long val)
 {
 	unsigned long prev;
@@ -244,7 +247,7 @@ __xchg_u32_local(volatile void *p, unsigned long val)
 }
 
 #ifdef CONFIG_PPC64
-static __inline__ unsigned long
+static __always_inline unsigned long
 __xchg_u64(volatile void *p, unsigned long val)
 {
 	unsigned long prev;
@@ -263,7 +266,7 @@ __xchg_u64(volatile void *p, unsigned long val)
 	return prev;
 }
 
-static __inline__ unsigned long
+static __always_inline unsigned long
 __xchg_u64_local(volatile void *p, unsigned long val)
 {
 	unsigned long prev;
@@ -287,7 +290,7 @@ __xchg_u64_local(volatile void *p, unsigned long val)
  */
 extern void __xchg_called_with_bad_pointer(void);
 
-static __inline__ unsigned long
+static __always_inline unsigned long
 __xchg(volatile void *ptr, unsigned long x, unsigned int size)
 {
 	switch (size) {
@@ -302,7 +305,7 @@ __xchg(volatile void *ptr, unsigned long x, unsigned int size)
 	return x;
 }
 
-static __inline__ unsigned long
+static __always_inline unsigned long
 __xchg_local(volatile void *ptr, unsigned long x, unsigned int size)
 {
 	switch (size) {
@@ -335,7 +338,7 @@ __xchg_local(volatile void *ptr, unsigned long x, unsigned int size)
  */
 #define __HAVE_ARCH_CMPXCHG	1
 
-static __inline__ unsigned long
+static __always_inline unsigned long
 __cmpxchg_u32(volatile unsigned int *p, unsigned long old, unsigned long new)
 {
 	unsigned int prev;
@@ -358,7 +361,7 @@ __cmpxchg_u32(volatile unsigned int *p, unsigned long old, unsigned long new)
 	return prev;
 }
 
-static __inline__ unsigned long
+static __always_inline unsigned long
 __cmpxchg_u32_local(volatile unsigned int *p, unsigned long old,
 			unsigned long new)
 {
@@ -381,7 +384,7 @@ __cmpxchg_u32_local(volatile unsigned int *p, unsigned long old,
 }
 
 #ifdef CONFIG_PPC64
-static __inline__ unsigned long
+static __always_inline unsigned long
 __cmpxchg_u64(volatile unsigned long *p, unsigned long old, unsigned long new)
 {
 	unsigned long prev;
@@ -403,7 +406,7 @@ __cmpxchg_u64(volatile unsigned long *p, unsigned long old, unsigned long new)
 	return prev;
 }
 
-static __inline__ unsigned long
+static __always_inline unsigned long
 __cmpxchg_u64_local(volatile unsigned long *p, unsigned long old,
 			unsigned long new)
 {
@@ -429,7 +432,7 @@ __cmpxchg_u64_local(volatile unsigned long *p, unsigned long old,
    if something tries to do an invalid cmpxchg().  */
 extern void __cmpxchg_called_with_bad_pointer(void);
 
-static __inline__ unsigned long
+static __always_inline unsigned long
 __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new,
 	  unsigned int size)
 {
@@ -445,7 +448,7 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new,
 	return old;
 }
 
-static __inline__ unsigned long
+static __always_inline unsigned long
 __cmpxchg_local(volatile void *ptr, unsigned long old, unsigned long new,
 	  unsigned int size)
 {
@@ -461,7 +464,7 @@ __cmpxchg_local(volatile void *ptr, unsigned long old, unsigned long new,
 	return old;
 }
 
-#define cmpxchg(ptr,o,n)						 \
+#define cmpxchg(ptr, o, n)						 \
   ({									 \
      __typeof__(*(ptr)) _o_ = (o);					 \
      __typeof__(*(ptr)) _n_ = (n);					 \
@@ -470,7 +473,7 @@ __cmpxchg_local(volatile void *ptr, unsigned long old, unsigned long new,
   })
 
 
-#define cmpxchg_local(ptr,o,n)						 \
+#define cmpxchg_local(ptr, o, n)					 \
   ({									 \
      __typeof__(*(ptr)) _o_ = (o);					 \
      __typeof__(*(ptr)) _n_ = (n);					 \
@@ -490,6 +493,20 @@ __cmpxchg_local(volatile void *ptr, unsigned long old, unsigned long new,
  */
 #define NET_IP_ALIGN	0
 #define NET_SKB_PAD	L1_CACHE_BYTES
+
+#define cmpxchg64(ptr, o, n)						\
+  ({									\
+	BUILD_BUG_ON(sizeof(*(ptr)) != 8);				\
+	cmpxchg((ptr), (o), (n));					\
+  })
+#define cmpxchg64_local(ptr, o, n)					\
+  ({									\
+	BUILD_BUG_ON(sizeof(*(ptr)) != 8);				\
+	cmpxchg_local((ptr), (o), (n));					\
+  })
+#else
+#include <asm-generic/cmpxchg-local.h>
+#define cmpxchg64_local(ptr, o, n) __cmpxchg64_local_generic((ptr), (o), (n))
 #endif
 
 #define arch_align_stack(x) (x)

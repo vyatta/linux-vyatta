@@ -20,7 +20,6 @@
 #include <linux/nfsd/debug.h>
 #include <linux/nfsd/nfsfh.h>
 #include <linux/nfsd/export.h>
-#include <linux/nfsd/auth.h>
 #include <linux/nfsd/stats.h>
 /*
  * nfsd version
@@ -28,7 +27,6 @@
 #define NFSD_VERSION		"0.5"
 #define NFSD_SUPPORTED_MINOR_VERSION	0
 
-#ifdef __KERNEL__
 /*
  * Special flags for nfsd_permission. These must be different from MAY_READ,
  * MAY_WRITE, and MAY_EXEC.
@@ -57,11 +55,19 @@ extern struct svc_program	nfsd_program;
 extern struct svc_version	nfsd_version2, nfsd_version3,
 				nfsd_version4;
 extern struct svc_serv		*nfsd_serv;
+
+extern struct seq_operations nfs_exports_op;
+
 /*
  * Function prototypes.
  */
 int		nfsd_svc(unsigned short port, int nrservs);
 int		nfsd_dispatch(struct svc_rqst *rqstp, __be32 *statp);
+
+int		nfsd_nrthreads(void);
+int		nfsd_nrpools(void);
+int		nfsd_get_nrthreads(int n, int *);
+int		nfsd_set_nrthreads(int n, int *);
 
 /* nfsd/vfs.c */
 int		fh_lock_parent(struct svc_fh *, struct dentry *);
@@ -70,9 +76,9 @@ void		nfsd_racache_shutdown(void);
 int		nfsd_cross_mnt(struct svc_rqst *rqstp, struct dentry **dpp,
 		                struct svc_export **expp);
 __be32		nfsd_lookup(struct svc_rqst *, struct svc_fh *,
-				const char *, int, struct svc_fh *);
+				const char *, unsigned int, struct svc_fh *);
 __be32		 nfsd_lookup_dentry(struct svc_rqst *, struct svc_fh *,
-				const char *, int,
+				const char *, unsigned int,
 				struct svc_export **, struct dentry **);
 __be32		nfsd_setattr(struct svc_rqst *, struct svc_fh *,
 				struct iattr *, int, time_t);
@@ -323,10 +329,8 @@ extern struct timeval	nfssvc_boot;
 (FATTR4_WORD0_SIZE              | FATTR4_WORD0_ACL                                         )
 #define NFSD_WRITEABLE_ATTRS_WORD1                                                          \
 (FATTR4_WORD1_MODE              | FATTR4_WORD1_OWNER         | FATTR4_WORD1_OWNER_GROUP     \
- | FATTR4_WORD1_TIME_ACCESS_SET | FATTR4_WORD1_TIME_METADATA | FATTR4_WORD1_TIME_MODIFY_SET)
+ | FATTR4_WORD1_TIME_ACCESS_SET | FATTR4_WORD1_TIME_MODIFY_SET)
 
 #endif /* CONFIG_NFSD_V4 */
-
-#endif /* __KERNEL__ */
 
 #endif /* LINUX_NFSD_NFSD_H */

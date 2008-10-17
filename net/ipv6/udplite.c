@@ -26,7 +26,7 @@ static void udplitev6_err(struct sk_buff *skb,
 			  struct inet6_skb_parm *opt,
 			  int type, int code, int offset, __be32 info)
 {
-	return __udp6_lib_err(skb, opt, type, code, offset, info, udplite_hash);
+	__udp6_lib_err(skb, opt, type, code, offset, info, udplite_hash);
 }
 
 static struct inet6_protocol udplitev6_protocol = {
@@ -34,13 +34,6 @@ static struct inet6_protocol udplitev6_protocol = {
 	.err_handler	=	udplitev6_err,
 	.flags		=	INET6_PROTO_NOPOLICY|INET6_PROTO_FINAL,
 };
-
-static int udplite_v6_get_port(struct sock *sk, unsigned short snum)
-{
-	return udplite_get_port(sk, snum, ipv6_rcv_saddr_equal);
-}
-
-DEFINE_PROTO_INUSE(udplitev6)
 
 struct proto udplitev6_prot = {
 	.name		   = "UDPLITEv6",
@@ -58,13 +51,13 @@ struct proto udplitev6_prot = {
 	.backlog_rcv	   = udpv6_queue_rcv_skb,
 	.hash		   = udp_lib_hash,
 	.unhash		   = udp_lib_unhash,
-	.get_port	   = udplite_v6_get_port,
+	.get_port	   = udp_v6_get_port,
 	.obj_size	   = sizeof(struct udp6_sock),
+	.h.udp_hash	   = udplite_hash,
 #ifdef CONFIG_COMPAT
 	.compat_setsockopt = compat_udpv6_setsockopt,
 	.compat_getsockopt = compat_udpv6_getsockopt,
 #endif
-	REF_PROTO_INUSE(udplitev6)
 };
 
 static struct inet_protosw udplite6_protosw = {
@@ -77,32 +70,66 @@ static struct inet_protosw udplite6_protosw = {
 	.flags		= INET_PROTOSW_PERMANENT,
 };
 
-void __init udplitev6_init(void)
+int __init udplitev6_init(void)
 {
-	if (inet6_add_protocol(&udplitev6_protocol, IPPROTO_UDPLITE) < 0)
-		printk(KERN_ERR "%s: Could not register.\n", __FUNCTION__);
+	int ret;
 
-	inet6_register_protosw(&udplite6_protosw);
+	ret = inet6_add_protocol(&udplitev6_protocol, IPPROTO_UDPLITE);
+	if (ret)
+		goto out;
+
+	ret = inet6_register_protosw(&udplite6_protosw);
+	if (ret)
+		goto out_udplitev6_protocol;
+out:
+	return ret;
+
+out_udplitev6_protocol:
+	inet6_del_protocol(&udplitev6_protocol, IPPROTO_UDPLITE);
+	goto out;
+}
+
+void udplitev6_exit(void)
+{
+	inet6_unregister_protosw(&udplite6_protosw);
+	inet6_del_protocol(&udplitev6_protocol, IPPROTO_UDPLITE);
 }
 
 #ifdef CONFIG_PROC_FS
-static struct file_operations udplite6_seq_fops;
 static struct udp_seq_afinfo udplite6_seq_afinfo = {
-	.owner		= THIS_MODULE,
 	.name		= "udplite6",
 	.family		= AF_INET6,
 	.hashtable	= udplite_hash,
-	.seq_show	= udp6_seq_show,
-	.seq_fops	= &udplite6_seq_fops,
+	.seq_fops	= {
+		.owner	=	THIS_MODULE,
+	},
+	.seq_ops	= {
+		.show		= udp6_seq_show,
+	},
+};
+
+static int udplite6_proc_init_net(struct net *net)
+{
+	return udp_proc_register(net, &udplite6_seq_afinfo);
+}
+
+static void udplite6_proc_exit_net(struct net *net)
+{
+	udp_proc_unregister(net, &udplite6_seq_afinfo);
+}
+
+static struct pernet_operations udplite6_net_ops = {
+	.init = udplite6_proc_init_net,
+	.exit = udplite6_proc_exit_net,
 };
 
 int __init udplite6_proc_init(void)
 {
-	return udp_proc_register(&udplite6_seq_afinfo);
+	return register_pernet_subsys(&udplite6_net_ops);
 }
 
 void udplite6_proc_exit(void)
 {
-	udp_proc_unregister(&udplite6_seq_afinfo);
+	unregister_pernet_subsys(&udplite6_net_ops);
 }
 #endif

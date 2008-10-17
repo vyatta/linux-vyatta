@@ -20,6 +20,7 @@
 #include <linux/idr.h>
 #include <linux/completion.h>
 #include <linux/mutex.h>
+#include <linux/slab.h>
 #include "sysfs.h"
 
 DEFINE_MUTEX(sysfs_mutex);
@@ -418,12 +419,8 @@ void sysfs_addrm_start(struct sysfs_addrm_cxt *acxt,
  */
 int sysfs_add_one(struct sysfs_addrm_cxt *acxt, struct sysfs_dirent *sd)
 {
-	if (sysfs_find_dirent(acxt->parent_sd, sd->s_name)) {
-		printk(KERN_WARNING "sysfs: duplicate filename '%s' "
-		       "can not be created\n", sd->s_name);
-		WARN_ON(1);
+	if (sysfs_find_dirent(acxt->parent_sd, sd->s_name))
 		return -EEXIST;
-	}
 
 	sd->s_parent = sysfs_get(acxt->parent_sd);
 
@@ -440,7 +437,7 @@ int sysfs_add_one(struct sysfs_addrm_cxt *acxt, struct sysfs_dirent *sd)
 /**
  *	sysfs_remove_one - remove sysfs_dirent from parent
  *	@acxt: addrm context to use
- *	@sd: sysfs_dirent to be added
+ *	@sd: sysfs_dirent to be removed
  *
  *	Mark @sd removed and drop nlink of parent inode if @sd is a
  *	directory.  @sd is unlinked from the children list.

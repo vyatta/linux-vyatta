@@ -128,9 +128,6 @@ static struct usb_serial_driver belkin_device = {
 	.description =		"Belkin / Peracom / GoHubs USB Serial Adapter",
 	.usb_driver =		&belkin_driver,
 	.id_table =		id_table_combined,
-	.num_interrupt_in =	1,
-	.num_bulk_in =		1,
-	.num_bulk_out =		1,
 	.num_ports =		1,
 	.open =			belkin_sa_open,
 	.close =		belkin_sa_close,
@@ -198,7 +195,7 @@ static void belkin_sa_shutdown (struct usb_serial *serial)
 	struct belkin_sa_private *priv;
 	int i;
 	
-	dbg ("%s", __FUNCTION__);
+	dbg ("%s", __func__);
 
 	/* stop reads and writes on all ports */
 	for (i=0; i < serial->num_ports; ++i) {
@@ -213,7 +210,7 @@ static int  belkin_sa_open (struct usb_serial_port *port, struct file *filp)
 {
 	int retval = 0;
 
-	dbg("%s port %d", __FUNCTION__, port->number);
+	dbg("%s port %d", __func__, port->number);
 
 	/*Start reading from the device*/
 	/* TODO: Look at possibility of submitting multiple URBs to device to
@@ -240,7 +237,7 @@ exit:
 
 static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 {
-	dbg("%s port %d", __FUNCTION__, port->number);
+	dbg("%s port %d", __func__, port->number);
 
 	/* shutdown our bulk reads and writes */
 	usb_kill_urb(port->write_urb);
@@ -251,7 +248,7 @@ static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 
 static void belkin_sa_read_int_callback (struct urb *urb)
 {
-	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
+	struct usb_serial_port *port = urb->context;
 	struct belkin_sa_private *priv;
 	unsigned char *data = urb->transfer_buffer;
 	int retval;
@@ -267,15 +264,15 @@ static void belkin_sa_read_int_callback (struct urb *urb)
 	case -ESHUTDOWN:
 		/* this urb is terminated, clean up */
 		dbg("%s - urb shutting down with status: %d",
-		    __FUNCTION__, status);
+		    __func__, status);
 		return;
 	default:
 		dbg("%s - nonzero urb status received: %d",
-		    __FUNCTION__, status);
+		    __func__, status);
 		goto exit;
 	}
 
-	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, urb->actual_length, data);
+	usb_serial_debug_data(debug, &port->dev, __func__, urb->actual_length, data);
 
 	/* Handle known interrupt data */
 	/* ignore data[0] and data[1] */
@@ -334,7 +331,7 @@ exit:
 	retval = usb_submit_urb (urb, GFP_ATOMIC);
 	if (retval)
 		err ("%s - usb_submit_urb failed with result %d",
-		     __FUNCTION__, retval);
+		     __func__, retval);
 }
 
 static void belkin_sa_set_termios (struct usb_serial_port *port, struct ktermios *old_termios)
@@ -350,14 +347,12 @@ static void belkin_sa_set_termios (struct usb_serial_port *port, struct ktermios
 	unsigned long control_state;
 	int bad_flow_control;
 	speed_t baud;
+	struct ktermios *termios = port->tty->termios;
 	
-	if ((!port->tty) || (!port->tty->termios)) {
-		dbg ("%s - no tty or termios structure", __FUNCTION__);
-		return;
-	}
+	iflag = termios->c_iflag;
+	cflag = termios->c_cflag;
 
-	iflag = port->tty->termios->c_iflag;
-	cflag = port->tty->termios->c_cflag;
+	termios->c_cflag &= ~CMSPAR;
 
 	/* get a local copy of the current port settings */
 	spin_lock_irqsave(&priv->lock, flags);
@@ -369,33 +364,30 @@ static void belkin_sa_set_termios (struct usb_serial_port *port, struct ktermios
 	old_cflag = old_termios->c_cflag;
 
 	/* Set the baud rate */
-	if( (cflag&CBAUD) != (old_cflag&CBAUD) ) {
+	if ((cflag & CBAUD) != (old_cflag & CBAUD)) {
 		/* reassert DTR and (maybe) RTS on transition from B0 */
 		if( (old_cflag&CBAUD) == B0 ) {
 			control_state |= (TIOCM_DTR|TIOCM_RTS);
 			if (BSA_USB_CMD(BELKIN_SA_SET_DTR_REQUEST, 1) < 0)
 				err("Set DTR error");
 			/* don't set RTS if using hardware flow control */
-			if (!(old_cflag&CRTSCTS) )
+			if (!(old_cflag & CRTSCTS))
 				if (BSA_USB_CMD(BELKIN_SA_SET_RTS_REQUEST, 1) < 0)
 					err("Set RTS error");
 		}
 	}
 
 	baud = tty_get_baud_rate(port->tty);
-	if (baud == 0) {
-		dbg("%s - tty_get_baud_rate says 0 baud", __FUNCTION__);
-		return;
-	}
-	urb_value = BELKIN_SA_BAUD(baud);
-	/* Clip to maximum speed */
-	if (urb_value == 0)
-		urb_value = 1;
-	/* Turn it back into a resulting real baud rate */
-	baud = BELKIN_SA_BAUD(urb_value);
-	/* FIXME: Once the tty updates are done then push this back to the tty */
+	if (baud) {
+		urb_value = BELKIN_SA_BAUD(baud);
+		/* Clip to maximum speed */
+		if (urb_value == 0)
+			urb_value = 1;
+		/* Turn it back into a resulting real baud rate */
+		baud = BELKIN_SA_BAUD(urb_value);
 
-	if ((cflag & CBAUD) != B0 ) {
+		/* Report the actual baud rate back to the caller */
+		tty_encode_baud_rate(port->tty, baud, baud);
 		if (BSA_USB_CMD(BELKIN_SA_SET_BAUDRATE_REQUEST, urb_value) < 0)
 			err("Set baudrate error");
 	} else {
@@ -486,7 +478,7 @@ static int belkin_sa_tiocmget (struct usb_serial_port *port, struct file *file)
 	unsigned long control_state;
 	unsigned long flags;
 	
-	dbg("%s", __FUNCTION__);
+	dbg("%s", __func__);
 
 	spin_lock_irqsave(&priv->lock, flags);
 	control_state = priv->control_state;
@@ -507,7 +499,7 @@ static int belkin_sa_tiocmset (struct usb_serial_port *port, struct file *file,
 	int rts = 0;
 	int dtr = 0;
 	
-	dbg("%s", __FUNCTION__);
+	dbg("%s", __func__);
 
 	spin_lock_irqsave(&priv->lock, flags);
 	control_state = priv->control_state;

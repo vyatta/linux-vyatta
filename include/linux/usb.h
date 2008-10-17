@@ -23,6 +23,7 @@
 
 struct usb_device;
 struct usb_driver;
+struct wusb_dev;
 
 /*-------------------------------------------------------------------------*/
 
@@ -94,10 +95,9 @@ enum usb_interface_condition {
  * @altsetting: array of interface structures, one for each alternate
  * 	setting that may be selected.  Each one includes a set of
  * 	endpoint configurations.  They will be in no particular order.
- * @num_altsetting: number of altsettings defined.
  * @cur_altsetting: the current altsetting.
+ * @num_altsetting: number of altsettings defined.
  * @intf_assoc: interface association descriptor
- * @driver: the USB driver that is bound to this interface.
  * @minor: the minor number assigned to this interface, if this
  *	interface is bound to a driver that uses the USB major number.
  *	If this interface does not use the USB major, this field should
@@ -162,19 +162,19 @@ struct usb_interface {
 	unsigned needs_remote_wakeup:1;	/* driver requires remote wakeup */
 
 	struct device dev;		/* interface specific device info */
-	struct device *usb_dev;		/* pointer to the usb class's device, if any */
+	struct device *usb_dev;
 	int pm_usage_cnt;		/* usage counter for autosuspend */
 };
 #define	to_usb_interface(d) container_of(d, struct usb_interface, dev)
 #define	interface_to_usbdev(intf) \
 	container_of(intf->dev.parent, struct usb_device, dev)
 
-static inline void *usb_get_intfdata (struct usb_interface *intf)
+static inline void *usb_get_intfdata(struct usb_interface *intf)
 {
-	return dev_get_drvdata (&intf->dev);
+	return dev_get_drvdata(&intf->dev);
 }
 
-static inline void usb_set_intfdata (struct usb_interface *intf, void *data)
+static inline void usb_set_intfdata(struct usb_interface *intf, void *data)
 {
 	dev_set_drvdata(&intf->dev, data);
 }
@@ -275,9 +275,10 @@ struct usb_host_config {
 
 int __usb_get_extra_descriptor(char *buffer, unsigned size,
 	unsigned char type, void **ptr);
-#define usb_get_extra_descriptor(ifpoint,type,ptr)\
-	__usb_get_extra_descriptor((ifpoint)->extra,(ifpoint)->extralen,\
-		type,(void**)ptr)
+#define usb_get_extra_descriptor(ifpoint, type, ptr) \
+				__usb_get_extra_descriptor((ifpoint)->extra, \
+				(ifpoint)->extralen, \
+				type, (void **)ptr)
 
 /* ----------------------------------------------------------------------- */
 
@@ -318,7 +319,7 @@ struct usb_bus {
 #ifdef CONFIG_USB_DEVICEFS
 	struct dentry *usbfs_dentry;	/* usbfs dentry entry for the bus */
 #endif
-	struct class_device *class_dev;	/* class device for this bus */
+	struct device *dev;		/* device for this bus */
 
 #if defined(CONFIG_USB_MON)
 	struct mon_bus *mon_bus;	/* non-null when associated */
@@ -341,99 +342,146 @@ struct usb_bus {
 
 struct usb_tt;
 
-/*
+/**
  * struct usb_device - kernel's representation of a USB device
+ * @devnum: device number; address on a USB bus
+ * @devpath: device ID string for use in messages (e.g., /port/...)
+ * @state: device state: configured, not attached, etc.
+ * @speed: device speed: high/full/low (or error)
+ * @tt: Transaction Translator info; used with low/full speed dev, highspeed hub
+ * @ttport: device port on that tt hub
+ * @toggle: one bit for each endpoint, with ([0] = IN, [1] = OUT) endpoints
+ * @parent: our hub, unless we're the root
+ * @bus: bus we're part of
+ * @ep0: endpoint 0 data (default control pipe)
+ * @dev: generic device interface
+ * @descriptor: USB device descriptor
+ * @config: all of the device's configs
+ * @actconfig: the active configuration
+ * @ep_in: array of IN endpoints
+ * @ep_out: array of OUT endpoints
+ * @rawdescriptors: raw descriptors for each config
+ * @bus_mA: Current available from the bus
+ * @portnum: parent port number (origin 1)
+ * @level: number of USB hub ancestors
+ * @can_submit: URBs may be submitted
+ * @discon_suspended: disconnected while suspended
+ * @persist_enabled:  USB_PERSIST enabled for this device
+ * @have_langid: whether string_langid is valid
+ * @authorized: policy has said we can use it;
+ *	(user space) policy determines if we authorize this device to be
+ *	used or not. By default, wired USB devices are authorized.
+ *	WUSB devices are not, until we authorize them from user space.
+ *	FIXME -- complete doc
+ * @authenticated: Crypto authentication passed
+ * @wusb: device is Wireless USB
+ * @string_langid: language ID for strings
+ * @product: iProduct string, if present (static)
+ * @manufacturer: iManufacturer string, if present (static)
+ * @serial: iSerialNumber string, if present (static)
+ * @filelist: usbfs files that are open to this device
+ * @usb_classdev: USB class device that was created for usbfs device
+ *	access from userspace
+ * @usbfs_dentry: usbfs dentry entry for the device
+ * @maxchild: number of ports if hub
+ * @children: child devices - USB devices that are attached to this hub
+ * @pm_usage_cnt: usage counter for autosuspend
+ * @quirks: quirks of the whole device
+ * @urbnum: number of URBs submitted for the whole device
+ * @active_duration: total time device is not suspended
+ * @autosuspend: for delayed autosuspends
+ * @pm_mutex: protects PM operations
+ * @last_busy: time of last use
+ * @autosuspend_delay: in jiffies
+ * @connect_time: time device was first connected
+ * @auto_pm: autosuspend/resume in progress
+ * @do_remote_wakeup:  remote wakeup should be enabled
+ * @reset_resume: needs reset instead of resume
+ * @autosuspend_disabled: autosuspend disabled by the user
+ * @autoresume_disabled: autoresume disabled by the user
+ * @skip_sys_resume: skip the next system resume
  *
- * FIXME: Write the kerneldoc!
- *
+ * Notes:
  * Usbcore drivers should not set usbdev->state directly.  Instead use
  * usb_set_device_state().
- *
- * @authorized: (user space) policy determines if we authorize this
- *              device to be used or not. By default, wired USB
- *              devices are authorized. WUSB devices are not, until we
- *              authorize them from user space. FIXME -- complete doc
  */
 struct usb_device {
-	int		devnum;		/* Address on USB bus */
-	char		devpath [16];	/* Use in messages: /port/port/... */
-	enum usb_device_state	state;	/* configured, not attached, etc */
-	enum usb_device_speed	speed;	/* high/full/low (or error) */
+	int		devnum;
+	char		devpath [16];
+	enum usb_device_state	state;
+	enum usb_device_speed	speed;
 
-	struct usb_tt	*tt; 		/* low/full speed dev, highspeed hub */
-	int		ttport;		/* device port on that tt hub */
+	struct usb_tt	*tt;
+	int		ttport;
 
-	unsigned int toggle[2];		/* one bit for each endpoint
-					 * ([0] = IN, [1] = OUT) */
+	unsigned int toggle[2];
 
-	struct usb_device *parent;	/* our hub, unless we're the root */
-	struct usb_bus *bus;		/* Bus we're part of */
+	struct usb_device *parent;
+	struct usb_bus *bus;
 	struct usb_host_endpoint ep0;
 
-	struct device dev;		/* Generic device interface */
+	struct device dev;
 
-	struct usb_device_descriptor descriptor;/* Descriptor */
-	struct usb_host_config *config;	/* All of the configs */
+	struct usb_device_descriptor descriptor;
+	struct usb_host_config *config;
 
-	struct usb_host_config *actconfig;/* the active configuration */
+	struct usb_host_config *actconfig;
 	struct usb_host_endpoint *ep_in[16];
 	struct usb_host_endpoint *ep_out[16];
 
-	char **rawdescriptors;		/* Raw descriptors for each config */
+	char **rawdescriptors;
 
-	unsigned short bus_mA;		/* Current available from the bus */
-	u8 portnum;			/* Parent port number (origin 1) */
-	u8 level;			/* Number of USB hub ancestors */
+	unsigned short bus_mA;
+	u8 portnum;
+	u8 level;
 
-	unsigned can_submit:1;		/* URBs may be submitted */
-	unsigned discon_suspended:1;	/* Disconnected while suspended */
-	unsigned have_langid:1;		/* whether string_langid is valid */
-	unsigned authorized:1;		/* Policy has determined we can use it */
-	unsigned wusb:1;		/* Device is Wireless USB */
-	int string_langid;		/* language ID for strings */
+	unsigned can_submit:1;
+	unsigned discon_suspended:1;
+	unsigned persist_enabled:1;
+	unsigned have_langid:1;
+	unsigned authorized:1;
+ 	unsigned authenticated:1;
+	unsigned wusb:1;
+	int string_langid;
 
 	/* static strings from the device */
-	char *product;			/* iProduct string, if present */
-	char *manufacturer;		/* iManufacturer string, if present */
-	char *serial;			/* iSerialNumber string, if present */
+	char *product;
+	char *manufacturer;
+	char *serial;
 
 	struct list_head filelist;
 #ifdef CONFIG_USB_DEVICE_CLASS
 	struct device *usb_classdev;
 #endif
 #ifdef CONFIG_USB_DEVICEFS
-	struct dentry *usbfs_dentry;	/* usbfs dentry entry for the device */
+	struct dentry *usbfs_dentry;
 #endif
-	/*
-	 * Child devices - these can be either new devices
-	 * (if this is a hub device), or different instances
-	 * of this same device.
-	 *
-	 * Each instance needs its own set of data structures.
-	 */
 
-	int maxchild;			/* Number of ports if hub */
+	int maxchild;
 	struct usb_device *children[USB_MAXCHILDREN];
 
-	int pm_usage_cnt;		/* usage counter for autosuspend */
-	u32 quirks;			/* quirks of the whole device */
-	atomic_t urbnum;		/* number of URBs submitted for the whole device */
+	int pm_usage_cnt;
+	u32 quirks;
+	atomic_t urbnum;
+
+	unsigned long active_duration;
 
 #ifdef CONFIG_PM
-	struct delayed_work autosuspend; /* for delayed autosuspends */
-	struct mutex pm_mutex;		/* protects PM operations */
+	struct delayed_work autosuspend;
+	struct mutex pm_mutex;
 
-	unsigned long last_busy;	/* time of last use */
-	int autosuspend_delay;		/* in jiffies */
+	unsigned long last_busy;
+	int autosuspend_delay;
+	unsigned long connect_time;
 
-	unsigned auto_pm:1;		/* autosuspend/resume in progress */
-	unsigned do_remote_wakeup:1;	/* remote wakeup should be enabled */
-	unsigned reset_resume:1;	/* needs reset instead of resume */
-	unsigned persist_enabled:1;	/* USB_PERSIST enabled for this dev */
-	unsigned autosuspend_disabled:1; /* autosuspend and autoresume */
-	unsigned autoresume_disabled:1;  /*  disabled by the user */
-	unsigned skip_sys_resume:1;	/* skip the next system resume */
+	unsigned auto_pm:1;
+	unsigned do_remote_wakeup:1;
+	unsigned reset_resume:1;
+	unsigned autosuspend_disabled:1;
+	unsigned autoresume_disabled:1;
+	unsigned skip_sys_resume:1;
 #endif
+	struct wusb_dev *wusb_dev;
 };
 #define	to_usb_device(d) container_of(d, struct usb_device, dev)
 
@@ -498,11 +546,11 @@ static inline void usb_mark_last_busy(struct usb_device *udev)
 /*-------------------------------------------------------------------------*/
 
 /* for drivers using iso endpoints */
-extern int usb_get_current_frame_number (struct usb_device *usb_dev);
+extern int usb_get_current_frame_number(struct usb_device *usb_dev);
 
 /* used these for multi-interface device registration */
 extern int usb_driver_claim_interface(struct usb_driver *driver,
-			struct usb_interface *iface, void* priv);
+			struct usb_interface *iface, void *priv);
 
 /**
  * usb_interface_claimed - returns true iff an interface is claimed
@@ -514,7 +562,8 @@ extern int usb_driver_claim_interface(struct usb_driver *driver,
  * may need to explicitly claim that lock.
  *
  */
-static inline int usb_interface_claimed(struct usb_interface *iface) {
+static inline int usb_interface_claimed(struct usb_interface *iface)
+{
 	return (iface->dev.driver != NULL);
 }
 
@@ -557,12 +606,11 @@ extern struct usb_host_interface *usb_altnum_to_altsetting(
  * USB 2.0 root hubs (EHCI host controllers) will get one path ID if they are
  * high speed, and a different one if they are full or low speed.
  */
-static inline int usb_make_path (struct usb_device *dev, char *buf,
-		size_t size)
+static inline int usb_make_path(struct usb_device *dev, char *buf, size_t size)
 {
 	int actual;
-	actual = snprintf (buf, size, "usb-%s-%s", dev->bus->bus_name,
-			dev->devpath);
+	actual = snprintf(buf, size, "usb-%s-%s", dev->bus->bus_name,
+			  dev->devpath);
 	return (actual >= (int)size) ? -1 : actual;
 }
 
@@ -608,7 +656,8 @@ static inline int usb_endpoint_dir_in(const struct usb_endpoint_descriptor *epd)
  *
  * Returns true if the endpoint is of type OUT, otherwise it returns false.
  */
-static inline int usb_endpoint_dir_out(const struct usb_endpoint_descriptor *epd)
+static inline int usb_endpoint_dir_out(
+				const struct usb_endpoint_descriptor *epd)
 {
 	return ((epd->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_OUT);
 }
@@ -619,7 +668,8 @@ static inline int usb_endpoint_dir_out(const struct usb_endpoint_descriptor *epd
  *
  * Returns true if the endpoint is of type bulk, otherwise it returns false.
  */
-static inline int usb_endpoint_xfer_bulk(const struct usb_endpoint_descriptor *epd)
+static inline int usb_endpoint_xfer_bulk(
+				const struct usb_endpoint_descriptor *epd)
 {
 	return ((epd->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) ==
 		USB_ENDPOINT_XFER_BULK);
@@ -631,7 +681,8 @@ static inline int usb_endpoint_xfer_bulk(const struct usb_endpoint_descriptor *e
  *
  * Returns true if the endpoint is of type control, otherwise it returns false.
  */
-static inline int usb_endpoint_xfer_control(const struct usb_endpoint_descriptor *epd)
+static inline int usb_endpoint_xfer_control(
+				const struct usb_endpoint_descriptor *epd)
 {
 	return ((epd->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) ==
 		USB_ENDPOINT_XFER_CONTROL);
@@ -644,7 +695,8 @@ static inline int usb_endpoint_xfer_control(const struct usb_endpoint_descriptor
  * Returns true if the endpoint is of type interrupt, otherwise it returns
  * false.
  */
-static inline int usb_endpoint_xfer_int(const struct usb_endpoint_descriptor *epd)
+static inline int usb_endpoint_xfer_int(
+				const struct usb_endpoint_descriptor *epd)
 {
 	return ((epd->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) ==
 		USB_ENDPOINT_XFER_INT);
@@ -657,7 +709,8 @@ static inline int usb_endpoint_xfer_int(const struct usb_endpoint_descriptor *ep
  * Returns true if the endpoint is of type isochronous, otherwise it returns
  * false.
  */
-static inline int usb_endpoint_xfer_isoc(const struct usb_endpoint_descriptor *epd)
+static inline int usb_endpoint_xfer_isoc(
+				const struct usb_endpoint_descriptor *epd)
 {
 	return ((epd->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) ==
 		USB_ENDPOINT_XFER_ISOC);
@@ -670,7 +723,8 @@ static inline int usb_endpoint_xfer_isoc(const struct usb_endpoint_descriptor *e
  * Returns true if the endpoint has bulk transfer type and IN direction,
  * otherwise it returns false.
  */
-static inline int usb_endpoint_is_bulk_in(const struct usb_endpoint_descriptor *epd)
+static inline int usb_endpoint_is_bulk_in(
+				const struct usb_endpoint_descriptor *epd)
 {
 	return (usb_endpoint_xfer_bulk(epd) && usb_endpoint_dir_in(epd));
 }
@@ -682,7 +736,8 @@ static inline int usb_endpoint_is_bulk_in(const struct usb_endpoint_descriptor *
  * Returns true if the endpoint has bulk transfer type and OUT direction,
  * otherwise it returns false.
  */
-static inline int usb_endpoint_is_bulk_out(const struct usb_endpoint_descriptor *epd)
+static inline int usb_endpoint_is_bulk_out(
+				const struct usb_endpoint_descriptor *epd)
 {
 	return (usb_endpoint_xfer_bulk(epd) && usb_endpoint_dir_out(epd));
 }
@@ -694,7 +749,8 @@ static inline int usb_endpoint_is_bulk_out(const struct usb_endpoint_descriptor 
  * Returns true if the endpoint has interrupt transfer type and IN direction,
  * otherwise it returns false.
  */
-static inline int usb_endpoint_is_int_in(const struct usb_endpoint_descriptor *epd)
+static inline int usb_endpoint_is_int_in(
+				const struct usb_endpoint_descriptor *epd)
 {
 	return (usb_endpoint_xfer_int(epd) && usb_endpoint_dir_in(epd));
 }
@@ -706,7 +762,8 @@ static inline int usb_endpoint_is_int_in(const struct usb_endpoint_descriptor *e
  * Returns true if the endpoint has interrupt transfer type and OUT direction,
  * otherwise it returns false.
  */
-static inline int usb_endpoint_is_int_out(const struct usb_endpoint_descriptor *epd)
+static inline int usb_endpoint_is_int_out(
+				const struct usb_endpoint_descriptor *epd)
 {
 	return (usb_endpoint_xfer_int(epd) && usb_endpoint_dir_out(epd));
 }
@@ -718,7 +775,8 @@ static inline int usb_endpoint_is_int_out(const struct usb_endpoint_descriptor *
  * Returns true if the endpoint has isochronous transfer type and IN direction,
  * otherwise it returns false.
  */
-static inline int usb_endpoint_is_isoc_in(const struct usb_endpoint_descriptor *epd)
+static inline int usb_endpoint_is_isoc_in(
+				const struct usb_endpoint_descriptor *epd)
 {
 	return (usb_endpoint_xfer_isoc(epd) && usb_endpoint_dir_in(epd));
 }
@@ -730,7 +788,8 @@ static inline int usb_endpoint_is_isoc_in(const struct usb_endpoint_descriptor *
  * Returns true if the endpoint has isochronous transfer type and OUT direction,
  * otherwise it returns false.
  */
-static inline int usb_endpoint_is_isoc_out(const struct usb_endpoint_descriptor *epd)
+static inline int usb_endpoint_is_isoc_out(
+				const struct usb_endpoint_descriptor *epd)
 {
 	return (usb_endpoint_xfer_isoc(epd) && usb_endpoint_dir_out(epd));
 }
@@ -761,11 +820,11 @@ static inline int usb_endpoint_is_isoc_out(const struct usb_endpoint_descriptor 
  * specific device.
  */
 #define USB_DEVICE(vend,prod) \
-	.match_flags = USB_DEVICE_ID_MATCH_DEVICE, .idVendor = (vend), \
-			.idProduct = (prod)
+	.match_flags = USB_DEVICE_ID_MATCH_DEVICE, \
+	.idVendor = (vend), \
+	.idProduct = (prod)
 /**
- * USB_DEVICE_VER - macro used to describe a specific usb device with a
- *		version range
+ * USB_DEVICE_VER - describe a specific usb device with a version range
  * @vend: the 16 bit USB Vendor ID
  * @prod: the 16 bit USB Product ID
  * @lo: the bcdDevice_lo value
@@ -774,14 +833,15 @@ static inline int usb_endpoint_is_isoc_out(const struct usb_endpoint_descriptor 
  * This macro is used to create a struct usb_device_id that matches a
  * specific device, with a version range.
  */
-#define USB_DEVICE_VER(vend,prod,lo,hi) \
+#define USB_DEVICE_VER(vend, prod, lo, hi) \
 	.match_flags = USB_DEVICE_ID_MATCH_DEVICE_AND_VERSION, \
-	.idVendor = (vend), .idProduct = (prod), \
-	.bcdDevice_lo = (lo), .bcdDevice_hi = (hi)
+	.idVendor = (vend), \
+	.idProduct = (prod), \
+	.bcdDevice_lo = (lo), \
+	.bcdDevice_hi = (hi)
 
 /**
- * USB_DEVICE_INTERFACE_PROTOCOL - macro used to describe a usb
- *		device with a specific interface protocol
+ * USB_DEVICE_INTERFACE_PROTOCOL - describe a usb device with a specific interface protocol
  * @vend: the 16 bit USB Vendor ID
  * @prod: the 16 bit USB Product ID
  * @pr: bInterfaceProtocol value
@@ -789,8 +849,9 @@ static inline int usb_endpoint_is_isoc_out(const struct usb_endpoint_descriptor 
  * This macro is used to create a struct usb_device_id that matches a
  * specific interface protocol of devices.
  */
-#define USB_DEVICE_INTERFACE_PROTOCOL(vend,prod,pr) \
-	.match_flags = USB_DEVICE_ID_MATCH_DEVICE | USB_DEVICE_ID_MATCH_INT_PROTOCOL, \
+#define USB_DEVICE_INTERFACE_PROTOCOL(vend, prod, pr) \
+	.match_flags = USB_DEVICE_ID_MATCH_DEVICE | \
+		       USB_DEVICE_ID_MATCH_INT_PROTOCOL, \
 	.idVendor = (vend), \
 	.idProduct = (prod), \
 	.bInterfaceProtocol = (pr)
@@ -804,12 +865,14 @@ static inline int usb_endpoint_is_isoc_out(const struct usb_endpoint_descriptor 
  * This macro is used to create a struct usb_device_id that matches a
  * specific class of devices.
  */
-#define USB_DEVICE_INFO(cl,sc,pr) \
-	.match_flags = USB_DEVICE_ID_MATCH_DEV_INFO, .bDeviceClass = (cl), \
-	.bDeviceSubClass = (sc), .bDeviceProtocol = (pr)
+#define USB_DEVICE_INFO(cl, sc, pr) \
+	.match_flags = USB_DEVICE_ID_MATCH_DEV_INFO, \
+	.bDeviceClass = (cl), \
+	.bDeviceSubClass = (sc), \
+	.bDeviceProtocol = (pr)
 
 /**
- * USB_INTERFACE_INFO - macro used to describe a class of usb interfaces 
+ * USB_INTERFACE_INFO - macro used to describe a class of usb interfaces
  * @cl: bInterfaceClass value
  * @sc: bInterfaceSubClass value
  * @pr: bInterfaceProtocol value
@@ -817,13 +880,14 @@ static inline int usb_endpoint_is_isoc_out(const struct usb_endpoint_descriptor 
  * This macro is used to create a struct usb_device_id that matches a
  * specific class of interfaces.
  */
-#define USB_INTERFACE_INFO(cl,sc,pr) \
-	.match_flags = USB_DEVICE_ID_MATCH_INT_INFO, .bInterfaceClass = (cl), \
-	.bInterfaceSubClass = (sc), .bInterfaceProtocol = (pr)
+#define USB_INTERFACE_INFO(cl, sc, pr) \
+	.match_flags = USB_DEVICE_ID_MATCH_INT_INFO, \
+	.bInterfaceClass = (cl), \
+	.bInterfaceSubClass = (sc), \
+	.bInterfaceProtocol = (pr)
 
 /**
- * USB_DEVICE_AND_INTERFACE_INFO - macro used to describe a specific usb device
- * 		with a class of usb interfaces
+ * USB_DEVICE_AND_INTERFACE_INFO - describe a specific usb device with a class of usb interfaces
  * @vend: the 16 bit USB Vendor ID
  * @prod: the 16 bit USB Product ID
  * @cl: bInterfaceClass value
@@ -836,12 +900,14 @@ static inline int usb_endpoint_is_isoc_out(const struct usb_endpoint_descriptor 
  * This is especially useful when explicitly matching devices that have
  * vendor specific bDeviceClass values, but standards-compliant interfaces.
  */
-#define USB_DEVICE_AND_INTERFACE_INFO(vend,prod,cl,sc,pr) \
+#define USB_DEVICE_AND_INTERFACE_INFO(vend, prod, cl, sc, pr) \
 	.match_flags = USB_DEVICE_ID_MATCH_INT_INFO \
 		| USB_DEVICE_ID_MATCH_DEVICE, \
-	.idVendor = (vend), .idProduct = (prod), \
+	.idVendor = (vend), \
+	.idProduct = (prod), \
 	.bInterfaceClass = (cl), \
-	.bInterfaceSubClass = (sc), .bInterfaceProtocol = (pr)
+	.bInterfaceSubClass = (sc), \
+	.bInterfaceProtocol = (pr)
 
 /* ----------------------------------------------------------------------- */
 
@@ -876,10 +942,11 @@ struct usbdrv_wrap {
  *	and should normally be the same as the module name.
  * @probe: Called to see if the driver is willing to manage a particular
  *	interface on a device.  If it is, probe returns zero and uses
- *	dev_set_drvdata() to associate driver-specific data with the
+ *	usb_set_intfdata() to associate driver-specific data with the
  *	interface.  It may also use usb_set_interface() to specify the
  *	appropriate altsetting.  If unwilling to manage the interface,
- *	return a negative errno value.
+ *	return -ENODEV, if genuine IO errors occured, an appropriate
+ *	negative errno value.
  * @disconnect: Called when the interface is no longer accessible, usually
  *	because its device has been (or is being) disconnected or the
  *	driver module is being unloaded.
@@ -894,10 +961,7 @@ struct usbdrv_wrap {
  * @pre_reset: Called by usb_reset_composite_device() when the device
  *	is about to be reset.
  * @post_reset: Called by usb_reset_composite_device() after the device
- *	has been reset, or in lieu of @resume following a reset-resume
- *	(i.e., the device is reset instead of being resumed, as might
- *	happen if power was lost).  The second argument tells which is
- *	the reason.
+ *	has been reset
  * @id_table: USB drivers use ID table to support hotplugging.
  *	Export this with MODULE_DEVICE_TABLE(usb,...).  This must be set
  *	or your driver's probe function will never get called.
@@ -1119,7 +1183,7 @@ typedef void (*usb_complete_t)(struct urb *);
  *	transferred.  It will normally be the same as requested, unless
  *	either an error was reported or a short read was performed.
  *	The URB_SHORT_NOT_OK transfer flag may be used to make such
- *	short reads be reported as errors. 
+ *	short reads be reported as errors.
  * @setup_packet: Only used for control transfers, this points to eight bytes
  *	of setup data.  Control transfers always start by sending this data
  *	to the device.  Then transfer_buffer is read or written, if needed.
@@ -1138,7 +1202,7 @@ typedef void (*usb_complete_t)(struct urb *);
  * @complete: Completion handler. This URB is passed as the parameter to the
  *	completion function.  The completion function may then do what
  *	it likes with the URB, including resubmitting or freeing it.
- * @iso_frame_desc: Used to provide arrays of ISO transfer buffers and to 
+ * @iso_frame_desc: Used to provide arrays of ISO transfer buffers and to
  *	collect the transfer status for each buffer.
  *
  * This structure identifies USB transfer requests.  URBs must be allocated by
@@ -1242,8 +1306,7 @@ typedef void (*usb_complete_t)(struct urb *);
  * when the urb is owned by the hcd, that is, since the call to
  * usb_submit_urb() till the entry into the completion routine.
  */
-struct urb
-{
+struct urb {
 	/* private: usb core and host controller only fields in the urb */
 	struct kref kref;		/* reference count of the URB */
 	void *hcpriv;			/* private data for host controller */
@@ -1254,10 +1317,10 @@ struct urb
 	/* public: documented fields in the urb that can be used by drivers */
 	struct list_head urb_list;	/* list head for use by the urb's
 					 * current owner */
-	struct list_head anchor_list;	/* the URB may be anchored by the driver */
+	struct list_head anchor_list;	/* the URB may be anchored */
 	struct usb_anchor *anchor;
 	struct usb_device *dev; 	/* (in) pointer to associated device */
-	struct usb_host_endpoint *ep;	/* (internal) pointer to endpoint struct */
+	struct usb_host_endpoint *ep;	/* (internal) pointer to endpoint */
 	unsigned int pipe;		/* (in) pipe information */
 	int status;			/* (return) non-ISO status */
 	unsigned int transfer_flags;	/* (in) URB_SHORT_NOT_OK | ...*/
@@ -1294,14 +1357,14 @@ struct urb
  * Initializes a control urb with the proper information needed to submit
  * it to a device.
  */
-static inline void usb_fill_control_urb (struct urb *urb,
-					 struct usb_device *dev,
-					 unsigned int pipe,
-					 unsigned char *setup_packet,
-					 void *transfer_buffer,
-					 int buffer_length,
-					 usb_complete_t complete_fn,
-					 void *context)
+static inline void usb_fill_control_urb(struct urb *urb,
+					struct usb_device *dev,
+					unsigned int pipe,
+					unsigned char *setup_packet,
+					void *transfer_buffer,
+					int buffer_length,
+					usb_complete_t complete_fn,
+					void *context)
 {
 	urb->dev = dev;
 	urb->pipe = pipe;
@@ -1325,13 +1388,13 @@ static inline void usb_fill_control_urb (struct urb *urb,
  * Initializes a bulk urb with the proper information needed to submit it
  * to a device.
  */
-static inline void usb_fill_bulk_urb (struct urb *urb,
-				      struct usb_device *dev,
-				      unsigned int pipe,
-				      void *transfer_buffer,
-				      int buffer_length,
-				      usb_complete_t complete_fn,
-				      void *context)
+static inline void usb_fill_bulk_urb(struct urb *urb,
+				     struct usb_device *dev,
+				     unsigned int pipe,
+				     void *transfer_buffer,
+				     int buffer_length,
+				     usb_complete_t complete_fn,
+				     void *context)
 {
 	urb->dev = dev;
 	urb->pipe = pipe;
@@ -1359,14 +1422,14 @@ static inline void usb_fill_bulk_urb (struct urb *urb,
  * the endpoint interval, and express polling intervals in microframes
  * (eight per millisecond) rather than in frames (one per millisecond).
  */
-static inline void usb_fill_int_urb (struct urb *urb,
-				     struct usb_device *dev,
-				     unsigned int pipe,
-				     void *transfer_buffer,
-				     int buffer_length,
-				     usb_complete_t complete_fn,
-				     void *context,
-				     int interval)
+static inline void usb_fill_int_urb(struct urb *urb,
+				    struct usb_device *dev,
+				    unsigned int pipe,
+				    void *transfer_buffer,
+				    int buffer_length,
+				    usb_complete_t complete_fn,
+				    void *context,
+				    int interval)
 {
 	urb->dev = dev;
 	urb->pipe = pipe;
@@ -1390,6 +1453,7 @@ extern int usb_submit_urb(struct urb *urb, gfp_t mem_flags);
 extern int usb_unlink_urb(struct urb *urb);
 extern void usb_kill_urb(struct urb *urb);
 extern void usb_kill_anchored_urbs(struct usb_anchor *anchor);
+extern void usb_unlink_anchored_urbs(struct usb_anchor *anchor);
 extern void usb_anchor_urb(struct urb *urb, struct usb_anchor *anchor);
 extern void usb_unanchor_urb(struct urb *urb);
 extern int usb_wait_anchor_empty_timeout(struct usb_anchor *anchor,
@@ -1419,15 +1483,15 @@ static inline int usb_urb_dir_out(struct urb *urb)
 	return (urb->transfer_flags & URB_DIR_MASK) == URB_DIR_OUT;
 }
 
-void *usb_buffer_alloc (struct usb_device *dev, size_t size,
+void *usb_buffer_alloc(struct usb_device *dev, size_t size,
 	gfp_t mem_flags, dma_addr_t *dma);
-void usb_buffer_free (struct usb_device *dev, size_t size,
+void usb_buffer_free(struct usb_device *dev, size_t size,
 	void *addr, dma_addr_t dma);
 
 #if 0
-struct urb *usb_buffer_map (struct urb *urb);
-void usb_buffer_dmasync (struct urb *urb);
-void usb_buffer_unmap (struct urb *urb);
+struct urb *usb_buffer_map(struct urb *urb);
+void usb_buffer_dmasync(struct urb *urb);
+void usb_buffer_unmap(struct urb *urb);
 #endif
 
 struct scatterlist;
@@ -1499,7 +1563,7 @@ struct usb_sg_request {
 	int			status;
 	size_t			bytes;
 
-	/* 
+	/*
 	 * members below are private: to usbcore,
 	 * and are not provided for driver access!
 	 */
@@ -1517,18 +1581,18 @@ struct usb_sg_request {
 	struct completion	complete;
 };
 
-int usb_sg_init (
+int usb_sg_init(
 	struct usb_sg_request	*io,
 	struct usb_device	*dev,
-	unsigned		pipe, 
+	unsigned		pipe,
 	unsigned		period,
 	struct scatterlist	*sg,
 	int			nents,
 	size_t			length,
 	gfp_t			mem_flags
 );
-void usb_sg_cancel (struct usb_sg_request *io);
-void usb_sg_wait (struct usb_sg_request *io);
+void usb_sg_cancel(struct usb_sg_request *io);
+void usb_sg_wait(struct usb_sg_request *io);
 
 
 /* ----------------------------------------------------------------------- */
@@ -1585,21 +1649,21 @@ static inline unsigned int __create_pipe(struct usb_device *dev,
 
 /* Create various pipes... */
 #define usb_sndctrlpipe(dev,endpoint)	\
-	((PIPE_CONTROL << 30) | __create_pipe(dev,endpoint))
+	((PIPE_CONTROL << 30) | __create_pipe(dev, endpoint))
 #define usb_rcvctrlpipe(dev,endpoint)	\
-	((PIPE_CONTROL << 30) | __create_pipe(dev,endpoint) | USB_DIR_IN)
+	((PIPE_CONTROL << 30) | __create_pipe(dev, endpoint) | USB_DIR_IN)
 #define usb_sndisocpipe(dev,endpoint)	\
-	((PIPE_ISOCHRONOUS << 30) | __create_pipe(dev,endpoint))
+	((PIPE_ISOCHRONOUS << 30) | __create_pipe(dev, endpoint))
 #define usb_rcvisocpipe(dev,endpoint)	\
-	((PIPE_ISOCHRONOUS << 30) | __create_pipe(dev,endpoint) | USB_DIR_IN)
+	((PIPE_ISOCHRONOUS << 30) | __create_pipe(dev, endpoint) | USB_DIR_IN)
 #define usb_sndbulkpipe(dev,endpoint)	\
-	((PIPE_BULK << 30) | __create_pipe(dev,endpoint))
+	((PIPE_BULK << 30) | __create_pipe(dev, endpoint))
 #define usb_rcvbulkpipe(dev,endpoint)	\
-	((PIPE_BULK << 30) | __create_pipe(dev,endpoint) | USB_DIR_IN)
+	((PIPE_BULK << 30) | __create_pipe(dev, endpoint) | USB_DIR_IN)
 #define usb_sndintpipe(dev,endpoint)	\
-	((PIPE_INTERRUPT << 30) | __create_pipe(dev,endpoint))
+	((PIPE_INTERRUPT << 30) | __create_pipe(dev, endpoint))
 #define usb_rcvintpipe(dev,endpoint)	\
-	((PIPE_INTERRUPT << 30) | __create_pipe(dev,endpoint) | USB_DIR_IN)
+	((PIPE_INTERRUPT << 30) | __create_pipe(dev, endpoint) | USB_DIR_IN)
 
 /*-------------------------------------------------------------------------*/
 
@@ -1640,13 +1704,12 @@ extern void usb_unregister_notify(struct notifier_block *nb);
 #define dbg(format, arg...) do {} while (0)
 #endif
 
-#define err(format, arg...) printk(KERN_ERR "%s: " format "\n" , \
-	__FILE__ , ## arg)
-#define info(format, arg...) printk(KERN_INFO "%s: " format "\n" , \
-	__FILE__ , ## arg)
-#define warn(format, arg...) printk(KERN_WARNING "%s: " format "\n" , \
-	__FILE__ , ## arg)
-
+#define err(format, arg...) printk(KERN_ERR KBUILD_MODNAME ": " \
+	format "\n" , ## arg)
+#define info(format, arg...) printk(KERN_INFO KBUILD_MODNAME ": " \
+	format "\n" , ## arg)
+#define warn(format, arg...) printk(KERN_WARNING KBUILD_MODNAME ": " \
+	format "\n" , ## arg)
 
 #endif  /* __KERNEL__ */
 

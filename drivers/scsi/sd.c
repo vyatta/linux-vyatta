@@ -95,7 +95,7 @@ static int sd_resume(struct device *);
 static void sd_rescan(struct device *);
 static int sd_done(struct scsi_cmnd *);
 static void sd_read_capacity(struct scsi_disk *sdkp, unsigned char *buffer);
-static void scsi_disk_release(struct class_device *cdev);
+static void scsi_disk_release(struct device *cdev);
 static void sd_print_sense_hdr(struct scsi_disk *, struct scsi_sense_hdr *);
 static void sd_print_result(struct scsi_disk *, int);
 
@@ -112,11 +112,12 @@ static const char *sd_cache_types[] = {
 	"write back, no read (daft)"
 };
 
-static ssize_t sd_store_cache_type(struct class_device *cdev, const char *buf,
-				   size_t count)
+static ssize_t
+sd_store_cache_type(struct device *dev, struct device_attribute *attr,
+		    const char *buf, size_t count)
 {
 	int i, ct = -1, rcd, wce, sp;
-	struct scsi_disk *sdkp = to_scsi_disk(cdev);
+	struct scsi_disk *sdkp = to_scsi_disk(dev);
 	struct scsi_device *sdp = sdkp->device;
 	char buffer[64];
 	char *buffer_data;
@@ -163,10 +164,11 @@ static ssize_t sd_store_cache_type(struct class_device *cdev, const char *buf,
 	return count;
 }
 
-static ssize_t sd_store_manage_start_stop(struct class_device *cdev,
-					  const char *buf, size_t count)
+static ssize_t
+sd_store_manage_start_stop(struct device *dev, struct device_attribute *attr,
+			   const char *buf, size_t count)
 {
-	struct scsi_disk *sdkp = to_scsi_disk(cdev);
+	struct scsi_disk *sdkp = to_scsi_disk(dev);
 	struct scsi_device *sdp = sdkp->device;
 
 	if (!capable(CAP_SYS_ADMIN))
@@ -177,10 +179,11 @@ static ssize_t sd_store_manage_start_stop(struct class_device *cdev,
 	return count;
 }
 
-static ssize_t sd_store_allow_restart(struct class_device *cdev, const char *buf,
-				      size_t count)
+static ssize_t
+sd_store_allow_restart(struct device *dev, struct device_attribute *attr,
+		       const char *buf, size_t count)
 {
-	struct scsi_disk *sdkp = to_scsi_disk(cdev);
+	struct scsi_disk *sdkp = to_scsi_disk(dev);
 	struct scsi_device *sdp = sdkp->device;
 
 	if (!capable(CAP_SYS_ADMIN))
@@ -194,37 +197,44 @@ static ssize_t sd_store_allow_restart(struct class_device *cdev, const char *buf
 	return count;
 }
 
-static ssize_t sd_show_cache_type(struct class_device *cdev, char *buf)
+static ssize_t
+sd_show_cache_type(struct device *dev, struct device_attribute *attr,
+		   char *buf)
 {
-	struct scsi_disk *sdkp = to_scsi_disk(cdev);
+	struct scsi_disk *sdkp = to_scsi_disk(dev);
 	int ct = sdkp->RCD + 2*sdkp->WCE;
 
 	return snprintf(buf, 40, "%s\n", sd_cache_types[ct]);
 }
 
-static ssize_t sd_show_fua(struct class_device *cdev, char *buf)
+static ssize_t
+sd_show_fua(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	struct scsi_disk *sdkp = to_scsi_disk(cdev);
+	struct scsi_disk *sdkp = to_scsi_disk(dev);
 
 	return snprintf(buf, 20, "%u\n", sdkp->DPOFUA);
 }
 
-static ssize_t sd_show_manage_start_stop(struct class_device *cdev, char *buf)
+static ssize_t
+sd_show_manage_start_stop(struct device *dev, struct device_attribute *attr,
+			  char *buf)
 {
-	struct scsi_disk *sdkp = to_scsi_disk(cdev);
+	struct scsi_disk *sdkp = to_scsi_disk(dev);
 	struct scsi_device *sdp = sdkp->device;
 
 	return snprintf(buf, 20, "%u\n", sdp->manage_start_stop);
 }
 
-static ssize_t sd_show_allow_restart(struct class_device *cdev, char *buf)
+static ssize_t
+sd_show_allow_restart(struct device *dev, struct device_attribute *attr,
+		      char *buf)
 {
-	struct scsi_disk *sdkp = to_scsi_disk(cdev);
+	struct scsi_disk *sdkp = to_scsi_disk(dev);
 
 	return snprintf(buf, 40, "%d\n", sdkp->device->allow_restart);
 }
 
-static struct class_device_attribute sd_disk_attrs[] = {
+static struct device_attribute sd_disk_attrs[] = {
 	__ATTR(cache_type, S_IRUGO|S_IWUSR, sd_show_cache_type,
 	       sd_store_cache_type),
 	__ATTR(FUA, S_IRUGO, sd_show_fua, NULL),
@@ -238,8 +248,8 @@ static struct class_device_attribute sd_disk_attrs[] = {
 static struct class sd_disk_class = {
 	.name		= "scsi_disk",
 	.owner		= THIS_MODULE,
-	.release	= scsi_disk_release,
-	.class_dev_attrs = sd_disk_attrs,
+	.dev_release	= scsi_disk_release,
+	.dev_attrs	= sd_disk_attrs,
 };
 
 static struct scsi_driver sd_template = {
@@ -297,7 +307,7 @@ static struct scsi_disk *__scsi_disk_get(struct gendisk *disk)
 	if (disk->private_data) {
 		sdkp = scsi_disk(disk);
 		if (scsi_device_get(sdkp->device) == 0)
-			class_device_get(&sdkp->cdev);
+			get_device(&sdkp->dev);
 		else
 			sdkp = NULL;
 	}
@@ -331,7 +341,7 @@ static void scsi_disk_put(struct scsi_disk *sdkp)
 	struct scsi_device *sdev = sdkp->device;
 
 	mutex_lock(&sd_ref_mutex);
-	class_device_put(&sdkp->cdev);
+	put_device(&sdkp->dev);
 	scsi_device_put(sdev);
 	mutex_unlock(&sd_ref_mutex);
 }
@@ -394,6 +404,15 @@ static int sd_prep_fn(struct request_queue *q, struct request *rq)
 		/* printk("SCSI disk has been changed. Prohibiting further I/O.\n"); */
 		goto out;
 	}
+
+	/*
+	 * Some devices (some sdcards for one) don't like it if the
+	 * last sector gets read in a larger then 1 sector read.
+	 */
+	if (unlikely(sdp->last_sector_bug &&
+	    rq->nr_sectors > sdp->sector_size / 512 &&
+	    block + this_count == get_capacity(disk)))
+		this_count -= sdp->sector_size / 512;
 
 	SCSI_LOG_HLQUEUE(2, scmd_printk(KERN_INFO, SCpnt, "block=%llu\n",
 					(unsigned long long)block));
@@ -510,7 +529,7 @@ static int sd_prep_fn(struct request_queue *q, struct request *rq)
 		SCpnt->cmnd[4] = (unsigned char) this_count;
 		SCpnt->cmnd[5] = 0;
 	}
-	SCpnt->request_bufflen = this_count * sdp->sector_size;
+	SCpnt->sdb.length = this_count * sdp->sector_size;
 
 	/*
 	 * We shouldn't disconnect in the middle of a sector, so with a dumb
@@ -736,6 +755,7 @@ static int sd_media_changed(struct gendisk *disk)
 {
 	struct scsi_disk *sdkp = scsi_disk(disk);
 	struct scsi_device *sdp = sdkp->device;
+	struct scsi_sense_hdr *sshdr = NULL;
 	int retval;
 
 	SCSI_LOG_HLQUEUE(3, sd_printk(KERN_INFO, sdkp, "sd_media_changed\n"));
@@ -749,8 +769,11 @@ static int sd_media_changed(struct gendisk *disk)
 	 * can deal with it then.  It is only because of unrecoverable errors
 	 * that we would ever take a device offline in the first place.
 	 */
-	if (!scsi_device_online(sdp))
-		goto not_present;
+	if (!scsi_device_online(sdp)) {
+		set_media_not_present(sdkp);
+		retval = 1;
+		goto out;
+	}
 
 	/*
 	 * Using TEST_UNIT_READY enables differentiation between drive with
@@ -762,8 +785,12 @@ static int sd_media_changed(struct gendisk *disk)
 	 * sd_revalidate() is called.
 	 */
 	retval = -ENODEV;
-	if (scsi_block_when_processing_errors(sdp))
-		retval = scsi_test_unit_ready(sdp, SD_TIMEOUT, SD_MAX_RETRIES);
+
+	if (scsi_block_when_processing_errors(sdp)) {
+		sshdr  = kzalloc(sizeof(*sshdr), GFP_KERNEL);
+		retval = scsi_test_unit_ready(sdp, SD_TIMEOUT, SD_MAX_RETRIES,
+					      sshdr);
+	}
 
 	/*
 	 * Unable to test, unit probably not ready.   This usually
@@ -771,8 +798,13 @@ static int sd_media_changed(struct gendisk *disk)
 	 * and we will figure it out later once the drive is
 	 * available again.
 	 */
-	if (retval)
-		 goto not_present;
+	if (retval || (scsi_sense_valid(sshdr) &&
+		       /* 0x3a is medium not present */
+		       sshdr->asc == 0x3a)) {
+		set_media_not_present(sdkp);
+		retval = 1;
+		goto out;
+	}
 
 	/*
 	 * For removable scsi disk we have to recognise the presence
@@ -783,12 +815,12 @@ static int sd_media_changed(struct gendisk *disk)
 
 	retval = sdp->changed;
 	sdp->changed = 0;
-
+out:
+	if (retval != sdkp->previous_state)
+		sdev_evt_send_simple(sdp, SDEV_EVT_MEDIA_CHANGE, GFP_KERNEL);
+	sdkp->previous_state = retval;
+	kfree(sshdr);
 	return retval;
-
-not_present:
-	set_media_not_present(sdkp);
-	return 1;
 }
 
 static int sd_sync_cache(struct scsi_disk *sdkp)
@@ -828,7 +860,6 @@ static int sd_sync_cache(struct scsi_disk *sdkp)
 
 static void sd_prepare_flush(struct request_queue *q, struct request *rq)
 {
-	memset(rq->cmd, 0, sizeof(rq->cmd));
 	rq->cmd_type = REQ_TYPE_BLOCK_PC;
 	rq->timeout = SD_TIMEOUT;
 	rq->cmd[0] = SYNCHRONIZE_CACHE;
@@ -904,7 +935,7 @@ static struct block_device_operations sd_fops = {
 static int sd_done(struct scsi_cmnd *SCpnt)
 {
 	int result = SCpnt->result;
- 	unsigned int xfer_size = SCpnt->request_bufflen;
+	unsigned int xfer_size = scsi_bufflen(SCpnt);
  	unsigned int good_bytes = result ? 0 : xfer_size;
  	u64 start_lba = SCpnt->request->sector;
 	u64 end_lba = SCpnt->request->sector + (xfer_size / 512);
@@ -1632,6 +1663,7 @@ static int sd_probe(struct device *dev)
 	sdkp->disk = gd;
 	sdkp->index = index;
 	sdkp->openers = 0;
+	sdkp->previous_state = 1;
 
 	if (!sdp->timeout) {
 		if (sdp->type != TYPE_MOD)
@@ -1640,12 +1672,12 @@ static int sd_probe(struct device *dev)
 			sdp->timeout = SD_MOD_TIMEOUT;
 	}
 
-	class_device_initialize(&sdkp->cdev);
-	sdkp->cdev.dev = &sdp->sdev_gendev;
-	sdkp->cdev.class = &sd_disk_class;
-	strncpy(sdkp->cdev.class_id, sdp->sdev_gendev.bus_id, BUS_ID_SIZE);
+	device_initialize(&sdkp->dev);
+	sdkp->dev.parent = &sdp->sdev_gendev;
+	sdkp->dev.class = &sd_disk_class;
+	strncpy(sdkp->dev.bus_id, sdp->sdev_gendev.bus_id, BUS_ID_SIZE);
 
-	if (class_device_add(&sdkp->cdev))
+	if (device_add(&sdkp->dev))
 		goto out_put;
 
 	get_device(&sdp->sdev_gendev);
@@ -1711,13 +1743,13 @@ static int sd_remove(struct device *dev)
 {
 	struct scsi_disk *sdkp = dev_get_drvdata(dev);
 
-	class_device_del(&sdkp->cdev);
+	device_del(&sdkp->dev);
 	del_gendisk(sdkp->disk);
 	sd_shutdown(dev);
 
 	mutex_lock(&sd_ref_mutex);
 	dev_set_drvdata(dev, NULL);
-	class_device_put(&sdkp->cdev);
+	put_device(&sdkp->dev);
 	mutex_unlock(&sd_ref_mutex);
 
 	return 0;
@@ -1725,16 +1757,16 @@ static int sd_remove(struct device *dev)
 
 /**
  *	scsi_disk_release - Called to free the scsi_disk structure
- *	@cdev: pointer to embedded class device
+ *	@dev: pointer to embedded class device
  *
  *	sd_ref_mutex must be held entering this routine.  Because it is
  *	called on last put, you should always use the scsi_disk_get()
  *	scsi_disk_put() helpers which manipulate the semaphore directly
- *	and never do a direct class_device_put().
+ *	and never do a direct put_device.
  **/
-static void scsi_disk_release(struct class_device *cdev)
+static void scsi_disk_release(struct device *dev)
 {
-	struct scsi_disk *sdkp = to_scsi_disk(cdev);
+	struct scsi_disk *sdkp = to_scsi_disk(dev);
 	struct gendisk *disk = sdkp->disk;
 	
 	spin_lock(&sd_index_lock);
@@ -1813,8 +1845,7 @@ static int sd_suspend(struct device *dev, pm_message_t mesg)
 			goto done;
 	}
 
-	if (mesg.event == PM_EVENT_SUSPEND &&
-	    sdkp->device->manage_start_stop) {
+	if ((mesg.event & PM_EVENT_SLEEP) && sdkp->device->manage_start_stop) {
 		sd_printk(KERN_NOTICE, sdkp, "Stopping disk\n");
 		ret = sd_start_stop_device(sdkp, 0);
 	}

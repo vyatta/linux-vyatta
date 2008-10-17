@@ -405,7 +405,7 @@ int iser_send_data_out(struct iscsi_conn     *conn,
 	struct iser_dto *send_dto = NULL;
 	unsigned long buf_offset;
 	unsigned long data_seg_len;
-	unsigned int itt;
+	uint32_t itt;
 	int err = 0;
 
 	if (!iser_conn_state_comp(iser_conn->ib_conn, ISER_CONN_UP)) {
@@ -416,7 +416,7 @@ int iser_send_data_out(struct iscsi_conn     *conn,
 	if (iser_check_xmit(conn, ctask))
 		return -ENOBUFS;
 
-	itt = ntohl(hdr->itt);
+	itt = (__force uint32_t)hdr->itt;
 	data_seg_len = ntoh24(hdr->dlength);
 	buf_offset   = ntohl(hdr->offset);
 
@@ -561,7 +561,7 @@ void iser_rcv_completion(struct iser_desc *rx_desc,
 	if (opcode == ISCSI_OP_SCSI_CMD_RSP) {
 	        itt = get_itt(hdr->itt); /* mask out cid and age bits */
 		if (!(itt < session->cmds_max))
-			iser_err("itt can't be matched to task!!!"
+			iser_err("itt can't be matched to task!!! "
 				 "conn %p opcode %d cmds_max %d itt %d\n",
 				 conn->iscsi_conn,opcode,session->cmds_max,itt);
 		/* use the mapping given with the cmds array indexed by itt */
@@ -621,9 +621,7 @@ void iser_snd_completion(struct iser_desc *tx_desc)
 			struct iscsi_session *session = conn->session;
 
 			spin_lock(&conn->session->lock);
-			list_del(&mtask->running);
-			__kfifo_put(session->mgmtpool.queue, (void*)&mtask,
-				    sizeof(void*));
+			iscsi_free_mgmt_task(conn, mtask);
 			spin_unlock(&session->lock);
 		}
 	}

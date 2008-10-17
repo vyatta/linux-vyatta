@@ -23,15 +23,7 @@ struct bhv_vattr;
 struct xfs_iomap;
 struct attrlist_cursor_kern;
 
-typedef struct dentry	bhv_vname_t;
-typedef __u64		bhv_vnumber_t;
 typedef struct inode	bhv_vnode_t;
-
-#define VN_ISLNK(vp)	S_ISLNK((vp)->i_mode)
-#define VN_ISREG(vp)	S_ISREG((vp)->i_mode)
-#define VN_ISDIR(vp)	S_ISDIR((vp)->i_mode)
-#define VN_ISCHR(vp)	S_ISCHR((vp)->i_mode)
-#define VN_ISBLK(vp)	S_ISBLK((vp)->i_mode)
 
 /*
  * Vnode to Linux inode mapping.
@@ -44,18 +36,6 @@ static inline struct inode *vn_to_inode(bhv_vnode_t *vnode)
 {
 	return vnode;
 }
-
-/*
- * Values for the vop_rwlock/rwunlock flags parameter.
- */
-typedef enum bhv_vrwlock {
-	VRWLOCK_NONE,
-	VRWLOCK_READ,
-	VRWLOCK_WRITE,
-	VRWLOCK_WRITE_DIRECT,
-	VRWLOCK_TRY_READ,
-	VRWLOCK_TRY_WRITE
-} bhv_vrwlock_t;
 
 /*
  * Return values for xfs_inactive.  A return value of
@@ -73,12 +53,9 @@ typedef enum bhv_vrwlock {
 #define IO_INVIS	0x00020		/* don't update inode timestamps */
 
 /*
- * Flags for vop_iflush call
+ * Flags for xfs_inode_flush
  */
 #define FLUSH_SYNC		1	/* wait for flush to complete	*/
-#define FLUSH_INODE		2	/* flush the inode itself	*/
-#define FLUSH_LOG		4	/* force the last log entry for
-					 * this inode out to disk	*/
 
 /*
  * Flush/Invalidate options for vop_toss/flush/flushinval_pages.
@@ -168,29 +145,8 @@ typedef struct bhv_vattr {
 		XFS_AT_TYPE|XFS_AT_BLKSIZE|XFS_AT_NBLOCKS|XFS_AT_VCODE|\
 		XFS_AT_NEXTENTS|XFS_AT_ANEXTENTS|XFS_AT_GENCOUNT)
 
-/*
- *  Modes.
- */
-#define VSUID	S_ISUID		/* set user id on execution */
-#define VSGID	S_ISGID		/* set group id on execution */
-#define VSVTX	S_ISVTX		/* save swapped text even after use */
-#define VREAD	S_IRUSR		/* read, write, execute permissions */
-#define VWRITE	S_IWUSR
-#define VEXEC	S_IXUSR
-
-#define MODEMASK S_IALLUGO	/* mode bits plus permission bits */
-
-/*
- * Check whether mandatory file locking is enabled.
- */
-#define MANDLOCK(vp, mode)	\
-	(VN_ISREG(vp) && ((mode) & (VSGID|(VEXEC>>3))) == VSGID)
-
 extern void	vn_init(void);
-extern bhv_vnode_t	*vn_initialize(struct inode *);
 extern int	vn_revalidate(bhv_vnode_t *);
-extern int	__vn_revalidate(bhv_vnode_t *, bhv_vattr_t *);
-extern void	vn_revalidate_core(bhv_vnode_t *, bhv_vattr_t *);
 
 /*
  * Yeah, these don't take vnode anymore at all, all this should be
@@ -210,12 +166,12 @@ static inline int vn_count(bhv_vnode_t *vp)
  */
 extern bhv_vnode_t	*vn_hold(bhv_vnode_t *);
 
-#if defined(XFS_VNODE_TRACE)
+#if defined(XFS_INODE_TRACE)
 #define VN_HOLD(vp)		\
 	((void)vn_hold(vp),	\
-	  vn_trace_hold(xfs_vtoi(vp), __FILE__, __LINE__, (inst_t *)__return_address))
+	  xfs_itrace_hold(xfs_vtoi(vp), __FILE__, __LINE__, (inst_t *)__return_address))
 #define VN_RELE(vp)		\
-	  (vn_trace_rele(xfs_vtoi(vp), __FILE__, __LINE__, (inst_t *)__return_address), \
+	  (xfs_itrace_rele(xfs_vtoi(vp), __FILE__, __LINE__, (inst_t *)__return_address), \
 	   iput(vn_to_inode(vp)))
 #else
 #define VN_HOLD(vp)		((void)vn_hold(vp))
@@ -229,20 +185,8 @@ static inline bhv_vnode_t *vn_grab(bhv_vnode_t *vp)
 }
 
 /*
- * Vname handling macros.
- */
-#define VNAME(dentry)		((char *) (dentry)->d_name.name)
-#define VNAMELEN(dentry)	((dentry)->d_name.len)
-#define VNAME_TO_VNODE(dentry)	(vn_from_inode((dentry)->d_inode))
-
-/*
  * Dealing with bad inodes
  */
-static inline void vn_mark_bad(bhv_vnode_t *vp)
-{
-	make_bad_inode(vn_to_inode(vp));
-}
-
 static inline int VN_BAD(bhv_vnode_t *vp)
 {
 	return is_bad_inode(vn_to_inode(vp));
@@ -286,36 +230,38 @@ static inline void vn_atime_to_time_t(bhv_vnode_t *vp, time_t *tt)
 #define ATTR_NOSIZETOK	0x400	/* Don't get the SIZE token */
 
 /*
- * Flags to vop_fsync/reclaim.
- */
-#define FSYNC_NOWAIT	0	/* asynchronous flush */
-#define FSYNC_WAIT	0x1	/* synchronous fsync or forced reclaim */
-#define FSYNC_INVAL	0x2	/* flush and invalidate cached data */
-#define FSYNC_DATA	0x4	/* synchronous fsync of data only */
-
-/*
  * Tracking vnode activity.
  */
-#if defined(XFS_VNODE_TRACE)
+#if defined(XFS_INODE_TRACE)
 
-#define	VNODE_TRACE_SIZE	16		/* number of trace entries */
-#define	VNODE_KTRACE_ENTRY	1
-#define	VNODE_KTRACE_EXIT	2
-#define	VNODE_KTRACE_HOLD	3
-#define	VNODE_KTRACE_REF	4
-#define	VNODE_KTRACE_RELE	5
+#define	INODE_TRACE_SIZE	16		/* number of trace entries */
+#define	INODE_KTRACE_ENTRY	1
+#define	INODE_KTRACE_EXIT	2
+#define	INODE_KTRACE_HOLD	3
+#define	INODE_KTRACE_REF	4
+#define	INODE_KTRACE_RELE	5
 
-extern void vn_trace_entry(struct xfs_inode *, const char *, inst_t *);
-extern void vn_trace_exit(struct xfs_inode *, const char *, inst_t *);
-extern void vn_trace_hold(struct xfs_inode *, char *, int, inst_t *);
-extern void vn_trace_ref(struct xfs_inode *, char *, int, inst_t *);
-extern void vn_trace_rele(struct xfs_inode *, char *, int, inst_t *);
+extern void _xfs_itrace_entry(struct xfs_inode *, const char *, inst_t *);
+extern void _xfs_itrace_exit(struct xfs_inode *, const char *, inst_t *);
+extern void xfs_itrace_hold(struct xfs_inode *, char *, int, inst_t *);
+extern void _xfs_itrace_ref(struct xfs_inode *, char *, int, inst_t *);
+extern void xfs_itrace_rele(struct xfs_inode *, char *, int, inst_t *);
+#define xfs_itrace_entry(ip)	\
+	_xfs_itrace_entry(ip, __func__, (inst_t *)__return_address)
+#define xfs_itrace_exit(ip)	\
+	_xfs_itrace_exit(ip, __func__, (inst_t *)__return_address)
+#define xfs_itrace_exit_tag(ip, tag)	\
+	_xfs_itrace_exit(ip, tag, (inst_t *)__return_address)
+#define xfs_itrace_ref(ip)	\
+	_xfs_itrace_ref(ip, __FILE__, __LINE__, (inst_t *)__return_address)
+
 #else
-#define	vn_trace_entry(a,b,c)
-#define	vn_trace_exit(a,b,c)
-#define	vn_trace_hold(a,b,c,d)
-#define	vn_trace_ref(a,b,c,d)
-#define	vn_trace_rele(a,b,c,d)
+#define	xfs_itrace_entry(a)
+#define	xfs_itrace_exit(a)
+#define	xfs_itrace_exit_tag(a, b)
+#define	xfs_itrace_hold(a, b, c, d)
+#define	xfs_itrace_ref(a)
+#define	xfs_itrace_rele(a, b, c, d)
 #endif
 
 #endif	/* __XFS_VNODE_H__ */

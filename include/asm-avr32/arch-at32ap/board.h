@@ -38,9 +38,7 @@ struct platform_device *
 at32_add_device_lcdc(unsigned int id, struct atmel_lcdfb_info *data,
 		     unsigned long fbmem_start, unsigned long fbmem_len);
 
-struct usba_platform_data {
-	int vbus_pin;
-};
+struct usba_platform_data;
 struct platform_device *
 at32_add_device_usba(unsigned int id, struct usba_platform_data *data);
 
@@ -50,6 +48,9 @@ struct ide_platform_data {
 struct platform_device *
 at32_add_device_ide(unsigned int id, unsigned int extint,
 		    struct ide_platform_data *data);
+
+/* mask says which PWM channels to mux */
+struct platform_device *at32_add_device_pwm(u32 mask);
 
 /* depending on what's hooked up, not all SSC pins will be used */
 #define	ATMEL_SSC_TK		0x01
@@ -65,7 +66,10 @@ at32_add_device_ide(unsigned int id, unsigned int extint,
 struct platform_device *
 at32_add_device_ssc(unsigned int id, unsigned int flags);
 
-struct platform_device *at32_add_device_twi(unsigned int id);
+struct i2c_board_info;
+struct platform_device *at32_add_device_twi(unsigned int id,
+					    struct i2c_board_info *b,
+					    unsigned int n);
 struct platform_device *at32_add_device_mci(unsigned int id);
 struct platform_device *at32_add_device_ac97c(unsigned int id);
 struct platform_device *at32_add_device_abdac(unsigned int id);

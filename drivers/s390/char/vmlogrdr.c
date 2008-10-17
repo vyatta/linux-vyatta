@@ -683,7 +683,7 @@ static int vmlogrdr_register_driver(void)
 	/* Register with iucv driver */
 	ret = iucv_register(&vmlogrdr_iucv_handler, 1);
 	if (ret) {
-		printk (KERN_ERR "vmlogrdr: failed to register with"
+		printk (KERN_ERR "vmlogrdr: failed to register with "
 			"iucv driver\n");
 		goto out;
 	}
@@ -762,10 +762,10 @@ static int vmlogrdr_register_device(struct vmlogrdr_priv_t *priv)
 		device_unregister(dev);
 		return ret;
 	}
-	priv->class_device = device_create(vmlogrdr_class, dev,
-					   MKDEV(vmlogrdr_major,
-						 priv->minor_num),
-					   "%s", dev->bus_id);
+	priv->class_device = device_create_drvdata(vmlogrdr_class, dev,
+						   MKDEV(vmlogrdr_major,
+							 priv->minor_num),
+						   priv, "%s", dev->bus_id);
 	if (IS_ERR(priv->class_device)) {
 		ret = PTR_ERR(priv->class_device);
 		priv->class_device=NULL;
@@ -773,7 +773,6 @@ static int vmlogrdr_register_device(struct vmlogrdr_priv_t *priv)
 		device_unregister(dev);
 		return ret;
 	}
-	dev->driver_data = priv;
 	priv->device = dev;
 	return 0;
 }
@@ -858,7 +857,7 @@ static int __init vmlogrdr_init(void)
 	for (i=0; i < MAXMINOR; ++i ) {
 		sys_ser[i].buffer = (char *) get_zeroed_page(GFP_KERNEL);
 		if (!sys_ser[i].buffer) {
-			rc = ENOMEM;
+			rc = -ENOMEM;
 			break;
 		}
 		sys_ser[i].current_position = sys_ser[i].buffer;

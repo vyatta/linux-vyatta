@@ -1,6 +1,4 @@
 /*
- * $Id: usbkbd.c,v 1.27 2001/12/27 10:37:41 vojtech Exp $
- *
  *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
  *  USB HIDBP Keyboard support
@@ -234,6 +232,14 @@ static int usb_kbd_probe(struct usb_interface *iface,
 	endpoint = &interface->endpoint[0].desc;
 	if (!usb_endpoint_is_int_in(endpoint))
 		return -ENODEV;
+
+#ifdef CONFIG_USB_HID
+	if (usbhid_lookup_quirk(le16_to_cpu(dev->descriptor.idVendor),
+				le16_to_cpu(dev->descriptor.idProduct))
+			& HID_QUIRK_IGNORE) {
+		return -ENODEV;
+	}
+#endif
 
 	pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
 	maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));

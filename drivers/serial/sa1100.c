@@ -655,7 +655,7 @@ void __init sa1100_register_uart_fns(struct sa1100_port_fns *fns)
 void __init sa1100_register_uart(int idx, int port)
 {
 	if (idx >= NR_PORTS) {
-		printk(KERN_ERR "%s: bad index number %d\n", __FUNCTION__, idx);
+		printk(KERN_ERR "%s: bad index number %d\n", __func__, idx);
 		return;
 	}
 
@@ -682,7 +682,7 @@ void __init sa1100_register_uart(int idx, int port)
 		break;
 
 	default:
-		printk(KERN_ERR "%s: bad port number %d\n", __FUNCTION__, port);
+		printk(KERN_ERR "%s: bad port number %d\n", __func__, port);
 	}
 }
 
@@ -884,6 +884,7 @@ static struct platform_driver sa11x0_serial_driver = {
 	.resume		= sa1100_serial_resume,
 	.driver		= {
 		.name	= "sa11x0-uart",
+		.owner	= THIS_MODULE,
 	},
 };
 
@@ -917,3 +918,4 @@ MODULE_AUTHOR("Deep Blue Solutions Ltd");
 MODULE_DESCRIPTION("SA1100 generic serial port driver $Revision: 1.50 $");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS_CHARDEV_MAJOR(SERIAL_SA1100_MAJOR);
+MODULE_ALIAS("platform:sa11x0-uart");

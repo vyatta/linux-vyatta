@@ -4,15 +4,9 @@ S/390 common I/O-Layer - command line parameters, procfs and debugfs entries
 Command line parameters
 -----------------------
 
-* cio_msg = yes | no
-  
-  Determines whether information on found devices and sensed device 
-  characteristics should be shown during startup or when new devices are
-  found, i. e. messages of the types "Detected device 0.0.4711 on subchannel
-  0.0.0042" and "SenseID: Device 0.0.4711 reports: ...".
+* ccw_timeout_log
 
-  Default is off.
-
+  Enable logging of debug information in case of ccw device timeouts.
 
 * cio_ignore = {all} |
 	       {<device> | <range of devices>} |

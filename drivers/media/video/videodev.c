@@ -18,14 +18,14 @@
 
 #define dbgarg(cmd, fmt, arg...) \
 		if (vfd->debug & V4L2_DEBUG_IOCTL_ARG) {		\
-			printk (KERN_DEBUG "%s: ",  vfd->name);		\
+			printk(KERN_DEBUG "%s: ",  vfd->name);		\
 			v4l_printk_ioctl(cmd);				\
-			printk (KERN_DEBUG "%s: " fmt, vfd->name, ## arg); \
+			printk(" " fmt,  ## arg);			\
 		}
 
 #define dbgarg2(fmt, arg...) \
 		if (vfd->debug & V4L2_DEBUG_IOCTL_ARG)			\
-			printk (KERN_DEBUG "%s: " fmt, vfd->name, ## arg);
+			printk(KERN_DEBUG "%s: " fmt, vfd->name, ## arg);
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -46,9 +46,325 @@
 #include <linux/videodev.h>
 #endif
 #include <media/v4l2-common.h>
+#include <linux/video_decoder.h>
 
 #define VIDEO_NUM_DEVICES	256
 #define VIDEO_NAME              "video4linux"
+
+struct std_descr {
+	v4l2_std_id std;
+	const char *descr;
+};
+
+static const struct std_descr standards[] = {
+	{ V4L2_STD_NTSC, 	"NTSC"      },
+	{ V4L2_STD_NTSC_M, 	"NTSC-M"    },
+	{ V4L2_STD_NTSC_M_JP, 	"NTSC-M-JP" },
+	{ V4L2_STD_NTSC_M_KR,	"NTSC-M-KR" },
+	{ V4L2_STD_NTSC_443, 	"NTSC-443"  },
+	{ V4L2_STD_PAL, 	"PAL"       },
+	{ V4L2_STD_PAL_BG, 	"PAL-BG"    },
+	{ V4L2_STD_PAL_B, 	"PAL-B"     },
+	{ V4L2_STD_PAL_B1, 	"PAL-B1"    },
+	{ V4L2_STD_PAL_G, 	"PAL-G"     },
+	{ V4L2_STD_PAL_H, 	"PAL-H"     },
+	{ V4L2_STD_PAL_I, 	"PAL-I"     },
+	{ V4L2_STD_PAL_DK, 	"PAL-DK"    },
+	{ V4L2_STD_PAL_D, 	"PAL-D"     },
+	{ V4L2_STD_PAL_D1, 	"PAL-D1"    },
+	{ V4L2_STD_PAL_K, 	"PAL-K"     },
+	{ V4L2_STD_PAL_M, 	"PAL-M"     },
+	{ V4L2_STD_PAL_N, 	"PAL-N"     },
+	{ V4L2_STD_PAL_Nc, 	"PAL-Nc"    },
+	{ V4L2_STD_PAL_60, 	"PAL-60"    },
+	{ V4L2_STD_SECAM, 	"SECAM"     },
+	{ V4L2_STD_SECAM_B, 	"SECAM-B"   },
+	{ V4L2_STD_SECAM_G, 	"SECAM-G"   },
+	{ V4L2_STD_SECAM_H, 	"SECAM-H"   },
+	{ V4L2_STD_SECAM_DK, 	"SECAM-DK"  },
+	{ V4L2_STD_SECAM_D, 	"SECAM-D"   },
+	{ V4L2_STD_SECAM_K, 	"SECAM-K"   },
+	{ V4L2_STD_SECAM_K1, 	"SECAM-K1"  },
+	{ V4L2_STD_SECAM_L, 	"SECAM-L"   },
+	{ V4L2_STD_SECAM_LC, 	"SECAM-Lc"  },
+	{ 0, 			"Unknown"   }
+};
+
+/* video4linux standard ID conversion to standard name
+ */
+const char *v4l2_norm_to_name(v4l2_std_id id)
+{
+	u32 myid = id;
+	int i;
+
+	/* HACK: ppc32 architecture doesn't have __ucmpdi2 function to handle
+	   64 bit comparations. So, on that architecture, with some gcc
+	   variants, compilation fails. Currently, the max value is 30bit wide.
+	 */
+	BUG_ON(myid != id);
+
+	for (i = 0; standards[i].std; i++)
+		if (myid == standards[i].std)
+			break;
+	return standards[i].descr;
+}
+EXPORT_SYMBOL(v4l2_norm_to_name);
+
+/* Fill in the fields of a v4l2_standard structure according to the
+   'id' and 'transmission' parameters.  Returns negative on error.  */
+int v4l2_video_std_construct(struct v4l2_standard *vs,
+			     int id, const char *name)
+{
+	u32 index = vs->index;
+
+	memset(vs, 0, sizeof(struct v4l2_standard));
+	vs->index = index;
+	vs->id    = id;
+	if (id & V4L2_STD_525_60) {
+		vs->frameperiod.numerator = 1001;
+		vs->frameperiod.denominator = 30000;
+		vs->framelines = 525;
+	} else {
+		vs->frameperiod.numerator = 1;
+		vs->frameperiod.denominator = 25;
+		vs->framelines = 625;
+	}
+	strlcpy(vs->name, name, sizeof(vs->name));
+	return 0;
+}
+EXPORT_SYMBOL(v4l2_video_std_construct);
+
+/* ----------------------------------------------------------------- */
+/* some arrays for pretty-printing debug messages of enum types      */
+
+char *v4l2_field_names[] = {
+	[V4L2_FIELD_ANY]        = "any",
+	[V4L2_FIELD_NONE]       = "none",
+	[V4L2_FIELD_TOP]        = "top",
+	[V4L2_FIELD_BOTTOM]     = "bottom",
+	[V4L2_FIELD_INTERLACED] = "interlaced",
+	[V4L2_FIELD_SEQ_TB]     = "seq-tb",
+	[V4L2_FIELD_SEQ_BT]     = "seq-bt",
+	[V4L2_FIELD_ALTERNATE]  = "alternate",
+	[V4L2_FIELD_INTERLACED_TB] = "interlaced-tb",
+	[V4L2_FIELD_INTERLACED_BT] = "interlaced-bt",
+};
+EXPORT_SYMBOL(v4l2_field_names);
+
+char *v4l2_type_names[] = {
+	[V4L2_BUF_TYPE_VIDEO_CAPTURE]      = "video-cap",
+	[V4L2_BUF_TYPE_VIDEO_OVERLAY]      = "video-over",
+	[V4L2_BUF_TYPE_VIDEO_OUTPUT]       = "video-out",
+	[V4L2_BUF_TYPE_VBI_CAPTURE]        = "vbi-cap",
+	[V4L2_BUF_TYPE_VBI_OUTPUT]         = "vbi-out",
+	[V4L2_BUF_TYPE_SLICED_VBI_CAPTURE] = "sliced-vbi-cap",
+	[V4L2_BUF_TYPE_SLICED_VBI_OUTPUT]  = "sliced-vbi-out",
+	[V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY] = "video-out-over",
+};
+EXPORT_SYMBOL(v4l2_type_names);
+
+static char *v4l2_memory_names[] = {
+	[V4L2_MEMORY_MMAP]    = "mmap",
+	[V4L2_MEMORY_USERPTR] = "userptr",
+	[V4L2_MEMORY_OVERLAY] = "overlay",
+};
+
+#define prt_names(a, arr) ((((a) >= 0) && ((a) < ARRAY_SIZE(arr))) ? \
+			   arr[a] : "unknown")
+
+/* ------------------------------------------------------------------ */
+/* debug help functions                                               */
+
+#ifdef CONFIG_VIDEO_V4L1_COMPAT
+static const char *v4l1_ioctls[] = {
+	[_IOC_NR(VIDIOCGCAP)]       = "VIDIOCGCAP",
+	[_IOC_NR(VIDIOCGCHAN)]      = "VIDIOCGCHAN",
+	[_IOC_NR(VIDIOCSCHAN)]      = "VIDIOCSCHAN",
+	[_IOC_NR(VIDIOCGTUNER)]     = "VIDIOCGTUNER",
+	[_IOC_NR(VIDIOCSTUNER)]     = "VIDIOCSTUNER",
+	[_IOC_NR(VIDIOCGPICT)]      = "VIDIOCGPICT",
+	[_IOC_NR(VIDIOCSPICT)]      = "VIDIOCSPICT",
+	[_IOC_NR(VIDIOCCAPTURE)]    = "VIDIOCCAPTURE",
+	[_IOC_NR(VIDIOCGWIN)]       = "VIDIOCGWIN",
+	[_IOC_NR(VIDIOCSWIN)]       = "VIDIOCSWIN",
+	[_IOC_NR(VIDIOCGFBUF)]      = "VIDIOCGFBUF",
+	[_IOC_NR(VIDIOCSFBUF)]      = "VIDIOCSFBUF",
+	[_IOC_NR(VIDIOCKEY)]        = "VIDIOCKEY",
+	[_IOC_NR(VIDIOCGFREQ)]      = "VIDIOCGFREQ",
+	[_IOC_NR(VIDIOCSFREQ)]      = "VIDIOCSFREQ",
+	[_IOC_NR(VIDIOCGAUDIO)]     = "VIDIOCGAUDIO",
+	[_IOC_NR(VIDIOCSAUDIO)]     = "VIDIOCSAUDIO",
+	[_IOC_NR(VIDIOCSYNC)]       = "VIDIOCSYNC",
+	[_IOC_NR(VIDIOCMCAPTURE)]   = "VIDIOCMCAPTURE",
+	[_IOC_NR(VIDIOCGMBUF)]      = "VIDIOCGMBUF",
+	[_IOC_NR(VIDIOCGUNIT)]      = "VIDIOCGUNIT",
+	[_IOC_NR(VIDIOCGCAPTURE)]   = "VIDIOCGCAPTURE",
+	[_IOC_NR(VIDIOCSCAPTURE)]   = "VIDIOCSCAPTURE",
+	[_IOC_NR(VIDIOCSPLAYMODE)]  = "VIDIOCSPLAYMODE",
+	[_IOC_NR(VIDIOCSWRITEMODE)] = "VIDIOCSWRITEMODE",
+	[_IOC_NR(VIDIOCGPLAYINFO)]  = "VIDIOCGPLAYINFO",
+	[_IOC_NR(VIDIOCSMICROCODE)] = "VIDIOCSMICROCODE",
+	[_IOC_NR(VIDIOCGVBIFMT)]    = "VIDIOCGVBIFMT",
+	[_IOC_NR(VIDIOCSVBIFMT)]    = "VIDIOCSVBIFMT"
+};
+#define V4L1_IOCTLS ARRAY_SIZE(v4l1_ioctls)
+#endif
+
+static const char *v4l2_ioctls[] = {
+	[_IOC_NR(VIDIOC_QUERYCAP)]         = "VIDIOC_QUERYCAP",
+	[_IOC_NR(VIDIOC_RESERVED)]         = "VIDIOC_RESERVED",
+	[_IOC_NR(VIDIOC_ENUM_FMT)]         = "VIDIOC_ENUM_FMT",
+	[_IOC_NR(VIDIOC_G_FMT)]            = "VIDIOC_G_FMT",
+	[_IOC_NR(VIDIOC_S_FMT)]            = "VIDIOC_S_FMT",
+	[_IOC_NR(VIDIOC_REQBUFS)]          = "VIDIOC_REQBUFS",
+	[_IOC_NR(VIDIOC_QUERYBUF)]         = "VIDIOC_QUERYBUF",
+	[_IOC_NR(VIDIOC_G_FBUF)]           = "VIDIOC_G_FBUF",
+	[_IOC_NR(VIDIOC_S_FBUF)]           = "VIDIOC_S_FBUF",
+	[_IOC_NR(VIDIOC_OVERLAY)]          = "VIDIOC_OVERLAY",
+	[_IOC_NR(VIDIOC_QBUF)]             = "VIDIOC_QBUF",
+	[_IOC_NR(VIDIOC_DQBUF)]            = "VIDIOC_DQBUF",
+	[_IOC_NR(VIDIOC_STREAMON)]         = "VIDIOC_STREAMON",
+	[_IOC_NR(VIDIOC_STREAMOFF)]        = "VIDIOC_STREAMOFF",
+	[_IOC_NR(VIDIOC_G_PARM)]           = "VIDIOC_G_PARM",
+	[_IOC_NR(VIDIOC_S_PARM)]           = "VIDIOC_S_PARM",
+	[_IOC_NR(VIDIOC_G_STD)]            = "VIDIOC_G_STD",
+	[_IOC_NR(VIDIOC_S_STD)]            = "VIDIOC_S_STD",
+	[_IOC_NR(VIDIOC_ENUMSTD)]          = "VIDIOC_ENUMSTD",
+	[_IOC_NR(VIDIOC_ENUMINPUT)]        = "VIDIOC_ENUMINPUT",
+	[_IOC_NR(VIDIOC_G_CTRL)]           = "VIDIOC_G_CTRL",
+	[_IOC_NR(VIDIOC_S_CTRL)]           = "VIDIOC_S_CTRL",
+	[_IOC_NR(VIDIOC_G_TUNER)]          = "VIDIOC_G_TUNER",
+	[_IOC_NR(VIDIOC_S_TUNER)]          = "VIDIOC_S_TUNER",
+	[_IOC_NR(VIDIOC_G_AUDIO)]          = "VIDIOC_G_AUDIO",
+	[_IOC_NR(VIDIOC_S_AUDIO)]          = "VIDIOC_S_AUDIO",
+	[_IOC_NR(VIDIOC_QUERYCTRL)]        = "VIDIOC_QUERYCTRL",
+	[_IOC_NR(VIDIOC_QUERYMENU)]        = "VIDIOC_QUERYMENU",
+	[_IOC_NR(VIDIOC_G_INPUT)]          = "VIDIOC_G_INPUT",
+	[_IOC_NR(VIDIOC_S_INPUT)]          = "VIDIOC_S_INPUT",
+	[_IOC_NR(VIDIOC_G_OUTPUT)]         = "VIDIOC_G_OUTPUT",
+	[_IOC_NR(VIDIOC_S_OUTPUT)]         = "VIDIOC_S_OUTPUT",
+	[_IOC_NR(VIDIOC_ENUMOUTPUT)]       = "VIDIOC_ENUMOUTPUT",
+	[_IOC_NR(VIDIOC_G_AUDOUT)]         = "VIDIOC_G_AUDOUT",
+	[_IOC_NR(VIDIOC_S_AUDOUT)]         = "VIDIOC_S_AUDOUT",
+	[_IOC_NR(VIDIOC_G_MODULATOR)]      = "VIDIOC_G_MODULATOR",
+	[_IOC_NR(VIDIOC_S_MODULATOR)]      = "VIDIOC_S_MODULATOR",
+	[_IOC_NR(VIDIOC_G_FREQUENCY)]      = "VIDIOC_G_FREQUENCY",
+	[_IOC_NR(VIDIOC_S_FREQUENCY)]      = "VIDIOC_S_FREQUENCY",
+	[_IOC_NR(VIDIOC_CROPCAP)]          = "VIDIOC_CROPCAP",
+	[_IOC_NR(VIDIOC_G_CROP)]           = "VIDIOC_G_CROP",
+	[_IOC_NR(VIDIOC_S_CROP)]           = "VIDIOC_S_CROP",
+	[_IOC_NR(VIDIOC_G_JPEGCOMP)]       = "VIDIOC_G_JPEGCOMP",
+	[_IOC_NR(VIDIOC_S_JPEGCOMP)]       = "VIDIOC_S_JPEGCOMP",
+	[_IOC_NR(VIDIOC_QUERYSTD)]         = "VIDIOC_QUERYSTD",
+	[_IOC_NR(VIDIOC_TRY_FMT)]          = "VIDIOC_TRY_FMT",
+	[_IOC_NR(VIDIOC_ENUMAUDIO)]        = "VIDIOC_ENUMAUDIO",
+	[_IOC_NR(VIDIOC_ENUMAUDOUT)]       = "VIDIOC_ENUMAUDOUT",
+	[_IOC_NR(VIDIOC_G_PRIORITY)]       = "VIDIOC_G_PRIORITY",
+	[_IOC_NR(VIDIOC_S_PRIORITY)]       = "VIDIOC_S_PRIORITY",
+	[_IOC_NR(VIDIOC_G_SLICED_VBI_CAP)] = "VIDIOC_G_SLICED_VBI_CAP",
+	[_IOC_NR(VIDIOC_LOG_STATUS)]       = "VIDIOC_LOG_STATUS",
+	[_IOC_NR(VIDIOC_G_EXT_CTRLS)]      = "VIDIOC_G_EXT_CTRLS",
+	[_IOC_NR(VIDIOC_S_EXT_CTRLS)]      = "VIDIOC_S_EXT_CTRLS",
+	[_IOC_NR(VIDIOC_TRY_EXT_CTRLS)]    = "VIDIOC_TRY_EXT_CTRLS",
+#if 1
+	[_IOC_NR(VIDIOC_ENUM_FRAMESIZES)]  = "VIDIOC_ENUM_FRAMESIZES",
+	[_IOC_NR(VIDIOC_ENUM_FRAMEINTERVALS)] = "VIDIOC_ENUM_FRAMEINTERVALS",
+	[_IOC_NR(VIDIOC_G_ENC_INDEX)] 	   = "VIDIOC_G_ENC_INDEX",
+	[_IOC_NR(VIDIOC_ENCODER_CMD)] 	   = "VIDIOC_ENCODER_CMD",
+	[_IOC_NR(VIDIOC_TRY_ENCODER_CMD)]  = "VIDIOC_TRY_ENCODER_CMD",
+
+	[_IOC_NR(VIDIOC_DBG_S_REGISTER)]   = "VIDIOC_DBG_S_REGISTER",
+	[_IOC_NR(VIDIOC_DBG_G_REGISTER)]   = "VIDIOC_DBG_G_REGISTER",
+
+	[_IOC_NR(VIDIOC_G_CHIP_IDENT)]     = "VIDIOC_G_CHIP_IDENT",
+#endif
+};
+#define V4L2_IOCTLS ARRAY_SIZE(v4l2_ioctls)
+
+static const char *v4l2_int_ioctls[] = {
+#ifdef CONFIG_VIDEO_V4L1_COMPAT
+	[_IOC_NR(DECODER_GET_CAPABILITIES)]    = "DECODER_GET_CAPABILITIES",
+	[_IOC_NR(DECODER_GET_STATUS)]          = "DECODER_GET_STATUS",
+	[_IOC_NR(DECODER_SET_NORM)]            = "DECODER_SET_NORM",
+	[_IOC_NR(DECODER_SET_INPUT)]           = "DECODER_SET_INPUT",
+	[_IOC_NR(DECODER_SET_OUTPUT)]          = "DECODER_SET_OUTPUT",
+	[_IOC_NR(DECODER_ENABLE_OUTPUT)]       = "DECODER_ENABLE_OUTPUT",
+	[_IOC_NR(DECODER_SET_PICTURE)]         = "DECODER_SET_PICTURE",
+	[_IOC_NR(DECODER_SET_GPIO)]            = "DECODER_SET_GPIO",
+	[_IOC_NR(DECODER_INIT)]                = "DECODER_INIT",
+	[_IOC_NR(DECODER_SET_VBI_BYPASS)]      = "DECODER_SET_VBI_BYPASS",
+	[_IOC_NR(DECODER_DUMP)]                = "DECODER_DUMP",
+#endif
+	[_IOC_NR(AUDC_SET_RADIO)]              = "AUDC_SET_RADIO",
+
+	[_IOC_NR(TUNER_SET_TYPE_ADDR)]         = "TUNER_SET_TYPE_ADDR",
+	[_IOC_NR(TUNER_SET_STANDBY)]           = "TUNER_SET_STANDBY",
+	[_IOC_NR(TUNER_SET_CONFIG)]            = "TUNER_SET_CONFIG",
+
+	[_IOC_NR(VIDIOC_INT_S_TUNER_MODE)]     = "VIDIOC_INT_S_TUNER_MODE",
+	[_IOC_NR(VIDIOC_INT_RESET)]            = "VIDIOC_INT_RESET",
+	[_IOC_NR(VIDIOC_INT_AUDIO_CLOCK_FREQ)] = "VIDIOC_INT_AUDIO_CLOCK_FREQ",
+	[_IOC_NR(VIDIOC_INT_DECODE_VBI_LINE)]  = "VIDIOC_INT_DECODE_VBI_LINE",
+	[_IOC_NR(VIDIOC_INT_S_VBI_DATA)]       = "VIDIOC_INT_S_VBI_DATA",
+	[_IOC_NR(VIDIOC_INT_G_VBI_DATA)]       = "VIDIOC_INT_G_VBI_DATA",
+	[_IOC_NR(VIDIOC_INT_I2S_CLOCK_FREQ)]   = "VIDIOC_INT_I2S_CLOCK_FREQ",
+	[_IOC_NR(VIDIOC_INT_S_STANDBY)]        = "VIDIOC_INT_S_STANDBY",
+	[_IOC_NR(VIDIOC_INT_S_AUDIO_ROUTING)]  = "VIDIOC_INT_S_AUDIO_ROUTING",
+	[_IOC_NR(VIDIOC_INT_G_AUDIO_ROUTING)]  = "VIDIOC_INT_G_AUDIO_ROUTING",
+	[_IOC_NR(VIDIOC_INT_S_VIDEO_ROUTING)]  = "VIDIOC_INT_S_VIDEO_ROUTING",
+	[_IOC_NR(VIDIOC_INT_G_VIDEO_ROUTING)]  = "VIDIOC_INT_G_VIDEO_ROUTING",
+	[_IOC_NR(VIDIOC_INT_S_CRYSTAL_FREQ)]   = "VIDIOC_INT_S_CRYSTAL_FREQ",
+	[_IOC_NR(VIDIOC_INT_INIT)]   	       = "VIDIOC_INT_INIT",
+	[_IOC_NR(VIDIOC_INT_G_STD_OUTPUT)]     = "VIDIOC_INT_G_STD_OUTPUT",
+	[_IOC_NR(VIDIOC_INT_S_STD_OUTPUT)]     = "VIDIOC_INT_S_STD_OUTPUT",
+};
+#define V4L2_INT_IOCTLS ARRAY_SIZE(v4l2_int_ioctls)
+
+/* Common ioctl debug function. This function can be used by
+   external ioctl messages as well as internal V4L ioctl */
+void v4l_printk_ioctl(unsigned int cmd)
+{
+	char *dir, *type;
+
+	switch (_IOC_TYPE(cmd)) {
+	case 'd':
+		if (_IOC_NR(cmd) >= V4L2_INT_IOCTLS) {
+			type = "v4l2_int";
+			break;
+		}
+		printk("%s", v4l2_int_ioctls[_IOC_NR(cmd)]);
+		return;
+#ifdef CONFIG_VIDEO_V4L1_COMPAT
+	case 'v':
+		if (_IOC_NR(cmd) >= V4L1_IOCTLS) {
+			type = "v4l1";
+			break;
+		}
+		printk("%s", v4l1_ioctls[_IOC_NR(cmd)]);
+		return;
+#endif
+	case 'V':
+		if (_IOC_NR(cmd) >= V4L2_IOCTLS) {
+			type = "v4l2";
+			break;
+		}
+		printk("%s", v4l2_ioctls[_IOC_NR(cmd)]);
+		return;
+	default:
+		type = "unknown";
+	}
+
+	switch (_IOC_DIR(cmd)) {
+	case _IOC_NONE:              dir = "--"; break;
+	case _IOC_READ:              dir = "r-"; break;
+	case _IOC_WRITE:             dir = "-w"; break;
+	case _IOC_READ | _IOC_WRITE: dir = "rw"; break;
+	default:                     dir = "*ERR*"; break;
+	}
+	printk("%s ioctl '%c', dir=%s, #%d (0x%08x)",
+		type, _IOC_TYPE(cmd), dir, _IOC_NR(cmd), cmd);
+}
+EXPORT_SYMBOL(v4l_printk_ioctl);
 
 /*
  *	sysfs stuff
@@ -69,11 +385,13 @@ struct video_device *video_device_alloc(void)
 	vfd = kzalloc(sizeof(*vfd),GFP_KERNEL);
 	return vfd;
 }
+EXPORT_SYMBOL(video_device_alloc);
 
 void video_device_release(struct video_device *vfd)
 {
 	kfree(vfd);
 }
+EXPORT_SYMBOL(video_device_release);
 
 static void video_release(struct device *cd)
 {
@@ -110,6 +428,7 @@ struct video_device* video_devdata(struct file *file)
 {
 	return video_device[iminor(file->f_path.dentry->d_inode)];
 }
+EXPORT_SYMBOL(video_devdata);
 
 /*
  *	Open a video device - FIXME: Obsoleted
@@ -278,6 +597,7 @@ out:
 	kfree(mbuf);
 	return err;
 }
+EXPORT_SYMBOL(video_usercopy);
 
 /*
  * open/release helper functions -- handle exclusive opens
@@ -297,6 +617,7 @@ int video_exclusive_open(struct inode *inode, struct file *file)
 	mutex_unlock(&vfl->lock);
 	return retval;
 }
+EXPORT_SYMBOL(video_exclusive_open);
 
 int video_exclusive_release(struct inode *inode, struct file *file)
 {
@@ -305,41 +626,7 @@ int video_exclusive_release(struct inode *inode, struct file *file)
 	vfl->users--;
 	return 0;
 }
-
-static char *v4l2_memory_names[] = {
-	[V4L2_MEMORY_MMAP]    = "mmap",
-	[V4L2_MEMORY_USERPTR] = "userptr",
-	[V4L2_MEMORY_OVERLAY] = "overlay",
-};
-
-
-/* FIXME: Those stuff are replicated also on v4l2-common.c */
-static char *v4l2_type_names_FIXME[] = {
-	[V4L2_BUF_TYPE_VIDEO_CAPTURE]      = "video-cap",
-	[V4L2_BUF_TYPE_VIDEO_OVERLAY]      = "video-over",
-	[V4L2_BUF_TYPE_VIDEO_OUTPUT]       = "video-out",
-	[V4L2_BUF_TYPE_VBI_CAPTURE]        = "vbi-cap",
-	[V4L2_BUF_TYPE_VBI_OUTPUT]         = "vbi-out",
-	[V4L2_BUF_TYPE_SLICED_VBI_OUTPUT]  = "sliced-vbi-out",
-	[V4L2_BUF_TYPE_SLICED_VBI_CAPTURE] = "sliced-vbi-capture",
-	[V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY] = "video-out-over",
-	[V4L2_BUF_TYPE_PRIVATE]            = "private",
-};
-
-static char *v4l2_field_names_FIXME[] = {
-	[V4L2_FIELD_ANY]        = "any",
-	[V4L2_FIELD_NONE]       = "none",
-	[V4L2_FIELD_TOP]        = "top",
-	[V4L2_FIELD_BOTTOM]     = "bottom",
-	[V4L2_FIELD_INTERLACED] = "interlaced",
-	[V4L2_FIELD_SEQ_TB]     = "seq-tb",
-	[V4L2_FIELD_SEQ_BT]     = "seq-bt",
-	[V4L2_FIELD_ALTERNATE]  = "alternate",
-	[V4L2_FIELD_INTERLACED_TB] = "interlaced-tb",
-	[V4L2_FIELD_INTERLACED_BT] = "interlaced-bt",
-};
-
-#define prt_names(a,arr) (((a)>=0)&&((a)<ARRAY_SIZE(arr)))?arr[a]:"unknown"
+EXPORT_SYMBOL(video_exclusive_release);
 
 static void dbgbuf(unsigned int cmd, struct video_device *vfd,
 					struct v4l2_buffer *p)
@@ -354,10 +641,10 @@ static void dbgbuf(unsigned int cmd, struct video_device *vfd,
 			(int)(p->timestamp.tv_sec%60),
 			p->timestamp.tv_usec,
 			p->index,
-			prt_names(p->type,v4l2_type_names_FIXME),
-			p->bytesused,p->flags,
-			p->field,p->sequence,
-			prt_names(p->memory,v4l2_memory_names),
+			prt_names(p->type, v4l2_type_names),
+			p->bytesused, p->flags,
+			p->field, p->sequence,
+			prt_names(p->memory, v4l2_memory_names),
 			p->m.userptr, p->length);
 	dbgarg2 ("timecode= %02d:%02d:%02d type=%d, "
 		"flags=0x%08d, frames=%d, userbits=0x%08x\n",
@@ -382,8 +669,8 @@ static inline void v4l_print_pix_fmt (struct video_device *vfd,
 		(fmt->pixelformat >>  8) & 0xff,
 		(fmt->pixelformat >> 16) & 0xff,
 		(fmt->pixelformat >> 24) & 0xff,
-		prt_names(fmt->field,v4l2_field_names_FIXME),
-		fmt->bytesperline,fmt->sizeimage,fmt->colorspace);
+		prt_names(fmt->field, v4l2_field_names),
+		fmt->bytesperline, fmt->sizeimage, fmt->colorspace);
 };
 
 
@@ -440,6 +727,7 @@ static int __video_do_ioctl(struct inode *inode, struct file *file,
 	if ( (vfd->debug & V4L2_DEBUG_IOCTL) &&
 				!(vfd->debug & V4L2_DEBUG_IOCTL_ARG)) {
 		v4l_print_ioctl(vfd->name, cmd);
+		printk("\n");
 	}
 
 #ifdef CONFIG_VIDEO_V4L1_COMPAT
@@ -597,7 +885,7 @@ static int __video_do_ioctl(struct inode *inode, struct file *file,
 
 		/* FIXME: Should be one dump per type */
 		dbgarg (cmd, "type=%s\n", prt_names(type,
-					v4l2_type_names_FIXME));
+					v4l2_type_names));
 
 		switch (type) {
 		case V4L2_BUF_TYPE_VIDEO_CAPTURE:
@@ -650,7 +938,7 @@ static int __video_do_ioctl(struct inode *inode, struct file *file,
 
 		/* FIXME: Should be one dump per type */
 		dbgarg (cmd, "type=%s\n", prt_names(f->type,
-					v4l2_type_names_FIXME));
+					v4l2_type_names));
 
 		switch (f->type) {
 		case V4L2_BUF_TYPE_VIDEO_CAPTURE:
@@ -702,7 +990,7 @@ static int __video_do_ioctl(struct inode *inode, struct file *file,
 
 		/* FIXME: Should be one dump per type */
 		dbgarg (cmd, "type=%s\n", prt_names(f->type,
-						v4l2_type_names_FIXME));
+						v4l2_type_names));
 		switch (f->type) {
 		case V4L2_BUF_TYPE_VIDEO_CAPTURE:
 			if (vfd->vidioc_try_fmt_cap)
@@ -768,8 +1056,8 @@ static int __video_do_ioctl(struct inode *inode, struct file *file,
 		ret=vfd->vidioc_reqbufs(file, fh, p);
 		dbgarg (cmd, "count=%d, type=%s, memory=%s\n",
 				p->count,
-				prt_names(p->type,v4l2_type_names_FIXME),
-				prt_names(p->memory,v4l2_memory_names));
+				prt_names(p->type, v4l2_type_names),
+				prt_names(p->memory, v4l2_memory_names));
 		break;
 	}
 	case VIDIOC_QUERYBUF:
@@ -858,7 +1146,7 @@ static int __video_do_ioctl(struct inode *inode, struct file *file,
 		enum v4l2_buf_type i = *(int *)arg;
 		if (!vfd->vidioc_streamon)
 			break;
-		dbgarg (cmd, "type=%s\n", prt_names(i,v4l2_type_names_FIXME));
+		dbgarg(cmd, "type=%s\n", prt_names(i, v4l2_type_names));
 		ret=vfd->vidioc_streamon(file, fh,i);
 		break;
 	}
@@ -868,7 +1156,7 @@ static int __video_do_ioctl(struct inode *inode, struct file *file,
 
 		if (!vfd->vidioc_streamoff)
 			break;
-		dbgarg (cmd, "type=%s\n", prt_names(i,v4l2_type_names_FIXME));
+		dbgarg(cmd, "type=%s\n", prt_names(i, v4l2_type_names));
 		ret=vfd->vidioc_streamoff(file, fh, i);
 		break;
 	}
@@ -876,95 +1164,40 @@ static int __video_do_ioctl(struct inode *inode, struct file *file,
 	case VIDIOC_ENUMSTD:
 	{
 		struct v4l2_standard *p = arg;
-		v4l2_std_id id = vfd->tvnorms,curr_id=0;
-		unsigned int index = p->index,i;
+		v4l2_std_id id = vfd->tvnorms, curr_id = 0;
+		unsigned int index = p->index, i, j = 0;
+		const char *descr = "";
 
-		if (index<0) {
-			ret=-EINVAL;
-			break;
-		}
-
-		/* Return norm array on a canonical way */
-		for (i=0;i<= index && id; i++) {
-			if ( (id & V4L2_STD_PAL) == V4L2_STD_PAL) {
-				curr_id = V4L2_STD_PAL;
-			} else if ( (id & V4L2_STD_PAL_BG) == V4L2_STD_PAL_BG) {
-				curr_id = V4L2_STD_PAL_BG;
-			} else if ( (id & V4L2_STD_PAL_DK) == V4L2_STD_PAL_DK) {
-				curr_id = V4L2_STD_PAL_DK;
-			} else if ( (id & V4L2_STD_PAL_B) == V4L2_STD_PAL_B) {
-				curr_id = V4L2_STD_PAL_B;
-			} else if ( (id & V4L2_STD_PAL_B1) == V4L2_STD_PAL_B1) {
-				curr_id = V4L2_STD_PAL_B1;
-			} else if ( (id & V4L2_STD_PAL_G) == V4L2_STD_PAL_G) {
-				curr_id = V4L2_STD_PAL_G;
-			} else if ( (id & V4L2_STD_PAL_H) == V4L2_STD_PAL_H) {
-				curr_id = V4L2_STD_PAL_H;
-			} else if ( (id & V4L2_STD_PAL_I) == V4L2_STD_PAL_I) {
-				curr_id = V4L2_STD_PAL_I;
-			} else if ( (id & V4L2_STD_PAL_D) == V4L2_STD_PAL_D) {
-				curr_id = V4L2_STD_PAL_D;
-			} else if ( (id & V4L2_STD_PAL_D1) == V4L2_STD_PAL_D1) {
-				curr_id = V4L2_STD_PAL_D1;
-			} else if ( (id & V4L2_STD_PAL_K) == V4L2_STD_PAL_K) {
-				curr_id = V4L2_STD_PAL_K;
-			} else if ( (id & V4L2_STD_PAL_M) == V4L2_STD_PAL_M) {
-				curr_id = V4L2_STD_PAL_M;
-			} else if ( (id & V4L2_STD_PAL_N) == V4L2_STD_PAL_N) {
-				curr_id = V4L2_STD_PAL_N;
-			} else if ( (id & V4L2_STD_PAL_Nc) == V4L2_STD_PAL_Nc) {
-				curr_id = V4L2_STD_PAL_Nc;
-			} else if ( (id & V4L2_STD_PAL_60) == V4L2_STD_PAL_60) {
-				curr_id = V4L2_STD_PAL_60;
-			} else if ( (id & V4L2_STD_NTSC) == V4L2_STD_NTSC) {
-				curr_id = V4L2_STD_NTSC;
-			} else if ( (id & V4L2_STD_NTSC_M) == V4L2_STD_NTSC_M) {
-				curr_id = V4L2_STD_NTSC_M;
-			} else if ( (id & V4L2_STD_NTSC_M_JP) == V4L2_STD_NTSC_M_JP) {
-				curr_id = V4L2_STD_NTSC_M_JP;
-			} else if ( (id & V4L2_STD_NTSC_443) == V4L2_STD_NTSC_443) {
-				curr_id = V4L2_STD_NTSC_443;
-			} else if ( (id & V4L2_STD_NTSC_M_KR) == V4L2_STD_NTSC_M_KR) {
-				curr_id = V4L2_STD_NTSC_M_KR;
-			} else if ( (id & V4L2_STD_SECAM) == V4L2_STD_SECAM) {
-				curr_id = V4L2_STD_SECAM;
-			} else if ( (id & V4L2_STD_SECAM_DK) == V4L2_STD_SECAM_DK) {
-				curr_id = V4L2_STD_SECAM_DK;
-			} else if ( (id & V4L2_STD_SECAM_B) == V4L2_STD_SECAM_B) {
-				curr_id = V4L2_STD_SECAM_B;
-			} else if ( (id & V4L2_STD_SECAM_D) == V4L2_STD_SECAM_D) {
-				curr_id = V4L2_STD_SECAM_D;
-			} else if ( (id & V4L2_STD_SECAM_G) == V4L2_STD_SECAM_G) {
-				curr_id = V4L2_STD_SECAM_G;
-			} else if ( (id & V4L2_STD_SECAM_H) == V4L2_STD_SECAM_H) {
-				curr_id = V4L2_STD_SECAM_H;
-			} else if ( (id & V4L2_STD_SECAM_K) == V4L2_STD_SECAM_K) {
-				curr_id = V4L2_STD_SECAM_K;
-			} else if ( (id & V4L2_STD_SECAM_K1) == V4L2_STD_SECAM_K1) {
-				curr_id = V4L2_STD_SECAM_K1;
-			} else if ( (id & V4L2_STD_SECAM_L) == V4L2_STD_SECAM_L) {
-				curr_id = V4L2_STD_SECAM_L;
-			} else if ( (id & V4L2_STD_SECAM_LC) == V4L2_STD_SECAM_LC) {
-				curr_id = V4L2_STD_SECAM_LC;
-			} else {
+		/* Return norm array in a canonical way */
+		for (i = 0; i <= index && id; i++) {
+			/* last std value in the standards array is 0, so this
+			   while always ends there since (id & 0) == 0. */
+			while ((id & standards[j].std) != standards[j].std)
+				j++;
+			curr_id = standards[j].std;
+			descr = standards[j].descr;
+			j++;
+			if (curr_id == 0)
 				break;
-			}
-			id &= ~curr_id;
+			if (curr_id != V4L2_STD_PAL &&
+			    curr_id != V4L2_STD_SECAM &&
+			    curr_id != V4L2_STD_NTSC)
+				id &= ~curr_id;
 		}
-		if (i<=index)
+		if (i <= index)
 			return -EINVAL;
 
-		v4l2_video_std_construct(p, curr_id,v4l2_norm_to_name(curr_id));
+		v4l2_video_std_construct(p, curr_id, descr);
 		p->index = index;
 
-		dbgarg (cmd, "index=%d, id=%Ld, name=%s, fps=%d/%d, "
+		dbgarg(cmd, "index=%d, id=%Ld, name=%s, fps=%d/%d, "
 				"framelines=%d\n", p->index,
 				(unsigned long long)p->id, p->name,
 				p->frameperiod.numerator,
 				p->frameperiod.denominator,
 				p->framelines);
 
-		ret=0;
+		ret = 0;
 		break;
 	}
 	case VIDIOC_G_STD:
@@ -973,7 +1206,7 @@ static int __video_do_ioctl(struct inode *inode, struct file *file,
 
 		*id = vfd->current_norm;
 
-		dbgarg (cmd, "value=%Lu\n", (long long unsigned) *id);
+		dbgarg (cmd, "value=%08Lx\n", (long long unsigned) *id);
 
 		ret=0;
 		break;
@@ -982,7 +1215,7 @@ static int __video_do_ioctl(struct inode *inode, struct file *file,
 	{
 		v4l2_std_id *id = arg,norm;
 
-		dbgarg (cmd, "value=%Lu\n", (long long unsigned) *id);
+		dbgarg (cmd, "value=%08Lx\n", (long long unsigned) *id);
 
 		norm = (*id) & vfd->tvnorms;
 		if ( vfd->tvnorms && !norm)	/* Check if std is supported */
@@ -1008,7 +1241,7 @@ static int __video_do_ioctl(struct inode *inode, struct file *file,
 			break;
 		ret=vfd->vidioc_querystd(file, fh, arg);
 		if (!ret)
-			dbgarg (cmd, "detected std=%Lu\n",
+			dbgarg (cmd, "detected std=%08Lx\n",
 						(unsigned long long)*p);
 		break;
 	}
@@ -1028,7 +1261,7 @@ static int __video_do_ioctl(struct inode *inode, struct file *file,
 		if (!ret)
 			dbgarg (cmd, "index=%d, name=%s, type=%d, "
 					"audioset=%d, "
-					"tuner=%d, std=%Ld, status=%d\n",
+					"tuner=%d, std=%08Lx, status=%d\n",
 					p->index,p->name,p->type,p->audioset,
 					p->tuner,
 					(unsigned long long)p->std,
@@ -1519,12 +1752,20 @@ static int __video_do_ioctl(struct inode *inode, struct file *file,
 			dbgarg (cmd, "chip_ident=%u, revision=0x%x\n", p->ident, p->revision);
 		break;
 	}
+	default:
+	{
+		if (!vfd->vidioc_default)
+			break;
+		ret = vfd->vidioc_default(file, fh, cmd, arg);
+		break;
+	}
 	} /* switch */
 
 	if (vfd->debug & V4L2_DEBUG_IOCTL_ARG) {
 		if (ret<0) {
-			printk ("%s: err:\n", vfd->name);
+			printk("%s: err: on ", vfd->name);
 			v4l_print_ioctl(vfd->name, cmd);
+			printk("\n");
 		}
 	}
 
@@ -1624,7 +1865,7 @@ out:
 	kfree(mbuf);
 	return err;
 }
-
+EXPORT_SYMBOL(video_ioctl2);
 
 static const struct file_operations video_fops;
 
@@ -1685,7 +1926,7 @@ int video_register_device(struct video_device *vfd, int type, int nr)
 			break;
 		default:
 			printk(KERN_ERR "%s called with unknown type: %d\n",
-			       __FUNCTION__, type);
+			       __func__, type);
 			return -1;
 	}
 
@@ -1723,7 +1964,7 @@ int video_register_device(struct video_device *vfd, int type, int nr)
 	ret = device_register(&vfd->class_dev);
 	if (ret < 0) {
 		printk(KERN_ERR "%s: device_register failed\n",
-		       __FUNCTION__);
+		       __func__);
 		goto fail_minor;
 	}
 
@@ -1743,6 +1984,7 @@ fail_minor:
 	mutex_unlock(&videodev_lock);
 	return ret;
 }
+EXPORT_SYMBOL(video_register_device);
 
 /**
  *	video_unregister_device - unregister a video4linux device
@@ -1762,6 +2004,7 @@ void video_unregister_device(struct video_device *vfd)
 	device_unregister(&vfd->class_dev);
 	mutex_unlock(&videodev_lock);
 }
+EXPORT_SYMBOL(video_unregister_device);
 
 /*
  * Video fs operations
@@ -1805,16 +2048,6 @@ static void __exit videodev_exit(void)
 
 module_init(videodev_init)
 module_exit(videodev_exit)
-
-EXPORT_SYMBOL(video_register_device);
-EXPORT_SYMBOL(video_unregister_device);
-EXPORT_SYMBOL(video_devdata);
-EXPORT_SYMBOL(video_usercopy);
-EXPORT_SYMBOL(video_exclusive_open);
-EXPORT_SYMBOL(video_exclusive_release);
-EXPORT_SYMBOL(video_ioctl2);
-EXPORT_SYMBOL(video_device_alloc);
-EXPORT_SYMBOL(video_device_release);
 
 MODULE_AUTHOR("Alan Cox, Mauro Carvalho Chehab <mchehab@infradead.org>");
 MODULE_DESCRIPTION("Device registrar for Video4Linux drivers v2");

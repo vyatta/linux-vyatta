@@ -37,6 +37,7 @@ struct ccwgroup_device {
  * @remove: function called on remove
  * @set_online: function called when device is set online
  * @set_offline: function called when device is set offline
+ * @shutdown: function called when device is shut down
  * @driver: embedded driver structure
  */
 struct ccwgroup_driver {
@@ -49,16 +50,16 @@ struct ccwgroup_driver {
 	void (*remove) (struct ccwgroup_device *);
 	int (*set_online) (struct ccwgroup_device *);
 	int (*set_offline) (struct ccwgroup_device *);
+	void (*shutdown)(struct ccwgroup_device *);
 
 	struct device_driver driver;
 };
 
 extern int  ccwgroup_driver_register   (struct ccwgroup_driver *cdriver);
 extern void ccwgroup_driver_unregister (struct ccwgroup_driver *cdriver);
-extern int ccwgroup_create (struct device *root,
-			    unsigned int creator_id,
-			    struct ccw_driver *gdrv,
-			    int argc, char *argv[]);
+int ccwgroup_create_from_string(struct device *root, unsigned int creator_id,
+				struct ccw_driver *cdrv, int num_devices,
+				const char *buf);
 
 extern int ccwgroup_probe_ccwdev(struct ccw_device *cdev);
 extern void ccwgroup_remove_ccwdev(struct ccw_device *cdev);

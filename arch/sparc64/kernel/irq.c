@@ -1,6 +1,6 @@
 /* irq.c: UltraSparc IRQ handling/init/registry.
  *
- * Copyright (C) 1997, 2007  David S. Miller  (davem@davemloft.net)
+ * Copyright (C) 1997, 2007, 2008 David S. Miller (davem@davemloft.net)
  * Copyright (C) 1998  Eddie C. Dost    (ecd@skynet.be)
  * Copyright (C) 1998  Jakub Jelinek    (jj@ultra.linux.cz)
  */
@@ -44,27 +44,10 @@
 #include <asm/hypervisor.h>
 #include <asm/cacheflush.h>
 
-/* UPA nodes send interrupt packet to UltraSparc with first data reg
- * value low 5 (7 on Starfire) bits holding the IRQ identifier being
- * delivered.  We must translate this into a non-vector IRQ so we can
- * set the softint on this cpu.
- *
- * To make processing these packets efficient and race free we use
- * an array of irq buckets below.  The interrupt vector handler in
- * entry.S feeds incoming packets into per-cpu pil-indexed lists.
- *
- * If you make changes to ino_bucket, please update hand coded assembler
- * of the vectored interrupt trap handler(s) in entry.S and sun4v_ivec.S
- */
-struct ino_bucket {
-/*0x00*/unsigned long __irq_chain_pa;
-
-	/* Virtual interrupt number assigned to this INO.  */
-/*0x08*/unsigned int __virt_irq;
-/*0x0c*/unsigned int __pad;
-};
+#include "entry.h"
 
 #define NUM_IVECS	(IMAP_INR + 1)
+
 struct ino_bucket *ivector_table;
 unsigned long ivector_table_pa;
 
@@ -325,6 +308,7 @@ static void sun4u_irq_enable(unsigned int virt_irq)
 			 IMAP_AID_SAFARI | IMAP_NID_SAFARI);
 		val |= tid | IMAP_VALID;
 		upa_writeq(val, imap);
+		upa_writeq(ICLR_IDLE, data->iclr);
 	}
 }
 
@@ -522,7 +506,7 @@ static struct irq_chip sun4v_virq = {
 	.set_affinity	= sun4v_virt_set_affinity,
 };
 
-static void fastcall pre_flow_handler(unsigned int virt_irq,
+static void pre_flow_handler(unsigned int virt_irq,
 				      struct irq_desc *desc)
 {
 	struct irq_handler_data *data = get_irq_chip_data(virt_irq);
@@ -637,8 +621,9 @@ unsigned int sun4v_build_irq(u32 devhandle, unsigned int devino)
 unsigned int sun4v_build_virq(u32 devhandle, unsigned int devino)
 {
 	struct irq_handler_data *data;
-	struct ino_bucket *bucket;
 	unsigned long hv_err, cookie;
+	struct ino_bucket *bucket;
+	struct irq_desc *desc;
 	unsigned int virt_irq;
 
 	bucket = kzalloc(sizeof(struct ino_bucket), GFP_ATOMIC);
@@ -658,6 +643,13 @@ unsigned int sun4v_build_virq(u32 devhandle, unsigned int devino)
 	data = kzalloc(sizeof(struct irq_handler_data), GFP_ATOMIC);
 	if (unlikely(!data))
 		return 0;
+
+	/* In order to make the LDC channel startup sequence easier,
+	 * especially wrt. locking, we do not let request_irq() enable
+	 * the interrupt.
+	 */
+	desc = irq_desc + virt_irq;
+	desc->status |= IRQ_NOAUTOEN;
 
 	set_irq_chip_data(virt_irq, data);
 
@@ -690,10 +682,32 @@ void ack_bad_irq(unsigned int virt_irq)
 	       ino, virt_irq);
 }
 
+void *hardirq_stack[NR_CPUS];
+void *softirq_stack[NR_CPUS];
+
+static __attribute__((always_inline)) void *set_hardirq_stack(void)
+{
+	void *orig_sp, *sp = hardirq_stack[smp_processor_id()];
+
+	__asm__ __volatile__("mov %%sp, %0" : "=r" (orig_sp));
+	if (orig_sp < sp ||
+	    orig_sp > (sp + THREAD_SIZE)) {
+		sp += THREAD_SIZE - 192 - STACK_BIAS;
+		__asm__ __volatile__("mov %0, %%sp" : : "r" (sp));
+	}
+
+	return orig_sp;
+}
+static __attribute__((always_inline)) void restore_hardirq_stack(void *orig_sp)
+{
+	__asm__ __volatile__("mov %0, %%sp" : : "r" (orig_sp));
+}
+
 void handler_irq(int irq, struct pt_regs *regs)
 {
 	unsigned long pstate, bucket_pa;
 	struct pt_regs *old_regs;
+	void *orig_sp;
 
 	clear_softint(1 << irq);
 
@@ -711,6 +725,8 @@ void handler_irq(int irq, struct pt_regs *regs)
 			       "i" (PSTATE_IE)
 			     : "memory");
 
+	orig_sp = set_hardirq_stack();
+
 	while (bucket_pa) {
 		struct irq_desc *desc;
 		unsigned long next_pa;
@@ -727,8 +743,36 @@ void handler_irq(int irq, struct pt_regs *regs)
 		bucket_pa = next_pa;
 	}
 
+	restore_hardirq_stack(orig_sp);
+
 	irq_exit();
 	set_irq_regs(old_regs);
+}
+
+void do_softirq(void)
+{
+	unsigned long flags;
+
+	if (in_interrupt())
+		return;
+
+	local_irq_save(flags);
+
+	if (local_softirq_pending()) {
+		void *orig_sp, *sp = softirq_stack[smp_processor_id()];
+
+		sp += THREAD_SIZE - 192 - STACK_BIAS;
+
+		__asm__ __volatile__("mov %%sp, %0\n\t"
+				     "mov %1, %%sp"
+				     : "=&r" (orig_sp)
+				     : "r" (sp));
+		__do_softirq();
+		__asm__ __volatile__("mov %0, %%sp"
+				     : : "r" (orig_sp));
+	}
+
+	local_irq_restore(flags);
 }
 
 #ifdef CONFIG_HOTPLUG_CPU

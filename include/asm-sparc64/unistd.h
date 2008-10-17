@@ -329,23 +329,15 @@
 #define __NR_epoll_pwait	309
 #define __NR_utimensat		310
 #define __NR_signalfd		311
-#define __NR_timerfd		312
+#define __NR_timerfd_create	312
 #define __NR_eventfd		313
 #define __NR_fallocate		314
+#define __NR_timerfd_settime	315
+#define __NR_timerfd_gettime	316
 
-#define NR_SYSCALLS		315
+#define NR_SYSCALLS		317
 
 #ifdef __KERNEL__
-/* sysconf options, for SunOS compatibility */
-#define   _SC_ARG_MAX             1
-#define   _SC_CHILD_MAX           2
-#define   _SC_CLK_TCK             3
-#define   _SC_NGROUPS_MAX         4
-#define   _SC_OPEN_MAX            5
-#define   _SC_JOB_CONTROL         6
-#define   _SC_SAVED_IDS           7
-#define   _SC_VERSION             8
-
 #define __ARCH_WANT_IPC_PARSE_VERSION
 #define __ARCH_WANT_OLD_READDIR
 #define __ARCH_WANT_STAT64

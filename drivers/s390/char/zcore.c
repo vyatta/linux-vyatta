@@ -224,7 +224,7 @@ static int __init init_cpu_info(enum arch_id arch)
 
 	sa = kmalloc(sizeof(*sa), GFP_KERNEL);
 	if (!sa) {
-		ERROR_MSG("kmalloc failed: %s: %i\n",__FUNCTION__, __LINE__);
+		ERROR_MSG("kmalloc failed: %s: %i\n",__func__, __LINE__);
 		return -ENOMEM;
 	}
 	if (memcpy_hsa_kernel(sa, sys_info.sa_base, sys_info.sa_size) < 0) {
@@ -470,7 +470,7 @@ static loff_t zcore_lseek(struct file *file, loff_t offset, int orig)
 	return rc;
 }
 
-static struct file_operations zcore_fops = {
+static const struct file_operations zcore_fops = {
 	.owner		= THIS_MODULE,
 	.llseek		= zcore_lseek,
 	.read		= zcore_read,

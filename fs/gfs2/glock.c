@@ -1,6 +1,6 @@
 /*
  * Copyright (C) Sistina Software, Inc.  1997-2003 All rights reserved.
- * Copyright (C) 2004-2006 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2004-2008 Red Hat, Inc.  All rights reserved.
  *
  * This copyrighted material is made available to anyone wishing to use,
  * modify, copy, or redistribute it subject to the terms and conditions
@@ -35,7 +35,6 @@
 #include "glock.h"
 #include "glops.h"
 #include "inode.h"
-#include "lm.h"
 #include "lops.h"
 #include "meta_io.h"
 #include "quota.h"
@@ -183,7 +182,8 @@ static void glock_free(struct gfs2_glock *gl)
 	struct gfs2_sbd *sdp = gl->gl_sbd;
 	struct inode *aspace = gl->gl_aspace;
 
-	gfs2_lm_put_lock(sdp, gl->gl_lock);
+	if (likely(!test_bit(SDF_SHUTDOWN, &sdp->sd_flags)))
+		sdp->sd_lockstruct.ls_ops->lm_put_lock(gl->gl_lock);
 
 	if (aspace)
 		gfs2_aspace_put(aspace);
@@ -197,7 +197,7 @@ static void glock_free(struct gfs2_glock *gl)
  *
  */
 
-void gfs2_glock_hold(struct gfs2_glock *gl)
+static void gfs2_glock_hold(struct gfs2_glock *gl)
 {
 	atomic_inc(&gl->gl_ref);
 }
@@ -217,7 +217,6 @@ int gfs2_glock_put(struct gfs2_glock *gl)
 	if (atomic_dec_and_test(&gl->gl_ref)) {
 		hlist_del(&gl->gl_list);
 		write_unlock(gl_lock_addr(gl->gl_hash));
-		BUG_ON(spin_is_locked(&gl->gl_spin));
 		gfs2_assert(sdp, gl->gl_state == LM_ST_UNLOCKED);
 		gfs2_assert(sdp, list_empty(&gl->gl_reclaim));
 		gfs2_assert(sdp, list_empty(&gl->gl_holders));
@@ -294,6 +293,16 @@ static void glock_work_func(struct work_struct *work)
 	gfs2_glock_put(gl);
 }
 
+static int gfs2_lm_get_lock(struct gfs2_sbd *sdp, struct lm_lockname *name,
+		     void **lockp)
+{
+	int error = -EIO;
+	if (likely(!test_bit(SDF_SHUTDOWN, &sdp->sd_flags)))
+		error = sdp->sd_lockstruct.ls_ops->lm_get_lock(
+				sdp->sd_lockstruct.ls_lockspace, name, lockp);
+	return error;
+}
+
 /**
  * gfs2_glock_get() - Get a glock, or create one if one doesn't exist
  * @sdp: The GFS2 superblock
@@ -335,18 +344,15 @@ int gfs2_glock_get(struct gfs2_sbd *sdp, u64 number,
 	gl->gl_state = LM_ST_UNLOCKED;
 	gl->gl_demote_state = LM_ST_EXCLUSIVE;
 	gl->gl_hash = hash;
-	gl->gl_owner_pid = 0;
+	gl->gl_owner_pid = NULL;
 	gl->gl_ip = 0;
 	gl->gl_ops = glops;
 	gl->gl_req_gh = NULL;
-	gl->gl_req_bh = NULL;
-	gl->gl_vn = 0;
 	gl->gl_stamp = jiffies;
 	gl->gl_tchange = jiffies;
 	gl->gl_object = NULL;
 	gl->gl_sbd = sdp;
 	gl->gl_aspace = NULL;
-	lops_init_le(&gl->gl_le, &gfs2_glock_lops);
 	INIT_DELAYED_WORK(&gl->gl_work, glock_work_func);
 
 	/* If this glock protects actual on-disk data or metadata blocks,
@@ -401,7 +407,7 @@ void gfs2_holder_init(struct gfs2_glock *gl, unsigned int state, unsigned flags,
 	INIT_LIST_HEAD(&gh->gh_list);
 	gh->gh_gl = gl;
 	gh->gh_ip = (unsigned long)__builtin_return_address(0);
-	gh->gh_owner_pid = current->pid;
+	gh->gh_owner_pid = get_pid(task_pid(current));
 	gh->gh_state = state;
 	gh->gh_flags = flags;
 	gh->gh_error = 0;
@@ -435,6 +441,7 @@ void gfs2_holder_reinit(unsigned int state, unsigned flags, struct gfs2_holder *
 
 void gfs2_holder_uninit(struct gfs2_holder *gh)
 {
+	put_pid(gh->gh_owner_pid);
 	gfs2_glock_put(gh->gh_gl);
 	gh->gh_gl = NULL;
 	gh->gh_ip = 0;
@@ -461,7 +468,6 @@ static void wait_on_holder(struct gfs2_holder *gh)
 
 static void gfs2_demote_wake(struct gfs2_glock *gl)
 {
-	BUG_ON(!spin_is_locked(&gl->gl_spin));
 	gl->gl_demote_state = LM_ST_EXCLUSIVE;
         clear_bit(GLF_DEMOTE, &gl->gl_flags);
         smp_mb__after_clear_bit();
@@ -507,21 +513,12 @@ static int rq_mutex(struct gfs2_holder *gh)
 static int rq_promote(struct gfs2_holder *gh)
 {
 	struct gfs2_glock *gl = gh->gh_gl;
-	struct gfs2_sbd *sdp = gl->gl_sbd;
 
 	if (!relaxed_state_ok(gl->gl_state, gh->gh_state, gh->gh_flags)) {
 		if (list_empty(&gl->gl_holders)) {
 			gl->gl_req_gh = gh;
 			set_bit(GLF_LOCK, &gl->gl_flags);
 			spin_unlock(&gl->gl_spin);
-
-			if (atomic_read(&sdp->sd_reclaim_count) >
-			    gfs2_tune_get(sdp, gt_reclaim_limit) &&
-			    !(gh->gh_flags & LM_FLAG_PRIORITY)) {
-				gfs2_reclaim_glock(sdp);
-				gfs2_reclaim_glock(sdp);
-			}
-
 			gfs2_glock_xmote_th(gh->gh_gl, gh);
 			spin_lock(&gl->gl_spin);
 		}
@@ -567,7 +564,10 @@ static int rq_demote(struct gfs2_glock *gl)
 		gfs2_demote_wake(gl);
 		return 0;
 	}
+
 	set_bit(GLF_LOCK, &gl->gl_flags);
+	set_bit(GLF_DEMOTE_IN_PROGRESS, &gl->gl_flags);
+
 	if (gl->gl_demote_state == LM_ST_UNLOCKED ||
 	    gl->gl_state != LM_ST_EXCLUSIVE) {
 		spin_unlock(&gl->gl_spin);
@@ -576,7 +576,9 @@ static int rq_demote(struct gfs2_glock *gl)
 		spin_unlock(&gl->gl_spin);
 		gfs2_glock_xmote_th(gl, NULL);
 	}
+
 	spin_lock(&gl->gl_spin);
+	clear_bit(GLF_DEMOTE_IN_PROGRESS, &gl->gl_flags);
 
 	return 0;
 }
@@ -598,23 +600,19 @@ static void run_queue(struct gfs2_glock *gl)
 		if (!list_empty(&gl->gl_waiters1)) {
 			gh = list_entry(gl->gl_waiters1.next,
 					struct gfs2_holder, gh_list);
-
-			if (test_bit(HIF_MUTEX, &gh->gh_iflags))
-				blocked = rq_mutex(gh);
-			else
-				gfs2_assert_warn(gl->gl_sbd, 0);
-
+			blocked = rq_mutex(gh);
 		} else if (test_bit(GLF_DEMOTE, &gl->gl_flags)) {
 			blocked = rq_demote(gl);
+			if (test_bit(GLF_WAITERS2, &gl->gl_flags) &&
+				     !blocked) {
+				set_bit(GLF_DEMOTE, &gl->gl_flags);
+				gl->gl_demote_state = LM_ST_UNLOCKED;
+			}
+			clear_bit(GLF_WAITERS2, &gl->gl_flags);
 		} else if (!list_empty(&gl->gl_waiters3)) {
 			gh = list_entry(gl->gl_waiters3.next,
 					struct gfs2_holder, gh_list);
-
-			if (test_bit(HIF_PROMOTE, &gh->gh_iflags))
-				blocked = rq_promote(gh);
-			else
-				gfs2_assert_warn(gl->gl_sbd, 0);
-
+			blocked = rq_promote(gh);
 		} else
 			break;
 
@@ -632,27 +630,21 @@ static void run_queue(struct gfs2_glock *gl)
 
 static void gfs2_glmutex_lock(struct gfs2_glock *gl)
 {
-	struct gfs2_holder gh;
-
-	gfs2_holder_init(gl, 0, 0, &gh);
-	set_bit(HIF_MUTEX, &gh.gh_iflags);
-	if (test_and_set_bit(HIF_WAIT, &gh.gh_iflags))
-		BUG();
-
 	spin_lock(&gl->gl_spin);
 	if (test_and_set_bit(GLF_LOCK, &gl->gl_flags)) {
-		list_add_tail(&gh.gh_list, &gl->gl_waiters1);
-	} else {
-		gl->gl_owner_pid = current->pid;
-		gl->gl_ip = (unsigned long)__builtin_return_address(0);
-		clear_bit(HIF_WAIT, &gh.gh_iflags);
-		smp_mb();
-		wake_up_bit(&gh.gh_iflags, HIF_WAIT);
-	}
-	spin_unlock(&gl->gl_spin);
+		struct gfs2_holder gh;
 
-	wait_on_holder(&gh);
-	gfs2_holder_uninit(&gh);
+		gfs2_holder_init(gl, 0, 0, &gh);
+		set_bit(HIF_WAIT, &gh.gh_iflags);
+		list_add_tail(&gh.gh_list, &gl->gl_waiters1);
+		spin_unlock(&gl->gl_spin);
+		wait_on_holder(&gh);
+		gfs2_holder_uninit(&gh);
+	} else {
+		gl->gl_owner_pid = get_pid(task_pid(current));
+		gl->gl_ip = (unsigned long)__builtin_return_address(0);
+		spin_unlock(&gl->gl_spin);
+	}
 }
 
 /**
@@ -670,7 +662,7 @@ static int gfs2_glmutex_trylock(struct gfs2_glock *gl)
 	if (test_and_set_bit(GLF_LOCK, &gl->gl_flags)) {
 		acquired = 0;
 	} else {
-		gl->gl_owner_pid = current->pid;
+		gl->gl_owner_pid = get_pid(task_pid(current));
 		gl->gl_ip = (unsigned long)__builtin_return_address(0);
 	}
 	spin_unlock(&gl->gl_spin);
@@ -686,13 +678,17 @@ static int gfs2_glmutex_trylock(struct gfs2_glock *gl)
 
 static void gfs2_glmutex_unlock(struct gfs2_glock *gl)
 {
+	struct pid *pid;
+
 	spin_lock(&gl->gl_spin);
 	clear_bit(GLF_LOCK, &gl->gl_flags);
-	gl->gl_owner_pid = 0;
+	pid = gl->gl_owner_pid;
+	gl->gl_owner_pid = NULL;
 	gl->gl_ip = 0;
 	run_queue(gl);
-	BUG_ON(!spin_is_locked(&gl->gl_spin));
 	spin_unlock(&gl->gl_spin);
+
+	put_pid(pid);
 }
 
 /**
@@ -722,7 +718,10 @@ static void handle_callback(struct gfs2_glock *gl, unsigned int state,
 		}
 	} else if (gl->gl_demote_state != LM_ST_UNLOCKED &&
 			gl->gl_demote_state != state) {
-		gl->gl_demote_state = LM_ST_UNLOCKED;
+		if (test_bit(GLF_DEMOTE_IN_PROGRESS,  &gl->gl_flags)) 
+			set_bit(GLF_WAITERS2, &gl->gl_flags);
+		else 
+			gl->gl_demote_state = LM_ST_UNLOCKED;
 	}
 	spin_unlock(&gl->gl_spin);
 }
@@ -753,6 +752,43 @@ static void state_change(struct gfs2_glock *gl, unsigned int new_state)
 }
 
 /**
+ * drop_bh - Called after a lock module unlock completes
+ * @gl: the glock
+ * @ret: the return status
+ *
+ * Doesn't wake up the process waiting on the struct gfs2_holder (if any)
+ * Doesn't drop the reference on the glock the top half took out
+ *
+ */
+
+static void drop_bh(struct gfs2_glock *gl, unsigned int ret)
+{
+	struct gfs2_sbd *sdp = gl->gl_sbd;
+	struct gfs2_holder *gh = gl->gl_req_gh;
+
+	gfs2_assert_warn(sdp, test_bit(GLF_LOCK, &gl->gl_flags));
+	gfs2_assert_warn(sdp, list_empty(&gl->gl_holders));
+	gfs2_assert_warn(sdp, !ret);
+
+	state_change(gl, LM_ST_UNLOCKED);
+
+	if (test_and_clear_bit(GLF_CONV_DEADLK, &gl->gl_flags)) {
+		spin_lock(&gl->gl_spin);
+		gh->gh_error = 0;
+		spin_unlock(&gl->gl_spin);
+		gfs2_glock_xmote_th(gl, gl->gl_req_gh);
+		gfs2_glock_put(gl);
+		return;
+	}
+
+	spin_lock(&gl->gl_spin);
+	gfs2_demote_wake(gl);
+	clear_bit(GLF_LOCK, &gl->gl_flags);
+	spin_unlock(&gl->gl_spin);
+	gfs2_glock_put(gl);
+}
+
+/**
  * xmote_bh - Called after the lock module is done acquiring a lock
  * @gl: The glock in question
  * @ret: the int returned from the lock module
@@ -764,24 +800,18 @@ static void xmote_bh(struct gfs2_glock *gl, unsigned int ret)
 	struct gfs2_sbd *sdp = gl->gl_sbd;
 	const struct gfs2_glock_operations *glops = gl->gl_ops;
 	struct gfs2_holder *gh = gl->gl_req_gh;
-	int prev_state = gl->gl_state;
 	int op_done = 1;
+
+	if (!gh && (ret & LM_OUT_ST_MASK) == LM_ST_UNLOCKED) {
+		drop_bh(gl, ret);
+		return;
+	}
 
 	gfs2_assert_warn(sdp, test_bit(GLF_LOCK, &gl->gl_flags));
 	gfs2_assert_warn(sdp, list_empty(&gl->gl_holders));
 	gfs2_assert_warn(sdp, !(ret & LM_OUT_ASYNC));
 
 	state_change(gl, ret & LM_OUT_ST_MASK);
-
-	if (prev_state != LM_ST_UNLOCKED && !(ret & LM_OUT_CACHEABLE)) {
-		if (glops->go_inval)
-			glops->go_inval(gl, DIO_METADATA);
-	} else if (gl->gl_state == LM_ST_DEFERRED) {
-		/* We might not want to do this here.
-		   Look at moving to the inode glops. */
-		if (glops->go_inval)
-			glops->go_inval(gl, 0);
-	}
 
 	/*  Deal with each possible exit condition  */
 
@@ -792,7 +822,6 @@ static void xmote_bh(struct gfs2_glock *gl, unsigned int ret)
 		} else {
 			spin_lock(&gl->gl_spin);
 			if (gl->gl_state != gl->gl_demote_state) {
-				gl->gl_req_bh = NULL;
 				spin_unlock(&gl->gl_spin);
 				gfs2_glock_drop_th(gl);
 				gfs2_glock_put(gl);
@@ -803,6 +832,14 @@ static void xmote_bh(struct gfs2_glock *gl, unsigned int ret)
 		}
 	} else {
 		spin_lock(&gl->gl_spin);
+		if (ret & LM_OUT_CONV_DEADLK) {
+			gh->gh_error = 0;
+			set_bit(GLF_CONV_DEADLK, &gl->gl_flags);
+			spin_unlock(&gl->gl_spin);
+			gfs2_glock_drop_th(gl);
+			gfs2_glock_put(gl);
+			return;
+		}
 		list_del_init(&gh->gh_list);
 		gh->gh_error = -EIO;
 		if (unlikely(test_bit(SDF_SHUTDOWN, &sdp->sd_flags))) 
@@ -834,7 +871,6 @@ out:
 	if (op_done) {
 		spin_lock(&gl->gl_spin);
 		gl->gl_req_gh = NULL;
-		gl->gl_req_bh = NULL;
 		clear_bit(GLF_LOCK, &gl->gl_flags);
 		spin_unlock(&gl->gl_spin);
 	}
@@ -843,6 +879,17 @@ out:
 
 	if (gh)
 		gfs2_holder_wake(gh);
+}
+
+static unsigned int gfs2_lm_lock(struct gfs2_sbd *sdp, void *lock,
+				 unsigned int cur_state, unsigned int req_state,
+				 unsigned int flags)
+{
+	int ret = 0;
+	if (likely(!test_bit(SDF_SHUTDOWN, &sdp->sd_flags)))
+		ret = sdp->sd_lockstruct.ls_ops->lm_lock(lock, cur_state,
+							 req_state, flags);
+	return ret;
 }
 
 /**
@@ -866,6 +913,8 @@ static void gfs2_glock_xmote_th(struct gfs2_glock *gl, struct gfs2_holder *gh)
 
 	if (glops->go_xmote_th)
 		glops->go_xmote_th(gl);
+	if (state == LM_ST_DEFERRED && glops->go_inval)
+		glops->go_inval(gl, DIO_METADATA);
 
 	gfs2_assert_warn(sdp, test_bit(GLF_LOCK, &gl->gl_flags));
 	gfs2_assert_warn(sdp, list_empty(&gl->gl_holders));
@@ -873,7 +922,6 @@ static void gfs2_glock_xmote_th(struct gfs2_glock *gl, struct gfs2_holder *gh)
 	gfs2_assert_warn(sdp, state != gl->gl_state);
 
 	gfs2_glock_hold(gl);
-	gl->gl_req_bh = xmote_bh;
 
 	lck_ret = gfs2_lm_lock(sdp, gl->gl_lock, gl->gl_state, state, lck_flags);
 
@@ -886,49 +934,13 @@ static void gfs2_glock_xmote_th(struct gfs2_glock *gl, struct gfs2_holder *gh)
 		xmote_bh(gl, lck_ret);
 }
 
-/**
- * drop_bh - Called after a lock module unlock completes
- * @gl: the glock
- * @ret: the return status
- *
- * Doesn't wake up the process waiting on the struct gfs2_holder (if any)
- * Doesn't drop the reference on the glock the top half took out
- *
- */
-
-static void drop_bh(struct gfs2_glock *gl, unsigned int ret)
+static unsigned int gfs2_lm_unlock(struct gfs2_sbd *sdp, void *lock,
+				   unsigned int cur_state)
 {
-	struct gfs2_sbd *sdp = gl->gl_sbd;
-	const struct gfs2_glock_operations *glops = gl->gl_ops;
-	struct gfs2_holder *gh = gl->gl_req_gh;
-
-	gfs2_assert_warn(sdp, test_bit(GLF_LOCK, &gl->gl_flags));
-	gfs2_assert_warn(sdp, list_empty(&gl->gl_holders));
-	gfs2_assert_warn(sdp, !ret);
-
-	state_change(gl, LM_ST_UNLOCKED);
-
-	if (glops->go_inval)
-		glops->go_inval(gl, DIO_METADATA);
-
-	if (gh) {
-		spin_lock(&gl->gl_spin);
-		list_del_init(&gh->gh_list);
-		gh->gh_error = 0;
-		spin_unlock(&gl->gl_spin);
-	}
-
-	spin_lock(&gl->gl_spin);
-	gfs2_demote_wake(gl);
-	gl->gl_req_gh = NULL;
-	gl->gl_req_bh = NULL;
-	clear_bit(GLF_LOCK, &gl->gl_flags);
-	spin_unlock(&gl->gl_spin);
-
-	gfs2_glock_put(gl);
-
-	if (gh)
-		gfs2_holder_wake(gh);
+	int ret = 0;
+	if (likely(!test_bit(SDF_SHUTDOWN, &sdp->sd_flags)))
+		ret =  sdp->sd_lockstruct.ls_ops->lm_unlock(lock, cur_state);
+	return ret;
 }
 
 /**
@@ -943,15 +955,16 @@ static void gfs2_glock_drop_th(struct gfs2_glock *gl)
 	const struct gfs2_glock_operations *glops = gl->gl_ops;
 	unsigned int ret;
 
-	if (glops->go_drop_th)
-		glops->go_drop_th(gl);
+	if (glops->go_xmote_th)
+		glops->go_xmote_th(gl);
+	if (glops->go_inval)
+		glops->go_inval(gl, DIO_METADATA);
 
 	gfs2_assert_warn(sdp, test_bit(GLF_LOCK, &gl->gl_flags));
 	gfs2_assert_warn(sdp, list_empty(&gl->gl_holders));
 	gfs2_assert_warn(sdp, gl->gl_state != LM_ST_UNLOCKED);
 
 	gfs2_glock_hold(gl);
-	gl->gl_req_bh = drop_bh;
 
 	ret = gfs2_lm_unlock(sdp, gl->gl_lock, gl->gl_state);
 
@@ -974,16 +987,17 @@ static void gfs2_glock_drop_th(struct gfs2_glock *gl)
 static void do_cancels(struct gfs2_holder *gh)
 {
 	struct gfs2_glock *gl = gh->gh_gl;
+	struct gfs2_sbd *sdp = gl->gl_sbd;
 
 	spin_lock(&gl->gl_spin);
 
 	while (gl->gl_req_gh != gh &&
 	       !test_bit(HIF_HOLDER, &gh->gh_iflags) &&
 	       !list_empty(&gh->gh_list)) {
-		if (gl->gl_req_bh && !(gl->gl_req_gh &&
-				     (gl->gl_req_gh->gh_flags & GL_NOCANCEL))) {
+		if (!(gl->gl_req_gh && (gl->gl_req_gh->gh_flags & GL_NOCANCEL))) {
 			spin_unlock(&gl->gl_spin);
-			gfs2_lm_cancel(gl->gl_sbd, gl->gl_lock);
+			if (likely(!test_bit(SDF_SHUTDOWN, &sdp->sd_flags)))
+				sdp->sd_lockstruct.ls_ops->lm_cancel(gl->gl_lock);
 			msleep(100);
 			spin_lock(&gl->gl_spin);
 		} else {
@@ -1051,7 +1065,6 @@ static int glock_wait_internal(struct gfs2_holder *gh)
 
 		spin_lock(&gl->gl_spin);
 		gl->gl_req_gh = NULL;
-		gl->gl_req_bh = NULL;
 		clear_bit(GLF_LOCK, &gl->gl_flags);
 		run_queue(gl);
 		spin_unlock(&gl->gl_spin);
@@ -1061,7 +1074,7 @@ static int glock_wait_internal(struct gfs2_holder *gh)
 }
 
 static inline struct gfs2_holder *
-find_holder_by_owner(struct list_head *head, pid_t pid)
+find_holder_by_owner(struct list_head *head, struct pid *pid)
 {
 	struct gfs2_holder *gh;
 
@@ -1098,7 +1111,7 @@ static void add_to_queue(struct gfs2_holder *gh)
 	struct gfs2_glock *gl = gh->gh_gl;
 	struct gfs2_holder *existing;
 
-	BUG_ON(!gh->gh_owner_pid);
+	BUG_ON(gh->gh_owner_pid == NULL);
 	if (test_and_set_bit(HIF_WAIT, &gh->gh_iflags))
 		BUG();
 
@@ -1108,12 +1121,14 @@ static void add_to_queue(struct gfs2_holder *gh)
 		if (existing) {
 			print_symbol(KERN_WARNING "original: %s\n", 
 				     existing->gh_ip);
-			printk(KERN_INFO "pid : %d\n", existing->gh_owner_pid);
+			printk(KERN_INFO "pid : %d\n",
+					pid_nr(existing->gh_owner_pid));
 			printk(KERN_INFO "lock type : %d lock state : %d\n",
 			       existing->gh_gl->gl_name.ln_type, 
 			       existing->gh_gl->gl_state);
 			print_symbol(KERN_WARNING "new: %s\n", gh->gh_ip);
-			printk(KERN_INFO "pid : %d\n", gh->gh_owner_pid);
+			printk(KERN_INFO "pid : %d\n",
+					pid_nr(gh->gh_owner_pid));
 			printk(KERN_INFO "lock type : %d lock state : %d\n",
 			       gl->gl_name.ln_type, gl->gl_state);
 			BUG();
@@ -1155,8 +1170,6 @@ restart:
 		set_bit(HIF_ABORTED, &gh->gh_iflags);
 		return -EIO;
 	}
-
-	set_bit(HIF_PROMOTE, &gh->gh_iflags);
 
 	spin_lock(&gl->gl_spin);
 	add_to_queue(gh);
@@ -1248,12 +1261,11 @@ void gfs2_glock_dq(struct gfs2_holder *gh)
 	list_del_init(&gh->gh_list);
 
 	if (list_empty(&gl->gl_holders)) {
-		spin_unlock(&gl->gl_spin);
-
-		if (glops->go_unlock)
+		if (glops->go_unlock) {
+			spin_unlock(&gl->gl_spin);
 			glops->go_unlock(gh);
-
-		spin_lock(&gl->gl_spin);
+			spin_lock(&gl->gl_spin);
+		}
 		gl->gl_stamp = jiffies;
 	}
 
@@ -1439,6 +1451,14 @@ void gfs2_glock_dq_uninit_m(unsigned int num_gh, struct gfs2_holder *ghs)
 		gfs2_glock_dq_uninit(&ghs[x]);
 }
 
+static int gfs2_lm_hold_lvb(struct gfs2_sbd *sdp, void *lock, char **lvbp)
+{
+	int error = -EIO;
+	if (likely(!test_bit(SDF_SHUTDOWN, &sdp->sd_flags)))
+		error = sdp->sd_lockstruct.ls_ops->lm_hold_lvb(lock, lvbp);
+	return error;
+}
+
 /**
  * gfs2_lvb_hold - attach a LVB from a glock
  * @gl: The glock in question
@@ -1474,12 +1494,15 @@ int gfs2_lvb_hold(struct gfs2_glock *gl)
 
 void gfs2_lvb_unhold(struct gfs2_glock *gl)
 {
+	struct gfs2_sbd *sdp = gl->gl_sbd;
+
 	gfs2_glock_hold(gl);
 	gfs2_glmutex_lock(gl);
 
 	gfs2_assert(gl->gl_sbd, atomic_read(&gl->gl_lvb_count) > 0);
 	if (atomic_dec_and_test(&gl->gl_lvb_count)) {
-		gfs2_lm_unhold_lvb(gl->gl_sbd, gl->gl_lock, gl->gl_lvb);
+		if (likely(!test_bit(SDF_SHUTDOWN, &sdp->sd_flags)))
+			sdp->sd_lockstruct.ls_ops->lm_unhold_lvb(gl->gl_lock, gl->gl_lvb);
 		gl->gl_lvb = NULL;
 		gfs2_glock_put(gl);
 	}
@@ -1545,8 +1568,7 @@ void gfs2_glock_cb(void *cb_data, unsigned int type, void *data)
 		gl = gfs2_glock_find(sdp, &async->lc_name);
 		if (gfs2_assert_warn(sdp, gl))
 			return;
-		if (!gfs2_assert_warn(sdp, gl->gl_req_bh))
-			gl->gl_req_bh(gl, async->lc_ret);
+		xmote_bh(gl, async->lc_ret);
 		if (queue_delayed_work(glock_workqueue, &gl->gl_work, 0) == 0)
 			gfs2_glock_put(gl);
 		up_read(&gfs2_umount_flush_sem);
@@ -1605,10 +1627,10 @@ void gfs2_glock_schedule_for_reclaim(struct gfs2_glock *gl)
 		gfs2_glock_hold(gl);
 		list_add(&gl->gl_reclaim, &sdp->sd_reclaim_list);
 		atomic_inc(&sdp->sd_reclaim_count);
-	}
-	spin_unlock(&sdp->sd_reclaim_lock);
-
-	wake_up(&sdp->sd_reclaim_wq);
+		spin_unlock(&sdp->sd_reclaim_lock);
+		wake_up(&sdp->sd_reclaim_wq);
+	} else
+		spin_unlock(&sdp->sd_reclaim_lock);
 }
 
 /**
@@ -1817,8 +1839,9 @@ static int dump_holder(struct glock_iter *gi, char *str,
 
 	print_dbg(gi, "  %s\n", str);
 	if (gh->gh_owner_pid) {
-		print_dbg(gi, "    owner = %ld ", (long)gh->gh_owner_pid);
-		gh_owner = find_task_by_pid(gh->gh_owner_pid);
+		print_dbg(gi, "    owner = %ld ",
+				(long)pid_nr(gh->gh_owner_pid));
+		gh_owner = pid_task(gh->gh_owner_pid, PIDTYPE_PID);
 		if (gh_owner)
 			print_dbg(gi, "(%s)\n", gh_owner->comm);
 		else
@@ -1896,22 +1919,19 @@ static int dump_glock(struct glock_iter *gi, struct gfs2_glock *gl)
 	print_dbg(gi, "  gl_ref = %d\n", atomic_read(&gl->gl_ref));
 	print_dbg(gi, "  gl_state = %u\n", gl->gl_state);
 	if (gl->gl_owner_pid) {
-		gl_owner = find_task_by_pid(gl->gl_owner_pid);
+		gl_owner = pid_task(gl->gl_owner_pid, PIDTYPE_PID);
 		if (gl_owner)
 			print_dbg(gi, "  gl_owner = pid %d (%s)\n",
-				  gl->gl_owner_pid, gl_owner->comm);
+				  pid_nr(gl->gl_owner_pid), gl_owner->comm);
 		else
 			print_dbg(gi, "  gl_owner = %d (ended)\n",
-				  gl->gl_owner_pid);
+				  pid_nr(gl->gl_owner_pid));
 	} else
 		print_dbg(gi, "  gl_owner = -1\n");
 	print_dbg(gi, "  gl_ip = %lu\n", gl->gl_ip);
 	print_dbg(gi, "  req_gh = %s\n", (gl->gl_req_gh) ? "yes" : "no");
-	print_dbg(gi, "  req_bh = %s\n", (gl->gl_req_bh) ? "yes" : "no");
 	print_dbg(gi, "  lvb_count = %d\n", atomic_read(&gl->gl_lvb_count));
 	print_dbg(gi, "  object = %s\n", (gl->gl_object) ? "yes" : "no");
-	print_dbg(gi, "  le = %s\n",
-		   (list_empty(&gl->gl_le.le_list)) ? "no" : "yes");
 	print_dbg(gi, "  reclaim = %s\n",
 		   (list_empty(&gl->gl_reclaim)) ? "no" : "yes");
 	if (gl->gl_aspace)
