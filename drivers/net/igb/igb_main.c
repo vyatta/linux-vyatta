@@ -3047,8 +3047,6 @@ igb_get_stats(struct net_device *netdev)
 		stats->rx_packets += rx_ring->rx_stats.packets;
 	}
 
-	igb_update_stats(adapter);
-
 	return stats;
 }
 
