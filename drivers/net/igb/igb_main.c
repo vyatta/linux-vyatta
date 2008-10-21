@@ -3029,9 +3029,27 @@ static struct net_device_stats *
 igb_get_stats(struct net_device *netdev)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
+	struct net_device_stats *stats = &adapter->net_stats;
+	int i;
 
-	/* only return the current stats */
-	return &adapter->net_stats;
+	stats->tx_bytes = 0;
+	stats->tx_packets = 0;
+	for (i = 0; i < adapter->num_tx_queues; i++) {
+		struct igb_ring *tx_ring = &adapter->tx_ring[i];
+		stats->tx_bytes += tx_ring->tx_stats.bytes;
+		stats->tx_packets += tx_ring->tx_stats.packets;
+	}
+	stats->rx_bytes = 0;
+	stats->rx_packets = 0;
+	for (i = 0; i < adapter->num_rx_queues; i++) {
+		struct igb_ring *rx_ring = &adapter->rx_ring[i];
+		stats->rx_bytes += rx_ring->rx_stats.bytes;
+		stats->rx_packets += rx_ring->rx_stats.packets;
+	}
+
+	igb_update_stats(adapter);
+
+	return stats;
 }
 
 /**
@@ -3719,8 +3737,6 @@ done_cleaning:
 	tx_ring->total_packets += total_packets;
 	tx_ring->tx_stats.bytes += total_bytes;
 	tx_ring->tx_stats.packets += total_packets;
-	adapter->net_stats.tx_bytes += total_bytes;
-	adapter->net_stats.tx_packets += total_packets;
 	return retval;
 }
 
@@ -3961,8 +3977,6 @@ next_desc:
 	rx_ring->total_bytes += total_bytes;
 	rx_ring->rx_stats.packets += total_packets;
 	rx_ring->rx_stats.bytes += total_bytes;
-	adapter->net_stats.rx_bytes += total_bytes;
-	adapter->net_stats.rx_packets += total_packets;
 	return cleaned;
 }
 
