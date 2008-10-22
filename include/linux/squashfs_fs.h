@@ -4,7 +4,7 @@
 /*
  * Squashfs
  *
- * Copyright (c) 2002, 2003, 2004, 2005, 2006, 2007
+ * Copyright (c) 2002, 2003, 2004, 2005, 2006, 2007, 2008
  * Phillip Lougher <phillip@lougher.demon.co.uk>
  *
  * This program is free software; you can redistribute it and/or
@@ -94,7 +94,7 @@
 						SQUASHFS_CHECK)
 
 #define SQUASHFS_MKFLAGS(noi, nod, check_data, nof, no_frag, always_frag, \
-		duplicate_checking, exortable)	(noi | (nod << 1) | (check_data << 2) \
+		duplicate_checking, exportable)	(noi | (nod << 1) | (check_data << 2) \
 		| (nof << 3) | (no_frag << 4) | (always_frag << 5) | \
 		(duplicate_checking << 6) | (exportable << 7))
 
@@ -354,7 +354,7 @@ struct squashfs_dir_header {
 struct squashfs_fragment_entry {
 	long long		start_block;
 	unsigned int		size;
-	unsigned int		pending;
+	unsigned int		unused;
 } __attribute__ ((packed));
 
 extern int squashfs_uncompress_block(void *d, int dstlen, void *s, int srclen);
