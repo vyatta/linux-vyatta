@@ -1,6 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 27
+# EXTRAVERSION = .3
 EXTRAVERSION =
 NAME = Trembling Tortoise
 
@@ -1182,11 +1183,7 @@ clean: archclean $(clean-dirs)
 		\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
 		-o -name '.*.d' -o -name '.*.tmp' -o -name '*.mod.c' \
 		-o -name '*.symtypes' -o -name 'modules.order' \
-<<<<<<< HEAD:Makefile
 		-o -name 'Module.markers' -o -name '.tmp_*.o.*' \) \
-=======
-		-o -name 'Module.markers' \) \
->>>>>>> 5375addf59591d019929422a094b75b8222e3c44:Makefile
 		-type f -print | xargs rm -f
 
 # mrproper - Delete all generated files, including .config
