@@ -271,6 +271,29 @@ static inline void unionfs_unlock_dentry(struct dentry *d)
 	mutex_unlock(&UNIONFS_D(d)->lock);
 }
 
+static inline struct dentry *unionfs_lock_parent(struct dentry *d,
+						 unsigned int subclass)
+{
+	struct dentry *p;
+
+	BUG_ON(!d);
+	p = dget_parent(d);
+	if (p != d)
+		mutex_lock_nested(&UNIONFS_D(p)->lock, subclass);
+	return p;
+}
+
+static inline void unionfs_unlock_parent(struct dentry *d, struct dentry *p)
+{
+	BUG_ON(!d);
+	BUG_ON(!p);
+	if (p != d) {
+		BUG_ON(!mutex_is_locked(&UNIONFS_D(p)->lock));
+		mutex_unlock(&UNIONFS_D(p)->lock);
+	}
+	dput(p);
+}
+
 static inline void verify_locked(struct dentry *d)
 {
 	BUG_ON(!d);

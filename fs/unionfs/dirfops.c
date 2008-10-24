@@ -94,6 +94,7 @@ static int unionfs_readdir(struct file *file, void *dirent, filldir_t filldir)
 	int err = 0;
 	struct file *lower_file = NULL;
 	struct dentry *dentry = file->f_path.dentry;
+	struct dentry *parent;
 	struct inode *inode = NULL;
 	struct unionfs_getdents_callback buf;
 	struct unionfs_dir_state *uds;
@@ -101,9 +102,10 @@ static int unionfs_readdir(struct file *file, void *dirent, filldir_t filldir)
 	loff_t offset;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_PARENT);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
-	err = unionfs_file_revalidate(file, false);
+	err = unionfs_file_revalidate(file, parent, false);
 	if (unlikely(err))
 		goto out;
 
@@ -187,7 +189,10 @@ static int unionfs_readdir(struct file *file, void *dirent, filldir_t filldir)
 	}
 
 out:
+	if (!err)
+		unionfs_check_file(file);
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }
@@ -206,12 +211,14 @@ static loff_t unionfs_dir_llseek(struct file *file, loff_t offset, int origin)
 {
 	struct unionfs_dir_state *rdstate;
 	struct dentry *dentry = file->f_path.dentry;
+	struct dentry *parent;
 	loff_t err;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_PARENT);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
-	err = unionfs_file_revalidate(file, false);
+	err = unionfs_file_revalidate(file, parent, false);
 	if (unlikely(err))
 		goto out;
 
@@ -270,7 +277,10 @@ static loff_t unionfs_dir_llseek(struct file *file, loff_t offset, int origin)
 	}
 
 out:
+	if (!err)
+		unionfs_check_file(file);
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }

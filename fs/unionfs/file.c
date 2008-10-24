@@ -24,10 +24,13 @@ static ssize_t unionfs_read(struct file *file, char __user *buf,
 	int err;
 	struct file *lower_file;
 	struct dentry *dentry = file->f_path.dentry;
+	struct dentry *parent;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_PARENT);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
-	err = unionfs_file_revalidate(file, false);
+
+	err = unionfs_file_revalidate(file, parent, false);
 	if (unlikely(err))
 		goto out;
 
@@ -42,6 +45,7 @@ static ssize_t unionfs_read(struct file *file, char __user *buf,
 
 out:
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }
@@ -52,12 +56,13 @@ static ssize_t unionfs_write(struct file *file, const char __user *buf,
 	int err = 0;
 	struct file *lower_file;
 	struct dentry *dentry = file->f_path.dentry;
+	struct dentry *parent;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_PARENT);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
-	if (dentry != dentry->d_parent)
-		unionfs_lock_dentry(dentry->d_parent, UNIONFS_DMUTEX_PARENT);
-	err = unionfs_file_revalidate_locked(file, true);
+
+	err = unionfs_file_revalidate(file, parent, true);
 	if (unlikely(err))
 		goto out;
 
@@ -74,9 +79,8 @@ static ssize_t unionfs_write(struct file *file, const char __user *buf,
 	}
 
 out:
-	if (dentry != dentry->d_parent)
-		unionfs_unlock_dentry(dentry->d_parent);
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }
@@ -93,14 +97,16 @@ static int unionfs_mmap(struct file *file, struct vm_area_struct *vma)
 	bool willwrite;
 	struct file *lower_file;
 	struct dentry *dentry = file->f_path.dentry;
+	struct dentry *parent;
 	struct vm_operations_struct *saved_vm_ops = NULL;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_PARENT);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
 	/* This might be deferred to mmap's writepage */
 	willwrite = ((vma->vm_flags | VM_SHARED | VM_WRITE) == vma->vm_flags);
-	err = unionfs_file_revalidate(file, willwrite);
+	err = unionfs_file_revalidate(file, parent, willwrite);
 	if (unlikely(err))
 		goto out;
 	unionfs_check_file(file);
@@ -157,10 +163,11 @@ static int unionfs_mmap(struct file *file, struct vm_area_struct *vma)
 out:
 	if (!err) {
 		/* copyup could cause parent dir times to change */
-		unionfs_copy_attr_times(dentry->d_parent->d_inode);
+		unionfs_copy_attr_times(parent->d_inode);
 		unionfs_check_file(file);
 	}
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }
@@ -170,12 +177,15 @@ int unionfs_fsync(struct file *file, struct dentry *dentry, int datasync)
 	int bindex, bstart, bend;
 	struct file *lower_file;
 	struct dentry *lower_dentry;
+	struct dentry *parent;
 	struct inode *lower_inode, *inode;
 	int err = -EINVAL;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_PARENT);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
-	err = unionfs_file_revalidate(file, true);
+
+	err = unionfs_file_revalidate(file, parent, true);
 	if (unlikely(err))
 		goto out;
 	unionfs_check_file(file);
@@ -212,6 +222,7 @@ out:
 	if (!err)
 		unionfs_check_file(file);
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }
@@ -221,12 +232,15 @@ int unionfs_fasync(int fd, struct file *file, int flag)
 	int bindex, bstart, bend;
 	struct file *lower_file;
 	struct dentry *dentry = file->f_path.dentry;
+	struct dentry *parent;
 	struct inode *lower_inode, *inode;
 	int err = 0;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_PARENT);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
-	err = unionfs_file_revalidate(file, true);
+
+	err = unionfs_file_revalidate(file, parent, true);
 	if (unlikely(err))
 		goto out;
 	unionfs_check_file(file);
@@ -260,6 +274,7 @@ out:
 	if (!err)
 		unionfs_check_file(file);
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }
@@ -271,10 +286,13 @@ static ssize_t unionfs_splice_read(struct file *file, loff_t *ppos,
 	ssize_t err;
 	struct file *lower_file;
 	struct dentry *dentry = file->f_path.dentry;
+	struct dentry *parent;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_PARENT);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
-	err = unionfs_file_revalidate(file, false);
+
+	err = unionfs_file_revalidate(file, parent, false);
 	if (unlikely(err))
 		goto out;
 
@@ -289,6 +307,7 @@ static ssize_t unionfs_splice_read(struct file *file, loff_t *ppos,
 
 out:
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }
@@ -300,10 +319,13 @@ static ssize_t unionfs_splice_write(struct pipe_inode_info *pipe,
 	ssize_t err = 0;
 	struct file *lower_file;
 	struct dentry *dentry = file->f_path.dentry;
+	struct dentry *parent;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_PARENT);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
-	err = unionfs_file_revalidate(file, true);
+
+	err = unionfs_file_revalidate(file, parent, true);
 	if (unlikely(err))
 		goto out;
 
@@ -320,6 +342,7 @@ static ssize_t unionfs_splice_write(struct pipe_inode_info *pipe,
 
 out:
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }

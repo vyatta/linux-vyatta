@@ -43,12 +43,16 @@ ssize_t unionfs_getxattr(struct dentry *dentry, const char *name, void *value,
 			 size_t size)
 {
 	struct dentry *lower_dentry = NULL;
+	struct dentry *parent;
 	int err = -EOPNOTSUPP;
+	bool valid;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
-	if (unlikely(!__unionfs_d_revalidate_chain(dentry, NULL, false))) {
+	valid = __unionfs_d_revalidate(dentry, parent, false);
+	if (unlikely(!valid)) {
 		err = -ESTALE;
 		goto out;
 	}
@@ -60,6 +64,7 @@ ssize_t unionfs_getxattr(struct dentry *dentry, const char *name, void *value,
 out:
 	unionfs_check_dentry(dentry);
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }
@@ -72,12 +77,16 @@ int unionfs_setxattr(struct dentry *dentry, const char *name,
 		     const void *value, size_t size, int flags)
 {
 	struct dentry *lower_dentry = NULL;
+	struct dentry *parent;
 	int err = -EOPNOTSUPP;
+	bool valid;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
-	if (unlikely(!__unionfs_d_revalidate_chain(dentry, NULL, false))) {
+	valid = __unionfs_d_revalidate(dentry, parent, false);
+	if (unlikely(!valid)) {
 		err = -ESTALE;
 		goto out;
 	}
@@ -90,6 +99,7 @@ int unionfs_setxattr(struct dentry *dentry, const char *name,
 out:
 	unionfs_check_dentry(dentry);
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }
@@ -101,12 +111,16 @@ out:
 int unionfs_removexattr(struct dentry *dentry, const char *name)
 {
 	struct dentry *lower_dentry = NULL;
+	struct dentry *parent;
 	int err = -EOPNOTSUPP;
+	bool valid;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
-	if (unlikely(!__unionfs_d_revalidate_chain(dentry, NULL, false))) {
+	valid = __unionfs_d_revalidate(dentry, parent, false);
+	if (unlikely(!valid)) {
 		err = -ESTALE;
 		goto out;
 	}
@@ -118,6 +132,7 @@ int unionfs_removexattr(struct dentry *dentry, const char *name)
 out:
 	unionfs_check_dentry(dentry);
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }
@@ -129,13 +144,17 @@ out:
 ssize_t unionfs_listxattr(struct dentry *dentry, char *list, size_t size)
 {
 	struct dentry *lower_dentry = NULL;
+	struct dentry *parent;
 	int err = -EOPNOTSUPP;
 	char *encoded_list = NULL;
+	bool valid;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
-	if (unlikely(!__unionfs_d_revalidate_chain(dentry, NULL, false))) {
+	valid = __unionfs_d_revalidate(dentry, parent, false);
+	if (unlikely(!valid)) {
 		err = -ESTALE;
 		goto out;
 	}
@@ -148,6 +167,7 @@ ssize_t unionfs_listxattr(struct dentry *dentry, char *list, size_t size)
 out:
 	unionfs_check_dentry(dentry);
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }

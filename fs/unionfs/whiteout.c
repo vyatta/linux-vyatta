@@ -134,7 +134,7 @@ struct dentry *find_first_whiteout(struct dentry *dentry)
 	struct dentry *parent, *lower_parent, *wh_dentry;
 
 	parent = dget_parent(dentry);
-	unionfs_lock_dentry(parent, UNIONFS_DMUTEX_WHITEOUT);
+
 	bstart = dbstart(parent);
 	bend = dbend(parent);
 	wh_dentry = ERR_PTR(-ENOENT);
@@ -151,7 +151,7 @@ struct dentry *find_first_whiteout(struct dentry *dentry)
 		dput(wh_dentry);
 		wh_dentry = ERR_PTR(-ENOENT);
 	}
-	unionfs_unlock_dentry(parent);
+
 	dput(parent);
 
 	return wh_dentry;
@@ -238,7 +238,7 @@ int check_unlink_whiteout(struct dentry *dentry, struct dentry *lower_dentry,
 		err = -EIO;
 		printk(KERN_ERR "unionfs: found both whiteout and regular "
 		       "file in directory %s (branch %d)\n",
-		       lower_dentry->d_parent->d_name.name, bindex);
+		       lower_dir_dentry->d_name.name, bindex);
 		goto out_dput;
 	}
 

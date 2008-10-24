@@ -69,13 +69,12 @@ struct dentry *__lookup_one(struct dentry *base, struct vfsmount *mnt,
  * Returns: 0 (ok), or -ERRNO if an error occurred.
  * XXX: get rid of _partial_lookup and make callers call _lookup_full directly
  */
-int unionfs_partial_lookup(struct dentry *dentry)
+int unionfs_partial_lookup(struct dentry *dentry, struct dentry *parent)
 {
 	struct dentry *tmp;
-	struct nameidata nd = { .flags = 0 };
 	int err = -ENOSYS;
 
-	tmp = unionfs_lookup_full(dentry, &nd, INTERPOSE_PARTIAL);
+	tmp = unionfs_lookup_full(dentry, parent, INTERPOSE_PARTIAL);
 
 	if (!tmp) {
 		err = 0;
@@ -291,7 +290,7 @@ void release_lower_nd(struct nameidata *nd, int err)
  * dentry's info, which the caller must unlock.
  */
 struct dentry *unionfs_lookup_full(struct dentry *dentry,
-				   struct nameidata *nd_unused, int lookupmode)
+				   struct dentry *parent, int lookupmode)
 {
 	int err = 0;
 	struct dentry *lower_dentry = NULL;
@@ -299,7 +298,6 @@ struct dentry *unionfs_lookup_full(struct dentry *dentry,
 	struct vfsmount *lower_dir_mnt;
 	struct dentry *wh_lower_dentry = NULL;
 	struct dentry *lower_dir_dentry = NULL;
-	struct dentry *parent_dentry = NULL;
 	struct dentry *d_interposed = NULL;
 	int bindex, bstart, bend, bopaque;
 	int opaque, num_positive = 0;
@@ -313,6 +311,7 @@ struct dentry *unionfs_lookup_full(struct dentry *dentry,
 	 * new_dentry_private_data already locked.
 	 */
 	verify_locked(dentry);
+	verify_locked(parent);
 
 	/* must initialize dentry operations */
 	dentry->d_op = &unionfs_dops;
@@ -320,7 +319,6 @@ struct dentry *unionfs_lookup_full(struct dentry *dentry,
 	/* We never partial lookup the root directory. */
 	if (IS_ROOT(dentry))
 		goto out;
-	parent_dentry = dget_parent(dentry);
 
 	name = dentry->d_name.name;
 	namelen = dentry->d_name.len;
@@ -332,9 +330,9 @@ struct dentry *unionfs_lookup_full(struct dentry *dentry,
 	}
 
 	/* Now start the actual lookup procedure. */
-	bstart = dbstart(parent_dentry);
-	bend = dbend(parent_dentry);
-	bopaque = dbopaque(parent_dentry);
+	bstart = dbstart(parent);
+	bend = dbend(parent);
+	bopaque = dbopaque(parent);
 	BUG_ON(bstart < 0);
 
 	/* adjust bend to bopaque if needed */
@@ -359,7 +357,7 @@ struct dentry *unionfs_lookup_full(struct dentry *dentry,
 		}
 
 		lower_dir_dentry =
-			unionfs_lower_dentry_idx(parent_dentry, bindex);
+			unionfs_lower_dentry_idx(parent, bindex);
 		/* if the lower dentry's parent does not exist, skip this */
 		if (!lower_dir_dentry || !lower_dir_dentry->d_inode)
 			continue;
@@ -384,7 +382,7 @@ struct dentry *unionfs_lookup_full(struct dentry *dentry,
 		dput(wh_lower_dentry);
 
 		/* Now do regular lookup; lookup @name */
-		lower_dir_mnt = unionfs_lower_mnt_idx(parent_dentry, bindex);
+		lower_dir_mnt = unionfs_lower_mnt_idx(parent, bindex);
 		lower_mnt = NULL; /* XXX: needed? */
 
 		lower_dentry = __lookup_one(lower_dir_dentry, lower_dir_mnt,
@@ -395,7 +393,9 @@ struct dentry *unionfs_lookup_full(struct dentry *dentry,
 			goto out_free;
 		}
 		unionfs_set_lower_dentry_idx(dentry, bindex, lower_dentry);
-		BUG_ON(!lower_mnt);
+		if (!lower_mnt)
+			lower_mnt = unionfs_mntget(dentry->d_sb->s_root,
+						   bindex);
 		unionfs_set_lower_mnt_idx(dentry, bindex, lower_mnt);
 
 		/* adjust dbstart/end */
@@ -429,7 +429,7 @@ struct dentry *unionfs_lookup_full(struct dentry *dentry,
 		dbend(dentry) = bindex;
 
 		/* update parent directory's atime with the bindex */
-		fsstack_copy_attr_atime(parent_dentry->d_inode,
+		fsstack_copy_attr_atime(parent->d_inode,
 					lower_dir_dentry->d_inode);
 	}
 
@@ -466,7 +466,7 @@ struct dentry *unionfs_lookup_full(struct dentry *dentry,
 		if (unionfs_lower_dentry_idx(dentry, bindex))
 			goto out;
 		lower_dir_dentry =
-			unionfs_lower_dentry_idx(parent_dentry, bindex);
+			unionfs_lower_dentry_idx(parent, bindex);
 		if (!lower_dir_dentry || !lower_dir_dentry->d_inode)
 			goto out;
 		if (!S_ISDIR(lower_dir_dentry->d_inode->i_mode))
@@ -566,7 +566,6 @@ out:
 		BUG_ON(dbstart(d_interposed) >= 0 && dbend(d_interposed) < 0);
 	}
 
-	dput(parent_dentry);
 	if (!err && d_interposed)
 		return d_interposed;
 	return ERR_PTR(err);

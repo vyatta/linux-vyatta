@@ -44,14 +44,15 @@
  *     as as per Documentation/filesystems/unionfs/concepts.txt).
  *
  */
-static int unionfs_unlink_whiteout(struct inode *dir, struct dentry *dentry)
+static int unionfs_unlink_whiteout(struct inode *dir, struct dentry *dentry,
+				   struct dentry *parent)
 {
 	struct dentry *lower_dentry;
 	struct dentry *lower_dir_dentry;
 	int bindex;
 	int err = 0;
 
-	err = unionfs_partial_lookup(dentry);
+	err = unionfs_partial_lookup(dentry, parent);
 	if (err)
 		goto out;
 
@@ -123,30 +124,26 @@ int unionfs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	int err = 0;
 	struct inode *inode = dentry->d_inode;
+	struct dentry *parent;
 	int valid;
 
 	BUG_ON(S_ISDIR(inode->i_mode));
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
-	unionfs_lock_dentry(dentry->d_parent, UNIONFS_DMUTEX_PARENT);
 
-	valid = __unionfs_d_revalidate_chain(dentry->d_parent, NULL, false);
-	if (unlikely(!valid)) {
-		err = -ESTALE;
-		goto out;
-	}
-	valid = __unionfs_d_revalidate_one_locked(dentry, NULL, false);
+	valid = __unionfs_d_revalidate(dentry, parent, false);
 	if (unlikely(!valid)) {
 		err = -ESTALE;
 		goto out;
 	}
 	unionfs_check_dentry(dentry);
 
-	err = unionfs_unlink_whiteout(dir, dentry);
+	err = unionfs_unlink_whiteout(dir, dentry, parent);
 	/* call d_drop so the system "forgets" about us */
 	if (!err) {
 		unionfs_postcopyup_release(dentry);
-		unionfs_postcopyup_setmnt(dentry->d_parent);
+		unionfs_postcopyup_setmnt(parent);
 		if (inode->i_nlink == 0) /* drop lower inodes */
 			iput_lowers_all(inode, false);
 		d_drop(dentry);
@@ -162,8 +159,8 @@ out:
 		unionfs_check_dentry(dentry);
 		unionfs_check_inode(dir);
 	}
-	unionfs_unlock_dentry(dentry->d_parent);
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }
@@ -209,19 +206,23 @@ int unionfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
 	int err = 0;
 	struct unionfs_dir_state *namelist = NULL;
+	struct dentry *parent;
 	int dstart, dend;
+	bool valid;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
+	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
 
-	if (unlikely(!__unionfs_d_revalidate_chain(dentry, NULL, false))) {
+	valid = __unionfs_d_revalidate(dentry, parent, false);
+	if (unlikely(!valid)) {
 		err = -ESTALE;
 		goto out;
 	}
 	unionfs_check_dentry(dentry);
 
 	/* check if this unionfs directory is empty or not */
-	err = check_empty(dentry, &namelist);
+	err = check_empty(dentry, parent, &namelist);
 	if (err)
 		goto out;
 
@@ -267,12 +268,15 @@ out:
 		d_drop(dentry);
 		/* update our lower vfsmnts, in case a copyup took place */
 		unionfs_postcopyup_setmnt(dentry);
+		unionfs_check_dentry(dentry);
+		unionfs_check_inode(dir);
 	}
 
 	if (namelist)
 		free_rdstate(namelist);
 
 	unionfs_unlock_dentry(dentry);
+	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
 	return err;
 }

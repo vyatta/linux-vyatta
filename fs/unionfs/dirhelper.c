@@ -68,7 +68,8 @@ out:
 }
 
 /* Is a directory logically empty? */
-int check_empty(struct dentry *dentry, struct unionfs_dir_state **namelist)
+int check_empty(struct dentry *dentry, struct dentry *parent,
+		struct unionfs_dir_state **namelist)
 {
 	int err = 0;
 	struct dentry *lower_dentry = NULL;
@@ -83,7 +84,7 @@ int check_empty(struct dentry *dentry, struct unionfs_dir_state **namelist)
 
 	BUG_ON(!S_ISDIR(dentry->d_inode->i_mode));
 
-	err = unionfs_partial_lookup(dentry);
+	err = unionfs_partial_lookup(dentry, parent);
 	if (err)
 		goto out;
 
