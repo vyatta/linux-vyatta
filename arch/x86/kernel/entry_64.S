@@ -51,8 +51,95 @@
 #include <asm/page.h>
 #include <asm/irqflags.h>
 #include <asm/paravirt.h>
+#include <asm/ftrace.h>
 
 	.code64
+
+#ifdef CONFIG_FTRACE
+#ifdef CONFIG_DYNAMIC_FTRACE
+ENTRY(mcount)
+	retq
+END(mcount)
+
+ENTRY(ftrace_caller)
+	cmpl $0, function_trace_stop
+	jne  ftrace_stub
+
+	/* taken from glibc */
+	subq $0x38, %rsp
+	movq %rax, (%rsp)
+	movq %rcx, 8(%rsp)
+	movq %rdx, 16(%rsp)
+	movq %rsi, 24(%rsp)
+	movq %rdi, 32(%rsp)
+	movq %r8, 40(%rsp)
+	movq %r9, 48(%rsp)
+
+	movq 0x38(%rsp), %rdi
+	movq 8(%rbp), %rsi
+	subq $MCOUNT_INSN_SIZE, %rdi
+
+.globl ftrace_call
+ftrace_call:
+	call ftrace_stub
+
+	movq 48(%rsp), %r9
+	movq 40(%rsp), %r8
+	movq 32(%rsp), %rdi
+	movq 24(%rsp), %rsi
+	movq 16(%rsp), %rdx
+	movq 8(%rsp), %rcx
+	movq (%rsp), %rax
+	addq $0x38, %rsp
+
+.globl ftrace_stub
+ftrace_stub:
+	retq
+END(ftrace_caller)
+
+#else /* ! CONFIG_DYNAMIC_FTRACE */
+ENTRY(mcount)
+	cmpl $0, function_trace_stop
+	jne  ftrace_stub
+
+	cmpq $ftrace_stub, ftrace_trace_function
+	jnz trace
+.globl ftrace_stub
+ftrace_stub:
+	retq
+
+trace:
+	/* taken from glibc */
+	subq $0x38, %rsp
+	movq %rax, (%rsp)
+	movq %rcx, 8(%rsp)
+	movq %rdx, 16(%rsp)
+	movq %rsi, 24(%rsp)
+	movq %rdi, 32(%rsp)
+	movq %r8, 40(%rsp)
+	movq %r9, 48(%rsp)
+
+	movq 0x38(%rsp), %rdi
+	movq 8(%rbp), %rsi
+	subq $MCOUNT_INSN_SIZE, %rdi
+
+	call   *ftrace_trace_function
+
+	movq 48(%rsp), %r9
+	movq 40(%rsp), %r8
+	movq 32(%rsp), %rdi
+	movq 24(%rsp), %rsi
+	movq 16(%rsp), %rdx
+	movq 8(%rsp), %rcx
+	movq (%rsp), %rax
+	addq $0x38, %rsp
+
+	jmp ftrace_stub
+END(mcount)
+#endif /* CONFIG_DYNAMIC_FTRACE */
+#endif /* CONFIG_FTRACE */
+
+#define HARDNMI_MASK 0x40000000
 
 #ifndef CONFIG_PREEMPT
 #define retint_kernel retint_restore_args
@@ -249,7 +336,9 @@ ENTRY(system_call_after_swapgs)
 	cmpq $__NR_syscall_max,%rax
 	ja badsys
 	movq %r10,%rcx
+	TRACE_SYS_CALL
 	call *sys_call_table(,%rax,8)  # XXX:	 rip relative
+	TRACE_SYS_RET
 	movq %rax,RAX-ARGOFFSET(%rsp)
 /*
  * Syscall return path ending with SYSRET (fast path)
@@ -281,8 +370,8 @@ sysret_check:
 	/* Handle reschedules */
 	/* edx:	work, edi: workmask */	
 sysret_careful:
-	bt $TIF_NEED_RESCHED,%edx
-	jnc sysret_signal
+	testl $(_TIF_NEED_RESCHED),%edx
+	jz sysret_signal
 	TRACE_IRQS_ON
 	ENABLE_INTERRUPTS(CLBR_NONE)
 	pushq %rdi
@@ -305,7 +394,7 @@ sysret_signal:
 	leaq -ARGOFFSET(%rsp),%rdi # &pt_regs -> arg1
 	xorl %esi,%esi # oldset -> arg2
 	call ptregscall_common
-1:	movl $_TIF_NEED_RESCHED,%edi
+1:	movl $(_TIF_NEED_RESCHED),%edi
 	/* Use IRET because user could have changed frame. This
 	   works because ptregscall_common has called FIXUP_TOP_OF_STACK. */
 	DISABLE_INTERRUPTS(CLBR_NONE)
@@ -328,7 +417,9 @@ tracesys:
 	cmpq $__NR_syscall_max,%rax
 	ja   int_ret_from_sys_call	/* RAX(%rsp) set to -ENOSYS above */
 	movq %r10,%rcx	/* fixup for C */
+	TRACE_SYS_CALL
 	call *sys_call_table(,%rax,8)
+ 	TRACE_SYS_RET
 	movq %rax,RAX-ARGOFFSET(%rsp)
 	/* Use IRET because user could have changed frame */
 		
@@ -357,8 +448,8 @@ int_with_check:
 	/* First do a reschedule test. */
 	/* edx:	work, edi: workmask */
 int_careful:
-	bt $TIF_NEED_RESCHED,%edx
-	jnc  int_very_careful
+	testl $(_TIF_NEED_RESCHED),%edx
+	jz int_very_careful
 	TRACE_IRQS_ON
 	ENABLE_INTERRUPTS(CLBR_NONE)
 	pushq %rdi
@@ -393,7 +484,7 @@ int_signal:
 	movq %rsp,%rdi		# &ptregs -> arg1
 	xorl %esi,%esi		# oldset -> arg2
 	call do_notify_resume
-1:	movl $_TIF_NEED_RESCHED,%edi	
+1:	movl $(_TIF_NEED_RESCHED),%edi
 int_restore_rest:
 	RESTORE_REST
 	DISABLE_INTERRUPTS(CLBR_NONE)
@@ -620,8 +711,8 @@ bad_iret:
 	/* edi: workmask, edx: work */
 retint_careful:
 	CFI_RESTORE_STATE
-	bt    $TIF_NEED_RESCHED,%edx
-	jnc   retint_signal
+	testl $(_TIF_NEED_RESCHED),%edx
+	jz    retint_signal
 	TRACE_IRQS_ON
 	ENABLE_INTERRUPTS(CLBR_NONE)
 	pushq %rdi
@@ -647,7 +738,7 @@ retint_signal:
 	RESTORE_REST
 	DISABLE_INTERRUPTS(CLBR_NONE)
 	TRACE_IRQS_OFF
-	movl $_TIF_NEED_RESCHED,%edi
+	movl $(_TIF_NEED_RESCHED),%edi
 	GET_THREAD_INFO(%rcx)
 	jmp retint_check
 

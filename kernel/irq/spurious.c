@@ -13,6 +13,11 @@
 #include <linux/interrupt.h>
 #include <linux/moduleparam.h>
 
+#ifdef CONFIG_X86_IO_APIC
+# include <asm/apicdef.h>
+# include <asm/io_apic.h>
+#endif
+
 static int irqfixup __read_mostly;
 
 /*
@@ -57,9 +62,8 @@ static int misrouted_irq(int irq)
 			}
 			action = action->next;
 		}
-		local_irq_disable();
 		/* Now clean up the flags */
-		spin_lock(&desc->lock);
+		spin_lock_irq(&desc->lock);
 		action = desc->action;
 
 		/*
@@ -205,6 +209,12 @@ void note_interrupt(unsigned int irq, struct irq_desc *desc,
 		 * The interrupt is stuck
 		 */
 		__report_bad_irq(irq, desc, action_ret);
+#ifdef CONFIG_X86_IO_APIC
+		if (!sis_apic_bug) {
+			sis_apic_bug = 1;
+			printk(KERN_ERR "turning off IO-APIC fast mode.\n");
+		}
+#else
 		/*
 		 * Now kill the IRQ
 		 */
@@ -212,6 +222,7 @@ void note_interrupt(unsigned int irq, struct irq_desc *desc,
 		desc->status |= IRQ_DISABLED | IRQ_SPURIOUS_DISABLED;
 		desc->depth++;
 		desc->chip->disable(irq);
+#endif
 	}
 	desc->irqs_unhandled = 0;
 }
@@ -232,6 +243,11 @@ MODULE_PARM_DESC(noirqdebug, "Disable irq lockup detection when true");
 
 static int __init irqfixup_setup(char *str)
 {
+#ifdef CONFIG_PREEMPT_RT
+	printk(KERN_WARNING "irqfixup boot option not supported "
+		"w/ CONFIG_PREEMPT_RT\n");
+	return 1;
+#endif
 	irqfixup = 1;
 	printk(KERN_WARNING "Misrouted IRQ fixup support enabled.\n");
 	printk(KERN_WARNING "This may impact system performance.\n");
@@ -245,6 +261,11 @@ MODULE_PARM_DESC("irqfixup", "0: No fixup, 1: irqfixup mode 2: irqpoll mode");
 
 static int __init irqpoll_setup(char *str)
 {
+#ifdef CONFIG_PREEMPT_RT
+	printk(KERN_WARNING "irqpoll boot option not supported "
+		"w/ CONFIG_PREEMPT_RT\n");
+	return 1;
+#endif
 	irqfixup = 2;
 	printk(KERN_WARNING "Misrouted IRQ fixup and polling support "
 				"enabled\n");

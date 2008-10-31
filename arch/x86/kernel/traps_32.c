@@ -31,6 +31,7 @@
 #include <linux/bug.h>
 #include <linux/nmi.h>
 #include <linux/mm.h>
+#include <linux/ftrace.h>
 
 #ifdef CONFIG_EISA
 #include <linux/ioport.h>
@@ -260,6 +261,8 @@ show_trace_log_lvl(struct task_struct *task, struct pt_regs *regs,
 {
 	dump_trace(task, regs, stack, bp, &print_trace_ops, log_lvl);
 	printk("%s =======================\n", log_lvl);
+	print_preempt_trace(task);
+	debug_show_held_locks(task);
 }
 
 void show_trace(struct task_struct *task, struct pt_regs *regs,
@@ -290,9 +293,15 @@ show_stack_log_lvl(struct task_struct *task, struct pt_regs *regs,
 			printk("\n%s       ", log_lvl);
 		printk("%08lx ", *stack++);
 	}
+
+	pause_on_oops_head();
+
 	printk("\n%sCall Trace:\n", log_lvl);
 
 	show_trace_log_lvl(task, regs, sp, bp, log_lvl);
+
+	pause_on_oops_tail();
+
 }
 
 void show_stack(struct task_struct *task, unsigned long *sp)
@@ -324,6 +333,12 @@ void dump_stack(void)
 }
 
 EXPORT_SYMBOL(dump_stack);
+
+#if defined(CONFIG_DEBUG_STACKOVERFLOW) && defined(CONFIG_EVENT_TRACE)
+extern unsigned long worst_stack_left;
+#else
+# define worst_stack_left -1L
+#endif
 
 void show_registers(struct pt_regs *regs)
 {
@@ -391,6 +406,8 @@ int __kprobes __die(const char *str, struct pt_regs *regs, long err)
 	unsigned short ss;
 	unsigned long sp;
 
+	ftrace_halt();
+
 	printk(KERN_EMERG "%s: %04lx [#%d] ", str, err & 0xffff, ++die_counter);
 #ifdef CONFIG_PREEMPT
 	printk("PREEMPT ");
@@ -435,7 +452,7 @@ void die(const char *str, struct pt_regs *regs, long err)
 		u32 lock_owner;
 		int lock_owner_depth;
 	} die = {
-		.lock =			__RAW_SPIN_LOCK_UNLOCKED,
+		.lock =			RAW_SPIN_LOCK_UNLOCKED(die.lock),
 		.lock_owner =		-1,
 		.lock_owner_depth =	0
 	};
@@ -446,7 +463,7 @@ void die(const char *str, struct pt_regs *regs, long err)
 	if (die.lock_owner != raw_smp_processor_id()) {
 		console_verbose();
 		raw_local_irq_save(flags);
-		__raw_spin_lock(&die.lock);
+		spin_lock(&die.lock);
 		die.lock_owner = smp_processor_id();
 		die.lock_owner_depth = 0;
 		bust_spinlocks(1);
@@ -466,7 +483,7 @@ void die(const char *str, struct pt_regs *regs, long err)
 	bust_spinlocks(0);
 	die.lock_owner = -1;
 	add_taint(TAINT_DIE);
-	__raw_spin_unlock(&die.lock);
+	spin_unlock(&die.lock);
 	raw_local_irq_restore(flags);
 
 	if (!regs)
@@ -506,6 +523,11 @@ do_trap(int trapnr, int signr, char *str, int vm86, struct pt_regs *regs,
 
 	if (!user_mode(regs))
 		goto kernel_trap;
+
+#ifdef CONFIG_PREEMPT_RT
+	local_irq_enable();
+	preempt_check_resched();
+#endif
 
 trap_signal:
 	/*
@@ -784,6 +806,7 @@ void notrace __kprobes die_nmi(struct pt_regs *regs, const char *msg)
 		crash_kexec(regs);
 	}
 
+	nmi_exit();
 	do_exit(SIGSEGV);
 }
 
@@ -834,6 +857,8 @@ notrace __kprobes void do_nmi(struct pt_regs *regs, long error_code)
 	int cpu;
 
 	nmi_enter();
+
+	trace_event_irq(-1, user_mode(regs), regs->ip);
 
 	cpu = smp_processor_id();
 

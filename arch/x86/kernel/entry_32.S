@@ -51,6 +51,7 @@
 #include <asm/percpu.h>
 #include <asm/dwarf2.h>
 #include <asm/processor-flags.h>
+#include <asm/ftrace.h>
 #include "irq_vectors.h"
 
 /*
@@ -259,14 +260,18 @@ END(ret_from_exception)
 #ifdef CONFIG_PREEMPT
 ENTRY(resume_kernel)
 	DISABLE_INTERRUPTS(CLBR_ANY)
+	cmpl $0, kernel_preemption
+	jz restore_nocheck
 	cmpl $0,TI_preempt_count(%ebp)	# non-zero preempt_count ?
 	jnz restore_nocheck
 need_resched:
 	movl TI_flags(%ebp), %ecx	# need_resched set ?
 	testb $_TIF_NEED_RESCHED, %cl
-	jz restore_all
+	jz restore_nocheck
 	testl $X86_EFLAGS_IF,PT_EFLAGS(%esp)	# interrupts off (exception path) ?
-	jz restore_all
+	jz restore_nocheck
+	DISABLE_INTERRUPTS(CLBR_ANY)
+
 	call preempt_schedule_irq
 	jmp need_resched
 END(resume_kernel)
@@ -313,6 +318,11 @@ sysenter_past_esp:
 	pushl %eax
 	CFI_ADJUST_CFA_OFFSET 4
 	SAVE_ALL
+#ifdef CONFIG_EVENT_TRACE
+	pushl %edx; pushl %ecx; pushl %ebx; pushl %eax
+	call sys_call
+	popl %eax; popl %ebx; popl %ecx; popl %edx
+#endif
 	ENABLE_INTERRUPTS(CLBR_NONE)
 
 /*
@@ -343,6 +353,11 @@ sysenter_past_esp:
 	movl TI_flags(%ebp), %ecx
 	testw $_TIF_ALLWORK_MASK, %cx
 	jne syscall_exit_work
+#ifdef CONFIG_EVENT_TRACE
+	pushl %eax
+	call sys_ret
+	popl %eax
+#endif
 /* if something modifies registers it must also disable sysexit */
 	movl PT_EIP(%esp), %edx
 	movl PT_OLDESP(%esp), %ecx
@@ -366,6 +381,11 @@ ENTRY(system_call)
 	pushl %eax			# save orig_eax
 	CFI_ADJUST_CFA_OFFSET 4
 	SAVE_ALL
+#ifdef CONFIG_EVENT_TRACE
+	pushl %edx; pushl %ecx; pushl %ebx; pushl %eax
+	call sys_call
+	popl %eax; popl %ebx; popl %ecx; popl %edx
+#endif
 	GET_THREAD_INFO(%ebp)
 					# system call tracing in operation / emulation
 	/* Note, _TIF_SECCOMP is bit number 8, and so it needs testw and not testb */
@@ -465,20 +485,19 @@ ENDPROC(system_call)
 	ALIGN
 	RING0_PTREGS_FRAME		# can't unwind into user space anyway
 work_pending:
-	testb $_TIF_NEED_RESCHED, %cl
+	testl $(_TIF_NEED_RESCHED), %ecx
 	jz work_notifysig
 work_resched:
-	call schedule
+	call __schedule
 	LOCKDEP_SYS_EXIT
 	DISABLE_INTERRUPTS(CLBR_ANY)	# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
-	TRACE_IRQS_OFF
 	movl TI_flags(%ebp), %ecx
 	andl $_TIF_WORK_MASK, %ecx	# is there any work to be done other
 					# than syscall tracing?
 	jz restore_all
-	testb $_TIF_NEED_RESCHED, %cl
+	testl $(_TIF_NEED_RESCHED), %ecx
 	jnz work_resched
 
 work_notifysig:				# deal with pending signals and
@@ -1109,6 +1128,69 @@ ENTRY(xen_failsafe_callback)
 ENDPROC(xen_failsafe_callback)
 
 #endif	/* CONFIG_XEN */
+
+#ifdef CONFIG_FTRACE
+#ifdef CONFIG_DYNAMIC_FTRACE
+
+ENTRY(mcount)
+	ret
+END(mcount)
+
+ENTRY(ftrace_caller)
+	cmpl $0, function_trace_stop
+	jne  ftrace_stub
+
+	pushl %eax
+	pushl %ecx
+	pushl %edx
+	movl 0xc(%esp), %eax
+	movl 0x4(%ebp), %edx
+	subl $MCOUNT_INSN_SIZE, %eax
+
+.globl ftrace_call
+ftrace_call:
+	call ftrace_stub
+
+	popl %edx
+	popl %ecx
+	popl %eax
+
+.globl ftrace_stub
+ftrace_stub:
+	ret
+END(ftrace_caller)
+
+#else /* ! CONFIG_DYNAMIC_FTRACE */
+
+ENTRY(mcount)
+	cmpl $0, function_trace_stop
+	jne  ftrace_stub
+
+	cmpl $ftrace_stub, ftrace_trace_function
+	jnz trace
+.globl ftrace_stub
+ftrace_stub:
+	ret
+
+	/* taken from glibc */
+trace:
+	pushl %eax
+	pushl %ecx
+	pushl %edx
+	movl 0xc(%esp), %eax
+	movl 0x4(%ebp), %edx
+	subl $MCOUNT_INSN_SIZE, %eax
+
+	call *ftrace_trace_function
+
+	popl %edx
+	popl %ecx
+	popl %eax
+
+	jmp ftrace_stub
+END(mcount)
+#endif /* CONFIG_DYNAMIC_FTRACE */
+#endif /* CONFIG_FTRACE */
 
 .section .rodata,"a"
 #include "syscall_table_32.S"

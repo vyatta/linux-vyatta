@@ -26,6 +26,7 @@
 #include <linux/slab.h>
 #include <linux/cpu.h>
 #include <linux/notifier.h>
+#include <linux/syscalls.h>
 #include <linux/kthread.h>
 #include <linux/hardirq.h>
 #include <linux/mempolicy.h>
@@ -33,6 +34,11 @@
 #include <linux/kallsyms.h>
 #include <linux/debug_locks.h>
 #include <linux/lockdep.h>
+#include <linux/wait.h>
+
+#include <asm/uaccess.h>
+
+struct wq_barrier;
 
 /*
  * The per-CPU workqueue (if single thread, we always use the first
@@ -42,7 +48,7 @@ struct cpu_workqueue_struct {
 
 	spinlock_t lock;
 
-	struct list_head worklist;
+	struct plist_head worklist;
 	wait_queue_head_t more_work;
 	struct work_struct *current_work;
 
@@ -50,6 +56,9 @@ struct cpu_workqueue_struct {
 	struct task_struct *thread;
 
 	int run_depth;		/* Detect run_workqueue() recursion depth */
+
+	wait_queue_head_t work_done;
+	struct wq_barrier *barrier;
 } ____cacheline_aligned;
 
 /*
@@ -125,7 +134,7 @@ struct cpu_workqueue_struct *get_wq_data(struct work_struct *work)
 }
 
 static void insert_work(struct cpu_workqueue_struct *cwq,
-				struct work_struct *work, int tail)
+		struct work_struct *work, int prio, int boost_prio)
 {
 	set_wq_data(work, cwq);
 	/*
@@ -133,21 +142,22 @@ static void insert_work(struct cpu_workqueue_struct *cwq,
 	 * result of list_add() below, see try_to_grab_pending().
 	 */
 	smp_wmb();
-	if (tail)
-		list_add_tail(&work->entry, &cwq->worklist);
-	else
-		list_add(&work->entry, &cwq->worklist);
+	plist_node_init(&work->entry, prio);
+	plist_add(&work->entry, &cwq->worklist);
+
+	if (boost_prio < cwq->thread->prio)
+		task_setprio(cwq->thread, boost_prio);
 	wake_up(&cwq->more_work);
 }
 
 /* Preempt must be disabled. */
 static void __queue_work(struct cpu_workqueue_struct *cwq,
-			 struct work_struct *work)
+			 struct work_struct *work, int prio)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&cwq->lock, flags);
-	insert_work(cwq, work, 1);
+	insert_work(cwq, work, prio, prio);
 	spin_unlock_irqrestore(&cwq->lock, flags);
 }
 
@@ -160,15 +170,16 @@ static void __queue_work(struct cpu_workqueue_struct *cwq,
  *
  * We queue the work to the CPU on which it was submitted, but if the CPU dies
  * it can be processed by another CPU.
+ *
+ * Especially no such guarantee on PREEMPT_RT.
  */
 int queue_work(struct workqueue_struct *wq, struct work_struct *work)
 {
-	int ret = 0;
+	int ret = 0, cpu = raw_smp_processor_id();
 
 	if (!test_and_set_bit(WORK_STRUCT_PENDING, work_data_bits(work))) {
-		BUG_ON(!list_empty(&work->entry));
-		__queue_work(wq_per_cpu(wq, get_cpu()), work);
-		put_cpu();
+		BUG_ON(!plist_node_empty(&work->entry));
+		__queue_work(wq_per_cpu(wq, cpu), work, current->normal_prio);
 		ret = 1;
 	}
 	return ret;
@@ -181,7 +192,8 @@ static void delayed_work_timer_fn(unsigned long __data)
 	struct cpu_workqueue_struct *cwq = get_wq_data(&dwork->work);
 	struct workqueue_struct *wq = cwq->wq;
 
-	__queue_work(wq_per_cpu(wq, smp_processor_id()), &dwork->work);
+	__queue_work(wq_per_cpu(wq, raw_smp_processor_id()),
+			&dwork->work, dwork->prio);
 }
 
 /**
@@ -220,11 +232,12 @@ int queue_delayed_work_on(int cpu, struct workqueue_struct *wq,
 
 	if (!test_and_set_bit(WORK_STRUCT_PENDING, work_data_bits(work))) {
 		BUG_ON(timer_pending(timer));
-		BUG_ON(!list_empty(&work->entry));
+		BUG_ON(!plist_node_empty(&work->entry));
 
 		timer_stats_timer_set_start_info(&dwork->timer);
 
 		/* This stores cwq for the moment, for the timer_fn */
+		dwork->prio = current->normal_prio;
 		set_wq_data(work, wq_per_cpu(wq, raw_smp_processor_id()));
 		timer->expires = jiffies + delay;
 		timer->data = (unsigned long)dwork;
@@ -240,8 +253,34 @@ int queue_delayed_work_on(int cpu, struct workqueue_struct *wq,
 }
 EXPORT_SYMBOL_GPL(queue_delayed_work_on);
 
+static void leak_check(void *func)
+{
+	if (!in_atomic() && lockdep_depth(current) <= 0)
+		return;
+	printk(KERN_ERR "BUG: workqueue leaked lock or atomic: "
+				"%s/0x%08x/%d\n",
+				current->comm, preempt_count(),
+				current->pid);
+	printk(KERN_ERR "    last function: ");
+	print_symbol("%s\n", (unsigned long)func);
+	debug_show_held_locks(current);
+	dump_stack();
+}
+
+struct wq_barrier {
+	struct work_struct		work;
+	struct plist_head		worklist;
+	struct wq_barrier 		*prev_barrier;
+	int				prev_prio;
+	int				waiter_prio;
+	struct cpu_workqueue_struct 	*cwq;
+	struct completion		done;
+};
+
 static void run_workqueue(struct cpu_workqueue_struct *cwq)
 {
+	struct plist_head *worklist = &cwq->worklist;
+
 	spin_lock_irq(&cwq->lock);
 	cwq->run_depth++;
 	if (cwq->run_depth > 3) {
@@ -250,8 +289,11 @@ static void run_workqueue(struct cpu_workqueue_struct *cwq)
 			__func__, cwq->run_depth);
 		dump_stack();
 	}
-	while (!list_empty(&cwq->worklist)) {
-		struct work_struct *work = list_entry(cwq->worklist.next,
+
+again:
+	while (!plist_head_empty(worklist)) {
+		int prio;
+		struct work_struct *work = plist_first_entry(worklist,
 						struct work_struct, entry);
 		work_func_t f = work->func;
 #ifdef CONFIG_LOCKDEP
@@ -266,32 +308,56 @@ static void run_workqueue(struct cpu_workqueue_struct *cwq)
 		struct lockdep_map lockdep_map = work->lockdep_map;
 #endif
 
+		prio = work->entry.prio;
+		if (unlikely(worklist != &cwq->worklist)) {
+			prio = min(prio, cwq->barrier->prev_prio);
+			prio = min(prio, cwq->barrier->waiter_prio);
+			prio = min(prio, plist_first(&cwq->worklist)->prio);
+		}
+		prio = max(prio, 0);
+
+		if (likely(cwq->thread->prio != prio))
+			task_setprio(cwq->thread, prio);
+
 		cwq->current_work = work;
-		list_del_init(cwq->worklist.next);
+		plist_del(&work->entry, worklist);
+		plist_node_init(&work->entry, MAX_PRIO);
 		spin_unlock_irq(&cwq->lock);
 
 		BUG_ON(get_wq_data(work) != cwq);
 		work_clear_pending(work);
+		leak_check(NULL);
 		lock_acquire(&cwq->wq->lockdep_map, 0, 0, 0, 2, _THIS_IP_);
 		lock_acquire(&lockdep_map, 0, 0, 0, 2, _THIS_IP_);
 		f(work);
 		lock_release(&lockdep_map, 1, _THIS_IP_);
 		lock_release(&cwq->wq->lockdep_map, 1, _THIS_IP_);
-
-		if (unlikely(in_atomic() || lockdep_depth(current) > 0)) {
-			printk(KERN_ERR "BUG: workqueue leaked lock or atomic: "
-					"%s/0x%08x/%d\n",
-					current->comm, preempt_count(),
-				       	task_pid_nr(current));
-			printk(KERN_ERR "    last function: ");
-			print_symbol("%s\n", (unsigned long)f);
-			debug_show_held_locks(current);
-			dump_stack();
-		}
+		leak_check(f);
 
 		spin_lock_irq(&cwq->lock);
 		cwq->current_work = NULL;
+		wake_up_all(&cwq->work_done);
+		if (unlikely(cwq->barrier))
+			worklist = &cwq->barrier->worklist;
 	}
+
+	if (unlikely(worklist != &cwq->worklist)) {
+		struct wq_barrier *barrier = cwq->barrier;
+
+		BUG_ON(!barrier);
+		cwq->barrier = barrier->prev_barrier;
+		complete(&barrier->done);
+
+		if (unlikely(cwq->barrier))
+			worklist = &cwq->barrier->worklist;
+		else
+			worklist = &cwq->worklist;
+
+		if (!plist_head_empty(worklist))
+			goto again;
+	}
+
+	task_setprio(cwq->thread, current->normal_prio);
 	cwq->run_depth--;
 	spin_unlock_irq(&cwq->lock);
 }
@@ -310,7 +376,7 @@ static int worker_thread(void *__cwq)
 		prepare_to_wait(&cwq->more_work, &wait, TASK_INTERRUPTIBLE);
 		if (!freezing(current) &&
 		    !kthread_should_stop() &&
-		    list_empty(&cwq->worklist))
+		    plist_head_empty(&cwq->worklist))
 			schedule();
 		finish_wait(&cwq->more_work, &wait);
 
@@ -325,26 +391,37 @@ static int worker_thread(void *__cwq)
 	return 0;
 }
 
-struct wq_barrier {
-	struct work_struct	work;
-	struct completion	done;
-};
-
 static void wq_barrier_func(struct work_struct *work)
 {
-	struct wq_barrier *barr = container_of(work, struct wq_barrier, work);
-	complete(&barr->done);
+	struct wq_barrier *barrier =
+		container_of(work, struct wq_barrier, work);
+	struct cpu_workqueue_struct *cwq = barrier->cwq;
+	int prio = MAX_PRIO;
+
+	spin_lock_irq(&cwq->lock);
+	barrier->prev_barrier = cwq->barrier;
+	if (cwq->barrier) {
+		prio = min(prio, cwq->barrier->waiter_prio);
+		prio = min(prio, plist_first(&cwq->barrier->worklist)->prio);
+	}
+	barrier->prev_prio = prio;
+	cwq->barrier = barrier;
+	spin_unlock_irq(&cwq->lock);
 }
 
 static void insert_wq_barrier(struct cpu_workqueue_struct *cwq,
-					struct wq_barrier *barr, int tail)
+		struct wq_barrier *barr)
 {
 	INIT_WORK(&barr->work, wq_barrier_func);
 	__set_bit(WORK_STRUCT_PENDING, work_data_bits(&barr->work));
 
+	plist_head_init(&barr->worklist, NULL);
+	plist_head_splice(&cwq->worklist, &barr->worklist);
+	barr->cwq = cwq;
 	init_completion(&barr->done);
+	barr->waiter_prio = current->prio;
 
-	insert_work(cwq, &barr->work, tail);
+	insert_work(cwq, &barr->work, 0, current->prio);
 }
 
 static int flush_cpu_workqueue(struct cpu_workqueue_struct *cwq)
@@ -363,8 +440,9 @@ static int flush_cpu_workqueue(struct cpu_workqueue_struct *cwq)
 
 		active = 0;
 		spin_lock_irq(&cwq->lock);
-		if (!list_empty(&cwq->worklist) || cwq->current_work != NULL) {
-			insert_wq_barrier(cwq, &barr, 1);
+		if (!plist_head_empty(&cwq->worklist) ||
+			cwq->current_work != NULL) {
+			insert_wq_barrier(cwq, &barr);
 			active = 1;
 		}
 		spin_unlock_irq(&cwq->lock);
@@ -424,7 +502,7 @@ static int try_to_grab_pending(struct work_struct *work)
 		return ret;
 
 	spin_lock_irq(&cwq->lock);
-	if (!list_empty(&work->entry)) {
+	if (!plist_node_empty(&work->entry)) {
 		/*
 		 * This work is queued, but perhaps we locked the wrong cwq.
 		 * In that case we must see the new value after rmb(), see
@@ -432,7 +510,8 @@ static int try_to_grab_pending(struct work_struct *work)
 		 */
 		smp_rmb();
 		if (cwq == get_wq_data(work)) {
-			list_del_init(&work->entry);
+			plist_del(&work->entry, &cwq->worklist);
+			plist_node_init(&work->entry, MAX_PRIO);
 			ret = 1;
 		}
 	}
@@ -441,21 +520,24 @@ static int try_to_grab_pending(struct work_struct *work)
 	return ret;
 }
 
+static inline
+int is_current_work(struct cpu_workqueue_struct *cwq, struct work_struct *work)
+{
+	int ret;
+
+	spin_lock_irq(&cwq->lock);
+	ret = (cwq->current_work == work);
+	spin_unlock_irq(&cwq->lock);
+
+	return ret;
+}
+
 static void wait_on_cpu_work(struct cpu_workqueue_struct *cwq,
 				struct work_struct *work)
 {
-	struct wq_barrier barr;
-	int running = 0;
+	DEFINE_WAIT(wait);
 
-	spin_lock_irq(&cwq->lock);
-	if (unlikely(cwq->current_work == work)) {
-		insert_wq_barrier(cwq, &barr, 0);
-		running = 1;
-	}
-	spin_unlock_irq(&cwq->lock);
-
-	if (unlikely(running))
-		wait_for_completion(&barr.done);
+	wait_event(cwq->work_done, !is_current_work(cwq, work));
 }
 
 static void wait_on_work(struct work_struct *work)
@@ -584,37 +666,120 @@ int schedule_delayed_work_on(int cpu,
 }
 EXPORT_SYMBOL(schedule_delayed_work_on);
 
+struct schedule_on_each_cpu_work {
+	struct work_struct work;
+	void (*func)(void *info);
+	void *info;
+};
+
+static void schedule_on_each_cpu_func(struct work_struct *work)
+{
+	struct schedule_on_each_cpu_work *w;
+
+	w = container_of(work, typeof(*w), work);
+	w->func(w->info);
+
+	kfree(w);
+}
+
 /**
  * schedule_on_each_cpu - call a function on each online CPU from keventd
  * @func: the function to call
+ * @info: data to pass to function
+ * @retry: ignored
+ * @wait: wait for completion
  *
  * Returns zero on success.
  * Returns -ve errno on failure.
  *
  * schedule_on_each_cpu() is very slow.
  */
-int schedule_on_each_cpu(work_func_t func)
+int schedule_on_each_cpu(void (*func)(void *info), void *info, int retry, int wait)
+{
+	int cpu;
+	struct schedule_on_each_cpu_work **works;
+	int err = 0;
+
+	works = kzalloc(sizeof(void *)*nr_cpu_ids, GFP_KERNEL);
+	if (!works)
+		return -ENOMEM;
+
+	for_each_possible_cpu(cpu) {
+		works[cpu] = kmalloc_node(sizeof(struct schedule_on_each_cpu_work),
+				GFP_KERNEL, cpu_to_node(cpu));
+		if (!works[cpu]) {
+			err = -ENOMEM;
+			goto out;
+		}
+	}
+
+	get_online_cpus();
+	for_each_online_cpu(cpu) {
+		struct schedule_on_each_cpu_work *work;
+
+		work = works[cpu];
+		works[cpu] = NULL;
+
+		work->func = func;
+		work->info = info;
+		INIT_WORK(&work->work, schedule_on_each_cpu_func);
+		set_bit(WORK_STRUCT_PENDING, work_data_bits(&work->work));
+		__queue_work(per_cpu_ptr(keventd_wq->cpu_wq, cpu),
+				&work->work, current->normal_prio);
+	}
+	put_online_cpus();
+out:
+	for_each_possible_cpu(cpu) {
+		if (works[cpu])
+			kfree(works[cpu]);
+	}
+	kfree(works);
+
+	if (!err && wait)
+		flush_workqueue(keventd_wq);
+
+	return err;
+}
+EXPORT_SYMBOL(schedule_on_each_cpu);
+
+/**
+ * schedule_on_each_cpu_wq - call a function on each online CPU on a per-CPU wq
+ * @func: the function to call
+ *
+ * Returns zero on success.
+ * Returns -ve errno on failure.
+ *
+ * Appears to be racy against CPU hotplug.
+ *
+ * schedule_on_each_cpu() is very slow.
+ */
+int schedule_on_each_cpu_wq(struct workqueue_struct *wq, work_func_t func)
 {
 	int cpu;
 	struct work_struct *works;
 
+	if (is_single_threaded(wq)) {
+		WARN_ON(1);
+		return -EINVAL;
+	}
 	works = alloc_percpu(struct work_struct);
 	if (!works)
 		return -ENOMEM;
 
-	get_online_cpus();
 	for_each_online_cpu(cpu) {
 		struct work_struct *work = per_cpu_ptr(works, cpu);
 
 		INIT_WORK(work, func);
 		set_bit(WORK_STRUCT_PENDING, work_data_bits(work));
-		__queue_work(per_cpu_ptr(keventd_wq->cpu_wq, cpu), work);
+		__queue_work(per_cpu_ptr(wq->cpu_wq, cpu), work,
+				current->normal_prio);
 	}
-	flush_workqueue(keventd_wq);
-	put_online_cpus();
+	flush_workqueue(wq);
 	free_percpu(works);
+
 	return 0;
 }
+
 
 void flush_scheduled_work(void)
 {
@@ -676,8 +841,10 @@ init_cpu_workqueue(struct workqueue_struct *wq, int cpu)
 
 	cwq->wq = wq;
 	spin_lock_init(&cwq->lock);
-	INIT_LIST_HEAD(&cwq->worklist);
+	plist_head_init(&cwq->worklist, NULL);
 	init_waitqueue_head(&cwq->more_work);
+	cwq->barrier = NULL;
+	init_waitqueue_head(&cwq->work_done);
 
 	return cwq;
 }
@@ -797,6 +964,49 @@ static void cleanup_workqueue_thread(struct cpu_workqueue_struct *cwq)
 	cwq->thread = NULL;
 }
 
+void set_workqueue_thread_prio(struct workqueue_struct *wq, int cpu,
+			       int policy, int rt_priority, int nice)
+{
+	struct sched_param param = { .sched_priority = rt_priority };
+	struct cpu_workqueue_struct *cwq;
+	mm_segment_t oldfs = get_fs();
+	struct task_struct *p;
+	unsigned long flags;
+	int ret;
+
+	cwq = per_cpu_ptr(wq->cpu_wq, cpu);
+	spin_lock_irqsave(&cwq->lock, flags);
+	p = cwq->thread;
+	spin_unlock_irqrestore(&cwq->lock, flags);
+
+	set_user_nice(p, nice);
+
+	set_fs(KERNEL_DS);
+	ret = sys_sched_setscheduler(p->pid, policy, &param);
+	set_fs(oldfs);
+
+	WARN_ON(ret);
+}
+
+void set_workqueue_prio(struct workqueue_struct *wq, int policy,
+			int rt_priority, int nice)
+{
+	int cpu;
+
+	/* We don't need the distraction of CPUs appearing and vanishing. */
+	get_online_cpus();
+	spin_lock(&workqueue_lock);
+	if (is_single_threaded(wq))
+		set_workqueue_thread_prio(wq, 0, policy, rt_priority, nice);
+	else {
+		for_each_online_cpu(cpu)
+			set_workqueue_thread_prio(wq, cpu, policy,
+						  rt_priority, nice);
+	}
+	spin_unlock(&workqueue_lock);
+	put_online_cpus();
+}
+
 /**
  * destroy_workqueue - safely terminate a workqueue
  * @wq: target workqueue
@@ -877,4 +1087,5 @@ void __init init_workqueues(void)
 	hotcpu_notifier(workqueue_cpu_callback, 0);
 	keventd_wq = create_workqueue("events");
 	BUG_ON(!keventd_wq);
+	set_workqueue_prio(keventd_wq, SCHED_FIFO, 1, -20);
 }

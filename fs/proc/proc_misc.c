@@ -103,6 +103,32 @@ static int loadavg_read_proc(char *page, char **start, off_t off,
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 
+#ifdef CONFIG_PREEMPT_RT
+static int loadavg_rt_read_proc(char *page, char **start, off_t off,
+				 int count, int *eof, void *data)
+{
+	extern unsigned long avenrun_rt[];
+	extern unsigned long rt_nr_running(void);
+	int a, b, c;
+	int len;
+	unsigned long seq;
+
+	do {
+		seq = read_seqbegin(&xtime_lock);
+		a = avenrun_rt[0] + (FIXED_1/200);
+		b = avenrun_rt[1] + (FIXED_1/200);
+		c = avenrun_rt[2] + (FIXED_1/200);
+	} while (read_seqretry(&xtime_lock, seq));
+
+	len = sprintf(page,"%d.%02d %d.%02d %d.%02d %ld/%d %d\n",
+		LOAD_INT(a), LOAD_FRAC(a),
+		LOAD_INT(b), LOAD_FRAC(b),
+		LOAD_INT(c), LOAD_FRAC(c),
+		rt_nr_running(), nr_threads, current->nsproxy->pid_ns->last_pid);
+	return proc_calc_metrics(page, start, off, count, eof, len);
+}
+#endif
+
 static int uptime_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
@@ -290,6 +316,25 @@ static const struct file_operations proc_cpuinfo_operations = {
 	.release	= seq_release,
 };
 
+#ifdef CONFIG_RADIX_TREE_OPTIMISTIC
+extern struct seq_operations optimistic_op;
+static int optimistic_open(struct inode *inode, struct file *file)
+{
+	(void)inode;
+	return seq_open(file, &optimistic_op);
+}
+
+extern ssize_t optimistic_write(struct file *, const char __user *, size_t, loff_t *);
+
+static struct file_operations optimistic_file_operations = {
+	.open	= optimistic_open,
+	.read	= seq_read,
+	.llseek	= seq_lseek,
+	.release = seq_release,
+	.write	= optimistic_write,
+};
+#endif
+
 static int devinfo_show(struct seq_file *f, void *v)
 {
 	int i = *(loff_t *) v;
@@ -476,7 +521,8 @@ static int show_stat(struct seq_file *p, void *v)
 {
 	int i;
 	unsigned long jif;
-	cputime64_t user, nice, system, idle, iowait, irq, softirq, steal;
+	cputime64_t user_rt, user, nice, system_rt, system, idle,
+		    iowait, irq, softirq, steal;
 	cputime64_t guest;
 	u64 sum = 0;
 	struct timespec boottime;
@@ -486,7 +532,7 @@ static int show_stat(struct seq_file *p, void *v)
 	if (!per_irq_sum)
 		return -ENOMEM;
 
-	user = nice = system = idle = iowait =
+	user_rt = user = nice = system_rt = system = idle = iowait =
 		irq = softirq = steal = cputime64_zero;
 	guest = cputime64_zero;
 	getboottime(&boottime);
@@ -503,6 +549,8 @@ static int show_stat(struct seq_file *p, void *v)
 		irq = cputime64_add(irq, kstat_cpu(i).cpustat.irq);
 		softirq = cputime64_add(softirq, kstat_cpu(i).cpustat.softirq);
 		steal = cputime64_add(steal, kstat_cpu(i).cpustat.steal);
+		user_rt = cputime64_add(user_rt, kstat_cpu(i).cpustat.user_rt);
+		system_rt = cputime64_add(system_rt, kstat_cpu(i).cpustat.system_rt);
 		guest = cputime64_add(guest, kstat_cpu(i).cpustat.guest);
 		for (j = 0; j < NR_IRQS; j++) {
 			unsigned int temp = kstat_cpu(i).irqs[j];
@@ -511,7 +559,10 @@ static int show_stat(struct seq_file *p, void *v)
 		}
 	}
 
-	seq_printf(p, "cpu  %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
+	user = cputime64_add(user_rt, user);
+	system = cputime64_add(system_rt, system);
+
+	seq_printf(p, "cpu  %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
 		(unsigned long long)cputime64_to_clock_t(user),
 		(unsigned long long)cputime64_to_clock_t(nice),
 		(unsigned long long)cputime64_to_clock_t(system),
@@ -520,13 +571,17 @@ static int show_stat(struct seq_file *p, void *v)
 		(unsigned long long)cputime64_to_clock_t(irq),
 		(unsigned long long)cputime64_to_clock_t(softirq),
 		(unsigned long long)cputime64_to_clock_t(steal),
+		(unsigned long long)cputime64_to_clock_t(user_rt),
+		(unsigned long long)cputime64_to_clock_t(system_rt),
 		(unsigned long long)cputime64_to_clock_t(guest));
 	for_each_online_cpu(i) {
 
 		/* Copy values here to work around gcc-2.95.3, gcc-2.96 */
-		user = kstat_cpu(i).cpustat.user;
+		user_rt = kstat_cpu(i).cpustat.user_rt;
+		system_rt = kstat_cpu(i).cpustat.system_rt;
+		user = cputime64_add(user_rt, kstat_cpu(i).cpustat.user);
 		nice = kstat_cpu(i).cpustat.nice;
-		system = kstat_cpu(i).cpustat.system;
+ 		system = cputime64_add(system_rt, kstat_cpu(i).cpustat.system);
 		idle = kstat_cpu(i).cpustat.idle;
 		iowait = kstat_cpu(i).cpustat.iowait;
 		irq = kstat_cpu(i).cpustat.irq;
@@ -534,7 +589,7 @@ static int show_stat(struct seq_file *p, void *v)
 		steal = kstat_cpu(i).cpustat.steal;
 		guest = kstat_cpu(i).cpustat.guest;
 		seq_printf(p,
-			"cpu%d %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
+			"cpu%d %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
 			i,
 			(unsigned long long)cputime64_to_clock_t(user),
 			(unsigned long long)cputime64_to_clock_t(nice),
@@ -544,6 +599,8 @@ static int show_stat(struct seq_file *p, void *v)
 			(unsigned long long)cputime64_to_clock_t(irq),
 			(unsigned long long)cputime64_to_clock_t(softirq),
 			(unsigned long long)cputime64_to_clock_t(steal),
+			(unsigned long long)cputime64_to_clock_t(user_rt),
+			(unsigned long long)cputime64_to_clock_t(system_rt),
 			(unsigned long long)cputime64_to_clock_t(guest));
 	}
 	seq_printf(p, "intr %llu", (unsigned long long)sum);
@@ -564,6 +621,38 @@ static int show_stat(struct seq_file *p, void *v)
 		nr_iowait());
 
 	kfree(per_irq_sum);
+#ifdef CONFIG_PREEMPT_RT
+	{
+		unsigned long nr_uninterruptible_cpu(int cpu);
+		extern int pi_initialized;
+		unsigned long rt_nr_running(void);
+		unsigned long rt_nr_running_cpu(int cpu);
+		unsigned long rt_nr_uninterruptible(void);
+		unsigned long rt_nr_uninterruptible_cpu(int cpu);
+
+		int i;
+
+		seq_printf(p, "pi_init: %d\n", pi_initialized);
+		seq_printf(p, "nr_running(): %ld\n",
+			nr_running());
+		seq_printf(p, "nr_uninterruptible(): %ld\n",
+			nr_uninterruptible());
+		for_each_online_cpu(i)
+			seq_printf(p, "nr_uninterruptible(%d): %ld\n",
+				i, nr_uninterruptible_cpu(i));
+		seq_printf(p, "rt_nr_running(): %ld\n",
+			rt_nr_running());
+		for_each_online_cpu(i)
+			seq_printf(p, "rt_nr_running(%d): %ld\n",
+				i, rt_nr_running_cpu(i));
+		seq_printf(p, "nr_rt_uninterruptible(): %ld\n",
+			   rt_nr_uninterruptible());
+		for_each_online_cpu(i)
+			seq_printf(p, "nr_rt_uninterruptible(%d): %ld\n",
+				   i, rt_nr_uninterruptible_cpu(i));
+	}
+#endif
+
 	return 0;
 }
 
@@ -835,6 +924,9 @@ void __init proc_misc_init(void)
 		int (*read_proc)(char*,char**,off_t,int,int*,void*);
 	} *p, simple_ones[] = {
 		{"loadavg",     loadavg_read_proc},
+#ifdef CONFIG_PREEMPT_RT
+		{"loadavgrt",   loadavg_rt_read_proc},
+#endif
 		{"uptime",	uptime_read_proc},
 		{"meminfo",	meminfo_read_proc},
 		{"version",	version_read_proc},
@@ -857,6 +949,9 @@ void __init proc_misc_init(void)
 	/* And now for trickier ones */
 #ifdef CONFIG_PRINTK
 	proc_create("kmsg", S_IRUSR, NULL, &proc_kmsg_operations);
+#endif
+#ifdef CONFIG_RADIX_TREE_OPTIMISTIC
+	proc_create("radix_optimistic", 0, NULL, &optimistic_file_operations);
 #endif
 	proc_create("locks", 0, NULL, &proc_locks_operations);
 	proc_create("devices", 0, NULL, &proc_devinfo_operations);

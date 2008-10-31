@@ -187,13 +187,16 @@ struct hrtimer_clock_base {
  * @nr_events:		Total number of timer interrupt events
  */
 struct hrtimer_cpu_base {
-	spinlock_t			lock;
+	raw_spinlock_t			lock;
 	struct hrtimer_clock_base	clock_base[HRTIMER_MAX_CLOCK_BASES];
 	struct list_head		cb_pending;
 #ifdef CONFIG_HIGH_RES_TIMERS
 	ktime_t				expires_next;
 	int				hres_active;
 	unsigned long			nr_events;
+#endif
+#ifdef CONFIG_PREEMPT_SOFTIRQS
+	wait_queue_head_t		wait;
 #endif
 };
 
@@ -292,6 +295,13 @@ static inline int hrtimer_restart(struct hrtimer *timer)
 	return hrtimer_start(timer, timer->expires, HRTIMER_MODE_ABS);
 }
 
+/* Softirq preemption could deadlock timer removal */
+#ifdef CONFIG_PREEMPT_SOFTIRQS
+  extern void hrtimer_wait_for_timer(const struct hrtimer *timer);
+#else
+# define hrtimer_wait_for_timer(timer)	do { cpu_relax(); } while (0)
+#endif
+
 /* Query timers: */
 extern ktime_t hrtimer_get_remaining(const struct hrtimer *timer);
 extern int hrtimer_get_res(const clockid_t which_clock, struct timespec *tp);
@@ -335,6 +345,10 @@ static inline u64 hrtimer_forward_now(struct hrtimer *timer,
 {
 	return hrtimer_forward(timer, timer->base->get_time(), interval);
 }
+
+/* Overrun count: */
+extern unsigned long
+hrtimer_overrun(struct hrtimer *timer, ktime_t now, ktime_t interval);
 
 /* Precise sleep: */
 extern long hrtimer_nanosleep(struct timespec *rqtp,

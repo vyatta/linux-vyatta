@@ -40,7 +40,6 @@
 #include <linux/cpu.h>
 #include <linux/bitops.h>
 #include <linux/mpage.h>
-#include <linux/bit_spinlock.h>
 
 static int fsync_buffers_list(spinlock_t *lock, struct list_head *list);
 
@@ -348,7 +347,7 @@ void invalidate_bdev(struct block_device *bdev)
 {
 	struct address_space *mapping = bdev->bd_inode->i_mapping;
 
-	if (mapping->nrpages == 0)
+	if (mapping_nrpages(mapping) == 0)
 		return;
 
 	invalidate_bh_lrus();
@@ -406,8 +405,7 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 	 * decide that the page is now completely done.
 	 */
 	first = page_buffers(page);
-	local_irq_save(flags);
-	bit_spin_lock(BH_Uptodate_Lock, &first->b_state);
+	spin_lock_irqsave(&first->b_uptodate_lock, flags);
 	clear_buffer_async_read(bh);
 	unlock_buffer(bh);
 	tmp = bh;
@@ -420,8 +418,7 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 		}
 		tmp = tmp->b_this_page;
 	} while (tmp != bh);
-	bit_spin_unlock(BH_Uptodate_Lock, &first->b_state);
-	local_irq_restore(flags);
+	spin_unlock_irqrestore(&first->b_uptodate_lock, flags);
 
 	/*
 	 * If none of the buffers had errors and they are all
@@ -433,8 +430,7 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 	return;
 
 still_busy:
-	bit_spin_unlock(BH_Uptodate_Lock, &first->b_state);
-	local_irq_restore(flags);
+	spin_unlock_irqrestore(&first->b_uptodate_lock, flags);
 	return;
 }
 
@@ -469,8 +465,7 @@ static void end_buffer_async_write(struct buffer_head *bh, int uptodate)
 	}
 
 	first = page_buffers(page);
-	local_irq_save(flags);
-	bit_spin_lock(BH_Uptodate_Lock, &first->b_state);
+	spin_lock_irqsave(&first->b_uptodate_lock, flags);
 
 	clear_buffer_async_write(bh);
 	unlock_buffer(bh);
@@ -482,14 +477,12 @@ static void end_buffer_async_write(struct buffer_head *bh, int uptodate)
 		}
 		tmp = tmp->b_this_page;
 	}
-	bit_spin_unlock(BH_Uptodate_Lock, &first->b_state);
-	local_irq_restore(flags);
+	spin_unlock_irqrestore(&first->b_uptodate_lock, flags);
 	end_page_writeback(page);
 	return;
 
 still_busy:
-	bit_spin_unlock(BH_Uptodate_Lock, &first->b_state);
-	local_irq_restore(flags);
+	spin_unlock_irqrestore(&first->b_uptodate_lock, flags);
 	return;
 }
 
@@ -706,8 +699,9 @@ static int __set_page_dirty(struct page *page,
 	if (TestSetPageDirty(page))
 		return 0;
 
-	write_lock_irq(&mapping->tree_lock);
+	lock_page_ref_irq(page);
 	if (page->mapping) {	/* Race with truncate? */
+		DEFINE_RADIX_TREE_CONTEXT(ctx, &mapping->page_tree);
 		WARN_ON_ONCE(warn && !PageUptodate(page));
 
 		if (mapping_cap_account_dirty(mapping)) {
@@ -716,10 +710,12 @@ static int __set_page_dirty(struct page *page,
 					BDI_RECLAIMABLE);
 			task_io_account_write(PAGE_CACHE_SIZE);
 		}
-		radix_tree_tag_set(&mapping->page_tree,
+		radix_tree_lock(&ctx);
+		radix_tree_tag_set(ctx.tree,
 				page_index(page), PAGECACHE_TAG_DIRTY);
+		radix_tree_unlock(&ctx);
 	}
-	write_unlock_irq(&mapping->tree_lock);
+	unlock_page_ref_irq(page);
 	__mark_inode_dirty(mapping->host, I_DIRTY_PAGES);
 
 	return 1;
@@ -3177,6 +3173,8 @@ struct buffer_head *alloc_buffer_head(gfp_t gfp_flags)
 	struct buffer_head *ret = kmem_cache_alloc(bh_cachep, gfp_flags);
 	if (ret) {
 		INIT_LIST_HEAD(&ret->b_assoc_buffers);
+		spin_lock_init(&ret->b_uptodate_lock);
+		spin_lock_init(&ret->b_state_lock);
 		get_cpu_var(bh_accounting).nr++;
 		recalc_bh_state();
 		put_cpu_var(bh_accounting);
@@ -3188,6 +3186,8 @@ EXPORT_SYMBOL(alloc_buffer_head);
 void free_buffer_head(struct buffer_head *bh)
 {
 	BUG_ON(!list_empty(&bh->b_assoc_buffers));
+	BUG_ON(spin_is_locked(&bh->b_uptodate_lock));
+	BUG_ON(spin_is_locked(&bh->b_state_lock));
 	kmem_cache_free(bh_cachep, bh);
 	get_cpu_var(bh_accounting).nr--;
 	recalc_bh_state();

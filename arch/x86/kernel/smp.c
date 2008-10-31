@@ -18,6 +18,7 @@
 #include <linux/spinlock.h>
 #include <linux/kernel_stat.h>
 #include <linux/mc146818rtc.h>
+#include <linux/cpumask.h>
 #include <linux/cache.h>
 #include <linux/interrupt.h>
 #include <linux/cpu.h>
@@ -122,10 +123,28 @@ static void native_smp_send_reschedule(int cpu)
 }
 
 /*
+ * this function sends a 'reschedule' IPI to all other CPUs.
+ * This is used when RT tasks are starving and other CPUs
+ * might be able to run them:
+ */
+void smp_send_reschedule_allbutself(void)
+{
+	send_IPI_allbutself(RESCHEDULE_VECTOR);
+}
+
+void smp_send_reschedule_allbutself_cpumask(cpumask_t mask)
+{
+	cpu_clear(smp_processor_id(), mask);
+	cpus_and(mask, mask, cpu_online_map);
+	if (!cpus_empty(mask))
+		send_IPI_mask(mask, RESCHEDULE_VECTOR);
+}
+
+/*
  * Structure and data for smp_call_function(). This is designed to minimise
  * static memory requirements. It also looks cleaner.
  */
-static DEFINE_SPINLOCK(call_lock);
+static DEFINE_RAW_SPINLOCK(call_lock);
 
 struct call_data_struct {
 	void (*func) (void *info);

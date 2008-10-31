@@ -25,6 +25,7 @@
 #include <linux/kprobes.h>
 #include <linux/uaccess.h>
 #include <linux/kdebug.h>
+#include <linux/ftrace.h>
 
 #include <asm/system.h>
 #include <asm/desc.h>
@@ -363,6 +364,7 @@ static int is_f00f_bug(struct pt_regs *regs, unsigned long address)
 		nr = (address - idt_descr.address) >> 3;
 
 		if (nr == 6) {
+			zap_rt_locks();
 			do_invalid_op(regs, 0);
 			return 1;
 		}
@@ -602,6 +604,8 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	/* get the address */
 	address = read_cr2();
 
+	trace_event_fault(regs->ip, error_code, address);
+
 	si_code = SEGV_MAPERR;
 
 	if (notify_page_fault(regs))
@@ -651,7 +655,7 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	 * If we're in an interrupt, have no user context or are running in an
 	 * atomic region then we must not take the fault.
 	 */
-	if (in_atomic() || !mm)
+	if (unlikely(in_atomic() || !mm || current->pagefault_disabled))
 		goto bad_area_nosemaphore;
 #else /* CONFIG_X86_64 */
 	if (likely(regs->flags & X86_EFLAGS_IF))

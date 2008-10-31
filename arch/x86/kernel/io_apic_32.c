@@ -55,8 +55,8 @@ atomic_t irq_mis_count;
 /* Where if anywhere is the i8259 connect in external int mode */
 static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 
-static DEFINE_SPINLOCK(ioapic_lock);
-static DEFINE_SPINLOCK(vector_lock);
+static DEFINE_RAW_SPINLOCK(ioapic_lock);
+static DEFINE_RAW_SPINLOCK(vector_lock);
 
 int timer_over_8254 __initdata = 1;
 
@@ -270,14 +270,14 @@ static void __unmask_IO_APIC_irq (unsigned int irq)
 	__modify_IO_APIC_irq(irq, 0, 0x00010000);
 }
 
-/* mask = 1, trigger = 0 */
-static void __mask_and_edge_IO_APIC_irq (unsigned int irq)
+/* trigger = 0 (edge mode) */
+static void __pcix_mask_IO_APIC_irq (unsigned int irq)
 {
-	__modify_IO_APIC_irq(irq, 0x00010000, 0x00008000);
+	__modify_IO_APIC_irq(irq, 0, 0x00008000);
 }
 
-/* mask = 0, trigger = 1 */
-static void __unmask_and_level_IO_APIC_irq (unsigned int irq)
+/* mask = 0, trigger = 1 (level mode) */
+static void __pcix_unmask_IO_APIC_irq (unsigned int irq)
 {
 	__modify_IO_APIC_irq(irq, 0x00008000, 0x00010000);
 }
@@ -297,6 +297,24 @@ static void unmask_IO_APIC_irq (unsigned int irq)
 
 	spin_lock_irqsave(&ioapic_lock, flags);
 	__unmask_IO_APIC_irq(irq);
+	spin_unlock_irqrestore(&ioapic_lock, flags);
+}
+
+static void pcix_mask_IO_APIC_irq (unsigned int irq)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&ioapic_lock, flags);
+	__pcix_mask_IO_APIC_irq(irq);
+	spin_unlock_irqrestore(&ioapic_lock, flags);
+}
+
+static void pcix_unmask_IO_APIC_irq (unsigned int irq)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&ioapic_lock, flags);
+	__pcix_unmask_IO_APIC_irq(irq);
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
@@ -1203,23 +1221,28 @@ static int assign_irq_vector(int irq)
 
 	return vector;
 }
+
 static struct irq_chip ioapic_chip;
+static struct irq_chip pcix_ioapic_chip;
 
 #define IOAPIC_AUTO	-1
 #define IOAPIC_EDGE	0
 #define IOAPIC_LEVEL	1
 
-static void ioapic_register_intr(int irq, int vector, unsigned long trigger)
+static void ioapic_register_intr(int irq, int vector, unsigned long trigger,
+				 int pcix)
 {
+	struct irq_chip *chip = pcix ? &pcix_ioapic_chip : &ioapic_chip;
+
 	if ((trigger == IOAPIC_AUTO && IO_APIC_irq_trigger(irq)) ||
 	    trigger == IOAPIC_LEVEL) {
 		irq_desc[irq].status |= IRQ_LEVEL;
-		set_irq_chip_and_handler_name(irq, &ioapic_chip,
-					 handle_fasteoi_irq, "fasteoi");
+		set_irq_chip_and_handler_name(irq, chip, handle_fasteoi_irq,
+					      pcix ? "pcix-fasteoi" : "fasteoi");
 	} else {
 		irq_desc[irq].status &= ~IRQ_LEVEL;
-		set_irq_chip_and_handler_name(irq, &ioapic_chip,
-					 handle_edge_irq, "edge");
+		set_irq_chip_and_handler_name(irq, chip, handle_edge_irq,
+					      pcix ? "pcix-edge" : "edge");
 	}
 	set_intr_gate(vector, interrupt[irq]);
 }
@@ -1288,7 +1311,8 @@ static void __init setup_IO_APIC_irqs(void)
 		if (IO_APIC_IRQ(irq)) {
 			vector = assign_irq_vector(irq);
 			entry.vector = vector;
-			ioapic_register_intr(irq, vector, IOAPIC_AUTO);
+			ioapic_register_intr(irq, vector, IOAPIC_AUTO,
+					     apic > 0);
 		
 			if (!apic && (irq < 16))
 				disable_8259A_irq(irq);
@@ -1457,7 +1481,7 @@ void __init print_IO_APIC(void)
 	return;
 }
 
-#if 0
+#if 1
 
 static void print_APIC_bitfield (int base)
 {
@@ -1864,7 +1888,8 @@ static int __init timer_irq_works(void)
 	 * might have cached one ExtINT interrupt.  Finally, at
 	 * least one tick may be lost due to delays.
 	 */
-	if (time_after(jiffies, t1 + 4))
+	if (time_after(jiffies, t1 + 4) &&
+	    time_before(jiffies, t1 + 16))
 		return 1;
 
 	return 0;
@@ -1953,8 +1978,10 @@ static void ack_ioapic_quirk_irq(unsigned int irq)
 	if (!(v & (1 << (i & 0x1f)))) {
 		atomic_inc(&irq_mis_count);
 		spin_lock(&ioapic_lock);
-		__mask_and_edge_IO_APIC_irq(irq);
-		__unmask_and_level_IO_APIC_irq(irq);
+		/* mask = 1, trigger = 0 */
+		__modify_IO_APIC_irq(irq, 0x00010000, 0x00008000);
+		/* mask = 0, trigger = 1 */
+		__modify_IO_APIC_irq(irq, 0x00008000, 0x00010000);
 		spin_unlock(&ioapic_lock);
 	}
 }
@@ -1979,6 +2006,18 @@ static struct irq_chip ioapic_chip __read_mostly = {
 	.retrigger	= ioapic_retrigger_irq,
 };
 
+static struct irq_chip pcix_ioapic_chip __read_mostly = {
+	.name 		= "IO-APIC",
+	.startup 	= startup_ioapic_irq,
+	.mask	 	= pcix_mask_IO_APIC_irq,
+	.unmask	 	= pcix_unmask_IO_APIC_irq,
+	.ack 		= ack_ioapic_irq,
+	.eoi 		= ack_ioapic_irq,
+#ifdef CONFIG_SMP
+	.set_affinity 	= set_ioapic_affinity_irq,
+#endif
+	.retrigger	= ioapic_retrigger_irq,
+};
 
 static inline void init_IO_APIC_traps(void)
 {
@@ -2787,7 +2826,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 		mp_ioapics[ioapic].mpc_apicid, pin, entry.vector, irq,
 		edge_level, active_high_low);
 
-	ioapic_register_intr(irq, entry.vector, edge_level);
+	ioapic_register_intr(irq, entry.vector, edge_level, ioapic > 0);
 
 	if (!ioapic && (irq < 16))
 		disable_8259A_irq(irq);

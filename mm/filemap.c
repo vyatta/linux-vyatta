@@ -112,16 +112,21 @@ generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 /*
  * Remove a page from the page cache and free it. Caller has to make
  * sure the page is locked and that nobody else uses it - or that usage
- * is safe.  The caller must hold a write_lock on the mapping's tree_lock.
+ * is safe.  The caller must hold the mapping's tree_lock.
  */
 void __remove_from_page_cache(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
+	DEFINE_RADIX_TREE_CONTEXT(ctx, &mapping->page_tree);
 
 	mem_cgroup_uncharge_page(page);
-	radix_tree_delete(&mapping->page_tree, page->index);
+
+	radix_tree_lock(&ctx);
+	radix_tree_delete(ctx.tree, page->index);
+	radix_tree_unlock(&ctx);
+
 	page->mapping = NULL;
-	mapping->nrpages--;
+	mapping_nrpages_dec(mapping);
 	__dec_zone_page_state(page, NR_FILE_PAGES);
 	BUG_ON(page_mapped(page));
 
@@ -140,13 +145,11 @@ void __remove_from_page_cache(struct page *page)
 
 void remove_from_page_cache(struct page *page)
 {
-	struct address_space *mapping = page->mapping;
-
 	BUG_ON(!PageLocked(page));
 
-	write_lock_irq(&mapping->tree_lock);
+	lock_page_ref_irq(page);
 	__remove_from_page_cache(page);
-	write_unlock_irq(&mapping->tree_lock);
+	unlock_page_ref_irq(page);
 }
 
 static int sync_page(void *word)
@@ -212,7 +215,7 @@ int __filemap_fdatawrite_range(struct address_space *mapping, loff_t start,
 	int ret;
 	struct writeback_control wbc = {
 		.sync_mode = sync_mode,
-		.nr_to_write = mapping->nrpages * 2,
+		.nr_to_write = mapping_nrpages(mapping) * 2,
 		.range_start = start,
 		.range_end = end,
 	};
@@ -394,7 +397,7 @@ int filemap_write_and_wait(struct address_space *mapping)
 {
 	int err = 0;
 
-	if (mapping->nrpages) {
+	if (mapping_nrpages(mapping)) {
 		err = filemap_fdatawrite(mapping);
 		/*
 		 * Even if the above returned error, the pages may be
@@ -428,7 +431,7 @@ int filemap_write_and_wait_range(struct address_space *mapping,
 {
 	int err = 0;
 
-	if (mapping->nrpages) {
+	if (mapping_nrpages(mapping)) {
 		err = __filemap_fdatawrite_range(mapping, lstart, lend,
 						 WB_SYNC_ALL);
 		/* See comment of filemap_write_and_wait() */
@@ -466,19 +469,23 @@ int add_to_page_cache(struct page *page, struct address_space *mapping,
 
 	error = radix_tree_preload(gfp_mask & ~__GFP_HIGHMEM);
 	if (error == 0) {
-		write_lock_irq(&mapping->tree_lock);
-		error = radix_tree_insert(&mapping->page_tree, offset, page);
+		DEFINE_RADIX_TREE_CONTEXT(ctx, &mapping->page_tree);
+
+		lock_page_ref_irq(page);
+		radix_tree_lock(&ctx);
+		error = radix_tree_insert(ctx.tree, offset, page);
+		radix_tree_unlock(&ctx);
 		if (!error) {
 			page_cache_get(page);
 			SetPageLocked(page);
 			page->mapping = mapping;
 			page->index = offset;
-			mapping->nrpages++;
+			mapping_nrpages_inc(mapping);
 			__inc_zone_page_state(page, NR_FILE_PAGES);
 		} else
 			mem_cgroup_uncharge_page(page);
 
-		write_unlock_irq(&mapping->tree_lock);
+		unlock_page_ref_irq(page);
 		radix_tree_preload_end();
 	} else
 		mem_cgroup_uncharge_page(page);
@@ -514,21 +521,10 @@ static int __sleep_on_page_lock(void *word)
 	return 0;
 }
 
-/*
- * In order to wait for pages to become available there must be
- * waitqueues associated with pages. By using a hash table of
- * waitqueues where the bucket discipline is to maintain all
- * waiters on the same queue and wake all when any of the pages
- * become available, and for the woken contexts to check to be
- * sure the appropriate page became available, this saves space
- * at a cost of "thundering herd" phenomena during rare hash
- * collisions.
- */
-static wait_queue_head_t *page_waitqueue(struct page *page)
+int __sleep_on_page(void *word)
 {
-	const struct zone *zone = page_zone(page);
-
-	return &zone->wait_table[hash_ptr(page, zone->wait_table_bits)];
+	schedule();
+	return 0;
 }
 
 static inline void wake_up_page(struct page *page, int bit)
@@ -637,13 +633,33 @@ void __lock_page_nosync(struct page *page)
  */
 struct page * find_get_page(struct address_space *mapping, pgoff_t offset)
 {
+	void **pagep;
 	struct page *page;
 
-	read_lock_irq(&mapping->tree_lock);
-	page = radix_tree_lookup(&mapping->page_tree, offset);
-	if (page)
-		page_cache_get(page);
-	read_unlock_irq(&mapping->tree_lock);
+	rcu_read_lock();
+repeat:
+	page = NULL;
+	pagep = radix_tree_lookup_slot(&mapping->page_tree, offset);
+	if (pagep) {
+		page = radix_tree_deref_slot(pagep);
+		if (unlikely(!page || page == RADIX_TREE_RETRY))
+			goto repeat;
+
+		if (!page_cache_get_speculative(page))
+			goto repeat;
+
+		/*
+		 * Has the page moved?
+		 * This is part of the lockless pagecache protocol. See
+		 * include/linux/pagemap.h for details.
+		 */
+		if (unlikely(page != *pagep)) {
+			page_cache_release(page);
+			goto repeat;
+		}
+	}
+	rcu_read_unlock();
+
 	return page;
 }
 EXPORT_SYMBOL(find_get_page);
@@ -664,26 +680,16 @@ struct page *find_lock_page(struct address_space *mapping,
 	struct page *page;
 
 repeat:
-	read_lock_irq(&mapping->tree_lock);
-	page = radix_tree_lookup(&mapping->page_tree, offset);
+	page = find_get_page(mapping, offset);
 	if (page) {
-		page_cache_get(page);
-		if (TestSetPageLocked(page)) {
-			read_unlock_irq(&mapping->tree_lock);
-			__lock_page(page);
-
-			/* Has the page been truncated while we slept? */
-			if (unlikely(page->mapping != mapping)) {
-				unlock_page(page);
-				page_cache_release(page);
-				goto repeat;
-			}
-			VM_BUG_ON(page->index != offset);
-			goto out;
+		lock_page(page);
+		/* Has the page been truncated? */
+		if (unlikely(page->mapping != mapping)) {
+			unlock_page(page);
+			page_cache_release(page);
+			goto repeat;
 		}
 	}
-	read_unlock_irq(&mapping->tree_lock);
-out:
 	return page;
 }
 EXPORT_SYMBOL(find_lock_page);
@@ -749,13 +755,39 @@ unsigned find_get_pages(struct address_space *mapping, pgoff_t start,
 {
 	unsigned int i;
 	unsigned int ret;
+	unsigned int nr_found;
 
-	read_lock_irq(&mapping->tree_lock);
-	ret = radix_tree_gang_lookup(&mapping->page_tree,
-				(void **)pages, start, nr_pages);
-	for (i = 0; i < ret; i++)
-		page_cache_get(pages[i]);
-	read_unlock_irq(&mapping->tree_lock);
+	rcu_read_lock();
+restart:
+	nr_found = radix_tree_gang_lookup_slot(&mapping->page_tree,
+				(void ***)pages, start, nr_pages);
+	ret = 0;
+	for (i = 0; i < nr_found; i++) {
+		struct page *page;
+repeat:
+		page = radix_tree_deref_slot((void **)pages[i]);
+		if (unlikely(!page))
+			continue;
+		/*
+		 * this can only trigger if nr_found == 1, making livelock
+		 * a non issue.
+		 */
+		if (unlikely(page == RADIX_TREE_RETRY))
+			goto restart;
+
+		if (!page_cache_get_speculative(page))
+			goto repeat;
+
+		/* Has the page moved? */
+		if (unlikely(page != *((void **)pages[i]))) {
+			page_cache_release(page);
+			goto repeat;
+		}
+
+		pages[ret] = page;
+		ret++;
+	}
+	rcu_read_unlock();
 	return ret;
 }
 
@@ -776,19 +808,44 @@ unsigned find_get_pages_contig(struct address_space *mapping, pgoff_t index,
 {
 	unsigned int i;
 	unsigned int ret;
+	unsigned int nr_found;
 
-	read_lock_irq(&mapping->tree_lock);
-	ret = radix_tree_gang_lookup(&mapping->page_tree,
-				(void **)pages, index, nr_pages);
-	for (i = 0; i < ret; i++) {
-		if (pages[i]->mapping == NULL || pages[i]->index != index)
+	rcu_read_lock();
+restart:
+	nr_found = radix_tree_gang_lookup_slot(&mapping->page_tree,
+				(void ***)pages, index, nr_pages);
+	ret = 0;
+	for (i = 0; i < nr_found; i++) {
+		struct page *page;
+repeat:
+		page = radix_tree_deref_slot((void **)pages[i]);
+		if (unlikely(!page))
+			continue;
+		/*
+		 * this can only trigger if nr_found == 1, making livelock
+		 * a non issue.
+		 */
+		if (unlikely(page == RADIX_TREE_RETRY))
+			goto restart;
+
+		if (page->mapping == NULL || page->index != index)
 			break;
 
-		page_cache_get(pages[i]);
+		if (!page_cache_get_speculative(page))
+			goto repeat;
+
+		/* Has the page moved? */
+		if (unlikely(page != *((void **)pages[i]))) {
+			page_cache_release(page);
+			goto repeat;
+		}
+
+		pages[ret] = page;
+		ret++;
 		index++;
 	}
-	read_unlock_irq(&mapping->tree_lock);
-	return i;
+	rcu_read_unlock();
+	return ret;
 }
 EXPORT_SYMBOL(find_get_pages_contig);
 
@@ -808,15 +865,43 @@ unsigned find_get_pages_tag(struct address_space *mapping, pgoff_t *index,
 {
 	unsigned int i;
 	unsigned int ret;
+	unsigned int nr_found;
 
-	read_lock_irq(&mapping->tree_lock);
-	ret = radix_tree_gang_lookup_tag(&mapping->page_tree,
-				(void **)pages, *index, nr_pages, tag);
-	for (i = 0; i < ret; i++)
-		page_cache_get(pages[i]);
+	rcu_read_lock();
+restart:
+	nr_found = radix_tree_gang_lookup_tag_slot(&mapping->page_tree,
+				(void ***)pages, *index, nr_pages, tag);
+	ret = 0;
+	for (i = 0; i < nr_found; i++) {
+		struct page *page;
+repeat:
+		page = radix_tree_deref_slot((void **)pages[i]);
+		if (unlikely(!page))
+			continue;
+		/*
+		 * this can only trigger if nr_found == 1, making livelock
+		 * a non issue.
+		 */
+		if (unlikely(page == RADIX_TREE_RETRY))
+			goto restart;
+
+		if (!page_cache_get_speculative(page))
+			goto repeat;
+
+		/* Has the page moved? */
+		if (unlikely(page != *((void **)pages[i]))) {
+			page_cache_release(page);
+			goto repeat;
+		}
+
+		pages[ret] = page;
+		ret++;
+	}
+	rcu_read_unlock();
+
 	if (ret)
 		*index = pages[ret - 1]->index + 1;
-	read_unlock_irq(&mapping->tree_lock);
+
 	return ret;
 }
 EXPORT_SYMBOL(find_get_pages_tag);
@@ -1718,7 +1803,9 @@ size_t iov_iter_copy_from_user_atomic(struct page *page,
 	char *kaddr;
 	size_t copied;
 
-	BUG_ON(!in_atomic());
+#ifndef CONFIG_PREEMPT_RT
+	BUG_ON(!current->pagefault_disabled);
+#endif
 	kaddr = kmap_atomic(page, KM_USER0);
 	if (likely(i->nr_segs == 1)) {
 		int left;
@@ -2546,7 +2633,7 @@ generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	 * about to write.  We do this *before* the write so that we can return
 	 * -EIO without clobbering -EIOCBQUEUED from ->direct_IO().
 	 */
-	if (rw == WRITE && mapping->nrpages) {
+	if (rw == WRITE && mapping_nrpages(mapping)) {
 		retval = invalidate_inode_pages2_range(mapping,
 					offset >> PAGE_CACHE_SHIFT, end);
 		if (retval)
@@ -2563,7 +2650,7 @@ generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	 * so we don't support it 100%.  If this invalidation
 	 * fails, tough, the write still worked...
 	 */
-	if (rw == WRITE && mapping->nrpages) {
+	if (rw == WRITE && mapping_nrpages(mapping)) {
 		invalidate_inode_pages2_range(mapping, offset >> PAGE_CACHE_SHIFT, end);
 	}
 out:

@@ -30,14 +30,14 @@
 #include <asm/tlbflush.h>
 #include <asm/tlb.h>
 #include <asm/bug.h>
+#include <asm/machdep.h>
 
 DEFINE_PER_CPU(struct ppc64_tlb_batch, ppc64_tlb_batch);
 
 /* This is declared as we are using the more or less generic
  * include/asm-powerpc/tlb.h file -- tgall
  */
-DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
-DEFINE_PER_CPU(struct pte_freelist_batch *, pte_freelist_cur);
+DEFINE_PER_CPU_LOCKED(struct mmu_gather, mmu_gathers);
 unsigned long pte_freelist_forced_free;
 
 struct pte_freelist_batch
@@ -47,7 +47,7 @@ struct pte_freelist_batch
 	pgtable_free_t	tables[0];
 };
 
-DEFINE_PER_CPU(struct pte_freelist_batch *, pte_freelist_cur);
+DEFINE_PER_CPU_LOCKED(struct pte_freelist_batch *, pte_freelist_cur);
 unsigned long pte_freelist_forced_free;
 
 #define PTE_FREELIST_SIZE \
@@ -91,21 +91,21 @@ static void pte_free_submit(struct pte_freelist_batch *batch)
 
 void pgtable_free_tlb(struct mmu_gather *tlb, pgtable_free_t pgf)
 {
-	/* This is safe since tlb_gather_mmu has disabled preemption */
-        cpumask_t local_cpumask = cpumask_of_cpu(smp_processor_id());
-	struct pte_freelist_batch **batchp = &__get_cpu_var(pte_freelist_cur);
+	int cpu;
+        cpumask_t local_cpumask = cpumask_of_cpu(tlb->cpu);
+	struct pte_freelist_batch **batchp = &get_cpu_var_locked(pte_freelist_cur, &cpu);
 
 	if (atomic_read(&tlb->mm->mm_users) < 2 ||
 	    cpus_equal(tlb->mm->cpu_vm_mask, local_cpumask)) {
 		pgtable_free(pgf);
-		return;
+		goto cleanup;
 	}
 
 	if (*batchp == NULL) {
 		*batchp = (struct pte_freelist_batch *)__get_free_page(GFP_ATOMIC);
 		if (*batchp == NULL) {
 			pgtable_free_now(pgf);
-			return;
+			goto cleanup;
 		}
 		(*batchp)->index = 0;
 	}
@@ -114,6 +114,9 @@ void pgtable_free_tlb(struct mmu_gather *tlb, pgtable_free_t pgf)
 		pte_free_submit(*batchp);
 		*batchp = NULL;
 	}
+
+ cleanup:
+	put_cpu_var_locked(pte_freelist_cur, cpu);
 }
 
 /*
@@ -127,7 +130,7 @@ void pgtable_free_tlb(struct mmu_gather *tlb, pgtable_free_t pgf)
 void hpte_need_flush(struct mm_struct *mm, unsigned long addr,
 		     pte_t *ptep, unsigned long pte, int huge)
 {
-	struct ppc64_tlb_batch *batch = &__get_cpu_var(ppc64_tlb_batch);
+	struct ppc64_tlb_batch *batch = &get_cpu_var(ppc64_tlb_batch);
 	unsigned long vsid, vaddr;
 	unsigned int psize;
 	int ssize;
@@ -178,6 +181,7 @@ void hpte_need_flush(struct mm_struct *mm, unsigned long addr,
 	 */
 	if (!batch->active) {
 		flush_hash_page(vaddr, rpte, psize, ssize, 0);
+		put_cpu_var(ppc64_tlb_batch);
 		return;
 	}
 
@@ -204,8 +208,22 @@ void hpte_need_flush(struct mm_struct *mm, unsigned long addr,
 	batch->pte[i] = rpte;
 	batch->vaddr[i] = vaddr;
 	batch->index = ++i;
+
+#ifdef CONFIG_PREEMPT_RT
+	/*
+	 * Since flushing tlb needs expensive hypervisor call(s) on celleb,
+	 * always flush it on RT to reduce scheduling latency.
+	 */
+	if (machine_is(celleb)) {
+		__flush_tlb_pending(batch);
+		put_cpu_var(ppc64_tlb_batch);
+		return;
+	}
+#endif /* CONFIG_PREEMPT_RT */
+
 	if (i >= PPC64_TLB_BATCH_NR)
 		__flush_tlb_pending(batch);
+	put_cpu_var(ppc64_tlb_batch);
 }
 
 /*
@@ -234,13 +252,15 @@ void __flush_tlb_pending(struct ppc64_tlb_batch *batch)
 
 void pte_free_finish(void)
 {
-	/* This is safe since tlb_gather_mmu has disabled preemption */
-	struct pte_freelist_batch **batchp = &__get_cpu_var(pte_freelist_cur);
+	int cpu;
+	struct pte_freelist_batch **batchp = &get_cpu_var_locked(pte_freelist_cur, &cpu);
 
-	if (*batchp == NULL)
-		return;
-	pte_free_submit(*batchp);
-	*batchp = NULL;
+	if (*batchp) {
+		pte_free_submit(*batchp);
+		*batchp = NULL;
+	}
+
+	put_cpu_var_locked(pte_freelist_cur, cpu);
 }
 
 /**

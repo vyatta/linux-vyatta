@@ -55,6 +55,39 @@ sw_usp:
 .globl inthandler
 .globl fasthandler
 
+#ifdef CONFIG_FTRACE
+ENTRY(_mcount)
+	linkw	%fp, #0
+
+	moveal	ftrace_trace_function, %a0
+	movel	#ftrace_stub, %d0
+	cmpl	%a0@, %d0
+
+	bnew	do_mcount
+
+	unlk	%fp
+	rts
+
+do_mcount:
+
+	movel	%fp, %d0
+	moveal	%d0, %a1
+
+	moveal	%a1@, %a0
+	movel	%a0@(4), %sp@-	/* push parent ip */
+	movel	%a1@(4), %sp@-	/* push ip */
+
+	moveal	ftrace_trace_function, %a0
+	jsr	%a0@
+
+	unlk %fp
+
+.globl ftrace_stub
+ftrace_stub:
+	rts
+END(mcount)
+#endif
+
 enosys:
 	mov.l	#sys_ni_syscall,%d3
 	bra	1f
@@ -215,19 +248,8 @@ ENTRY(fasthandler)
 	RESTORE_LOCAL
 
 ENTRY(ret_from_interrupt)
-	moveb	%sp@(PT_SR),%d0
-	andl	#0x7,%d0
-	jeq	1f
-
-	RESTORE_ALL
-
-1:
-	/* check if we need to do software interrupts */
-	movel	irq_stat+CPUSTAT_SOFTIRQ_PENDING,%d0
-	jeq	ret_from_exception
-
-	pea	ret_from_exception
-	jmp	do_softirq
+	/* the fasthandler is confusing me, haven't seen any user */
+	jmp	ret_from_exception
 
 /*
  * Beware - when entering resume, prev (the current task) is

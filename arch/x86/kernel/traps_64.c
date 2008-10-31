@@ -32,6 +32,7 @@
 #include <linux/bug.h>
 #include <linux/kdebug.h>
 #include <linux/utsname.h>
+#include <linux/ftrace.h>
 
 #include <mach_traps.h>
 
@@ -84,20 +85,22 @@ static inline void conditional_sti(struct pt_regs *regs)
 		local_irq_enable();
 }
 
-static inline void preempt_conditional_sti(struct pt_regs *regs)
+static inline void preempt_conditional_sti(struct pt_regs *regs, int stack)
 {
-	inc_preempt_count();
+	if (stack)
+		inc_preempt_count();
 	if (regs->flags & X86_EFLAGS_IF)
 		local_irq_enable();
 }
 
-static inline void preempt_conditional_cli(struct pt_regs *regs)
+static inline void preempt_conditional_cli(struct pt_regs *regs, int stack)
 {
 	if (regs->flags & X86_EFLAGS_IF)
 		local_irq_disable();
 	/* Make sure to not schedule here because we could be running
 	   on an exception stack. */
-	dec_preempt_count();
+	if (stack)
+		dec_preempt_count();
 }
 
 int kstack_depth_to_print = 12;
@@ -134,10 +137,14 @@ static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 					unsigned *usedp, char **idp)
 {
 	static char ids[][8] = {
+#if DEBUG_STACK > 0
 		[DEBUG_STACK - 1] = "#DB",
+#endif
 		[NMI_STACK - 1] = "NMI",
 		[DOUBLEFAULT_STACK - 1] = "#DF",
+#if STACKFAULT_STACK > 0
 		[STACKFAULT_STACK - 1] = "#SS",
+#endif
 		[MCE_STACK - 1] = "#MC",
 #if DEBUG_STKSZ > EXCEPTION_STKSZ
 		[N_EXCEPTION_STACKS ... N_EXCEPTION_STACKS + DEBUG_STKSZ / EXCEPTION_STKSZ - 2] = "#DB[?]"
@@ -262,7 +269,7 @@ void dump_trace(struct task_struct *tsk, struct pt_regs *regs,
 		unsigned long *stack, unsigned long bp,
 		const struct stacktrace_ops *ops, void *data)
 {
-	const unsigned cpu = get_cpu();
+	const unsigned cpu = raw_smp_processor_id();
 	unsigned long *irqstack_end = (unsigned long*)cpu_pda(cpu)->irqstackptr;
 	unsigned used = 0;
 	struct thread_info *tinfo;
@@ -346,7 +353,6 @@ void dump_trace(struct task_struct *tsk, struct pt_regs *regs,
 	 * This handles the process stack:
 	 */
 	bp = print_context_stack(tinfo, stack, bp, ops, data, NULL);
-	put_cpu();
 }
 EXPORT_SYMBOL(dump_trace);
 
@@ -385,9 +391,13 @@ void
 show_trace(struct task_struct *tsk, struct pt_regs *regs, unsigned long *stack,
 		unsigned long bp)
 {
+	pause_on_oops_head();
 	printk("\nCall Trace:\n");
 	dump_trace(tsk, regs, stack, bp, &print_trace_ops, NULL);
 	printk("\n");
+	debug_show_held_locks(tsk);
+	pause_on_oops_tail();
+	print_preempt_trace(tsk);
 }
 
 static void
@@ -396,7 +406,7 @@ _show_stack(struct task_struct *tsk, struct pt_regs *regs, unsigned long *sp,
 {
 	unsigned long *stack;
 	int i;
-	const int cpu = smp_processor_id();
+	const int cpu = raw_smp_processor_id();
 	unsigned long *irqstack_end = (unsigned long *) (cpu_pda(cpu)->irqstackptr);
 	unsigned long *irqstack = (unsigned long *) (cpu_pda(cpu)->irqstackptr - IRQSTACKSIZE);
 
@@ -515,7 +525,7 @@ int is_valid_bugaddr(unsigned long ip)
 	return ud2 == 0x0b0f;
 }
 
-static raw_spinlock_t die_lock = __RAW_SPIN_LOCK_UNLOCKED;
+static raw_spinlock_t die_lock = RAW_SPIN_LOCK_UNLOCKED(die_lock);
 static int die_owner = -1;
 static unsigned int die_nest_count;
 
@@ -529,11 +539,11 @@ unsigned __kprobes long oops_begin(void)
 	/* racy, but better than risking deadlock. */
 	raw_local_irq_save(flags);
 	cpu = smp_processor_id();
-	if (!__raw_spin_trylock(&die_lock)) {
+	if (!spin_trylock(&die_lock)) {
 		if (cpu == die_owner) 
 			/* nested oops. should stop eventually */;
 		else
-			__raw_spin_lock(&die_lock);
+			spin_lock(&die_lock);
 	}
 	die_nest_count++;
 	die_owner = cpu;
@@ -549,7 +559,7 @@ void __kprobes oops_end(unsigned long flags, struct pt_regs *regs, int signr)
 	die_nest_count--;
 	if (!die_nest_count)
 		/* Nest count reaches zero, release the lock. */
-		__raw_spin_unlock(&die_lock);
+		spin_unlock(&die_lock);
 	raw_local_irq_restore(flags);
 	if (!regs) {
 		oops_exit();
@@ -564,6 +574,9 @@ void __kprobes oops_end(unsigned long flags, struct pt_regs *regs, int signr)
 int __kprobes __die(const char * str, struct pt_regs * regs, long err)
 {
 	static int die_counter;
+
+	ftrace_halt();
+
 	printk(KERN_EMERG "%s: %04lx [%u] ", str, err & 0xffff,++die_counter);
 #ifdef CONFIG_PREEMPT
 	printk("PREEMPT ");
@@ -715,9 +728,9 @@ asmlinkage void do_stack_segment(struct pt_regs *regs, long error_code)
 	if (notify_die(DIE_TRAP, "stack segment", regs, error_code,
 			12, SIGBUS) == NOTIFY_STOP)
 		return;
-	preempt_conditional_sti(regs);
+	preempt_conditional_sti(regs, STACKFAULT_STACK);
 	do_trap(12, SIGBUS, "stack segment", regs, error_code, NULL);
-	preempt_conditional_cli(regs);
+	preempt_conditional_cli(regs, STACKFAULT_STACK);
 }
 
 asmlinkage void do_double_fault(struct pt_regs * regs, long error_code)
@@ -835,6 +848,8 @@ asmlinkage notrace  __kprobes void default_do_nmi(struct pt_regs *regs)
 
 	cpu = smp_processor_id();
 
+	trace_event_irq(-1, user_mode(regs), regs->ip);
+
 	/* Only the BSP gets external NMIs from the system.  */
 	if (!cpu)
 		reason = get_nmi_reason();
@@ -873,9 +888,9 @@ asmlinkage void __kprobes do_int3(struct pt_regs * regs, long error_code)
 	if (notify_die(DIE_INT3, "int3", regs, error_code, 3, SIGTRAP) == NOTIFY_STOP) {
 		return;
 	}
-	preempt_conditional_sti(regs);
+	preempt_conditional_sti(regs, DEBUG_STACK);
 	do_trap(3, SIGTRAP, "int3", regs, error_code, NULL);
-	preempt_conditional_cli(regs);
+	preempt_conditional_cli(regs, DEBUG_STACK);
 }
 
 /* Help handler running on IST stack to switch back to user stack
@@ -921,7 +936,7 @@ asmlinkage void __kprobes do_debug(struct pt_regs * regs,
 						SIGTRAP) == NOTIFY_STOP)
 		return;
 
-	preempt_conditional_sti(regs);
+	preempt_conditional_sti(regs, DEBUG_STACK);
 
 	/* Mask out spurious debug traps due to lazy DR7 setting */
 	if (condition & (DR_TRAP0|DR_TRAP1|DR_TRAP2|DR_TRAP3)) {
@@ -953,13 +968,13 @@ asmlinkage void __kprobes do_debug(struct pt_regs * regs,
 
 clear_dr7:
 	set_debugreg(0UL, 7);
-	preempt_conditional_cli(regs);
+	preempt_conditional_cli(regs, DEBUG_STACK);
 	return;
 
 clear_TF_reenable:
 	set_tsk_thread_flag(tsk, TIF_SINGLESTEP);
 	regs->flags &= ~X86_EFLAGS_TF;
-	preempt_conditional_cli(regs);
+	preempt_conditional_cli(regs, DEBUG_STACK);
 }
 
 static int kernel_math_error(struct pt_regs *regs, const char *str, int trapnr)

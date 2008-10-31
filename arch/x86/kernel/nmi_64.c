@@ -20,11 +20,13 @@
 #include <linux/kprobes.h>
 #include <linux/cpumask.h>
 #include <linux/kdebug.h>
+#include <linux/kernel_stat.h>
 
 #include <asm/smp.h>
 #include <asm/nmi.h>
 #include <asm/proto.h>
 #include <asm/mce.h>
+#include <mach_ipi.h>
 
 #include <mach_traps.h>
 
@@ -44,12 +46,12 @@ atomic_t nmi_active = ATOMIC_INIT(0);		/* oprofile uses this */
 static int panic_on_timeout;
 
 unsigned int nmi_watchdog = NMI_DEFAULT;
-static unsigned int nmi_hz = HZ;
+static unsigned int nmi_hz = 1000;
 
 static DEFINE_PER_CPU(short, wd_enabled);
 
 /* Run after command line and cpu_init init, but before all other checks */
-void nmi_watchdog_default(void)
+static void nmi_watchdog_default(void)
 {
 	if (nmi_watchdog != NMI_DEFAULT)
 		return;
@@ -65,7 +67,9 @@ static int endflag __initdata = 0;
  */
 static __init void nmi_cpu_busy(void *data)
 {
+#ifndef CONFIG_PREEMPT_RT
 	local_irq_enable_in_hardirq();
+#endif
 	/* Intentionally don't use cpu_relax here. This is
 	   to make sure that the performance counter really ticks,
 	   even if there is a simulator or similar that catches the
@@ -299,7 +303,7 @@ void touch_nmi_watchdog(void)
 		unsigned cpu;
 
 		/*
- 		 * Tell other CPUs to reset their alert counters. We cannot
+		 * Tell other CPUs to reset their alert counters. We cannot
 		 * do it ourselves because the alert count increase is not
 		 * atomic.
 		 */
@@ -313,13 +317,67 @@ void touch_nmi_watchdog(void)
 }
 EXPORT_SYMBOL(touch_nmi_watchdog);
 
+int nmi_show_regs[NR_CPUS];
+
+static DEFINE_RAW_SPINLOCK(nmi_print_lock);
+
+notrace int irq_show_regs_callback(int cpu, struct pt_regs *regs)
+{
+	if (!nmi_show_regs[cpu])
+		return 0;
+
+	spin_lock(&nmi_print_lock);
+	printk(KERN_WARNING "NMI show regs on CPU#%d:\n", cpu);
+	printk(KERN_WARNING "apic_timer_irqs: %d\n", read_pda(apic_timer_irqs));
+	show_regs(regs);
+	spin_unlock(&nmi_print_lock);
+	nmi_show_regs[cpu] = 0;
+	return 1;
+}
+
+void nmi_show_all_regs(void)
+{
+	struct pt_regs *regs;
+	int i, cpu;
+
+	if (system_state == SYSTEM_BOOTING)
+		return;
+
+	preempt_disable();
+
+	regs = get_irq_regs();
+	cpu = smp_processor_id();
+
+	printk(KERN_WARNING "nmi_show_all_regs(): start on CPU#%d.\n", cpu);
+	dump_stack();
+
+	for_each_online_cpu(i)
+		nmi_show_regs[i] = 1;
+
+	if (regs)
+		irq_show_regs_callback(cpu, regs);
+	else
+		nmi_show_regs[cpu] = 0;
+
+	smp_send_nmi_allbutself();
+	preempt_enable();
+
+	for_each_online_cpu(i) {
+		while (nmi_show_regs[i] == 1)
+			barrier();
+	}
+}
+
 notrace __kprobes int
 nmi_watchdog_tick(struct pt_regs *regs, unsigned reason)
 {
 	int sum;
 	int touched = 0;
 	int cpu = smp_processor_id();
-	int rc = 0;
+	int rc;
+
+	rc = irq_show_regs_callback(cpu, regs);
+	__profile_tick(CPU_PROFILING, regs);
 
 	/* check for other users first */
 	if (notify_die(DIE_NMI, "nmi", regs, reason, 2, SIGINT)
@@ -328,14 +386,13 @@ nmi_watchdog_tick(struct pt_regs *regs, unsigned reason)
 		touched = 1;
 	}
 
-	sum = read_pda(apic_timer_irqs) + read_pda(irq0_irqs);
 	if (__get_cpu_var(nmi_touch)) {
 		__get_cpu_var(nmi_touch) = 0;
 		touched = 1;
 	}
 
 	if (cpu_isset(cpu, backtrace_mask)) {
-		static DEFINE_SPINLOCK(lock);	/* Serialise the printks */
+		static DEFINE_RAW_SPINLOCK(lock);	/* Serialise the printks */
 
 		spin_lock(&lock);
 		printk("NMI backtrace for cpu %d\n", cpu);
@@ -343,6 +400,12 @@ nmi_watchdog_tick(struct pt_regs *regs, unsigned reason)
 		spin_unlock(&lock);
 		cpu_clear(cpu, backtrace_mask);
 	}
+
+	/*
+	 * Take the local apic timer and PIT/HPET into account. We don't
+	 * know which one is active, when we have highres/dyntick on
+	 */
+	sum = read_pda(apic_timer_irqs) + kstat_cpu(cpu).irqs[0];
 
 #ifdef CONFIG_X86_MCE
 	/* Could check oops_in_progress here too, but it's safer
@@ -357,9 +420,26 @@ nmi_watchdog_tick(struct pt_regs *regs, unsigned reason)
 		 * wait a few IRQs (5 seconds) before doing the oops ...
 		 */
 		local_inc(&__get_cpu_var(alert_counter));
-		if (local_read(&__get_cpu_var(alert_counter)) == 5*nmi_hz)
+		if (local_read(&__get_cpu_var(alert_counter)) == 5*nmi_hz) {
+			int i;
+
+			for_each_online_cpu(i) {
+				if (i == cpu)
+					continue;
+				nmi_show_regs[i] = 1;
+			}
+
+			smp_send_nmi_allbutself();
+
+			for_each_online_cpu(i) {
+				if (i == cpu)
+					continue;
+				while (nmi_show_regs[i] == 1)
+					cpu_relax();
+			}
 			die_nmi("NMI Watchdog detected LOCKUP on CPU %d\n", regs,
 				panic_on_timeout);
+		}
 	} else {
 		__get_cpu_var(last_irq_sum) = sum;
 		local_set(&__get_cpu_var(alert_counter), 0);
@@ -476,6 +556,15 @@ void __trigger_all_cpu_backtrace(void)
 			break;
 		mdelay(1);
 	}
+}
+
+void smp_send_nmi_allbutself(void)
+{
+#ifdef CONFIG_SMP
+	preempt_disable();
+	send_IPI_allbutself(NMI_VECTOR);
+	preempt_enable();
+#endif
 }
 
 EXPORT_SYMBOL(nmi_active);

@@ -28,6 +28,7 @@
 #include <linux/acpi_pmtmr.h>
 #include <linux/module.h>
 #include <linux/dmi.h>
+#include <linux/ftrace.h>
 
 #include <asm/atomic.h>
 #include <asm/smp.h>
@@ -627,6 +628,7 @@ void smp_apic_timer_interrupt(struct pt_regs *regs)
 {
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
+	trace_event_irq(-1, user_mode(regs), regs->ip);
 	/*
 	 * NOTE! We'd better ACK the irq immediately,
 	 * because timer handling can be slow.
@@ -1358,6 +1360,7 @@ void smp_error_interrupt(struct pt_regs *regs)
 	*/
 	printk(KERN_DEBUG "APIC error on CPU%d: %02lx(%02lx)\n",
 		smp_processor_id(), v , v1);
+	dump_stack();
 	irq_exit();
 }
 

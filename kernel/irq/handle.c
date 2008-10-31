@@ -13,6 +13,7 @@
 #include <linux/irq.h>
 #include <linux/module.h>
 #include <linux/random.h>
+#include <linux/kallsyms.h>
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
 
@@ -53,12 +54,13 @@ struct irq_desc irq_desc[NR_IRQS] __cacheline_aligned_in_smp = {
 		.chip = &no_irq_chip,
 		.handle_irq = handle_bad_irq,
 		.depth = 1,
-		.lock = __SPIN_LOCK_UNLOCKED(irq_desc->lock),
+		.lock = RAW_SPIN_LOCK_UNLOCKED(irq_desc),
 #ifdef CONFIG_SMP
 		.affinity = CPU_MASK_ALL
 #endif
 	}
 };
+EXPORT_SYMBOL_GPL(irq_desc);
 
 /*
  * What should we do if we get a hw irq event on an illegal vector?
@@ -131,24 +133,85 @@ irqreturn_t handle_IRQ_event(unsigned int irq, struct irqaction *action)
 	irqreturn_t ret, retval = IRQ_NONE;
 	unsigned int status = 0;
 
+#ifdef __i386__
+	if (debug_direct_keyboard && irq == 1)
+		lockdep_off();
+#endif
+
 	handle_dynamic_tick(action);
 
-	if (!(action->flags & IRQF_DISABLED))
-		local_irq_enable_in_hardirq();
+	/*
+	 * Unconditionally enable interrupts for threaded
+	 * IRQ handlers:
+	 */
+	if (!hardirq_count() || !(action->flags & IRQF_DISABLED))
+		local_irq_enable();
 
 	do {
+		unsigned int preempt_count = preempt_count();
+
 		ret = action->handler(irq, action->dev_id);
+		if (preempt_count() != preempt_count) {
+			print_symbol("BUG: unbalanced irq-handler preempt count in %s!\n", (unsigned long) action->handler);
+			printk("entered with %08x, exited with %08x.\n", preempt_count, preempt_count());
+			dump_stack();
+			preempt_count() = preempt_count;
+		}
 		if (ret == IRQ_HANDLED)
 			status |= action->flags;
 		retval |= ret;
 		action = action->next;
 	} while (action);
 
-	if (status & IRQF_SAMPLE_RANDOM)
+	if (status & IRQF_SAMPLE_RANDOM) {
+		local_irq_enable();
 		add_interrupt_randomness(irq);
+	}
 	local_irq_disable();
 
+#ifdef __i386__
+	if (debug_direct_keyboard && irq == 1)
+		lockdep_on();
+#endif
 	return retval;
+}
+
+/*
+ * Hack - used for development only.
+ */
+int __read_mostly debug_direct_keyboard = 0;
+
+int __init debug_direct_keyboard_setup(char *str)
+{
+	debug_direct_keyboard = 1;
+	printk(KERN_INFO "Switching IRQ 1 (keyboard) to to direct!\n");
+#ifdef CONFIG_PREEMPT_RT
+	printk(KERN_INFO "WARNING: kernel may easily crash this way!\n");
+#endif
+	return 1;
+}
+
+__setup("debug_direct_keyboard", debug_direct_keyboard_setup);
+
+int redirect_hardirq(struct irq_desc *desc)
+{
+	/*
+	 * Direct execution:
+	 */
+	if (!hardirq_preemption || (desc->status & IRQ_NODELAY) ||
+							!desc->thread)
+		return 0;
+
+#ifdef __i386__
+	if (debug_direct_keyboard && (desc - irq_desc == 1))
+		return 0;
+#endif
+
+	BUG_ON(!irqs_disabled());
+	if (desc->thread && desc->thread->state != TASK_RUNNING)
+		wake_up_process(desc->thread);
+
+	return 1;
 }
 
 #ifndef CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ
@@ -186,6 +249,13 @@ unsigned int __do_IRQ(unsigned int irq)
 		desc->chip->end(irq);
 		return 1;
 	}
+	/*
+	 * If the task is currently running in user mode, don't
+	 * detect soft lockups.  If CONFIG_DETECT_SOFTLOCKUP is not
+	 * configured, this should be optimized out.
+	 */
+	if (user_mode(get_irq_regs()))
+		touch_softlockup_watchdog();
 
 	spin_lock(&desc->lock);
 	if (desc->chip->ack)

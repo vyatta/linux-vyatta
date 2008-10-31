@@ -11,11 +11,21 @@
 #ifndef _LINUX_TRACE_IRQFLAGS_H
 #define _LINUX_TRACE_IRQFLAGS_H
 
+#if !defined(BUILD_CHECK_IRQ_FLAGS) && defined(typecheck)
+#define BUILD_CHECK_IRQ_FLAGS(flags)					\
+	do {								\
+		BUILD_BUG_ON(sizeof(flags) != sizeof(unsigned long));	\
+		typecheck(unsigned long, flags);			\
+	} while (0)
+#else
+#define BUILD_CHECK_IRQ_FLAGS(flags)
+#endif
+
 #ifdef CONFIG_TRACE_IRQFLAGS
-  extern void trace_hardirqs_on(void);
-  extern void trace_hardirqs_off(void);
   extern void trace_softirqs_on(unsigned long ip);
   extern void trace_softirqs_off(unsigned long ip);
+  extern void trace_hardirqs_on(void);
+  extern void trace_hardirqs_off(void);
 # define trace_hardirq_context(p)	((p)->hardirq_context)
 # define trace_softirq_context(p)	((p)->softirq_context)
 # define trace_hardirqs_enabled(p)	((p)->hardirqs_enabled)
@@ -41,6 +51,15 @@
 # define INIT_TRACE_IRQFLAGS
 #endif
 
+#if defined(CONFIG_IRQSOFF_TRACER) || \
+	defined(CONFIG_PREEMPT_TRACER)
+ extern void stop_critical_timings(void);
+ extern void start_critical_timings(void);
+#else
+# define stop_critical_timings() do { } while (0)
+# define start_critical_timings() do { } while (0)
+#endif
+
 #ifdef CONFIG_TRACE_IRQFLAGS_SUPPORT
 
 #include <asm/irqflags.h>
@@ -50,10 +69,15 @@
 #define local_irq_disable() \
 	do { raw_local_irq_disable(); trace_hardirqs_off(); } while (0)
 #define local_irq_save(flags) \
-	do { raw_local_irq_save(flags); trace_hardirqs_off(); } while (0)
+	do {					\
+		BUILD_CHECK_IRQ_FLAGS(flags);	\
+		raw_local_irq_save(flags);	\
+		trace_hardirqs_off();		\
+	} while (0)
 
 #define local_irq_restore(flags)				\
 	do {							\
+		BUILD_CHECK_IRQ_FLAGS(flags);			\
 		if (raw_irqs_disabled_flags(flags)) {		\
 			raw_local_irq_restore(flags);		\
 			trace_hardirqs_off();			\
@@ -69,8 +93,16 @@
  */
 # define raw_local_irq_disable()	local_irq_disable()
 # define raw_local_irq_enable()		local_irq_enable()
-# define raw_local_irq_save(flags)	local_irq_save(flags)
-# define raw_local_irq_restore(flags)	local_irq_restore(flags)
+# define raw_local_irq_save(flags)		\
+	do {					\
+		BUILD_CHECK_IRQ_FLAGS(flags);	\
+		local_irq_save(flags);		\
+	} while (0)
+# define raw_local_irq_restore(flags)		\
+	do {					\
+		BUILD_CHECK_IRQ_FLAGS(flags);	\
+		local_irq_restore(flags);	\
+	} while (0)
 #endif /* CONFIG_TRACE_IRQFLAGS_SUPPORT */
 
 #ifdef CONFIG_TRACE_IRQFLAGS_SUPPORT
@@ -80,7 +112,11 @@
 		raw_safe_halt();				\
 	} while (0)
 
-#define local_save_flags(flags)		raw_local_save_flags(flags)
+#define local_save_flags(flags)			\
+	do {					\
+		BUILD_CHECK_IRQ_FLAGS(flags);	\
+		raw_local_save_flags(flags);	\
+	} while (0)
 
 #define irqs_disabled()						\
 ({								\
@@ -90,7 +126,11 @@
 	raw_irqs_disabled_flags(_flags);			\
 })
 
-#define irqs_disabled_flags(flags)	raw_irqs_disabled_flags(flags)
+#define irqs_disabled_flags(flags)	\
+({					\
+	BUILD_CHECK_IRQ_FLAGS(flags);	\
+	raw_irqs_disabled_flags(flags);	\
+})
 #endif		/* CONFIG_X86 */
 
 #endif

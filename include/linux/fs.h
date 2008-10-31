@@ -282,6 +282,7 @@ extern int dir_notify_enable;
 #include <linux/cache.h>
 #include <linux/kobject.h>
 #include <linux/list.h>
+#include <linux/percpu_list.h>
 #include <linux/radix-tree.h>
 #include <linux/prio_tree.h>
 #include <linux/init.h>
@@ -289,6 +290,7 @@ extern int dir_notify_enable;
 #include <linux/mutex.h>
 #include <linux/capability.h>
 #include <linux/semaphore.h>
+#include <linux/srcu.h>
 
 #include <asm/atomic.h>
 #include <asm/byteorder.h>
@@ -499,13 +501,13 @@ struct backing_dev_info;
 struct address_space {
 	struct inode		*host;		/* owner: inode, block_device */
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
-	rwlock_t		tree_lock;	/* and rwlock protecting it */
+	spinlock_t		priv_lock;	/* spinlock protecting various stuffs */
 	unsigned int		i_mmap_writable;/* count VM_SHARED mappings */
 	struct prio_tree_root	i_mmap;		/* tree of private and shared mappings */
 	struct list_head	i_mmap_nonlinear;/*list VM_NONLINEAR mappings */
 	spinlock_t		i_mmap_lock;	/* protect tree, count, list */
 	unsigned int		truncate_count;	/* Cover race condition with truncate */
-	unsigned long		nrpages;	/* number of total pages */
+	atomic_long_t		__nrpages;	/* number of total pages */
 	pgoff_t			writeback_index;/* writeback starts here */
 	const struct address_space_operations *a_ops;	/* methods */
 	unsigned long		flags;		/* error bits/gfp mask */
@@ -519,6 +521,26 @@ struct address_space {
 	 * must be enforced here for CRIS, to let the least signficant bit
 	 * of struct page's "mapping" pointer be used for PAGE_MAPPING_ANON.
 	 */
+
+static inline void mapping_nrpages_init(struct address_space *mapping)
+{
+	mapping->__nrpages = (atomic_long_t)ATOMIC_LONG_INIT(0);
+}
+
+static inline unsigned long mapping_nrpages(struct address_space *mapping)
+{
+	return (unsigned long)atomic_long_read(&mapping->__nrpages);
+}
+
+static inline void mapping_nrpages_inc(struct address_space *mapping)
+{
+	atomic_long_inc(&mapping->__nrpages);
+}
+
+static inline void mapping_nrpages_dec(struct address_space *mapping)
+{
+	atomic_long_dec(&mapping->__nrpages);
+}
 
 struct block_device {
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */
@@ -615,7 +637,7 @@ struct inode {
 	umode_t			i_mode;
 	spinlock_t		i_lock;	/* i_blocks, i_bytes, maybe i_size */
 	struct mutex		i_mutex;
-	struct rw_semaphore	i_alloc_sem;
+	struct compat_rw_semaphore	i_alloc_sem;
 	const struct inode_operations	*i_op;
 	const struct file_operations	*i_fop;	/* former ->i_op->default_file_ops */
 	struct super_block	*i_sb;
@@ -780,12 +802,8 @@ static inline int ra_has_index(struct file_ra_state *ra, pgoff_t index)
 #define FILE_MNT_WRITE_RELEASED	2
 
 struct file {
-	/*
-	 * fu_list becomes invalid after file_free is called and queued via
-	 * fu_rcuhead for RCU freeing
-	 */
 	union {
-		struct list_head	fu_list;
+		struct lock_list_head	fu_llist;
 		struct rcu_head 	fu_rcuhead;
 	} f_u;
 	struct path		f_path;
@@ -817,9 +835,6 @@ struct file {
 	unsigned long f_mnt_write_state;
 #endif
 };
-extern spinlock_t files_lock;
-#define file_list_lock() spin_lock(&files_lock);
-#define file_list_unlock() spin_unlock(&files_lock);
 
 #define get_file(x)	atomic_inc(&(x)->f_count)
 #define file_count(x)	atomic_read(&(x)->f_count)
@@ -1057,7 +1072,8 @@ struct super_block {
 	struct list_head	s_io;		/* parked for writeback */
 	struct list_head	s_more_io;	/* parked for more writeback */
 	struct hlist_head	s_anon;		/* anonymous dentries for (nfs) exporting */
-	struct list_head	s_files;
+	struct percpu_list	s_files;
+	struct qrcu_struct	s_qrcu;
 
 	struct block_device	*s_bdev;
 	struct mtd_info		*s_mtd;
@@ -1825,7 +1841,7 @@ static inline void insert_inode_hash(struct inode *inode) {
 }
 
 extern struct file * get_empty_filp(void);
-extern void file_move(struct file *f, struct list_head *list);
+extern void file_move(struct file *f, struct percpu_list *list);
 extern void file_kill(struct file *f);
 #ifdef CONFIG_BLOCK
 struct bio;

@@ -304,6 +304,9 @@ extern void lock_acquire(struct lockdep_map *lock, unsigned int subclass,
 extern void lock_release(struct lockdep_map *lock, int nested,
 			 unsigned long ip);
 
+extern void lock_set_subclass(struct lockdep_map *lock, unsigned int subclass,
+			      unsigned long ip);
+
 # define INIT_LOCKDEP				.lockdep_recursion = 0,
 
 #define lockdep_depth(tsk)	(debug_locks ? (tsk)->lockdep_depth : 0)
@@ -320,6 +323,7 @@ static inline void lockdep_on(void)
 
 # define lock_acquire(l, s, t, r, c, i)		do { } while (0)
 # define lock_release(l, n, i)			do { } while (0)
+# define lock_set_subclass(l, s, i)		do { } while (0)
 # define lockdep_init()				do { } while (0)
 # define lockdep_info()				do { } while (0)
 # define lockdep_init_map(lock, name, key, sub)	do { (void)(key); } while (0)
@@ -357,6 +361,38 @@ do {								\
 	lock_acquired(&(_lock)->dep_map);			\
 } while (0)
 
+#define LOCK_CONTENDED_RT(_lock, f_try, f_lock)			\
+do {								\
+	if (!f_try(&(_lock)->lock)) {				\
+		lock_contended(&(_lock)->dep_map, _RET_IP_);	\
+		f_lock(&(_lock)->lock);				\
+	}							\
+	lock_acquired(&(_lock)->dep_map);			\
+} while (0)
+
+
+#define LOCK_CONTENDED_RT_RET(_lock, f_try, f_lock)		\
+({								\
+ 	int ret = 0;						\
+	if (!f_try(&(_lock)->lock)) {				\
+		lock_contended(&(_lock)->dep_map, _RET_IP_);	\
+		ret = f_lock(&(_lock)->lock);			\
+	}							\
+	if (!ret)						\
+		lock_acquired(&(_lock)->dep_map);		\
+ 	ret;							\
+})
+
+#define LOCK_CONTENDED_RT_RW(_lock, f_try, f_lock)		\
+do {								\
+	if (!f_try(&(_lock)->owners)) {				\
+		lock_contended(&(_lock)->dep_map, _RET_IP_);	\
+		f_lock(&(_lock)->owners);			\
+	}							\
+	lock_acquired(&(_lock)->dep_map);			\
+} while (0)
+
+
 #else /* CONFIG_LOCK_STAT */
 
 #define lock_contended(lockdep_map, ip) do {} while (0)
@@ -364,6 +400,15 @@ do {								\
 
 #define LOCK_CONTENDED(_lock, try, lock) \
 	lock(_lock)
+
+#define LOCK_CONTENDED_RT(_lock, f_try, f_lock) \
+	f_lock(&(_lock)->lock)
+
+#define LOCK_CONTENDED_RT_RET(_lock, f_try, f_lock) \
+	f_lock(&(_lock)->lock)
+
+#define LOCK_CONTENDED_RT_RW(_lock, f_try, f_lock) \
+	f_lock(&(_lock)->owners)
 
 #endif /* CONFIG_LOCK_STAT */
 

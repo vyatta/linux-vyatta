@@ -32,7 +32,7 @@
 #define minicache_pgprot __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | \
 				  L_PTE_CACHEABLE)
 
-static DEFINE_SPINLOCK(minicache_lock);
+static DEFINE_RAW_SPINLOCK(minicache_lock);
 
 /*
  * XScale mini-dcache optimised copy_user_page
@@ -42,7 +42,7 @@ static DEFINE_SPINLOCK(minicache_lock);
  * Dcache aliasing issue.  The writes will be forwarded to the write buffer,
  * and merged as appropriate.
  */
-static void __attribute__((naked))
+static void notrace __attribute__((naked))
 mc_copy_user_page(void *from, void *to)
 {
 	/*
@@ -110,7 +110,7 @@ void xscale_mc_copy_user_page(void *kto, const void *kfrom, unsigned long vaddr)
 /*
  * XScale optimised clear_user_page
  */
-void __attribute__((naked))
+void notrace __attribute__((naked))
 xscale_mc_clear_user_page(void *kaddr, unsigned long vaddr)
 {
 	asm volatile(

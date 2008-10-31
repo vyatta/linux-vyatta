@@ -7,14 +7,31 @@ obj-y     = sched.o fork.o exec_domain.o panic.o printk.o profile.o \
 	    sysctl.o capability.o ptrace.o timer.o user.o \
 	    signal.o sys.o kmod.o workqueue.o pid.o \
 	    rcupdate.o extable.o params.o posix-timers.o \
-	    kthread.o wait.o kfifo.o sys_ni.o posix-cpu-timers.o mutex.o \
+	    kthread.o wait.o kfifo.o sys_ni.o posix-cpu-timers.o \
 	    hrtimer.o rwsem.o nsproxy.o srcu.o semaphore.o \
 	    notifier.o ksysfs.o pm_qos_params.o sched_clock.o
+
+CFLAGS_REMOVE_sched.o = -mno-spe
+
+ifdef CONFIG_FTRACE
+# Do not trace debug files and internal ftrace files
+CFLAGS_REMOVE_lockdep.o = -pg
+CFLAGS_REMOVE_lockdep_proc.o = -pg
+CFLAGS_REMOVE_mutex-debug.o = -pg
+CFLAGS_REMOVE_rtmutex-debug.o = -pg
+CFLAGS_REMOVE_cgroup-debug.o = -pg
+CFLAGS_REMOVE_sched_clock.o = -pg
+CFLAGS_REMOVE_marker.o = -pg
+CFLAGS_REMOVE_tracepoint.o = -pg
+endif
 
 obj-$(CONFIG_SYSCTL_SYSCALL_CHECK) += sysctl_check.o
 obj-$(CONFIG_STACKTRACE) += stacktrace.o
 obj-y += time/
+ifneq ($(CONFIG_PREEMPT_RT),y)
+obj-y += mutex.o
 obj-$(CONFIG_DEBUG_MUTEXES) += mutex-debug.o
+endif
 obj-$(CONFIG_LOCKDEP) += lockdep.o
 ifeq ($(CONFIG_PROC_FS),y)
 obj-$(CONFIG_LOCKDEP) += lockdep_proc.o
@@ -26,6 +43,7 @@ endif
 obj-$(CONFIG_RT_MUTEXES) += rtmutex.o
 obj-$(CONFIG_DEBUG_RT_MUTEXES) += rtmutex-debug.o
 obj-$(CONFIG_RT_MUTEX_TESTER) += rtmutex-tester.o
+obj-$(CONFIG_PREEMPT_RT) += rt.o
 obj-$(CONFIG_GENERIC_ISA_DMA) += dma.o
 obj-$(CONFIG_SMP) += cpu.o spinlock.o
 obj-$(CONFIG_DEBUG_SPINLOCK) += spinlock.o
@@ -57,9 +75,11 @@ obj-$(CONFIG_KGDB) += kgdb.o
 obj-$(CONFIG_DETECT_SOFTLOCKUP) += softlockup.o
 obj-$(CONFIG_GENERIC_HARDIRQS) += irq/
 obj-$(CONFIG_SECCOMP) += seccomp.o
+obj-$(CONFIG_RWLOCK_TORTURE_TEST) += rwlock_torture.o
 obj-$(CONFIG_RCU_TORTURE_TEST) += rcutorture.o
 obj-$(CONFIG_CLASSIC_RCU) += rcuclassic.o
 obj-$(CONFIG_PREEMPT_RCU) += rcupreempt.o
+obj-$(CONFIG_PREEMPT_RCU_BOOST) += rcupreempt-boost.o
 ifeq ($(CONFIG_PREEMPT_RCU),y)
 obj-$(CONFIG_RCU_TRACE) += rcupreempt_trace.o
 endif
@@ -68,7 +88,11 @@ obj-$(CONFIG_SYSCTL) += utsname_sysctl.o
 obj-$(CONFIG_TASK_DELAY_ACCT) += delayacct.o
 obj-$(CONFIG_TASKSTATS) += taskstats.o tsacct.o
 obj-$(CONFIG_MARKERS) += marker.o
+obj-$(CONFIG_TRACEPOINTS) += tracepoint.o
 obj-$(CONFIG_LATENCYTOP) += latencytop.o
+obj-$(CONFIG_FTRACE) += trace/
+obj-$(CONFIG_TRACING) += trace/
+obj-$(CONFIG_SMP) += sched_cpupri.o
 
 ifneq ($(CONFIG_SCHED_NO_NO_OMIT_FRAME_POINTER),y)
 # According to Alan Modra <alan@linuxcare.com.au>, the -fno-omit-frame-pointer is

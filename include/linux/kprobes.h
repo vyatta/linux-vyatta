@@ -201,7 +201,7 @@ static inline int init_test_probes(void)
 }
 #endif /* CONFIG_KPROBES_SANITY_TEST */
 
-extern spinlock_t kretprobe_lock;
+extern raw_spinlock_t kretprobe_lock;
 extern struct mutex kprobe_mutex;
 extern int arch_prepare_kprobe(struct kprobe *p);
 extern void arch_arm_kprobe(struct kprobe *p);
@@ -258,6 +258,11 @@ void recycle_rp_inst(struct kretprobe_instance *ri, struct hlist_head *head);
 #define __kprobes	/**/
 struct jprobe;
 struct kretprobe;
+
+static inline struct kprobe *get_kprobe(void *addr)
+{
+	return NULL;
+}
 
 static inline struct kprobe *kprobe_running(void)
 {

@@ -23,6 +23,7 @@
 #include <linux/file.h>
 #include <linux/writeback.h>
 #include <linux/blkdev.h>
+#include <linux/interrupt.h>
 #include <linux/buffer_head.h>	/* for try_to_release_page(),
 					buffer_heads_over_limit */
 #include <linux/mm_inline.h>
@@ -400,7 +401,7 @@ int remove_mapping(struct address_space *mapping, struct page *page)
 	BUG_ON(!PageLocked(page));
 	BUG_ON(mapping != page_mapping(page));
 
-	write_lock_irq(&mapping->tree_lock);
+	lock_page_ref_irq(page);
 	/*
 	 * The non racy check for a busy page.
 	 *
@@ -435,19 +436,19 @@ int remove_mapping(struct address_space *mapping, struct page *page)
 	if (PageSwapCache(page)) {
 		swp_entry_t swap = { .val = page_private(page) };
 		__delete_from_swap_cache(page);
-		write_unlock_irq(&mapping->tree_lock);
 		swap_free(swap);
-		__put_page(page);	/* The pagecache ref */
-		return 1;
+		goto free_it;
 	}
 
 	__remove_from_page_cache(page);
-	write_unlock_irq(&mapping->tree_lock);
-	__put_page(page);
+
+free_it:
+	unlock_page_ref_irq(page);
+	__put_page(page); /* The pagecache ref */
 	return 1;
 
 cannot_free:
-	write_unlock_irq(&mapping->tree_lock);
+	unlock_page_ref_irq(page);
 	return 0;
 }
 
@@ -872,7 +873,7 @@ static unsigned long shrink_inactive_list(unsigned long max_scan,
 		}
 
 		nr_reclaimed += nr_freed;
-		local_irq_disable();
+		local_irq_disable_nort();
 		if (current_is_kswapd()) {
 			__count_zone_vm_events(PGSCAN_KSWAPD, zone, nr_scan);
 			__count_vm_events(KSWAPD_STEAL, nr_freed);
@@ -904,9 +905,14 @@ static unsigned long shrink_inactive_list(unsigned long max_scan,
 			}
 		}
   	} while (nr_scanned < max_scan);
+	/*
+	 * Non-PREEMPT_RT relies on IRQs-off protecting the page_states
+	 * per-CPU data. PREEMPT_RT has that data protected even in
+	 * __mod_page_state(), so no need to keep IRQs disabled.
+	 */
 	spin_unlock(&zone->lru_lock);
 done:
-	local_irq_enable();
+	local_irq_enable_nort();
 	pagevec_release(&pvec);
 	return nr_reclaimed;
 }

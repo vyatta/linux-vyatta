@@ -34,6 +34,7 @@
 #include <linux/workqueue.h>
 #include <linux/profile.h>
 #include <linux/rcupdate.h>
+#include <linux/posix-timers.h>
 #include <linux/moduleparam.h>
 #include <linux/kallsyms.h>
 #include <linux/writeback.h>
@@ -47,6 +48,7 @@
 #include <linux/delayacct.h>
 #include <linux/unistd.h>
 #include <linux/rmap.h>
+#include <linux/irq.h>
 #include <linux/mempolicy.h>
 #include <linux/key.h>
 #include <linux/unwind.h>
@@ -60,6 +62,7 @@
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/idr.h>
+#include <linux/ftrace.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -99,6 +102,12 @@ static inline void acpi_early_init(void) { }
 #ifndef CONFIG_DEBUG_RODATA
 static inline void mark_rodata_ro(void) { }
 #endif
+#ifdef CONFIG_ALLOC_RTSJ_MEM
+extern void alloc_rtsj_mem_early_setup(void);
+#else
+static inline void alloc_rtsj_mem_early_setup(void) { }
+#endif
+
 
 #ifdef CONFIG_TC
 extern void tc_init(void);
@@ -341,6 +350,9 @@ static int __init rdinit_setup(char *str)
 {
 	unsigned int i;
 
+#ifdef CONFIG_PREEMPT_RT
+	ftrace_disable_daemon();
+#endif
 	ramdisk_execute_command = str;
 	/* See "auto" comment in init_setup */
 	for (i = 1; i < MAX_INIT_ARGS; i++)
@@ -457,6 +469,8 @@ static void noinline __init_refok rest_init(void)
 {
 	int pid;
 
+	system_state = SYSTEM_BOOTING_SCHEDULER_OK;
+
 	kernel_thread(kernel_init, NULL, CLONE_FS | CLONE_SIGHAND);
 	numa_default_policy();
 	pid = kernel_thread(kthreadd, NULL, CLONE_FS | CLONE_FILES);
@@ -468,7 +482,7 @@ static void noinline __init_refok rest_init(void)
 	 * at least once to get things moving:
 	 */
 	init_idle_bootup_task(current);
-	preempt_enable_no_resched();
+	__preempt_enable_no_resched();
 	schedule();
 	preempt_disable();
 
@@ -580,8 +594,10 @@ asmlinkage void __init start_kernel(void)
 	 * fragile until we cpu_idle() for the first time.
 	 */
 	preempt_disable();
+
 	build_all_zonelists();
 	page_alloc_init();
+	early_init_hardirqs();
 	printk(KERN_NOTICE "Kernel command line: %s\n", boot_command_line);
 	parse_early_param();
 	parse_args("Booting kernel", static_command_line, __start___param,
@@ -637,6 +653,7 @@ asmlinkage void __init start_kernel(void)
 #endif
 	vfs_caches_init_early();
 	cpuset_init_early();
+	alloc_rtsj_mem_early_setup();
 	mem_init();
 	enable_debug_pagealloc();
 	cpu_hotplug_init();
@@ -680,6 +697,11 @@ asmlinkage void __init start_kernel(void)
 
 	acpi_early_init(); /* before LAPIC and SMP init */
 
+	ftrace_init();
+
+#ifdef CONFIG_PREEMPT_RT
+	WARN_ON(irqs_disabled());
+#endif
 	/* Do the rest non-__init'ed, we're now alive */
 	rest_init();
 }
@@ -758,6 +780,7 @@ static void __init do_initcalls(void)
  */
 static void __init do_basic_setup(void)
 {
+	rcu_init_sched(); /* needed by module_init stage. */
 	/* drivers will send hotplug events */
 	init_workqueues();
 	usermodehelper_init();
@@ -778,11 +801,14 @@ __setup("nosoftlockup", nosoftlockup_setup);
 static void __init do_pre_smp_initcalls(void)
 {
 	extern int spawn_ksoftirqd(void);
+	extern int spawn_desched_task(void);
 
 	migration_init();
+	posix_cpu_thread_init();
 	spawn_ksoftirqd();
 	if (!nosoftlockup)
 		spawn_softlockup_task();
+	spawn_desched_task();
 }
 
 static void run_init_process(char *init_filename)
@@ -815,6 +841,9 @@ static int noinline init_post(void)
 		printk(KERN_WARNING "Failed to execute %s\n",
 				ramdisk_execute_command);
 	}
+#ifdef CONFIG_PREEMPT_RT
+	WARN_ON(irqs_disabled());
+#endif
 
 	/*
 	 * We try each of these until one succeeds.
@@ -856,6 +885,8 @@ static int __init kernel_init(void * unused)
 
 	smp_prepare_cpus(setup_max_cpus);
 
+	init_hardirqs();
+
 	do_pre_smp_initcalls();
 
 	smp_init();
@@ -877,12 +908,61 @@ static int __init kernel_init(void * unused)
 		ramdisk_execute_command = NULL;
 		prepare_namespace();
 	}
+#ifdef CONFIG_PREEMPT_RT
+	WARN_ON(irqs_disabled());
+#endif
 
+#define DEBUG_COUNT (defined(CONFIG_DEBUG_RT_MUTEXES) + defined(CONFIG_IRQSOFF_TRACER) + defined(CONFIG_PREEMPT_TRACER) + defined(CONFIG_STACK_TRACER) + defined(CONFIG_WAKEUP_LATENCY_HIST) + defined(CONFIG_DEBUG_SLAB) + defined(CONFIG_DEBUG_PAGEALLOC) + defined(CONFIG_LOCKDEP) + (defined(CONFIG_FTRACE) - defined(CONFIG_FTRACE_MCOUNT_RECORD)))
+
+#if DEBUG_COUNT > 0
+	printk(KERN_ERR "*****************************************************************************\n");
+	printk(KERN_ERR "*                                                                           *\n");
+#if DEBUG_COUNT == 1
+	printk(KERN_ERR "*  REMINDER, the following debugging option is turned on in your .config:   *\n");
+#else
+	printk(KERN_ERR "*  REMINDER, the following debugging options are turned on in your .config: *\n");
+#endif
+	printk(KERN_ERR "*                                                                           *\n");
+#ifdef CONFIG_DEBUG_RT_MUTEXES
+	printk(KERN_ERR "*        CONFIG_DEBUG_RT_MUTEXES                                            *\n");
+#endif
+#ifdef CONFIG_IRQSOFF_TRACER
+	printk(KERN_ERR "*        CONFIG_IRQSOFF_TRACER                                              *\n");
+#endif
+#ifdef CONFIG_PREEMPT_TRACER
+	printk(KERN_ERR "*        CONFIG_PREEMPT_TRACER                                              *\n");
+#endif
+#ifdef CONFIG_FTRACE
+	printk(KERN_ERR "*        CONFIG_FTRACE                                                      *\n");
+#endif
+#ifdef CONFIG_WAKEUP_LATENCY_HIST
+	printk(KERN_ERR "*        CONFIG_WAKEUP_LATENCY_HIST                                         *\n");
+#endif
+#ifdef CONFIG_DEBUG_SLAB
+	printk(KERN_ERR "*        CONFIG_DEBUG_SLAB                                                  *\n");
+#endif
+#ifdef CONFIG_DEBUG_PAGEALLOC
+	printk(KERN_ERR "*        CONFIG_DEBUG_PAGEALLOC                                             *\n");
+#endif
+#ifdef CONFIG_LOCKDEP
+	printk(KERN_ERR "*        CONFIG_LOCKDEP                                                     *\n");
+#endif
+	printk(KERN_ERR "*                                                                           *\n");
+#if DEBUG_COUNT == 1
+	printk(KERN_ERR "*  it may increase runtime overhead and latencies.                          *\n");
+#else
+	printk(KERN_ERR "*  they may increase runtime overhead and latencies.                        *\n");
+#endif
+	printk(KERN_ERR "*                                                                           *\n");
+	printk(KERN_ERR "*****************************************************************************\n");
+#endif
 	/*
 	 * Ok, we have completed the initial bootup, and
 	 * we're essentially up and running. Get rid of the
 	 * initmem segments and start the user-mode stuff..
 	 */
 	init_post();
+	WARN_ON(debug_direct_keyboard);
+
 	return 0;
 }

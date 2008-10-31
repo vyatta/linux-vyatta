@@ -527,6 +527,16 @@ config CC_OPTIMIZE_FOR_SIZE
 config SYSCTL
 	bool
 
+config RADIX_TREE_CONCURRENT
+	bool "Enable concurrent radix tree operations (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	default y if SMP
+
+config RADIX_TREE_OPTIMISTIC
+	bool "Enabled optimistic locking (EXPERIMENTAL)"
+	depends on RADIX_TREE_CONCURRENT
+	default y
+
 menuconfig EMBEDDED
 	bool "Configure standard kernel features (for small systems)"
 	help
@@ -759,6 +769,7 @@ config SLAB
 
 config SLUB
 	bool "SLUB (Unqueued Allocator)"
+	depends on !PREEMPT_RT
 	help
 	   SLUB is a slab allocator that minimizes cache line usage
 	   instead of managing queues of cached objects (SLAB approach).
@@ -781,6 +792,13 @@ config PROFILING
 	help
 	  Say Y here to enable the extended profiling support mechanisms used
 	  by profilers such as OProfile.
+
+config TRACEPOINTS
+	bool "Activate tracepoints"
+	default y
+	help
+	  Place an empty function call at each tracepoint site. Can be
+	  dynamically changed for a probe function.
 
 config MARKERS
 	bool "Activate markers"

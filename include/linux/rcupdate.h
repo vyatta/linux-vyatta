@@ -40,6 +40,7 @@
 #include <linux/cpumask.h>
 #include <linux/seqlock.h>
 #include <linux/lockdep.h>
+#include <linux/completion.h>
 
 /**
  * struct rcu_head - callback structure for use with RCU
@@ -168,6 +169,27 @@ struct rcu_head {
 		(p) = (v); \
 	})
 
+/* Infrastructure to implement the synchronize_() primitives. */
+
+struct rcu_synchronize {
+	struct rcu_head head;
+	struct completion completion;
+};
+
+extern void wakeme_after_rcu(struct rcu_head  *head);
+
+#define synchronize_rcu_xxx(name, func) \
+void name(void) \
+{ \
+	struct rcu_synchronize rcu; \
+	\
+	init_completion(&rcu.completion); \
+	/* Will wake me after RCU finished. */ \
+	func(&rcu.head, wakeme_after_rcu); \
+	/* Wait for it. */ \
+	wait_for_completion(&rcu.completion); \
+}
+
 /**
  * synchronize_sched - block until all CPUs have exited any non-preemptive
  * kernel code sequences.
@@ -230,5 +252,49 @@ extern long rcu_batches_completed_bh(void);
 /* Internal to kernel */
 extern void rcu_init(void);
 extern int rcu_needs_cpu(int cpu);
+
+struct dentry;
+
+#ifdef CONFIG_PREEMPT_RCU_BOOST
+extern void init_rcu_boost_late(void);
+extern void rcu_boost_readers(void);
+extern void rcu_unboost_readers(void);
+extern void __rcu_preempt_boost(void);
+#ifdef CONFIG_RCU_TRACE
+extern int rcu_trace_boost_create(struct dentry *rcudir);
+extern void rcu_trace_boost_destroy(void);
+#endif /* CONFIG_RCU_TRACE */
+#define rcu_preempt_boost() /* cpp to avoid #include hell. */ \
+	do { \
+		if (unlikely(current->rcu_read_lock_nesting > 0)) \
+			__rcu_preempt_boost(); \
+	} while (0)
+extern void __rcu_preempt_unboost(void);
+#else /* #ifdef CONFIG_PREEMPT_RCU_BOOST */
+static inline void init_rcu_boost_late(void)
+{
+}
+static inline void rcu_preempt_boost(void)
+{
+}
+static inline void __rcu_preempt_unboost(void)
+{
+}
+static inline void rcu_boost_readers(void)
+{
+}
+static inline void rcu_unboost_readers(void)
+{
+}
+#ifdef CONFIG_RCU_TRACE
+static inline int rcu_trace_boost_create(struct dentry *rcudir)
+{
+	return 0;
+}
+static inline void rcu_trace_boost_destroy(void)
+{
+}
+#endif /* CONFIG_RCU_TRACE */
+#endif /* #else #ifdef CONFIG_PREEMPT_RCU_BOOST */
 
 #endif /* __LINUX_RCUPDATE_H */

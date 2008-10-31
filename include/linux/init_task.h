@@ -10,6 +10,7 @@
 #include <linux/user_namespace.h>
 #include <linux/securebits.h>
 #include <net/net_namespace.h>
+#include <linux/spinlock.h>
 
 extern struct files_struct init_files;
 
@@ -66,6 +67,24 @@ extern struct nsproxy init_nsproxy;
 	.siglock	= __SPIN_LOCK_UNLOCKED(sighand.siglock),	\
 	.signalfd_wqh	= __WAIT_QUEUE_HEAD_INITIALIZER(sighand.signalfd_wqh),	\
 }
+
+#ifdef CONFIG_PREEMPT_RCU_BOOST
+#define INIT_RCU_BOOST_PRIO .rcu_prio	= MAX_PRIO,
+#define INIT_PREEMPT_RCU_BOOST(tsk)					\
+	.rcub_rbdp	= NULL,						\
+	.rcub_state	= RCU_BOOST_IDLE,				\
+	.rcub_entry	= LIST_HEAD_INIT(tsk.rcub_entry),
+#else /* #ifdef CONFIG_PREEMPT_RCU_BOOST */
+#define INIT_RCU_BOOST_PRIO
+#define INIT_PREEMPT_RCU_BOOST(tsk)
+#endif /* #else #ifdef CONFIG_PREEMPT_RCU_BOOST */
+
+#ifdef CONFIG_PREEMPT_RT
+# define INIT_RW_OWNERS(tsk) .owned_read_locks = {			\
+		[0 ... (MAX_RWLOCK_DEPTH - 1) ] = { .task = &tsk } },
+#else
+# define INIT_RW_OWNERS(tsk)
+#endif
 
 extern struct group_info init_groups;
 
@@ -128,6 +147,7 @@ extern struct group_info init_groups;
 	.static_prio	= MAX_PRIO-20,					\
 	.normal_prio	= MAX_PRIO-20,					\
 	.policy		= SCHED_NORMAL,					\
+	INIT_RCU_BOOST_PRIO						\
 	.cpus_allowed	= CPU_MASK_ALL,					\
 	.mm		= NULL,						\
 	.active_mm	= &init_mm,					\
@@ -140,6 +160,7 @@ extern struct group_info init_groups;
 		.nr_cpus_allowed = NR_CPUS,				\
 	},								\
 	.tasks		= LIST_HEAD_INIT(tsk.tasks),			\
+	.pushable_tasks = PLIST_NODE_INIT(tsk.pushable_tasks, MAX_PRIO), \
 	.ptrace_children= LIST_HEAD_INIT(tsk.ptrace_children),		\
 	.ptrace_list	= LIST_HEAD_INIT(tsk.ptrace_list),		\
 	.real_parent	= &tsk,						\
@@ -169,7 +190,8 @@ extern struct group_info init_groups;
 	.journal_info	= NULL,						\
 	.cpu_timers	= INIT_CPU_TIMERS(tsk.cpu_timers),		\
 	.fs_excl	= ATOMIC_INIT(0),				\
-	.pi_lock	= __SPIN_LOCK_UNLOCKED(tsk.pi_lock),		\
+	.posix_timer_list = NULL,					\
+	.pi_lock	= RAW_SPIN_LOCK_UNLOCKED(tsk.pi_lock),		\
 	.pids = {							\
 		[PIDTYPE_PID]  = INIT_PID_LINK(PIDTYPE_PID),		\
 		[PIDTYPE_PGID] = INIT_PID_LINK(PIDTYPE_PGID),		\
@@ -179,6 +201,8 @@ extern struct group_info init_groups;
 	INIT_IDS							\
 	INIT_TRACE_IRQFLAGS						\
 	INIT_LOCKDEP							\
+	INIT_PREEMPT_RCU_BOOST(tsk)					\
+	INIT_RW_OWNERS(tsk)						\
 }
 
 

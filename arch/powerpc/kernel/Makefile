@@ -12,6 +12,17 @@ CFLAGS_prom_init.o      += -fPIC
 CFLAGS_btext.o		+= -fPIC
 endif
 
+ifdef CONFIG_FTRACE
+# Do not trace early boot code
+CFLAGS_REMOVE_cputable.o = -pg -mno-sched-epilog
+CFLAGS_REMOVE_prom_init.o = -pg -mno-sched-epilog
+CFLAGS_REMOVE_btext.o = -pg -mno-sched-epilog
+
+# dynamic ftrace setup.
+CFLAGS_REMOVE_ftrace.o = -pg -mno-sched-epilog
+
+endif
+
 obj-y				:= cputable.o ptrace.o syscalls.o \
 				   irq.o align.o signal_32.o pmc.o vdso.o \
 				   init_task.o process.o systbl.o idle.o \
@@ -77,6 +88,8 @@ obj-$(CONFIG_KEXEC)		+= machine_kexec.o crash.o \
 				   machine_kexec_$(CONFIG_WORD_SIZE).o
 obj-$(CONFIG_AUDIT)		+= audit.o
 obj64-$(CONFIG_AUDIT)		+= compat_audit.o
+
+obj-$(CONFIG_FTRACE)		+= ftrace.o
 
 obj-$(CONFIG_8XX_MINIMAL_FPEMU) += softemu8xx.o
 

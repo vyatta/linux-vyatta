@@ -31,6 +31,7 @@
 #include <asm/bug.h>
 #include <asm/ptrace.h>
 #include <asm/irqflags.h>
+#include <asm/ftrace.h>
 
 /*
  * System calls.
@@ -594,44 +595,52 @@ do_work:
 	bne	restore
 	/* here we are preempting the current task */
 1:
+	/*
+	 * preempt_schedule_irq() expects interrupts disabled and returns
+	 * with interrupts disabled. No need to check preemption again,
+	 * preempt_schedule_irq just did that for us.
+	 */
+	bl	.preempt_schedule_irq
 #ifdef CONFIG_TRACE_IRQFLAGS
 	bl	.trace_hardirqs_on
+#endif /* CONFIG_TRACE_IRQFLAGS */
+
 	/* Note: we just clobbered r10 which used to contain the previous
 	 * MSR before the hard-disabling done by the caller of do_work.
 	 * We don't have that value anymore, but it doesn't matter as
 	 * we will hard-enable unconditionally, we can just reload the
 	 * current MSR into r10
 	 */
+	bl		.preempt_schedule_irq
 	mfmsr	r10
-#endif /* CONFIG_TRACE_IRQFLAGS */
-	li	r0,1
-	stb	r0,PACASOFTIRQEN(r13)
-	stb	r0,PACAHARDIRQEN(r13)
-	ori	r10,r10,MSR_EE
-	mtmsrd	r10,1		/* reenable interrupts */
-	bl	.preempt_schedule
-	mfmsr	r10
-	clrrdi	r9,r1,THREAD_SHIFT
-	rldicl	r10,r10,48,1	/* disable interrupts again */
-	rotldi	r10,r10,16
-	mtmsrd	r10,1
-	ld	r4,TI_FLAGS(r9)
-	andi.	r0,r4,_TIF_NEED_RESCHED
-	bne	1b
+	clrrdi  r9,r1,THREAD_SHIFT
+	rldicl  r10,r10,48,1    /* disable interrupts again */
+	rotldi  r10,r10,16
+	mtmsrd  r10,1
+	ld      r4,TI_FLAGS(r9)
+	andi.   r0,r4,(_TIF_NEED_RESCHED)
+	bne     1b
 	b	restore
 
 user_work:
 #endif
+	andi.	r0,r4,_TIF_NEED_RESCHED
+	beq	1f
+
+	/* preempt_schedule_irq() expects interrupts disabled. */
+	bl	.preempt_schedule_irq
+	b	.ret_from_except_lite
+
+	/* here we are preempting the current task */
+1:	li	r0,1
+	stb	r0,PACASOFTIRQEN(r13)
+	stb	r0,PACAHARDIRQEN(r13)
+
 	/* Enable interrupts */
 	ori	r10,r10,MSR_EE
 	mtmsrd	r10,1
 
-	andi.	r0,r4,_TIF_NEED_RESCHED
-	beq	1f
-	bl	.schedule
-	b	.ret_from_except_lite
-
-1:	bl	.save_nvgprs
+	bl	.save_nvgprs
 	li	r3,0
 	addi	r4,r1,STACK_FRAME_OVERHEAD
 	bl	.do_signal
@@ -870,3 +879,67 @@ _GLOBAL(enter_prom)
 	ld	r0,16(r1)
 	mtlr    r0
         blr
+
+#ifdef CONFIG_FTRACE
+#ifdef CONFIG_DYNAMIC_FTRACE
+_GLOBAL(mcount)
+_GLOBAL(_mcount)
+	/* Taken from output of objdump from lib64/glibc */
+	mflr	r3
+	stdu	r1, -112(r1)
+	std	r3, 128(r1)
+	subi	r3, r3, MCOUNT_INSN_SIZE
+	.globl mcount_call
+mcount_call:
+	bl	ftrace_stub
+	nop
+	ld	r0, 128(r1)
+	mtlr	r0
+	addi	r1, r1, 112
+	blr
+
+_GLOBAL(ftrace_caller)
+	/* Taken from output of objdump from lib64/glibc */
+	mflr	r3
+	ld	r11, 0(r1)
+	stdu	r1, -112(r1)
+	std	r3, 128(r1)
+	ld	r4, 16(r11)
+	subi	r3, r3, MCOUNT_INSN_SIZE
+.globl ftrace_call
+ftrace_call:
+	bl	ftrace_stub
+	nop
+	ld	r0, 128(r1)
+	mtlr	r0
+	addi	r1, r1, 112
+_GLOBAL(ftrace_stub)
+	blr
+#else
+_GLOBAL(mcount)
+	blr
+
+_GLOBAL(_mcount)
+	/* Taken from output of objdump from lib64/glibc */
+	mflr	r3
+	ld	r11, 0(r1)
+	stdu	r1, -112(r1)
+	std	r3, 128(r1)
+	ld	r4, 16(r11)
+
+	subi	r3, r3, MCOUNT_INSN_SIZE
+	LOAD_REG_ADDR(r5,ftrace_trace_function)
+	ld	r5,0(r5)
+	ld	r5,0(r5)
+	mtctr	r5
+	bctrl
+
+	nop
+	ld	r0, 128(r1)
+	mtlr	r0
+	addi	r1, r1, 112
+_GLOBAL(ftrace_stub)
+	blr
+
+#endif
+#endif

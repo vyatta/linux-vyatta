@@ -44,6 +44,7 @@ config BCM47XX
 	select CEVT_R4K
 	select CSRC_R4K
 	select DMA_NONCOHERENT
+	select NO_SPINLOCK
 	select HW_HAS_PCI
 	select IRQ_CPU
 	select SYS_HAS_CPU_MIPS32_R1
@@ -712,6 +713,10 @@ config RWSEM_GENERIC_SPINLOCK
 config RWSEM_XCHGADD_ALGORITHM
 	bool
 
+config ASM_SEMAPHORES
+	bool
+	default y
+
 config ARCH_HAS_ILOG2_U32
 	bool
 	default n
@@ -817,6 +822,9 @@ config DMA_NONCOHERENT
 	select DMA_NEED_PCI_MAP_STATE
 
 config DMA_NEED_PCI_MAP_STATE
+	bool
+
+config NO_SPINLOCK
 	bool
 
 config EARLY_PRINTK
@@ -1843,8 +1851,6 @@ config MIPS_CMP
 	  This is a placeholder option for the GCMP work. It will need to
 	  be handled differently...
 
-source "kernel/time/Kconfig"
-
 #
 # Timer Interrupt Frequency Configuration
 #
@@ -1962,11 +1968,16 @@ config SECCOMP
 
 	  If unsure, say Y. Only embedded should say N here.
 
-endmenu
-
-config RWSEM_GENERIC_SPINLOCK
+config GENERIC_TIME
 	bool
 	default y
+
+source "kernel/time/Kconfig"
+
+config CPU_SPEED
+	int "CPU speed used for clocksource/clockevent calculations"
+	default 600
+endmenu
 
 config LOCKDEP_SUPPORT
 	bool

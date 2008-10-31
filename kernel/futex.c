@@ -61,6 +61,7 @@
 #include "rtmutex_common.h"
 
 int __read_mostly futex_cmpxchg_enabled;
+int __read_mostly futex_rt_pi_warning;
 
 #define FUTEX_HASHBITS (CONFIG_BASE_SMALL ? 4 : 8)
 
@@ -952,7 +953,11 @@ static int futex_requeue(u32 __user *uaddr1, struct rw_semaphore *fshared,
 				plist_add(&this->list, &hb2->chain);
 				this->lock_ptr = &hb2->lock;
 #ifdef CONFIG_DEBUG_PI_LIST
+#ifdef CONFIG_PREEMPT_RT
+				this->list.plist.lock = NULL;
+#else
 				this->list.plist.lock = &hb2->lock;
+#endif
 #endif
 			}
 			this->key = key2;
@@ -1009,7 +1014,11 @@ static inline void queue_me(struct futex_q *q, struct futex_hash_bucket *hb)
 
 	plist_node_init(&q->list, prio);
 #ifdef CONFIG_DEBUG_PI_LIST
+#ifdef CONFIG_PREEMPT_RT
+	q->list.plist.lock = NULL;
+#else
 	q->list.plist.lock = &hb->lock;
+#endif
 #endif
 	plist_add(&q->list, &hb->chain);
 	q->task = current;
@@ -1226,6 +1235,16 @@ static int futex_wait(u32 __user *uaddr, struct rw_semaphore *fshared,
 
 	hb = queue_lock(&q);
 
+	if (futex_rt_pi_warning && unlikely(rt_task(curr))) {
+		if (printk_ratelimit()) {
+			printk(KERN_WARNING
+			       "RT task %s:%d with priority %d"
+			       " using non PI futex\n",
+			       current->comm, current->pid,
+			       MAX_RT_PRIO - current->prio);
+		}
+	}
+
 	/*
 	 * Access the page AFTER the futex is queued.
 	 * Order is important:
@@ -1293,6 +1312,10 @@ static int futex_wait(u32 __user *uaddr, struct rw_semaphore *fshared,
 	 * q.lock_ptr != 0 is not safe, because of ordering against wakeup.
 	 */
 	if (likely(!plist_node_empty(&q.list))) {
+		unsigned long nosched_flag = current->flags & PF_NOSCHED;
+
+		current->flags &= ~PF_NOSCHED;
+
 		if (!abs_time)
 			schedule();
 		else {
@@ -1321,6 +1344,8 @@ static int futex_wait(u32 __user *uaddr, struct rw_semaphore *fshared,
 
 			destroy_hrtimer_on_stack(&t.timer);
 		}
+
+		current->flags |= nosched_flag;
 	}
 	__set_current_state(TASK_RUNNING);
 
@@ -2088,7 +2113,11 @@ static int __init futex_init(void)
 		futex_cmpxchg_enabled = 1;
 
 	for (i = 0; i < ARRAY_SIZE(futex_queues); i++) {
+#ifdef CONFIG_PREEMPT_RT
+		plist_head_init(&futex_queues[i].chain, NULL);
+#else
 		plist_head_init(&futex_queues[i].chain, &futex_queues[i].lock);
+#endif
 		spin_lock_init(&futex_queues[i].lock);
 	}
 

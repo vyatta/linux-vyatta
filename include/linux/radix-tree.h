@@ -62,23 +62,65 @@ struct radix_tree_root {
 	unsigned int		height;
 	gfp_t			gfp_mask;
 	struct radix_tree_node	*rnode;
+	spinlock_t		lock;
 };
 
 #define RADIX_TREE_INIT(mask)	{					\
 	.height = 0,							\
 	.gfp_mask = (mask),						\
 	.rnode = NULL,							\
+	.lock = __SPIN_LOCK_UNLOCKED(radix_tree_root.lock),		\
 }
 
 #define RADIX_TREE(name, mask) \
 	struct radix_tree_root name = RADIX_TREE_INIT(mask)
 
-#define INIT_RADIX_TREE(root, mask)					\
-do {									\
-	(root)->height = 0;						\
-	(root)->gfp_mask = (mask);					\
-	(root)->rnode = NULL;						\
-} while (0)
+static inline void INIT_RADIX_TREE(struct radix_tree_root *root, gfp_t gfp_mask)
+{
+	root->height = 0;
+	root->gfp_mask = gfp_mask;
+	root->rnode = NULL;
+	spin_lock_init(&root->lock);
+}
+
+struct radix_tree_context {
+	struct radix_tree_root	*tree;
+	struct radix_tree_root	*root;
+#ifdef CONFIG_RADIX_TREE_CONCURRENT
+	spinlock_t		*locked;
+#endif
+};
+
+#ifdef CONFIG_RADIX_TREE_CONCURRENT
+#define RADIX_CONTEXT_ROOT(context)					\
+	((struct radix_tree_root *)(((unsigned long)context) + 1))
+
+#define __RADIX_TREE_CONTEXT_INIT(context, _tree)			\
+		.tree = RADIX_CONTEXT_ROOT(&context),			\
+		.locked = NULL,
+#else
+#define __RADIX_TREE_CONTEXT_INIT(context, _tree)			\
+		.tree = (_tree),
+#endif
+
+#define DEFINE_RADIX_TREE_CONTEXT(context, _tree) 			\
+	struct radix_tree_context context = { 				\
+		.root = (_tree), 					\
+		__RADIX_TREE_CONTEXT_INIT(context, _tree)		\
+       	}
+
+static inline void
+init_radix_tree_context(struct radix_tree_context *ctx,
+		struct radix_tree_root *root)
+{
+	ctx->root = root;
+#ifdef CONFIG_RADIX_TREE_CONCURRENT
+	ctx->tree = RADIX_CONTEXT_ROOT(ctx);
+	ctx->locked = NULL;
+#else
+	ctx->tree = root;
+#endif
+}
 
 /**
  * Radix-tree synchronization
@@ -99,12 +141,15 @@ do {									\
  *
  * The notable exceptions to this rule are the following functions:
  * radix_tree_lookup
+ * radix_tree_lookup_slot
  * radix_tree_tag_get
  * radix_tree_gang_lookup
+ * radix_tree_gang_lookup_slot
  * radix_tree_gang_lookup_tag
+ * radix_tree_gang_lookup_tag_slot
  * radix_tree_tagged
  *
- * The first 4 functions are able to be called locklessly, using RCU. The
+ * The first 7 functions are able to be called locklessly, using RCU. The
  * caller must ensure calls to these functions are made within rcu_read_lock()
  * regions. Other readers (lock-free or otherwise) and modifications may be
  * running concurrently.
@@ -152,6 +197,48 @@ static inline void radix_tree_replace_slot(void **pslot, void *item)
 	rcu_assign_pointer(*pslot, item);
 }
 
+#if defined(CONFIG_RADIX_TREE_OPTIMISTIC)
+static inline void radix_tree_lock(struct radix_tree_context *context)
+{
+	rcu_read_lock();
+	BUG_ON(context->locked);
+}
+#elif defined(CONFIG_RADIX_TREE_CONCURRENT)
+static inline void radix_tree_lock(struct radix_tree_context *context)
+{
+	struct radix_tree_root *root = context->root;
+
+	rcu_read_lock();
+	spin_lock(&root->lock);
+	BUG_ON(context->locked);
+	context->locked = &root->lock;
+}
+#else
+static inline void radix_tree_lock(struct radix_tree_context *context)
+{
+	struct radix_tree_root *root = context->root;
+
+	rcu_read_lock();
+	spin_lock(&root->lock);
+}
+#endif
+
+#if defined(CONFIG_RADIX_TREE_CONCURRENT)
+static inline void radix_tree_unlock(struct radix_tree_context *context)
+{
+	BUG_ON(!context->locked);
+	spin_unlock(context->locked);
+	context->locked = NULL;
+	rcu_read_unlock();
+}
+#else
+static inline void radix_tree_unlock(struct radix_tree_context *context)
+{
+	spin_unlock(&context->root->lock);
+	rcu_read_unlock();
+}
+#endif
+
 int radix_tree_insert(struct radix_tree_root *, unsigned long, void *);
 void *radix_tree_lookup(struct radix_tree_root *, unsigned long);
 void **radix_tree_lookup_slot(struct radix_tree_root *, unsigned long);
@@ -159,9 +246,23 @@ void *radix_tree_delete(struct radix_tree_root *, unsigned long);
 unsigned int
 radix_tree_gang_lookup(struct radix_tree_root *root, void **results,
 			unsigned long first_index, unsigned int max_items);
+unsigned int
+radix_tree_gang_lookup_slot(struct radix_tree_root *root, void ***results,
+			unsigned long first_index, unsigned int max_items);
 unsigned long radix_tree_next_hole(struct radix_tree_root *root,
 				unsigned long index, unsigned long max_scan);
+/*
+ * On a mutex based kernel we can freely schedule within the radix code:
+ */
+#ifdef CONFIG_PREEMPT_RT
+static inline int radix_tree_preload(gfp_t gfp_mask)
+{
+	return 0;
+}
+#else
 int radix_tree_preload(gfp_t gfp_mask);
+#endif
+
 void radix_tree_init(void);
 void *radix_tree_tag_set(struct radix_tree_root *root,
 			unsigned long index, unsigned int tag);
@@ -173,11 +274,17 @@ unsigned int
 radix_tree_gang_lookup_tag(struct radix_tree_root *root, void **results,
 		unsigned long first_index, unsigned int max_items,
 		unsigned int tag);
+unsigned int
+radix_tree_gang_lookup_tag_slot(struct radix_tree_root *root, void ***results,
+		unsigned long first_index, unsigned int max_items,
+		unsigned int tag);
 int radix_tree_tagged(struct radix_tree_root *root, unsigned int tag);
 
 static inline void radix_tree_preload_end(void)
 {
+#ifndef CONFIG_PREEMPT_RT
 	preempt_enable();
+#endif
 }
 
 #endif /* _LINUX_RADIX_TREE_H */

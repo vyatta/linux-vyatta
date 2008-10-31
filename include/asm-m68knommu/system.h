@@ -2,9 +2,10 @@
 #define _M68KNOMMU_SYSTEM_H
 
 #include <linux/linkage.h>
+#include <linux/kernel.h>
+#include <linux/irqflags.h>
 #include <asm/segment.h>
 #include <asm/entry.h>
-
 /*
  * switch_to(n) should switch tasks to task ptr, first checking that
  * ptr isn't the current task, in which case it does nothing.  This
@@ -118,6 +119,8 @@ asmlinkage void resume(void);
 #define smp_read_barrier_depends()	do { } while(0)
 #endif
 
+#define read_barrier_depends()  ((void)0)
+
 #define xchg(ptr,x) ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
 
 struct __xchg_dummy { unsigned long a[100]; };
@@ -128,7 +131,7 @@ static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int siz
 {
   unsigned long tmp, flags;
 
-  local_irq_save(flags);
+  raw_local_irq_save(flags);
 
   switch (size) {
   case 1:
@@ -150,7 +153,7 @@ static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int siz
     : "=&d" (tmp) : "d" (x), "m" (*__xg(ptr)) : "memory");
     break;
   }
-  local_irq_restore(flags);
+  raw_local_irq_restore(flags);
   return tmp;
 }
 #else
@@ -309,5 +312,14 @@ static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int siz
 #endif
 #endif
 #define arch_align_stack(x) (x)
+
+
+static inline int irqs_disabled_flags(unsigned long flags)
+{
+	if (flags & 0x0700)
+		return 0;
+	else
+		return 1;
+}
 
 #endif /* _M68KNOMMU_SYSTEM_H */

@@ -152,13 +152,13 @@ static int loopback_xmit(struct sk_buff *skb, struct net_device *dev)
 #endif
 	dev->last_rx = jiffies;
 
-	/* it's OK to use per_cpu_ptr() because BHs are off */
 	pcpu_lstats = netdev_priv(dev);
-	lb_stats = per_cpu_ptr(pcpu_lstats, smp_processor_id());
+	lb_stats = per_cpu_ptr(pcpu_lstats, get_cpu());
 	lb_stats->bytes += skb->len;
 	lb_stats->packets++;
+	put_cpu();
 
-	netif_rx(skb);
+	netif_rx_ni(skb);
 
 	return 0;
 }

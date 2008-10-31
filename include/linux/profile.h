@@ -4,16 +4,18 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/cpumask.h>
+#include <linux/kernel_stat.h>
 #include <linux/cache.h>
 
 #include <asm/errno.h>
 
 extern int prof_on __read_mostly;
 
-#define CPU_PROFILING	1
-#define SCHED_PROFILING	2
-#define SLEEP_PROFILING	3
-#define KVM_PROFILING	4
+#define CPU_PROFILING		1
+#define SCHED_PROFILING		2
+#define SLEEP_PROFILING		3
+#define KVM_PROFILING		4
+#define PREEMPT_PROFILING	5
 
 struct proc_dir_entry;
 struct pt_regs;
@@ -21,6 +23,7 @@ struct notifier_block;
 
 /* init basic kernel profiler */
 void __init profile_init(void);
+void __profile_tick(int type, struct pt_regs *regs);
 void profile_tick(int);
 
 /*
@@ -50,6 +53,8 @@ enum profile_type {
 	PROFILE_TASK_EXIT,
 	PROFILE_MUNMAP
 };
+
+extern int prof_pid;
 
 #ifdef CONFIG_PROFILING
 

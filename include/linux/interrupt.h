@@ -50,10 +50,12 @@
 #define IRQF_SAMPLE_RANDOM	0x00000040
 #define IRQF_SHARED		0x00000080
 #define IRQF_PROBE_SHARED	0x00000100
-#define IRQF_TIMER		0x00000200
+#define __IRQF_TIMER		0x00000200
 #define IRQF_PERCPU		0x00000400
 #define IRQF_NOBALANCING	0x00000800
 #define IRQF_IRQPOLL		0x00001000
+#define IRQF_NODELAY		0x00002000
+#define IRQF_TIMER		(__IRQF_TIMER | IRQF_NODELAY)
 
 typedef irqreturn_t (*irq_handler_t)(int, void *);
 
@@ -65,7 +67,7 @@ struct irqaction {
 	void *dev_id;
 	struct irqaction *next;
 	int irq;
-	struct proc_dir_entry *dir;
+	struct proc_dir_entry *dir, *threaded;
 };
 
 extern irqreturn_t no_action(int cpl, void *dev_id);
@@ -95,7 +97,7 @@ extern void devm_free_irq(struct device *dev, unsigned int irq, void *dev_id);
 #ifdef CONFIG_LOCKDEP
 # define local_irq_enable_in_hardirq()	do { } while (0)
 #else
-# define local_irq_enable_in_hardirq()	local_irq_enable()
+# define local_irq_enable_in_hardirq()	local_irq_enable_nort()
 #endif
 
 extern void disable_irq_nosync(unsigned int irq);
@@ -215,6 +217,7 @@ static inline int disable_irq_wake(unsigned int irq)
 
 #ifndef __ARCH_SET_SOFTIRQ_PENDING
 #define set_softirq_pending(x) (local_softirq_pending() = (x))
+// FIXME: PREEMPT_RT: set_bit()?
 #define or_softirq_pending(x)  (local_softirq_pending() |= (x))
 #endif
 
@@ -276,6 +279,8 @@ enum
 	HRTIMER_SOFTIRQ,
 #endif
 	RCU_SOFTIRQ, 	/* Preferable RCU should always be the last softirq */
+	/* Entries after this are ignored in split softirq mode */
+	MAX_SOFTIRQ,
 };
 
 /* softirq mask and active fields moved to irq_cpustat_t in
@@ -288,14 +293,27 @@ struct softirq_action
 	void	*data;
 };
 
+#ifdef CONFIG_PREEMPT_HARDIRQS
+# define __raise_softirq_irqoff(nr) raise_softirq_irqoff(nr)
+# define __do_raise_softirq_irqoff(nr) do { or_softirq_pending(1UL << (nr)); } while (0)
+#else
+# define __raise_softirq_irqoff(nr) do { or_softirq_pending(1UL << (nr)); } while (0)
+# define __do_raise_softirq_irqoff(nr) __raise_softirq_irqoff(nr)
+#endif
+
 asmlinkage void do_softirq(void);
 asmlinkage void __do_softirq(void);
 extern void open_softirq(int nr, void (*action)(struct softirq_action*), void *data);
 extern void softirq_init(void);
-#define __raise_softirq_irqoff(nr) do { or_softirq_pending(1UL << (nr)); } while (0)
 extern void raise_softirq_irqoff(unsigned int nr);
 extern void raise_softirq(unsigned int nr);
+extern void wakeup_irqd(void);
 
+#ifdef CONFIG_PREEMPT_SOFTIRQS
+extern void wait_for_softirq(int softirq);
+#else
+# define wait_for_softirq(x) do {} while(0)
+#endif
 
 /* Tasklets --- multithreaded analogue of BHs.
 
@@ -310,8 +328,9 @@ extern void raise_softirq(unsigned int nr);
      to be executed on some cpu at least once after this.
    * If the tasklet is already scheduled, but its excecution is still not
      started, it will be executed only once.
-   * If this tasklet is already running on another CPU (or schedule is called
-     from tasklet itself), it is rescheduled for later.
+   * If this tasklet is already running on another CPU, it is rescheduled
+     for later.
+   * Schedule must not be called from the tasklet itself (a lockup occurs)
    * Tasklet is strictly serialized wrt itself, but not
      wrt another tasklets. If client needs some intertask synchronization,
      he makes it with spinlocks.
@@ -336,13 +355,23 @@ struct tasklet_struct name = { NULL, 0, ATOMIC_INIT(1), func, data }
 enum
 {
 	TASKLET_STATE_SCHED,	/* Tasklet is scheduled for execution */
-	TASKLET_STATE_RUN	/* Tasklet is running (SMP only) */
+	TASKLET_STATE_RUN,	/* Tasklet is running (SMP only) */
+	TASKLET_STATE_PENDING	/* Tasklet is pending */
 };
 
-#ifdef CONFIG_SMP
+#define TASKLET_STATEF_SCHED	(1 << TASKLET_STATE_SCHED)
+#define TASKLET_STATEF_RUN	(1 << TASKLET_STATE_RUN)
+#define TASKLET_STATEF_PENDING	(1 << TASKLET_STATE_PENDING)
+
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT_RT)
 static inline int tasklet_trylock(struct tasklet_struct *t)
 {
 	return !test_and_set_bit(TASKLET_STATE_RUN, &(t)->state);
+}
+
+static inline int tasklet_tryunlock(struct tasklet_struct *t)
+{
+	return cmpxchg(&t->state, TASKLET_STATEF_RUN, 0) == TASKLET_STATEF_RUN;
 }
 
 static inline void tasklet_unlock(struct tasklet_struct *t)
@@ -351,12 +380,11 @@ static inline void tasklet_unlock(struct tasklet_struct *t)
 	clear_bit(TASKLET_STATE_RUN, &(t)->state);
 }
 
-static inline void tasklet_unlock_wait(struct tasklet_struct *t)
-{
-	while (test_bit(TASKLET_STATE_RUN, &(t)->state)) { barrier(); }
-}
+extern void tasklet_unlock_wait(struct tasklet_struct *t);
+
 #else
 #define tasklet_trylock(t) 1
+#define tasklet_tryunlock(t)	1
 #define tasklet_unlock_wait(t) do { } while (0)
 #define tasklet_unlock(t) do { } while (0)
 #endif
@@ -391,22 +419,14 @@ static inline void tasklet_disable(struct tasklet_struct *t)
 	smp_mb();
 }
 
-static inline void tasklet_enable(struct tasklet_struct *t)
-{
-	smp_mb__before_atomic_dec();
-	atomic_dec(&t->count);
-}
-
-static inline void tasklet_hi_enable(struct tasklet_struct *t)
-{
-	smp_mb__before_atomic_dec();
-	atomic_dec(&t->count);
-}
+extern  void tasklet_enable(struct tasklet_struct *t);
+extern  void tasklet_hi_enable(struct tasklet_struct *t);
 
 extern void tasklet_kill(struct tasklet_struct *t);
 extern void tasklet_kill_immediate(struct tasklet_struct *t, unsigned int cpu);
 extern void tasklet_init(struct tasklet_struct *t,
 			 void (*func)(unsigned long), unsigned long data);
+void takeover_tasklets(unsigned int cpu);
 
 /*
  * Autoprobing for irqs:
@@ -465,5 +485,38 @@ static inline void init_irq_proc(void)
 #endif
 
 int show_interrupts(struct seq_file *p, void *v);
+
+#ifdef CONFIG_PREEMPT_RT
+# define local_irq_disable_nort()	do { } while (0)
+# define local_irq_enable_nort()	do { } while (0)
+# define local_irq_enable_rt()		local_irq_enable()
+# define local_irq_save_nort(flags)	do { local_save_flags(flags); } while (0)
+# define local_irq_restore_nort(flags)	do { (void)(flags); } while (0)
+# define spin_lock_nort(lock)		do { } while (0)
+# define spin_unlock_nort(lock)		do { } while (0)
+# define spin_lock_bh_nort(lock)	do { } while (0)
+# define spin_unlock_bh_nort(lock)	do { } while (0)
+# define spin_lock_rt(lock)		spin_lock(lock)
+# define spin_unlock_rt(lock)		spin_unlock(lock)
+# define smp_processor_id_rt(cpu)	(cpu)
+# define in_atomic_rt()			(!oops_in_progress && \
+					  (in_atomic() || irqs_disabled()))
+# define read_trylock_rt(lock)		({read_lock(lock); 1; })
+#else
+# define local_irq_disable_nort()	local_irq_disable()
+# define local_irq_enable_nort()	local_irq_enable()
+# define local_irq_enable_rt()		do { } while (0)
+# define local_irq_save_nort(flags)	local_irq_save(flags)
+# define local_irq_restore_nort(flags)	local_irq_restore(flags)
+# define spin_lock_rt(lock)		do { } while (0)
+# define spin_unlock_rt(lock)		do { } while (0)
+# define spin_lock_nort(lock)		spin_lock(lock)
+# define spin_unlock_nort(lock)		spin_unlock(lock)
+# define spin_lock_bh_nort(lock)	spin_lock_bh(lock)
+# define spin_unlock_bh_nort(lock)	spin_unlock_bh(lock)
+# define smp_processor_id_rt(cpu)	smp_processor_id()
+# define in_atomic_rt()			0
+# define read_trylock_rt(lock)		read_trylock(lock)
+#endif
 
 #endif

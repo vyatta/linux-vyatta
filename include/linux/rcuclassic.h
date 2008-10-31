@@ -49,7 +49,7 @@ struct rcu_ctrlblk {
 
 	int	signaled;
 
-	spinlock_t	lock	____cacheline_internodealigned_in_smp;
+	raw_spinlock_t	lock	____cacheline_internodealigned_in_smp;
 	cpumask_t	cpumask; /* CPUs that need to switch in order    */
 				 /* for current batch to proceed.        */
 } ____cacheline_internodealigned_in_smp;
@@ -151,7 +151,10 @@ extern struct lockdep_map rcu_lock_map;
 
 #define __synchronize_sched() synchronize_rcu()
 
+#define call_rcu_sched(head, func) call_rcu(head, func)
+
 extern void __rcu_init(void);
+#define rcu_init_sched()	do { } while (0)
 extern void rcu_check_callbacks(int cpu, int user);
 extern void rcu_restart_cpu(int cpu);
 
@@ -160,5 +163,6 @@ extern long rcu_batches_completed_bh(void);
 
 #define rcu_enter_nohz()	do { } while (0)
 #define rcu_exit_nohz()		do { } while (0)
+#define rcu_preempt_boost_init() do { } while (0)
 
 #endif /* __LINUX_RCUCLASSIC_H */

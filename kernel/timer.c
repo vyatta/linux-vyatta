@@ -34,9 +34,11 @@
 #include <linux/posix-timers.h>
 #include <linux/cpu.h>
 #include <linux/syscalls.h>
+#include <linux/kallsyms.h>
 #include <linux/delay.h>
 #include <linux/tick.h>
 #include <linux/kallsyms.h>
+#include <linux/kthread.h>
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -69,6 +71,7 @@ struct tvec_root {
 struct tvec_base {
 	spinlock_t lock;
 	struct timer_list *running_timer;
+	wait_queue_head_t wait_for_running_timer;
 	unsigned long timer_jiffies;
 	struct tvec_root tv1;
 	struct tvec tv2;
@@ -247,9 +250,7 @@ EXPORT_SYMBOL_GPL(round_jiffies_relative);
 static inline void set_running_timer(struct tvec_base *base,
 					struct timer_list *timer)
 {
-#ifdef CONFIG_SMP
 	base->running_timer = timer;
-#endif
 }
 
 static void internal_add_timer(struct tvec_base *base, struct timer_list *timer)
@@ -524,7 +525,7 @@ int __mod_timer(struct timer_list *timer, unsigned long expires)
 {
 	struct tvec_base *base, *new_base;
 	unsigned long flags;
-	int ret = 0;
+	int ret = 0, cpu;
 
 	timer_stats_timer_set_start_info(timer);
 	BUG_ON(!timer->function);
@@ -538,7 +539,8 @@ int __mod_timer(struct timer_list *timer, unsigned long expires)
 
 	debug_timer_activate(timer);
 
-	new_base = __get_cpu_var(tvec_bases);
+	cpu = raw_smp_processor_id();
+	new_base = per_cpu(tvec_bases, cpu);
 
 	if (base != new_base) {
 		/*
@@ -595,6 +597,18 @@ void add_timer_on(struct timer_list *timer, int cpu)
 	 */
 	wake_up_idle_cpu(cpu);
 	spin_unlock_irqrestore(&base->lock, flags);
+}
+
+/*
+ * Wait for a running timer
+ */
+void wait_for_running_timer(struct timer_list *timer)
+{
+	struct tvec_base *base = timer->base;
+
+	if (base->running_timer == timer)
+		wait_event(base->wait_for_running_timer,
+			   base->running_timer != timer);
 }
 
 /**
@@ -667,7 +681,35 @@ int del_timer(struct timer_list *timer)
 
 EXPORT_SYMBOL(del_timer);
 
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT_SOFTIRQS)
+/*
+ * This function checks whether a timer is active and not running on any
+ * CPU. Upon successful (ret >= 0) exit the timer is not queued and the
+ * handler is not running on any CPU.
+ *
+ * It must not be called from interrupt contexts.
+ */
+int timer_pending_sync(struct timer_list *timer)
+{
+	struct tvec_base *base;
+	unsigned long flags;
+	int ret = -1;
+
+	base = lock_timer_base(timer, &flags);
+
+	if (base->running_timer == timer)
+		goto out;
+
+	ret = 0;
+	if (timer_pending(timer))
+		ret = 1;
+out:
+	spin_unlock_irqrestore(&base->lock, flags);
+
+	return ret;
+}
+
+
 /**
  * try_to_del_timer_sync - Try to deactivate a timer
  * @timer: timer do del
@@ -724,7 +766,7 @@ int del_timer_sync(struct timer_list *timer)
 		int ret = try_to_del_timer_sync(timer);
 		if (ret >= 0)
 			return ret;
-		cpu_relax();
+		wait_for_running_timer(timer);
 	}
 }
 
@@ -770,6 +812,20 @@ static inline void __run_timers(struct tvec_base *base)
 		struct list_head *head = &work_list;
 		int index = base->timer_jiffies & TVR_MASK;
 
+		if (softirq_need_resched()) {
+			spin_unlock_irq(&base->lock);
+			wake_up(&base->wait_for_running_timer);
+			cond_resched_softirq_context();
+			cpu_relax();
+			spin_lock_irq(&base->lock);
+			/*
+			 * We can simply continue after preemption, nobody
+			 * else can touch timer_jiffies so 'index' is still
+			 * valid. Any new jiffy will be taken care of in
+			 * subsequent loops:
+			 */
+		}
+
 		/*
 		 * Cascade timers:
 		 */
@@ -797,18 +853,17 @@ static inline void __run_timers(struct tvec_base *base)
 				int preempt_count = preempt_count();
 				fn(data);
 				if (preempt_count != preempt_count()) {
-					printk(KERN_ERR "huh, entered %p "
-					       "with preempt_count %08x, exited"
-					       " with %08x?\n",
-					       fn, preempt_count,
-					       preempt_count());
-					BUG();
+					print_symbol("BUG: unbalanced timer-handler preempt count in %s!\n", (unsigned long) fn);
+					printk("entered with %08x, exited with %08x.\n", preempt_count, preempt_count());
+					preempt_count() = preempt_count;
 				}
 			}
+			set_running_timer(base, NULL);
+			cond_resched_softirq_context();
 			spin_lock_irq(&base->lock);
 		}
 	}
-	set_running_timer(base, NULL);
+	wake_up(&base->wait_for_running_timer);
 	spin_unlock_irq(&base->lock);
 }
 
@@ -938,9 +993,22 @@ unsigned long get_next_timer_interrupt(unsigned long now)
 	struct tvec_base *base = __get_cpu_var(tvec_bases);
 	unsigned long expires;
 
+#ifdef CONFIG_PREEMPT_RT
+	/*
+	 * On PREEMPT_RT we cannot sleep here. If the trylock does not
+	 * succeed then we return the worst-case 'expires in 1 tick'
+	 * value:
+	 */
+	if (spin_trylock(&base->lock)) {
+		expires = __next_timer_interrupt(base);
+		spin_unlock(&base->lock);
+	} else
+		expires = now + 1;
+#else
 	spin_lock(&base->lock);
 	expires = __next_timer_interrupt(base);
 	spin_unlock(&base->lock);
+#endif
 
 	if (time_before_eq(expires, now))
 		return now;
@@ -983,10 +1051,10 @@ void update_process_times(int user_tick)
 
 	/* Note: this timer irq context must be accounted for as well. */
 	account_process_tick(p, user_tick);
+	scheduler_tick();
 	run_local_timers();
 	if (rcu_pending(cpu))
 		rcu_check_callbacks(cpu, user_tick);
-	scheduler_tick();
 	run_posix_cpu_timers(p);
 }
 
@@ -995,8 +1063,29 @@ void update_process_times(int user_tick)
  */
 static unsigned long count_active_tasks(void)
 {
+	/*
+	 * On PREEMPT_RT, we are running in the loadavg thread,
+	 * so consider 1 less running tasks:
+	 */
+#ifdef CONFIG_PREEMPT_RT
+	return (nr_active() - 1) * FIXED_1;
+#else
 	return nr_active() * FIXED_1;
+#endif
 }
+
+#ifdef CONFIG_PREEMPT_RT
+/*
+ * Nr of active tasks - counted in fixed-point numbers
+ */
+static unsigned long count_active_rt_tasks(void)
+{
+	extern unsigned long rt_nr_running(void);
+	extern unsigned long rt_nr_uninterruptible(void);
+
+	return (rt_nr_running() + rt_nr_uninterruptible()) * FIXED_1;
+}
+#endif
 
 /*
  * Hmm.. Changed this, as the GNU make sources (load.c) seems to
@@ -1010,6 +1099,8 @@ unsigned long avenrun[3];
 
 EXPORT_SYMBOL(avenrun);
 
+unsigned long avenrun_rt[3];
+
 /*
  * calc_load - given tick count, update the avenrun load estimates.
  * This is called while holding a write_lock on xtime_lock.
@@ -1018,31 +1109,74 @@ static inline void calc_load(unsigned long ticks)
 {
 	unsigned long active_tasks; /* fixed-point */
 	static int count = LOAD_FREQ;
+#ifdef CONFIG_PREEMPT_RT
+	unsigned long active_rt_tasks; /* fixed-point */
+#endif
 
 	count -= ticks;
 	if (unlikely(count < 0)) {
 		active_tasks = count_active_tasks();
+#ifdef CONFIG_PREEMPT_RT
+		active_rt_tasks = count_active_rt_tasks();
+#endif
 		do {
 			CALC_LOAD(avenrun[0], EXP_1, active_tasks);
 			CALC_LOAD(avenrun[1], EXP_5, active_tasks);
 			CALC_LOAD(avenrun[2], EXP_15, active_tasks);
+#ifdef CONFIG_PREEMPT_RT
+			CALC_LOAD(avenrun_rt[0], EXP_1, active_rt_tasks);
+			CALC_LOAD(avenrun_rt[1], EXP_5, active_rt_tasks);
+			CALC_LOAD(avenrun_rt[2], EXP_15, active_rt_tasks);
+#endif
 			count += LOAD_FREQ;
+
 		} while (count < 0);
 	}
 }
 
-/*
- * This function runs timers and the timer-tq in bottom half context.
- */
-static void run_timer_softirq(struct softirq_action *h)
+#ifdef CONFIG_PREEMPT_RT
+static int loadavg_calculator(void *data)
 {
-	struct tvec_base *base = __get_cpu_var(tvec_bases);
+	unsigned long now, last;
 
-	hrtimer_run_pending();
+	last = jiffies;
+	while (!kthread_should_stop()) {
+		struct timespec delay = {
+			.tv_sec = LOAD_FREQ / HZ,
+			.tv_nsec = 0
+		};
 
-	if (time_after_eq(jiffies, base->timer_jiffies))
-		__run_timers(base);
+		hrtimer_nanosleep(&delay, NULL, HRTIMER_MODE_REL,
+			CLOCK_MONOTONIC);
+		now = jiffies;
+		write_seqlock_irq(&xtime_lock);
+		calc_load(now - last);
+		write_sequnlock_irq(&xtime_lock);
+		last = now;
+	}
+
+	return 0;
 }
+
+static int __init start_loadavg_calculator(void)
+{
+	struct task_struct *p;
+	struct sched_param param = { .sched_priority = MAX_USER_RT_PRIO/2 };
+
+	p = kthread_create(loadavg_calculator, NULL, "loadavg");
+	if (IS_ERR(p)) {
+		printk(KERN_ERR "Could not create the loadavg thread.\n");
+		return 1;
+	}
+
+	sched_setscheduler(p, SCHED_FIFO, &param);
+	wake_up_process(p);
+
+	return 0;
+}
+
+late_initcall(start_loadavg_calculator);
+#endif
 
 /*
  * Called by the local, per-CPU timer interrupt on SMP.
@@ -1055,13 +1189,44 @@ void run_local_timers(void)
 }
 
 /*
- * Called by the timer interrupt. xtime_lock must already be taken
- * by the timer IRQ!
+ * Time of day handling:
  */
-static inline void update_times(unsigned long ticks)
+static inline void update_times(void)
 {
-	update_wall_time();
-	calc_load(ticks);
+	static unsigned long last_tick = INITIAL_JIFFIES;
+	unsigned long ticks, flags;
+
+	/*
+	 * Dont take the xtime_lock from every CPU in
+	 * every tick - only when needed:
+	 */
+	if (jiffies == last_tick)
+		return;
+
+	write_seqlock_irqsave(&xtime_lock, flags);
+	ticks = jiffies - last_tick;
+	if (ticks) {
+		last_tick += ticks;
+#ifndef CONFIG_PREEMPT_RT
+		calc_load(ticks);
+#endif
+	}
+	write_sequnlock_irqrestore(&xtime_lock, flags);
+}
+
+
+/*
+ * This function runs timers and the timer-tq in bottom half context.
+ */
+static void run_timer_softirq(struct softirq_action *h)
+{
+	struct tvec_base *base = per_cpu(tvec_bases, raw_smp_processor_id());
+
+	update_times();
+	hrtimer_run_pending();
+
+	if (time_after_eq(jiffies, base->timer_jiffies))
+		__run_timers(base);
 }
 
 /*
@@ -1073,7 +1238,7 @@ static inline void update_times(unsigned long ticks)
 void do_timer(unsigned long ticks)
 {
 	jiffies_64 += ticks;
-	update_times(ticks);
+	update_wall_time();
 }
 
 #ifdef __ARCH_WANT_SYS_ALARM
@@ -1407,6 +1572,7 @@ static int __cpuinit init_timers_cpu(int cpu)
 	}
 
 	spin_lock_init(&base->lock);
+	init_waitqueue_head(&base->wait_for_running_timer);
 
 	for (j = 0; j < TVN_SIZE; j++) {
 		INIT_LIST_HEAD(base->tv5.vec + j);
@@ -1444,7 +1610,7 @@ static void __cpuinit migrate_timers(int cpu)
 	old_base = per_cpu(tvec_bases, cpu);
 	new_base = get_cpu_var(tvec_bases);
 
-	local_irq_disable();
+	local_irq_disable_nort();
 	spin_lock(&new_base->lock);
 	spin_lock_nested(&old_base->lock, SINGLE_DEPTH_NESTING);
 
@@ -1461,7 +1627,7 @@ static void __cpuinit migrate_timers(int cpu)
 
 	spin_unlock(&old_base->lock);
 	spin_unlock(&new_base->lock);
-	local_irq_enable();
+	local_irq_enable_nort();
 	put_cpu_var(tvec_bases);
 }
 #endif /* CONFIG_HOTPLUG_CPU */

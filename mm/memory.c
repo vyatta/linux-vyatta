@@ -271,18 +271,52 @@ void free_pgd_range(struct mmu_gather **tlb,
 	} while (pgd++, addr = next, addr != end);
 }
 
+#ifdef CONFIG_IA64
+#define tlb_start_addr(tlb)	(tlb)->start_addr
+#define tlb_end_addr(tlb)	(tlb)->end_addr
+#else
+#define tlb_start_addr(tlb)	0UL	/* only ia64 really uses it */
+#define tlb_end_addr(tlb)	0UL	/* only ia64 really uses it */
+#endif
+
 void free_pgtables(struct mmu_gather **tlb, struct vm_area_struct *vma,
 		unsigned long floor, unsigned long ceiling)
 {
+#ifdef CONFIG_PREEMPT
+	struct vm_area_struct *unlink = vma;
+	int fullmm = (*tlb)->fullmm;
+
+	if (!vma)	/* Sometimes when exiting after an oops */
+		return;
+#ifndef CONFIG_PREEMPT_RT
+	if (vma->vm_next)
+#endif
+		tlb_finish_mmu(*tlb, tlb_start_addr(*tlb), tlb_end_addr(*tlb));
+	/*
+	 * Hide vma from rmap and vmtruncate before freeeing pgtables,
+	 * with preemption enabled, except when unmapping just one area.
+	 */
+	while (unlink) {
+		anon_vma_unlink(unlink);
+		unlink_file_vma(unlink);
+		unlink = unlink->vm_next;
+	}
+#ifndef CONFIG_PREEMPT_RT
+	if (vma->vm_next)
+#endif
+		*tlb = tlb_gather_mmu(vma->vm_mm, fullmm);
+#endif
 	while (vma) {
 		struct vm_area_struct *next = vma->vm_next;
 		unsigned long addr = vma->vm_start;
 
+#ifndef CONFIG_PREEMPT
 		/*
 		 * Hide vma from rmap and vmtruncate before freeing pgtables
 		 */
 		anon_vma_unlink(vma);
 		unlink_file_vma(vma);
+#endif
 
 		if (is_vm_hugetlb_page(vma)) {
 			hugetlb_free_pgd_range(tlb, addr, vma->vm_end,
@@ -295,8 +329,10 @@ void free_pgtables(struct mmu_gather **tlb, struct vm_area_struct *vma,
 			       && !is_vm_hugetlb_page(next)) {
 				vma = next;
 				next = vma->vm_next;
+#ifndef CONFIG_PREEMPT
 				anon_vma_unlink(vma);
 				unlink_file_vma(vma);
+#endif
 			}
 			free_pgd_range(tlb, addr, vma->vm_end,
 				floor, next? next->vm_start: ceiling);
@@ -834,10 +870,13 @@ static unsigned long unmap_page_range(struct mmu_gather *tlb,
 	return addr;
 }
 
-#ifdef CONFIG_PREEMPT
+#if defined(CONFIG_PREEMPT) && !defined(CONFIG_PREEMPT_RT)
 # define ZAP_BLOCK_SIZE	(8 * PAGE_SIZE)
 #else
-/* No preempt: go for improved straight-line efficiency */
+/*
+ * No preempt: go for improved straight-line efficiency
+ * on PREEMPT_RT this is not a critical latency-path.
+ */
 # define ZAP_BLOCK_SIZE	(1024 * PAGE_SIZE)
 #endif
 
@@ -2655,6 +2694,28 @@ unlock:
 	pte_unmap_unlock(pte, ptl);
 	return 0;
 }
+
+void pagefault_disable(void)
+{
+	current->pagefault_disabled++;
+	/*
+	 * make sure to have issued the store before a pagefault
+	 * can hit.
+	 */
+	barrier();
+}
+EXPORT_SYMBOL(pagefault_disable);
+
+void pagefault_enable(void)
+{
+	/*
+	 * make sure to issue those last loads/stores before enabling
+	 * the pagefault handler again.
+	 */
+	barrier();
+	current->pagefault_disabled--;
+}
+EXPORT_SYMBOL(pagefault_enable);
 
 /*
  * By the time we get here, we already hold the mm semaphore

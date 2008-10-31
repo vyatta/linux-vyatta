@@ -279,6 +279,21 @@ config DEBUG_RT_MUTEXES
 	help
 	 This allows rt mutex semantics violations and rt mutex related
 	 deadlocks (lockups) to be detected and reported automatically.
+	 When realtime preemption is enabled this includes spinlocks,
+	 rwlocks, mutexes and (rw)semaphores
+
+config RTMUTEX_CHECK
+	bool "RT Mutex integrity checker"
+	depends on PREEMPT_RT
+	default y
+	help
+	  When PREEMPT_RT is configured, most spinlocks and semaphores
+	  are converted into mutexes. There still exists true spin locks
+	  and old style semaphores. There are places in the kernel that
+	  passes the lock via pointer and typecasts it back. This
+	  can circumvent the compiler conversions. This option will add
+	  a magic number to all converted locks and check to make sure
+	  the lock is appropriate for the function being used.
 
 config DEBUG_PI_LIST
 	bool
@@ -302,10 +317,21 @@ config DEBUG_SPINLOCK
 
 config DEBUG_MUTEXES
 	bool "Mutex debugging: basic checks"
-	depends on DEBUG_KERNEL
+	depends on DEBUG_KERNEL && !PREEMPT_RT
 	help
 	 This feature allows mutex semantics violations to be detected and
 	 reported.
+
+config RWLOCK_TORTURE_TEST
+	tristate "torture tests for Priority Inheritance RW locks"
+	depends on DEBUG_KERNEL
+	depends on m
+	default n
+	help
+	  This option provides a kernel modules that runs a torture test
+	  of several threads that try to grab mutexes, rwlocks and rwsems.
+
+	  Say N if you are unsure.
 
 config DEBUG_LOCK_ALLOC
 	bool "Lock debugging: detect incorrect freeing of live locks"
@@ -633,6 +659,8 @@ config LATENCYTOP
 	help
 	  Enable this option if you want to use the LatencyTOP tool
 	  to find out which userspace is blocking on what kernel operations.
+
+source kernel/trace/Kconfig
 
 config PROVIDE_OHCI1394_DMA_INIT
 	bool "Remote debugging over FireWire early on boot"

@@ -166,7 +166,7 @@ void truncate_inode_pages_range(struct address_space *mapping,
 	pgoff_t next;
 	int i;
 
-	if (mapping->nrpages == 0)
+	if (mapping_nrpages(mapping) == 0)
 		return;
 
 	BUG_ON((lend & (PAGE_CACHE_SIZE - 1)) != (PAGE_CACHE_SIZE - 1));
@@ -349,18 +349,18 @@ invalidate_complete_page2(struct address_space *mapping, struct page *page)
 	if (PagePrivate(page) && !try_to_release_page(page, GFP_KERNEL))
 		return 0;
 
-	write_lock_irq(&mapping->tree_lock);
+	lock_page_ref_irq(page);
 	if (PageDirty(page))
 		goto failed;
 
 	BUG_ON(PagePrivate(page));
 	__remove_from_page_cache(page);
-	write_unlock_irq(&mapping->tree_lock);
+	unlock_page_ref_irq(page);
 	ClearPageUptodate(page);
 	page_cache_release(page);	/* pagecache ref */
 	return 1;
 failed:
-	write_unlock_irq(&mapping->tree_lock);
+	unlock_page_ref_irq(page);
 	return 0;
 }
 

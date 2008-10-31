@@ -16,6 +16,8 @@
 #include <linux/cpu.h>
 #include <linux/delay.h>
 
+#include <linux/ftrace.h>
+
 #include <asm/apic.h>
 #include <asm/uaccess.h>
 
@@ -77,6 +79,10 @@ unsigned int do_IRQ(struct pt_regs *regs)
 	u32 *isp;
 #endif
 
+#ifdef CONFIG_X86_LOCAL_APIC
+	irq_show_regs_callback(smp_processor_id(), regs);
+#endif
+
 	if (unlikely((unsigned)irq >= NR_IRQS)) {
 		printk(KERN_EMERG "%s: cannot handle IRQ %d\n",
 					__func__, irq);
@@ -85,6 +91,7 @@ unsigned int do_IRQ(struct pt_regs *regs)
 
 	old_regs = set_irq_regs(regs);
 	irq_enter();
+	trace_event_irq(irq, user_mode(regs), regs->ip);
 #ifdef CONFIG_DEBUG_STACKOVERFLOW
 	/* Debugging check for stack overflow: is there less than 1KB free? */
 	{
@@ -93,7 +100,7 @@ unsigned int do_IRQ(struct pt_regs *regs)
 		__asm__ __volatile__("andl %%esp,%0" :
 					"=r" (sp) : "0" (THREAD_SIZE - 1));
 		if (unlikely(sp < (sizeof(struct thread_info) + STACK_WARN))) {
-			printk("do_IRQ: stack overflow: %ld\n",
+			printk("BUG: do_IRQ: stack overflow: %ld\n",
 				sp - sizeof(struct thread_info));
 			dump_stack();
 		}

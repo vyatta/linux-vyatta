@@ -7,6 +7,7 @@
  */
 
 #include <linux/errno.h>
+#include <linux/cpumask.h>
 
 extern void cpu_idle(void);
 
@@ -32,6 +33,24 @@ extern void smp_send_stop(void);
  * sends a 'reschedule' event to another CPU:
  */
 extern void smp_send_reschedule(int cpu);
+
+/*
+ * trigger a reschedule on all other CPUs:
+ */
+extern void smp_send_reschedule_allbutself(void);
+
+/*
+ * trigger a reschedule on all other CPUs:
+ */
+extern void smp_send_reschedule_allbutself(void);
+
+#ifdef HAVE_RESCHEDULE_ALLBUTSELF_CPUMASK
+extern void smp_send_reschedule_allbutself_cpumask(cpumask_t);
+#else
+static inline void smp_send_reschedule_allbutself_cpumask(cpumask_t mask) {
+	smp_send_reschedule_allbutself();
+}
+#endif
 
 
 /*
@@ -100,6 +119,8 @@ static inline int up_smp_call_function(void (*func)(void *), void *info)
 		0;				\
 	})
 static inline void smp_send_reschedule(int cpu) { }
+static inline void smp_send_reschedule_allbutself(void) { }
+static inline void smp_send_reschedule_allbutself_cpumask(cpumask_t mask) { }
 #define num_booting_cpus()			1
 #define smp_prepare_boot_cpu()			do {} while (0)
 #define smp_call_function_single(cpuid, func, info, retry, wait) \
@@ -139,7 +160,7 @@ static inline void smp_send_reschedule(int cpu) { }
 
 #define get_cpu()		({ preempt_disable(); smp_processor_id(); })
 #define put_cpu()		preempt_enable()
-#define put_cpu_no_resched()	preempt_enable_no_resched()
+#define put_cpu_no_resched()	__preempt_enable_no_resched()
 
 void smp_setup_processor_id(void);
 

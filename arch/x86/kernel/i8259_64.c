@@ -97,8 +97,8 @@ static void (*__initdata interrupt[NR_VECTORS - FIRST_EXTERNAL_VECTOR])(void) = 
  */
 
 static int i8259A_auto_eoi;
-DEFINE_SPINLOCK(i8259A_lock);
 static void mask_and_ack_8259A(unsigned int);
+DEFINE_RAW_SPINLOCK(i8259A_lock);
 
 static struct irq_chip i8259A_chip = {
 	.name		= "XT-PIC",
@@ -405,6 +405,7 @@ void init_8259A(int auto_eoi)
 
 static struct irqaction irq2 = {
 	.handler = no_action,
+	.flags = IRQF_NODELAY,
 	.mask = CPU_MASK_NONE,
 	.name = "cascade",
 };

@@ -74,10 +74,14 @@ void cpu_idle(void)
 {
 	/* endless idle loop with no priority at all */
 	while (1) {
+		stop_critical_timings();
 		idle();
-		preempt_enable_no_resched();
-		schedule();
+		start_critical_timings();
+		local_irq_disable();
+		__preempt_enable_no_resched();
+		__schedule();
 		preempt_disable();
+		local_irq_enable();
 	}
 }
 

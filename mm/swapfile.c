@@ -367,16 +367,17 @@ int remove_exclusive_swap_page(struct page *page)
 	/* Is the only swap cache user the cache itself? */
 	retval = 0;
 	if (p->swap_map[swp_offset(entry)] == 1) {
+		spin_unlock(&swap_lock);
 		/* Recheck the page count with the swapcache lock held.. */
-		write_lock_irq(&swapper_space.tree_lock);
+		lock_page_ref_irq(page);
 		if ((page_count(page) == 2) && !PageWriteback(page)) {
 			__delete_from_swap_cache(page);
 			SetPageDirty(page);
 			retval = 1;
 		}
-		write_unlock_irq(&swapper_space.tree_lock);
-	}
-	spin_unlock(&swap_lock);
+		unlock_page_ref_irq(page);
+	} else
+		spin_unlock(&swap_lock);
 
 	if (retval) {
 		swap_free(entry);
@@ -401,13 +402,14 @@ void free_swap_and_cache(swp_entry_t entry)
 	p = swap_info_get(entry);
 	if (p) {
 		if (swap_entry_free(p, swp_offset(entry)) == 1) {
+			spin_unlock(&swap_lock);
 			page = find_get_page(&swapper_space, entry.val);
 			if (page && unlikely(TestSetPageLocked(page))) {
 				page_cache_release(page);
 				page = NULL;
 			}
-		}
-		spin_unlock(&swap_lock);
+		} else
+			spin_unlock(&swap_lock);
 	}
 	if (page) {
 		int one_user;

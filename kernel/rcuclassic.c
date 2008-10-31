@@ -60,13 +60,13 @@ EXPORT_SYMBOL_GPL(rcu_lock_map);
 static struct rcu_ctrlblk rcu_ctrlblk = {
 	.cur = -300,
 	.completed = -300,
-	.lock = __SPIN_LOCK_UNLOCKED(&rcu_ctrlblk.lock),
+	.lock = RAW_SPIN_LOCK_UNLOCKED(&rcu_ctrlblk.lock),
 	.cpumask = CPU_MASK_NONE,
 };
 static struct rcu_ctrlblk rcu_bh_ctrlblk = {
 	.cur = -300,
 	.completed = -300,
-	.lock = __SPIN_LOCK_UNLOCKED(&rcu_bh_ctrlblk.lock),
+	.lock = RAW_SPIN_LOCK_UNLOCKED(&rcu_bh_ctrlblk.lock),
 	.cpumask = CPU_MASK_NONE,
 };
 
@@ -416,6 +416,8 @@ static void rcu_offline_cpu(int cpu)
 static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 					struct rcu_data *rdp)
 {
+	unsigned long flags;
+
 	if (rdp->curlist && !rcu_batch_before(rcp->completed, rdp->batch)) {
 		*rdp->donetail = rdp->curlist;
 		rdp->donetail = rdp->curtail;
@@ -424,12 +426,12 @@ static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 	}
 
 	if (rdp->nxtlist && !rdp->curlist) {
-		local_irq_disable();
+		local_irq_save(flags);
 		rdp->curlist = rdp->nxtlist;
 		rdp->curtail = rdp->nxttail;
 		rdp->nxtlist = NULL;
 		rdp->nxttail = &rdp->nxtlist;
-		local_irq_enable();
+		local_irq_restore(flags);
 
 		/*
 		 * start the next batch of callbacks

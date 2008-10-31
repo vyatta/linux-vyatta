@@ -148,7 +148,7 @@ void cpu_idle(void)
 	current_thread_info()->status |= TS_POLLING;
 	/* endless idle loop with no priority at all */
 	while (1) {
-		tick_nohz_stop_sched_tick();
+		tick_nohz_stop_sched_tick(1);
 		while (!need_resched()) {
 			void (*idle)(void);
 
@@ -165,7 +165,10 @@ void cpu_idle(void)
 			 */
 			local_irq_disable();
 			enter_idle();
+			/* Don't trace irqs off for idle */
+			stop_critical_timings();
 			idle();
+			start_critical_timings();
 			/* In many cases the interrupt that ended idle
 			   has already called exit_idle. But some idle
 			   loops can be woken up without interrupt. */
@@ -173,9 +176,11 @@ void cpu_idle(void)
 		}
 
 		tick_nohz_restart_sched_tick();
-		preempt_enable_no_resched();
-		schedule();
+		local_irq_disable();
+		__preempt_enable_no_resched();
+		__schedule();
 		preempt_disable();
+		local_irq_enable();
 	}
 }
 
@@ -255,7 +260,7 @@ void exit_thread(void)
 	struct thread_struct *t = &me->thread;
 
 	if (me->thread.io_bitmap_ptr) {
-		struct tss_struct *tss = &per_cpu(init_tss, get_cpu());
+		struct tss_struct *tss;
 
 		kfree(t->io_bitmap_ptr);
 		t->io_bitmap_ptr = NULL;
@@ -263,6 +268,7 @@ void exit_thread(void)
 		/*
 		 * Careful, clear this in the TSS too:
 		 */
+		tss = &per_cpu(init_tss, get_cpu());
 		memset(tss->io_bitmap, 0xff, t->io_bitmap_max);
 		t->io_bitmap_max = 0;
 		put_cpu();
