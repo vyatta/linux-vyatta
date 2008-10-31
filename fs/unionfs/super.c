@@ -92,7 +92,7 @@ static void unionfs_delete_inode(struct inode *inode)
 	spin_unlock(&inode->i_lock);
 #endif
 
-	if (inode->i_data.nrpages)
+	if (mapping_nrpages(&inode->i_data))
 		truncate_inode_pages(&inode->i_data, 0);
 
 	clear_inode(inode);
