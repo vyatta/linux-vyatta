@@ -22,7 +22,7 @@
 #include "bond_3ad.h"
 #include "bond_alb.h"
 
-#define DRV_VERSION	"3.3.0"
+#define DRV_VERSION	"3.4.0"
 #define DRV_RELDATE	"June 10, 2008"
 #define DRV_NAME	"bonding"
 #define DRV_DESCRIPTION	"Ethernet Channel Bonding Driver"
@@ -133,6 +133,7 @@ struct bond_params {
 	int updelay;
 	int downdelay;
 	int lacp_fast;
+	int ad_select;
 	char primary[IFNAMSIZ];
 	__be32 arp_targets[BOND_MAX_ARP_TARGETS];
 };
