@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.27
-# Fri Nov  7 12:40:04 2008
+# Fri Nov  7 15:02:56 2008
 #
 # CONFIG_64BIT is not set
 CONFIG_X86_32=y
@@ -942,8 +942,10 @@ CONFIG_FIB_RULES=y
 #
 CONFIG_CFG80211=m
 CONFIG_NL80211=y
+CONFIG_WIRELESS_OLD_REGULATORY=y
 CONFIG_WIRELESS_EXT=y
 CONFIG_WIRELESS_EXT_SYSFS=y
+CONFIG_LIB80211=m
 CONFIG_MAC80211=m
 
 #
