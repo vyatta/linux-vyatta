@@ -25,8 +25,9 @@
  *
  * @NL80211_CMD_GET_WIPHY: request information about a wiphy or dump request
  *	to get a list of all present wiphys.
- * @NL80211_CMD_SET_WIPHY: set wiphy name, needs %NL80211_ATTR_WIPHY and
- *	%NL80211_ATTR_WIPHY_NAME.
+ * @NL80211_CMD_SET_WIPHY: set wiphy parameters, needs %NL80211_ATTR_WIPHY or
+ *	%NL80211_ATTR_IFINDEX; can be used to set %NL80211_ATTR_WIPHY_NAME
+ *	and/or %NL80211_ATTR_WIPHY_TXQ_PARAMS.
  * @NL80211_CMD_NEW_WIPHY: Newly created wiphy, response to get request
  *	or rename notification. Has attributes %NL80211_ATTR_WIPHY and
  *	%NL80211_ATTR_WIPHY_NAME.
@@ -89,6 +90,28 @@
  * @NL80211_CMD_DEL_PATH: Remove a mesh path identified by %NL80211_ATTR_MAC
  *	or, if no MAC address given, all mesh paths, on the interface identified
  *	by %NL80211_ATTR_IFINDEX.
+ * @NL80211_CMD_SET_BSS: Set BSS attributes for BSS identified by
+ *	%NL80211_ATTR_IFINDEX.
+ *
+ * @NL80211_CMD_SET_REG: Set current regulatory domain. CRDA sends this command
+ *	after being queried by the kernel. CRDA replies by sending a regulatory
+ *	domain structure which consists of %NL80211_ATTR_REG_ALPHA set to our
+ *	current alpha2 if it found a match. It also provides
+ * 	NL80211_ATTR_REG_RULE_FLAGS, and a set of regulatory rules. Each
+ * 	regulatory rule is a nested set of attributes  given by
+ * 	%NL80211_ATTR_REG_RULE_FREQ_[START|END] and
+ * 	%NL80211_ATTR_FREQ_RANGE_MAX_BW with an attached power rule given by
+ * 	%NL80211_ATTR_REG_RULE_POWER_MAX_ANT_GAIN and
+ * 	%NL80211_ATTR_REG_RULE_POWER_MAX_EIRP.
+ * @NL80211_CMD_REQ_SET_REG: ask the wireless core to set the regulatory domain
+ * 	to the the specified ISO/IEC 3166-1 alpha2 country code. The core will
+ * 	store this as a valid request and then query userspace for it.
+ *
+ * @NL80211_CMD_GET_MESH_PARAMS: Get mesh networking properties for the
+ *	interface identified by %NL80211_ATTR_IFINDEX
+ *
+ * @NL80211_CMD_SET_MESH_PARAMS: Set mesh networking properties for the
+ *      interface identified by %NL80211_ATTR_IFINDEX
  *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
@@ -127,13 +150,26 @@ enum nl80211_commands {
 	NL80211_CMD_NEW_MPATH,
 	NL80211_CMD_DEL_MPATH,
 
-	/* add commands here */
+	NL80211_CMD_SET_BSS,
+
+	NL80211_CMD_SET_REG,
+	NL80211_CMD_REQ_SET_REG,
+
+	NL80211_CMD_GET_MESH_PARAMS,
+	NL80211_CMD_SET_MESH_PARAMS,
+
+	/* add new commands above here */
 
 	/* used to define NL80211_CMD_MAX below */
 	__NL80211_CMD_AFTER_LAST,
 	NL80211_CMD_MAX = __NL80211_CMD_AFTER_LAST - 1
 };
 
+/*
+ * Allow user space programs to use #ifdef on new commands by defining them
+ * here
+ */
+#define NL80211_CMD_SET_BSS NL80211_CMD_SET_BSS
 
 /**
  * enum nl80211_attrs - nl80211 netlink attributes
@@ -143,6 +179,7 @@ enum nl80211_commands {
  * @NL80211_ATTR_WIPHY: index of wiphy to operate on, cf.
  *	/sys/class/ieee80211/<phyname>/index
  * @NL80211_ATTR_WIPHY_NAME: wiphy name (used for renaming)
+ * @NL80211_ATTR_WIPHY_TXQ_PARAMS: a nested array of TX queue parameters
  *
  * @NL80211_ATTR_IFINDEX: network interface index of the device to operate on
  * @NL80211_ATTR_IFNAME: network interface name
@@ -188,9 +225,36 @@ enum nl80211_commands {
  * 	info given for %NL80211_CMD_GET_MPATH, nested attribute described at
  *	&enum nl80211_mpath_info.
  *
- *
  * @NL80211_ATTR_MNTR_FLAGS: flags, nested element with NLA_FLAG attributes of
  *      &enum nl80211_mntr_flags.
+ *
+ * @NL80211_ATTR_REG_ALPHA2: an ISO-3166-alpha2 country code for which the
+ * 	current regulatory domain should be set to or is already set to.
+ * 	For example, 'CR', for Costa Rica. This attribute is used by the kernel
+ * 	to query the CRDA to retrieve one regulatory domain. This attribute can
+ * 	also be used by userspace to query the kernel for the currently set
+ * 	regulatory domain. We chose an alpha2 as that is also used by the
+ * 	IEEE-802.11d country information element to identify a country.
+ * 	Users can also simply ask the wireless core to set regulatory domain
+ * 	to a specific alpha2.
+ * @NL80211_ATTR_REG_RULES: a nested array of regulatory domain regulatory
+ *	rules.
+ *
+ * @NL80211_ATTR_BSS_CTS_PROT: whether CTS protection is enabled (u8, 0 or 1)
+ * @NL80211_ATTR_BSS_SHORT_PREAMBLE: whether short preamble is enabled
+ *	(u8, 0 or 1)
+ * @NL80211_ATTR_BSS_SHORT_SLOT_TIME: whether short slot time enabled
+ *	(u8, 0 or 1)
+ * @NL80211_ATTR_BSS_BASIC_RATES: basic rates, array of basic
+ *	rates in format defined by IEEE 802.11 7.3.2.2 but without the length
+ *	restriction (at most %NL80211_MAX_SUPP_RATES).
+ *
+ * @NL80211_ATTR_HT_CAPABILITY: HT Capability information element (from
+ *	association request when used with NL80211_CMD_NEW_STATION)
+ *
+ * @NL80211_ATTR_SUPPORTED_IFTYPES: nested attribute containing all
+ *	supported interface types, each a flag attribute with the number
+ *	of the interface mode.
  *
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -235,16 +299,43 @@ enum nl80211_attrs {
 	NL80211_ATTR_MPATH_NEXT_HOP,
 	NL80211_ATTR_MPATH_INFO,
 
+	NL80211_ATTR_BSS_CTS_PROT,
+	NL80211_ATTR_BSS_SHORT_PREAMBLE,
+	NL80211_ATTR_BSS_SHORT_SLOT_TIME,
+
+	NL80211_ATTR_HT_CAPABILITY,
+
+	NL80211_ATTR_SUPPORTED_IFTYPES,
+
+	NL80211_ATTR_REG_ALPHA2,
+	NL80211_ATTR_REG_RULES,
+
+	NL80211_ATTR_MESH_PARAMS,
+
+	NL80211_ATTR_BSS_BASIC_RATES,
+
+	NL80211_ATTR_WIPHY_TXQ_PARAMS,
+
 	/* add attributes here, update the policy in nl80211.c */
 
 	__NL80211_ATTR_AFTER_LAST,
 	NL80211_ATTR_MAX = __NL80211_ATTR_AFTER_LAST - 1
 };
 
+/*
+ * Allow user space programs to use #ifdef on new attributes by defining them
+ * here
+ */
+#define NL80211_ATTR_HT_CAPABILITY NL80211_ATTR_HT_CAPABILITY
+#define NL80211_ATTR_BSS_BASIC_RATES NL80211_ATTR_BSS_BASIC_RATES
+#define NL80211_ATTR_WIPHY_TXQ_PARAMS NL80211_ATTR_WIPHY_TXQ_PARAMS
+
 #define NL80211_MAX_SUPP_RATES			32
+#define NL80211_MAX_SUPP_REG_RULES		32
 #define NL80211_TKIP_DATA_OFFSET_ENCR_KEY	0
 #define NL80211_TKIP_DATA_OFFSET_TX_MIC_KEY	16
 #define NL80211_TKIP_DATA_OFFSET_RX_MIC_KEY	24
+#define NL80211_HT_CAPABILITY_LEN		26
 
 /**
  * enum nl80211_iftype - (virtual) interface types
@@ -383,16 +474,28 @@ enum nl80211_mpath_info {
  *	an array of nested frequency attributes
  * @NL80211_BAND_ATTR_RATES: supported bitrates in this band,
  *	an array of nested bitrate attributes
+ * @NL80211_BAND_ATTR_HT_MCS_SET: 16-byte attribute containing the MCS set as
+ *	defined in 802.11n
+ * @NL80211_BAND_ATTR_HT_CAPA: HT capabilities, as in the HT information IE
+ * @NL80211_BAND_ATTR_HT_AMPDU_FACTOR: A-MPDU factor, as in 11n
+ * @NL80211_BAND_ATTR_HT_AMPDU_DENSITY: A-MPDU density, as in 11n
  */
 enum nl80211_band_attr {
 	__NL80211_BAND_ATTR_INVALID,
 	NL80211_BAND_ATTR_FREQS,
 	NL80211_BAND_ATTR_RATES,
 
+	NL80211_BAND_ATTR_HT_MCS_SET,
+	NL80211_BAND_ATTR_HT_CAPA,
+	NL80211_BAND_ATTR_HT_AMPDU_FACTOR,
+	NL80211_BAND_ATTR_HT_AMPDU_DENSITY,
+
 	/* keep last */
 	__NL80211_BAND_ATTR_AFTER_LAST,
 	NL80211_BAND_ATTR_MAX = __NL80211_BAND_ATTR_AFTER_LAST - 1
 };
+
+#define NL80211_BAND_ATTR_HT_CAPA NL80211_BAND_ATTR_HT_CAPA
 
 /**
  * enum nl80211_frequency_attr - frequency attributes
@@ -436,6 +539,66 @@ enum nl80211_bitrate_attr {
 };
 
 /**
+ * enum nl80211_reg_rule_attr - regulatory rule attributes
+ * @NL80211_ATTR_REG_RULE_FLAGS: a set of flags which specify additional
+ * 	considerations for a given frequency range. These are the
+ * 	&enum nl80211_reg_rule_flags.
+ * @NL80211_ATTR_FREQ_RANGE_START: starting frequencry for the regulatory
+ * 	rule in KHz. This is not a center of frequency but an actual regulatory
+ * 	band edge.
+ * @NL80211_ATTR_FREQ_RANGE_END: ending frequency for the regulatory rule
+ * 	in KHz. This is not a center a frequency but an actual regulatory
+ * 	band edge.
+ * @NL80211_ATTR_FREQ_RANGE_MAX_BW: maximum allowed bandwidth for this
+ * 	frequency range, in KHz.
+ * @NL80211_ATTR_POWER_RULE_MAX_ANT_GAIN: the maximum allowed antenna gain
+ * 	for a given frequency range. The value is in mBi (100 * dBi).
+ * 	If you don't have one then don't send this.
+ * @NL80211_ATTR_POWER_RULE_MAX_EIRP: the maximum allowed EIRP for
+ * 	a given frequency range. The value is in mBm (100 * dBm).
+ */
+enum nl80211_reg_rule_attr {
+	__NL80211_REG_RULE_ATTR_INVALID,
+	NL80211_ATTR_REG_RULE_FLAGS,
+
+	NL80211_ATTR_FREQ_RANGE_START,
+	NL80211_ATTR_FREQ_RANGE_END,
+	NL80211_ATTR_FREQ_RANGE_MAX_BW,
+
+	NL80211_ATTR_POWER_RULE_MAX_ANT_GAIN,
+	NL80211_ATTR_POWER_RULE_MAX_EIRP,
+
+	/* keep last */
+	__NL80211_REG_RULE_ATTR_AFTER_LAST,
+	NL80211_REG_RULE_ATTR_MAX = __NL80211_REG_RULE_ATTR_AFTER_LAST - 1
+};
+
+/**
+ * enum nl80211_reg_rule_flags - regulatory rule flags
+ *
+ * @NL80211_RRF_NO_OFDM: OFDM modulation not allowed
+ * @NL80211_RRF_NO_CCK: CCK modulation not allowed
+ * @NL80211_RRF_NO_INDOOR: indoor operation not allowed
+ * @NL80211_RRF_NO_OUTDOOR: outdoor operation not allowed
+ * @NL80211_RRF_DFS: DFS support is required to be used
+ * @NL80211_RRF_PTP_ONLY: this is only for Point To Point links
+ * @NL80211_RRF_PTMP_ONLY: this is only for Point To Multi Point links
+ * @NL80211_RRF_PASSIVE_SCAN: passive scan is required
+ * @NL80211_RRF_NO_IBSS: no IBSS is allowed
+ */
+enum nl80211_reg_rule_flags {
+	NL80211_RRF_NO_OFDM		= 1<<0,
+	NL80211_RRF_NO_CCK		= 1<<1,
+	NL80211_RRF_NO_INDOOR		= 1<<2,
+	NL80211_RRF_NO_OUTDOOR		= 1<<3,
+	NL80211_RRF_DFS			= 1<<4,
+	NL80211_RRF_PTP_ONLY		= 1<<5,
+	NL80211_RRF_PTMP_ONLY		= 1<<6,
+	NL80211_RRF_PASSIVE_SCAN	= 1<<7,
+	NL80211_RRF_NO_IBSS		= 1<<8,
+};
+
+/**
  * enum nl80211_mntr_flags - monitor configuration flags
  *
  * Monitor configuration flags.
@@ -463,6 +626,115 @@ enum nl80211_mntr_flags {
 	/* keep last */
 	__NL80211_MNTR_FLAG_AFTER_LAST,
 	NL80211_MNTR_FLAG_MAX = __NL80211_MNTR_FLAG_AFTER_LAST - 1
+};
+
+/**
+ * enum nl80211_meshconf_params - mesh configuration parameters
+ *
+ * Mesh configuration parameters
+ *
+ * @__NL80211_MESHCONF_INVALID: internal use
+ *
+ * @NL80211_MESHCONF_RETRY_TIMEOUT: specifies the initial retry timeout in
+ * millisecond units, used by the Peer Link Open message
+ *
+ * @NL80211_MESHCONF_CONFIRM_TIMEOUT: specifies the inital confirm timeout, in
+ * millisecond units, used by the peer link management to close a peer link
+ *
+ * @NL80211_MESHCONF_HOLDING_TIMEOUT: specifies the holding timeout, in
+ * millisecond units
+ *
+ * @NL80211_MESHCONF_MAX_PEER_LINKS: maximum number of peer links allowed
+ * on this mesh interface
+ *
+ * @NL80211_MESHCONF_MAX_RETRIES: specifies the maximum number of peer link
+ * open retries that can be sent to establish a new peer link instance in a
+ * mesh
+ *
+ * @NL80211_MESHCONF_TTL: specifies the value of TTL field set at a source mesh
+ * point.
+ *
+ * @NL80211_MESHCONF_AUTO_OPEN_PLINKS: whether we should automatically
+ * open peer links when we detect compatible mesh peers.
+ *
+ * @NL80211_MESHCONF_HWMP_MAX_PREQ_RETRIES: the number of action frames
+ * containing a PREQ that an MP can send to a particular destination (path
+ * target)
+ *
+ * @NL80211_MESHCONF_PATH_REFRESH_TIME: how frequently to refresh mesh paths
+ * (in milliseconds)
+ *
+ * @NL80211_MESHCONF_MIN_DISCOVERY_TIMEOUT: minimum length of time to wait
+ * until giving up on a path discovery (in milliseconds)
+ *
+ * @NL80211_MESHCONF_HWMP_ACTIVE_PATH_TIMEOUT: The time (in TUs) for which mesh
+ * points receiving a PREQ shall consider the forwarding information from the
+ * root to be valid. (TU = time unit)
+ *
+ * @NL80211_MESHCONF_HWMP_PREQ_MIN_INTERVAL: The minimum interval of time (in
+ * TUs) during which an MP can send only one action frame containing a PREQ
+ * reference element
+ *
+ * @NL80211_MESHCONF_HWMP_NET_DIAM_TRVS_TIME: The interval of time (in TUs)
+ * that it takes for an HWMP information element to propagate across the mesh
+ *
+ * @NL80211_MESHCONF_ATTR_MAX: highest possible mesh configuration attribute
+ *
+ * @__NL80211_MESHCONF_ATTR_AFTER_LAST: internal use
+ */
+enum nl80211_meshconf_params {
+	__NL80211_MESHCONF_INVALID,
+	NL80211_MESHCONF_RETRY_TIMEOUT,
+	NL80211_MESHCONF_CONFIRM_TIMEOUT,
+	NL80211_MESHCONF_HOLDING_TIMEOUT,
+	NL80211_MESHCONF_MAX_PEER_LINKS,
+	NL80211_MESHCONF_MAX_RETRIES,
+	NL80211_MESHCONF_TTL,
+	NL80211_MESHCONF_AUTO_OPEN_PLINKS,
+	NL80211_MESHCONF_HWMP_MAX_PREQ_RETRIES,
+	NL80211_MESHCONF_PATH_REFRESH_TIME,
+	NL80211_MESHCONF_MIN_DISCOVERY_TIMEOUT,
+	NL80211_MESHCONF_HWMP_ACTIVE_PATH_TIMEOUT,
+	NL80211_MESHCONF_HWMP_PREQ_MIN_INTERVAL,
+	NL80211_MESHCONF_HWMP_NET_DIAM_TRVS_TIME,
+
+	/* keep last */
+	__NL80211_MESHCONF_ATTR_AFTER_LAST,
+	NL80211_MESHCONF_ATTR_MAX = __NL80211_MESHCONF_ATTR_AFTER_LAST - 1
+};
+
+/**
+ * enum nl80211_txq_attr - TX queue parameter attributes
+ * @__NL80211_TXQ_ATTR_INVALID: Attribute number 0 is reserved
+ * @NL80211_TXQ_ATTR_QUEUE: TX queue identifier (NL80211_TXQ_Q_*)
+ * @NL80211_TXQ_ATTR_TXOP: Maximum burst time in units of 32 usecs, 0 meaning
+ *	disabled
+ * @NL80211_TXQ_ATTR_CWMIN: Minimum contention window [a value of the form
+ *	2^n-1 in the range 1..32767]
+ * @NL80211_TXQ_ATTR_CWMAX: Maximum contention window [a value of the form
+ *	2^n-1 in the range 1..32767]
+ * @NL80211_TXQ_ATTR_AIFS: Arbitration interframe space [0..255]
+ * @__NL80211_TXQ_ATTR_AFTER_LAST: Internal
+ * @NL80211_TXQ_ATTR_MAX: Maximum TXQ attribute number
+ */
+enum nl80211_txq_attr {
+	__NL80211_TXQ_ATTR_INVALID,
+	NL80211_TXQ_ATTR_QUEUE,
+	NL80211_TXQ_ATTR_TXOP,
+	NL80211_TXQ_ATTR_CWMIN,
+	NL80211_TXQ_ATTR_CWMAX,
+	NL80211_TXQ_ATTR_AIFS,
+
+	/* keep last */
+	__NL80211_TXQ_ATTR_AFTER_LAST,
+	NL80211_TXQ_ATTR_MAX = __NL80211_TXQ_ATTR_AFTER_LAST - 1
+};
+
+enum nl80211_txq_q {
+	NL80211_TXQ_Q_VO,
+	NL80211_TXQ_Q_VI,
+	NL80211_TXQ_Q_BE,
+	NL80211_TXQ_Q_BK
 };
 
 #endif /* __LINUX_NL80211_H */

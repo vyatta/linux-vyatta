@@ -34,6 +34,7 @@
 #include <linux/module.h>
 #include <linux/jiffies.h>
 
+#include <net/lib80211.h>
 #include <net/ieee80211.h>
 #include <linux/wireless.h>
 
@@ -65,15 +66,9 @@ static char *ieee80211_translate_scan(struct ieee80211_device *ieee,
 	/* Add the ESSID */
 	iwe.cmd = SIOCGIWESSID;
 	iwe.u.data.flags = 1;
-	if (network->flags & NETWORK_EMPTY_ESSID) {
-		iwe.u.data.length = sizeof("<hidden>");
-		start = iwe_stream_add_point(info, start, stop,
-					     &iwe, "<hidden>");
-	} else {
-		iwe.u.data.length = min(network->ssid_len, (u8) 32);
-		start = iwe_stream_add_point(info, start, stop,
-					     &iwe, network->ssid);
-	}
+	iwe.u.data.length = min(network->ssid_len, (u8) 32);
+	start = iwe_stream_add_point(info, start, stop,
+				     &iwe, network->ssid);
 
 	/* Add the protocol name */
 	iwe.cmd = SIOCGIWNAME;
@@ -265,6 +260,7 @@ int ieee80211_wx_get_scan(struct ieee80211_device *ieee,
 	char *stop = ev + wrqu->data.length;
 	int i = 0;
 	DECLARE_MAC_BUF(mac);
+	DECLARE_SSID_BUF(ssid);
 
 	IEEE80211_DEBUG_WX("Getting scan\n");
 
@@ -284,8 +280,8 @@ int ieee80211_wx_get_scan(struct ieee80211_device *ieee,
 		else
 			IEEE80211_DEBUG_SCAN("Not showing network '%s ("
 					     "%s)' due to age (%dms).\n",
-					     escape_essid(network->ssid,
-							  network->ssid_len),
+					     print_ssid(ssid, network->ssid,
+							 network->ssid_len),
 					     print_mac(mac, network->bssid),
 					     jiffies_to_msecs(jiffies -
 							      network->
@@ -314,6 +310,7 @@ int ieee80211_wx_set_encode(struct ieee80211_device *ieee,
 	int i, key, key_provided, len;
 	struct ieee80211_crypt_data **crypt;
 	int host_crypto = ieee->host_encrypt || ieee->host_decrypt || ieee->host_build_iv;
+	DECLARE_SSID_BUF(ssid);
 
 	IEEE80211_DEBUG_WX("SET_ENCODE\n");
 
@@ -403,13 +400,17 @@ int ieee80211_wx_set_encode(struct ieee80211_device *ieee,
 
 	/* If a new key was provided, set it up */
 	if (erq->length > 0) {
+#ifdef CONFIG_IEEE80211_DEBUG
+		DECLARE_SSID_BUF(ssid);
+#endif
+
 		len = erq->length <= 5 ? 5 : 13;
 		memcpy(sec.keys[key], keybuf, erq->length);
 		if (len > erq->length)
 			memset(sec.keys[key] + erq->length, 0,
 			       len - erq->length);
 		IEEE80211_DEBUG_WX("Setting key %d to '%s' (%d:%d bytes)\n",
-				   key, escape_essid(sec.keys[key], len),
+				   key, print_ssid(ssid, sec.keys[key], len),
 				   erq->length, len);
 		sec.key_sizes[key] = len;
 		if (*crypt)
