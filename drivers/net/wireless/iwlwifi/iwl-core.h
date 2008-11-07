@@ -100,7 +100,7 @@ struct iwl_hcmd_utils_ops {
 };
 
 struct iwl_lib_ops {
-	/* set hw dependant perameters */
+	/* set hw dependent parameters */
 	int (*set_hw_params)(struct iwl_priv *priv);
 	/* ucode shared memory */
 	int (*alloc_shared_mem)(struct iwl_priv *priv);
@@ -173,6 +173,8 @@ struct iwl_cfg {
 	const char *fw_name;
 	unsigned int sku;
 	int eeprom_size;
+	u16  eeprom_ver;
+	u16  eeprom_calib_ver;
 	const struct iwl_ops *ops;
 	const struct iwl_mod_params *mod_params;
 };
@@ -184,17 +186,13 @@ struct iwl_cfg {
 struct ieee80211_hw *iwl_alloc_all(struct iwl_cfg *cfg,
 		struct ieee80211_ops *hw_ops);
 void iwl_hw_detect(struct iwl_priv *priv);
-
 void iwl_clear_stations_table(struct iwl_priv *priv);
-void iwl_free_calib_results(struct iwl_priv *priv);
 void iwl_reset_qos(struct iwl_priv *priv);
 void iwl_set_rxon_chain(struct iwl_priv *priv);
-int iwl_set_rxon_channel(struct iwl_priv *priv,
-				enum ieee80211_band band,
-				u16 channel);
+int iwl_set_rxon_channel(struct iwl_priv *priv, struct ieee80211_channel *ch);
 void iwl_set_rxon_ht(struct iwl_priv *priv, struct iwl_ht_info *ht_info);
 u8 iwl_is_fat_tx_allowed(struct iwl_priv *priv,
-			 struct ieee80211_ht_info *sta_ht_inf);
+			 struct ieee80211_sta_ht_cap *sta_ht_inf);
 int iwl_hw_nic_init(struct iwl_priv *priv);
 int iwl_setup_mac(struct iwl_priv *priv);
 int iwl_set_hw_params(struct iwl_priv *priv);
@@ -218,7 +216,6 @@ void iwl_rx_replenish(struct iwl_priv *priv);
 int iwl_rx_init(struct iwl_priv *priv, struct iwl_rx_queue *rxq);
 int iwl_rx_agg_start(struct iwl_priv *priv, const u8 *addr, int tid, u16 ssn);
 int iwl_rx_agg_stop(struct iwl_priv *priv, const u8 *addr, int tid);
-/* FIXME: remove when TX is moved to iwl core */
 int iwl_rx_queue_restock(struct iwl_priv *priv);
 int iwl_rx_queue_space(const struct iwl_rx_queue *q);
 void iwl_rx_allocate(struct iwl_priv *priv);
@@ -237,16 +234,11 @@ void iwl_rx_statistics(struct iwl_priv *priv,
 ******************************************************/
 int iwl_txq_ctx_reset(struct iwl_priv *priv);
 int iwl_tx_skb(struct iwl_priv *priv, struct sk_buff *skb);
-/* FIXME: remove when free Tx is fully merged into iwlcore */
-int iwl_hw_txq_free_tfd(struct iwl_priv *priv, struct iwl_tx_queue *txq);
 void iwl_hw_txq_ctx_free(struct iwl_priv *priv);
-int iwl_hw_txq_attach_buf_to_tfd(struct iwl_priv *priv, void *tfd,
-					dma_addr_t addr, u16 len);
 int iwl_txq_update_write_ptr(struct iwl_priv *priv, struct iwl_tx_queue *txq);
 int iwl_tx_agg_start(struct iwl_priv *priv, const u8 *ra, u16 tid, u16 *ssn);
 int iwl_tx_agg_stop(struct iwl_priv *priv , const u8 *ra, u16 tid);
 int iwl_txq_check_empty(struct iwl_priv *priv, int sta_id, u8 tid, int txq_id);
-
 /*****************************************************
  * TX power
  ****************************************************/
@@ -256,6 +248,7 @@ int iwl_set_tx_power(struct iwl_priv *priv, s8 tx_power, bool force);
  * RF -Kill - here and not in iwl-rfkill.h to be available when
  * RF-kill subsystem is not compiled.
  ****************************************************/
+void iwl_rf_kill(struct iwl_priv *priv);
 void iwl_radio_kill_sw_disable_radio(struct iwl_priv *priv);
 int iwl_radio_kill_sw_enable_radio(struct iwl_priv *priv);
 
@@ -266,6 +259,13 @@ int iwl_radio_kill_sw_enable_radio(struct iwl_priv *priv);
 void iwl_hwrate_to_tx_control(struct iwl_priv *priv, u32 rate_n_flags,
 			      struct ieee80211_tx_info *info);
 int iwl_hwrate_to_plcp_idx(u32 rate_n_flags);
+
+u8 iwl_toggle_tx_ant(struct iwl_priv *priv, u8 ant_idx);
+
+static inline u32 iwl_ant_idx_to_flags(u8 ant_idx)
+{
+	return BIT(ant_idx) << RATE_MCS_ANT_POS;
+}
 
 static inline u8 iwl_hw_get_rate(__le32 rate_n_flags)
 {
@@ -286,10 +286,16 @@ static inline __le32 iwl_hw_set_rate_n_flags(u8 rate, u32 flags)
 void iwl_init_scan_params(struct iwl_priv *priv);
 int iwl_scan_cancel(struct iwl_priv *priv);
 int iwl_scan_cancel_timeout(struct iwl_priv *priv, unsigned long ms);
-const char *iwl_escape_essid(const char *essid, u8 essid_len);
 int iwl_scan_initiate(struct iwl_priv *priv);
 void iwl_setup_rx_scan_handlers(struct iwl_priv *priv);
 void iwl_setup_scan_deferred_work(struct iwl_priv *priv);
+
+/*******************************************************************************
+ * Calibrations - implemented in iwl-calib.c
+ ******************************************************************************/
+int iwl_send_calib_results(struct iwl_priv *priv);
+int iwl_calib_set(struct iwl_calib_result *res, const u8 *buf, int len);
+void iwl_calib_free_results(struct iwl_priv *priv);
 
 /*****************************************************
  *   S e n d i n g     H o s t     C o m m a n d s   *
@@ -312,10 +318,9 @@ int iwl_enqueue_hcmd(struct iwl_priv *priv, struct iwl_host_cmd *cmd);
 /*****************************************************
 *  Error Handling Debugging
 ******************************************************/
-void iwl_print_event_log(struct iwl_priv *priv, u32 start_idx,
-			 u32 num_events, u32 mode);
 void iwl_dump_nic_error_log(struct iwl_priv *priv);
 void iwl_dump_nic_event_log(struct iwl_priv *priv);
+
 
 /*************** DRIVER STATUS FUNCTIONS   *****/
 
@@ -337,8 +342,7 @@ void iwl_dump_nic_event_log(struct iwl_priv *priv);
 #define STATUS_SCAN_HW		15
 #define STATUS_POWER_PMI	16
 #define STATUS_FW_ERROR		17
-#define STATUS_CONF_PENDING	18
-#define STATUS_MODE_PENDING	19
+#define STATUS_MODE_PENDING	18
 
 
 static inline int iwl_is_ready(struct iwl_priv *priv)

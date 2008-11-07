@@ -34,7 +34,6 @@ obj-$(CONFIG_PCMCIA_ATMEL)      += atmel_cs.o
 
 obj-$(CONFIG_PRISM54)		+= prism54/
 
-obj-$(CONFIG_HOSTAP)		+= hostap/
 obj-$(CONFIG_B43)		+= b43/
 obj-$(CONFIG_B43LEGACY)		+= b43legacy/
 obj-$(CONFIG_ZD1211RW)		+= zd1211rw/

@@ -64,328 +64,6 @@ static void ath_rx_buf_link(struct ath_softc *sc, struct ath_buf *bf)
 	ath9k_hw_rxena(ah);
 }
 
-/* Process received BAR frame */
-
-static int ath_bar_rx(struct ath_softc *sc,
-		      struct ath_node *an,
-		      struct sk_buff *skb)
-{
-	struct ieee80211_bar *bar;
-	struct ath_arx_tid *rxtid;
-	struct sk_buff *tskb;
-	struct ath_recv_status *rx_status;
-	int tidno, index, cindex;
-	u16 seqno;
-
-	/* look at BAR contents	 */
-
-	bar = (struct ieee80211_bar *)skb->data;
-	tidno = (le16_to_cpu(bar->control) & IEEE80211_BAR_CTL_TID_M)
-		>> IEEE80211_BAR_CTL_TID_S;
-	seqno = le16_to_cpu(bar->start_seq_num) >> IEEE80211_SEQ_SEQ_SHIFT;
-
-	/* process BAR - indicate all pending RX frames till the BAR seqno */
-
-	rxtid = &an->an_aggr.rx.tid[tidno];
-
-	spin_lock_bh(&rxtid->tidlock);
-
-	/* get relative index */
-
-	index = ATH_BA_INDEX(rxtid->seq_next, seqno);
-
-	/* drop BAR if old sequence (index is too large) */
-
-	if ((index > rxtid->baw_size) &&
-	    (index > (IEEE80211_SEQ_MAX - (rxtid->baw_size << 2))))
-		/* discard frame, ieee layer may not treat frame as a dup */
-		goto unlock_and_free;
-
-	/* complete receive processing for all pending frames upto BAR seqno */
-
-	cindex = (rxtid->baw_head + index) & (ATH_TID_MAX_BUFS - 1);
-	while ((rxtid->baw_head != rxtid->baw_tail) &&
-	       (rxtid->baw_head != cindex)) {
-		tskb = rxtid->rxbuf[rxtid->baw_head].rx_wbuf;
-		rx_status = &rxtid->rxbuf[rxtid->baw_head].rx_status;
-		rxtid->rxbuf[rxtid->baw_head].rx_wbuf = NULL;
-
-		if (tskb != NULL)
-			ath_rx_subframe(an, tskb, rx_status);
-
-		INCR(rxtid->baw_head, ATH_TID_MAX_BUFS);
-		INCR(rxtid->seq_next, IEEE80211_SEQ_MAX);
-	}
-
-	/* ... and indicate rest of the frames in-order */
-
-	while (rxtid->baw_head != rxtid->baw_tail &&
-	       rxtid->rxbuf[rxtid->baw_head].rx_wbuf != NULL) {
-		tskb = rxtid->rxbuf[rxtid->baw_head].rx_wbuf;
-		rx_status = &rxtid->rxbuf[rxtid->baw_head].rx_status;
-		rxtid->rxbuf[rxtid->baw_head].rx_wbuf = NULL;
-
-		ath_rx_subframe(an, tskb, rx_status);
-
-		INCR(rxtid->baw_head, ATH_TID_MAX_BUFS);
-		INCR(rxtid->seq_next, IEEE80211_SEQ_MAX);
-	}
-
-unlock_and_free:
-	spin_unlock_bh(&rxtid->tidlock);
-	/* free bar itself */
-	dev_kfree_skb(skb);
-	return IEEE80211_FTYPE_CTL;
-}
-
-/* Function to handle a subframe of aggregation when HT is enabled */
-
-static int ath_ampdu_input(struct ath_softc *sc,
-			   struct ath_node *an,
-			   struct sk_buff *skb,
-			   struct ath_recv_status *rx_status)
-{
-	struct ieee80211_hdr *hdr;
-	struct ath_arx_tid *rxtid;
-	struct ath_rxbuf *rxbuf;
-	u8 type, subtype;
-	u16 rxseq;
-	int tid = 0, index, cindex, rxdiff;
-	__le16 fc;
-	u8 *qc;
-
-	hdr = (struct ieee80211_hdr *)skb->data;
-	fc = hdr->frame_control;
-
-	/* collect stats of frames with non-zero version */
-
-	if ((le16_to_cpu(hdr->frame_control) & IEEE80211_FCTL_VERS) != 0) {
-		dev_kfree_skb(skb);
-		return -1;
-	}
-
-	type = le16_to_cpu(hdr->frame_control) & IEEE80211_FCTL_FTYPE;
-	subtype = le16_to_cpu(hdr->frame_control) & IEEE80211_FCTL_STYPE;
-
-	if (ieee80211_is_back_req(fc))
-		return ath_bar_rx(sc, an, skb);
-
-	/* special aggregate processing only for qos unicast data frames */
-
-	if (!ieee80211_is_data(fc) ||
-	    !ieee80211_is_data_qos(fc) ||
-	    is_multicast_ether_addr(hdr->addr1))
-		return ath_rx_subframe(an, skb, rx_status);
-
-	/* lookup rx tid state */
-
-	if (ieee80211_is_data_qos(fc)) {
-		qc = ieee80211_get_qos_ctl(hdr);
-		tid = qc[0] & 0xf;
-	}
-
-	if (sc->sc_opmode == ATH9K_M_STA) {
-		/* Drop the frame not belonging to me. */
-		if (memcmp(hdr->addr1, sc->sc_myaddr, ETH_ALEN)) {
-			dev_kfree_skb(skb);
-			return -1;
-		}
-	}
-
-	rxtid = &an->an_aggr.rx.tid[tid];
-
-	spin_lock(&rxtid->tidlock);
-
-	rxdiff = (rxtid->baw_tail - rxtid->baw_head) &
-		(ATH_TID_MAX_BUFS - 1);
-
-	/*
-	 * If the ADDBA exchange has not been completed by the source,
-	 * process via legacy path (i.e. no reordering buffer is needed)
-	 */
-	if (!rxtid->addba_exchangecomplete) {
-		spin_unlock(&rxtid->tidlock);
-		return ath_rx_subframe(an, skb, rx_status);
-	}
-
-	/* extract sequence number from recvd frame */
-
-	rxseq = le16_to_cpu(hdr->seq_ctrl) >> IEEE80211_SEQ_SEQ_SHIFT;
-
-	if (rxtid->seq_reset) {
-		rxtid->seq_reset = 0;
-		rxtid->seq_next = rxseq;
-	}
-
-	index = ATH_BA_INDEX(rxtid->seq_next, rxseq);
-
-	/* drop frame if old sequence (index is too large) */
-
-	if (index > (IEEE80211_SEQ_MAX - (rxtid->baw_size << 2))) {
-		/* discard frame, ieee layer may not treat frame as a dup */
-		spin_unlock(&rxtid->tidlock);
-		dev_kfree_skb(skb);
-		return IEEE80211_FTYPE_DATA;
-	}
-
-	/* sequence number is beyond block-ack window */
-
-	if (index >= rxtid->baw_size) {
-
-		/* complete receive processing for all pending frames */
-
-		while (index >= rxtid->baw_size) {
-
-			rxbuf = rxtid->rxbuf + rxtid->baw_head;
-
-			if (rxbuf->rx_wbuf != NULL) {
-				ath_rx_subframe(an, rxbuf->rx_wbuf,
-						&rxbuf->rx_status);
-				rxbuf->rx_wbuf = NULL;
-			}
-
-			INCR(rxtid->baw_head, ATH_TID_MAX_BUFS);
-			INCR(rxtid->seq_next, IEEE80211_SEQ_MAX);
-
-			index--;
-		}
-	}
-
-	/* add buffer to the recv ba window */
-
-	cindex = (rxtid->baw_head + index) & (ATH_TID_MAX_BUFS - 1);
-	rxbuf = rxtid->rxbuf + cindex;
-
-	if (rxbuf->rx_wbuf != NULL) {
-		spin_unlock(&rxtid->tidlock);
-		/* duplicate frame */
-		dev_kfree_skb(skb);
-		return IEEE80211_FTYPE_DATA;
-	}
-
-	rxbuf->rx_wbuf = skb;
-	rxbuf->rx_time = get_timestamp();
-	rxbuf->rx_status = *rx_status;
-
-	/* advance tail if sequence received is newer
-	 * than any received so far */
-
-	if (index >= rxdiff) {
-		rxtid->baw_tail = cindex;
-		INCR(rxtid->baw_tail, ATH_TID_MAX_BUFS);
-	}
-
-	/* indicate all in-order received frames */
-
-	while (rxtid->baw_head != rxtid->baw_tail) {
-		rxbuf = rxtid->rxbuf + rxtid->baw_head;
-		if (!rxbuf->rx_wbuf)
-			break;
-
-		ath_rx_subframe(an, rxbuf->rx_wbuf, &rxbuf->rx_status);
-		rxbuf->rx_wbuf = NULL;
-
-		INCR(rxtid->baw_head, ATH_TID_MAX_BUFS);
-		INCR(rxtid->seq_next, IEEE80211_SEQ_MAX);
-	}
-
-	/*
-	 * start a timer to flush all received frames if there are pending
-	 * receive frames
-	 */
-	if (rxtid->baw_head != rxtid->baw_tail)
-		mod_timer(&rxtid->timer, ATH_RX_TIMEOUT);
-	else
-		del_timer_sync(&rxtid->timer);
-
-	spin_unlock(&rxtid->tidlock);
-	return IEEE80211_FTYPE_DATA;
-}
-
-/* Timer to flush all received sub-frames */
-
-static void ath_rx_timer(unsigned long data)
-{
-	struct ath_arx_tid *rxtid = (struct ath_arx_tid *)data;
-	struct ath_node *an = rxtid->an;
-	struct ath_rxbuf *rxbuf;
-	int nosched;
-
-	spin_lock_bh(&rxtid->tidlock);
-	while (rxtid->baw_head != rxtid->baw_tail) {
-		rxbuf = rxtid->rxbuf + rxtid->baw_head;
-		if (!rxbuf->rx_wbuf) {
-			INCR(rxtid->baw_head, ATH_TID_MAX_BUFS);
-			INCR(rxtid->seq_next, IEEE80211_SEQ_MAX);
-			continue;
-		}
-
-		/*
-		 * Stop if the next one is a very recent frame.
-		 *
-		 * Call get_timestamp in every iteration to protect against the
-		 * case in which a new frame is received while we are executing
-		 * this function. Using a timestamp obtained before entering
-		 * the loop could lead to a very large time interval
-		 * (a negative value typecast to unsigned), breaking the
-		 * function's logic.
-		 */
-		if ((get_timestamp() - rxbuf->rx_time) <
-			(ATH_RX_TIMEOUT * HZ / 1000))
-			break;
-
-		ath_rx_subframe(an, rxbuf->rx_wbuf,
-				&rxbuf->rx_status);
-		rxbuf->rx_wbuf = NULL;
-
-		INCR(rxtid->baw_head, ATH_TID_MAX_BUFS);
-		INCR(rxtid->seq_next, IEEE80211_SEQ_MAX);
-	}
-
-	/*
-	 * start a timer to flush all received frames if there are pending
-	 * receive frames
-	 */
-	if (rxtid->baw_head != rxtid->baw_tail)
-		nosched = 0;
-	else
-		nosched = 1; /* no need to re-arm the timer again */
-
-	spin_unlock_bh(&rxtid->tidlock);
-}
-
-/* Free all pending sub-frames in the re-ordering buffer */
-
-static void ath_rx_flush_tid(struct ath_softc *sc,
-	struct ath_arx_tid *rxtid, int drop)
-{
-	struct ath_rxbuf *rxbuf;
-	unsigned long flag;
-
-	spin_lock_irqsave(&rxtid->tidlock, flag);
-	while (rxtid->baw_head != rxtid->baw_tail) {
-		rxbuf = rxtid->rxbuf + rxtid->baw_head;
-		if (!rxbuf->rx_wbuf) {
-			INCR(rxtid->baw_head, ATH_TID_MAX_BUFS);
-			INCR(rxtid->seq_next, IEEE80211_SEQ_MAX);
-			continue;
-		}
-
-		if (drop)
-			dev_kfree_skb(rxbuf->rx_wbuf);
-		else
-			ath_rx_subframe(rxtid->an,
-					rxbuf->rx_wbuf,
-					&rxbuf->rx_status);
-
-		rxbuf->rx_wbuf = NULL;
-
-		INCR(rxtid->baw_head, ATH_TID_MAX_BUFS);
-		INCR(rxtid->seq_next, IEEE80211_SEQ_MAX);
-	}
-	spin_unlock_irqrestore(&rxtid->tidlock, flag);
-}
-
 static struct sk_buff *ath_rxbuf_alloc(struct ath_softc *sc,
 	u32 len)
 {
@@ -449,17 +127,16 @@ static int ath_rx_indicate(struct ath_softc *sc,
 	int type;
 
 	/* indicate frame to the stack, which will free the old skb. */
-	type = ath__rx_indicate(sc, skb, status, keyix);
+	type = _ath_rx_indicate(sc, skb, status, keyix);
 
 	/* allocate a new skb and queue it to for H/W processing */
 	nskb = ath_rxbuf_alloc(sc, sc->sc_rxbufsize);
 	if (nskb != NULL) {
 		bf->bf_mpdu = nskb;
-		bf->bf_buf_addr = ath_skb_map_single(sc,
-			nskb,
-			PCI_DMA_FROMDEVICE,
-			/* XXX: Remove get_dma_mem_context() */
-			get_dma_mem_context(bf, bf_dmacontext));
+		bf->bf_buf_addr = pci_map_single(sc->pdev, nskb->data,
+					 skb_end_pointer(nskb) - nskb->head,
+					 PCI_DMA_FROMDEVICE);
+		bf->bf_dmacontext = bf->bf_buf_addr;
 		ATH_RX_CONTEXT(nskb)->ctx_rxbuf = bf;
 
 		/* queue the new wbuf to H/W */
@@ -505,7 +182,7 @@ int ath_rx_init(struct ath_softc *sc, int nbufs)
 
 	do {
 		spin_lock_init(&sc->sc_rxflushlock);
-		sc->sc_rxflush = 0;
+		sc->sc_flags &= ~SC_OP_RXFLUSH;
 		spin_lock_init(&sc->sc_rxbuflock);
 
 		/*
@@ -542,9 +219,10 @@ int ath_rx_init(struct ath_softc *sc, int nbufs)
 			}
 
 			bf->bf_mpdu = skb;
-			bf->bf_buf_addr =
-				ath_skb_map_single(sc, skb, PCI_DMA_FROMDEVICE,
-				       get_dma_mem_context(bf, bf_dmacontext));
+			bf->bf_buf_addr = pci_map_single(sc->pdev, skb->data,
+					 skb_end_pointer(skb) - skb->head,
+					 PCI_DMA_FROMDEVICE);
+			bf->bf_dmacontext = bf->bf_buf_addr;
 			ATH_RX_CONTEXT(skb)->ctx_rxbuf = bf;
 		}
 		sc->sc_rxlink = NULL;
@@ -598,6 +276,7 @@ void ath_rx_cleanup(struct ath_softc *sc)
 u32 ath_calcrxfilter(struct ath_softc *sc)
 {
 #define	RX_FILTER_PRESERVE (ATH9K_RX_FILTER_PHYERR | ATH9K_RX_FILTER_PHYRADAR)
+
 	u32 rfilt;
 
 	rfilt = (ath9k_hw_getrxfilter(sc->sc_ah) & RX_FILTER_PRESERVE)
@@ -605,25 +284,29 @@ u32 ath_calcrxfilter(struct ath_softc *sc)
 		| ATH9K_RX_FILTER_MCAST;
 
 	/* If not a STA, enable processing of Probe Requests */
-	if (sc->sc_opmode != ATH9K_M_STA)
+	if (sc->sc_ah->ah_opmode != ATH9K_M_STA)
 		rfilt |= ATH9K_RX_FILTER_PROBEREQ;
 
 	/* Can't set HOSTAP into promiscous mode */
-	if (sc->sc_opmode == ATH9K_M_MONITOR) {
+	if (((sc->sc_ah->ah_opmode != ATH9K_M_HOSTAP) &&
+	     (sc->rx_filter & FIF_PROMISC_IN_BSS)) ||
+	    (sc->sc_ah->ah_opmode == ATH9K_M_MONITOR)) {
 		rfilt |= ATH9K_RX_FILTER_PROM;
 		/* ??? To prevent from sending ACK */
 		rfilt &= ~ATH9K_RX_FILTER_UCAST;
 	}
 
-	if (sc->sc_opmode == ATH9K_M_STA || sc->sc_opmode == ATH9K_M_IBSS ||
-	    sc->sc_scanning)
+	if (((sc->sc_ah->ah_opmode == ATH9K_M_STA) &&
+	     (sc->rx_filter & FIF_BCN_PRBRESP_PROMISC)) ||
+	    (sc->sc_ah->ah_opmode == ATH9K_M_IBSS))
 		rfilt |= ATH9K_RX_FILTER_BEACON;
 
 	/* If in HOSTAP mode, want to enable reception of PSPOLL frames
 	   & beacon frames */
-	if (sc->sc_opmode == ATH9K_M_HOSTAP)
+	if (sc->sc_ah->ah_opmode == ATH9K_M_HOSTAP)
 		rfilt |= (ATH9K_RX_FILTER_BEACON | ATH9K_RX_FILTER_PSPOLL);
 	return rfilt;
+
 #undef RX_FILTER_PRESERVE
 }
 
@@ -703,30 +386,12 @@ void ath_flushrecv(struct ath_softc *sc)
 	 * progress (see references to sc_rxflush)
 	 */
 	spin_lock_bh(&sc->sc_rxflushlock);
-	sc->sc_rxflush = 1;
+	sc->sc_flags |= SC_OP_RXFLUSH;
 
 	ath_rx_tasklet(sc, 1);
 
-	sc->sc_rxflush = 0;
+	sc->sc_flags &= ~SC_OP_RXFLUSH;
 	spin_unlock_bh(&sc->sc_rxflushlock);
-}
-
-/* Process an individual frame */
-
-int ath_rx_input(struct ath_softc *sc,
-		 struct ath_node *an,
-		 int is_ampdu,
-		 struct sk_buff *skb,
-		 struct ath_recv_status *rx_status,
-		 enum ATH_RX_TYPE *status)
-{
-	if (is_ampdu && sc->sc_rxaggr) {
-		*status = ATH_RX_CONSUMED;
-		return ath_ampdu_input(sc, an, skb, rx_status);
-	} else {
-		*status = ATH_RX_NON_CONSUMED;
-		return -1;
-	}
 }
 
 /* Process receive queue, as well as LED, etc. */
@@ -751,7 +416,7 @@ int ath_rx_tasklet(struct ath_softc *sc, int flush)
 
 	do {
 		/* If handling rx interrupt and flush is in progress => exit */
-		if (sc->sc_rxflush && (flush == 0))
+		if ((sc->sc_flags & SC_OP_RXFLUSH) && (flush == 0))
 			break;
 
 		spin_lock_bh(&sc->sc_rxbuflock);
@@ -887,7 +552,7 @@ int ath_rx_tasklet(struct ath_softc *sc, int flush)
 
 		hdr = (struct ieee80211_hdr *)skb->data;
 		fc = hdr->frame_control;
-		memzero(&rx_status, sizeof(struct ath_recv_status));
+		memset(&rx_status, 0, sizeof(struct ath_recv_status));
 
 		if (ds->ds_rxstat.rs_more) {
 			/*
@@ -901,7 +566,7 @@ int ath_rx_tasklet(struct ath_softc *sc, int flush)
 			 * Enable this if you want to see
 			 * error frames in Monitor mode.
 			 */
-			if (sc->sc_opmode != ATH9K_M_MONITOR)
+			if (sc->sc_ah->ah_opmode != ATH9K_M_MONITOR)
 				goto rx_next;
 #endif
 			/* fall thru for monitor mode handling... */
@@ -946,7 +611,7 @@ int ath_rx_tasklet(struct ath_softc *sc, int flush)
 			 * decryption and MIC failures. For monitor mode,
 			 * we also ignore the CRC error.
 			 */
-			if (sc->sc_opmode == ATH9K_M_MONITOR) {
+			if (sc->sc_ah->ah_opmode == ATH9K_M_MONITOR) {
 				if (ds->ds_rxstat.rs_status &
 				    ~(ATH9K_RXERR_DECRYPT | ATH9K_RXERR_MIC |
 					ATH9K_RXERR_CRC))
@@ -994,20 +659,11 @@ int ath_rx_tasklet(struct ath_softc *sc, int flush)
 				rx_status.flags |= ATH_RX_SHORT_GI;
 		}
 
-		/* sc->sc_noise_floor is only available when the station
+		/* sc_noise_floor is only available when the station
 		   attaches to an AP, so we use a default value
 		   if we are not yet attached. */
-
-		/* XXX we should use either sc->sc_noise_floor or
-		 * ath_hal_getChanNoise(ah, &sc->sc_curchan)
-		 * to calculate the noise floor.
-		 * However, the value returned by ath_hal_getChanNoise
-		 * seems to be incorrect (-31dBm on the last test),
-		 * so we will use a hard-coded value until we
-		 * figure out what is going on.
-		 */
 		rx_status.abs_rssi =
-			ds->ds_rxstat.rs_rssi + ATH_DEFAULT_NOISE_FLOOR;
+			ds->ds_rxstat.rs_rssi + sc->sc_ani.sc_noise_floor;
 
 		pci_dma_sync_single_for_cpu(sc->pdev,
 					    bf->bf_buf_addr,
@@ -1090,230 +746,9 @@ rx_next:
 			"%s: Reset rx chain mask. "
 			"Do internal reset\n", __func__);
 		ASSERT(flush == 0);
-		ath_internal_reset(sc);
+		ath_reset(sc, false);
 	}
 
 	return 0;
 #undef PA2DESC
-}
-
-/* Process ADDBA request in per-TID data structure */
-
-int ath_rx_aggr_start(struct ath_softc *sc,
-		      const u8 *addr,
-		      u16 tid,
-		      u16 *ssn)
-{
-	struct ath_arx_tid *rxtid;
-	struct ath_node *an;
-	struct ieee80211_hw *hw = sc->hw;
-	struct ieee80211_supported_band *sband;
-	u16 buffersize = 0;
-
-	spin_lock_bh(&sc->node_lock);
-	an = ath_node_find(sc, (u8 *) addr);
-	spin_unlock_bh(&sc->node_lock);
-
-	if (!an) {
-		DPRINTF(sc, ATH_DBG_AGGR,
-			"%s: Node not found to initialize RX aggregation\n",
-			__func__);
-		return -1;
-	}
-
-	sband = hw->wiphy->bands[hw->conf.channel->band];
-	buffersize = IEEE80211_MIN_AMPDU_BUF <<
-		sband->ht_info.ampdu_factor; /* FIXME */
-
-	rxtid = &an->an_aggr.rx.tid[tid];
-
-	spin_lock_bh(&rxtid->tidlock);
-	if (sc->sc_rxaggr) {
-		/* Allow aggregation reception
-		 * Adjust rx BA window size. Peer might indicate a
-		 * zero buffer size for a _dont_care_ condition.
-		 */
-		if (buffersize)
-			rxtid->baw_size = min(buffersize, rxtid->baw_size);
-
-		/* set rx sequence number */
-		rxtid->seq_next = *ssn;
-
-		/* Allocate the receive buffers for this TID */
-		DPRINTF(sc, ATH_DBG_AGGR,
-			"%s: Allcating rxbuffer for TID %d\n", __func__, tid);
-
-		if (rxtid->rxbuf == NULL) {
-			/*
-			* If the rxbuff is not NULL at this point, we *probably*
-			* already allocated the buffer on a previous ADDBA,
-			* and this is a subsequent ADDBA that got through.
-			* Don't allocate, but use the value in the pointer,
-			* we zero it out when we de-allocate.
-			*/
-			rxtid->rxbuf = kmalloc(ATH_TID_MAX_BUFS *
-				sizeof(struct ath_rxbuf), GFP_ATOMIC);
-		}
-		if (rxtid->rxbuf == NULL) {
-			DPRINTF(sc, ATH_DBG_AGGR,
-				"%s: Unable to allocate RX buffer, "
-				"refusing ADDBA\n", __func__);
-		} else {
-			/* Ensure the memory is zeroed out (all internal
-			 * pointers are null) */
-			memzero(rxtid->rxbuf, ATH_TID_MAX_BUFS *
-				sizeof(struct ath_rxbuf));
-			DPRINTF(sc, ATH_DBG_AGGR,
-				"%s: Allocated @%p\n", __func__, rxtid->rxbuf);
-
-			/* Allow aggregation reception */
-			rxtid->addba_exchangecomplete = 1;
-		}
-	}
-	spin_unlock_bh(&rxtid->tidlock);
-
-	return 0;
-}
-
-/* Process DELBA */
-
-int ath_rx_aggr_stop(struct ath_softc *sc,
-		     const u8 *addr,
-		     u16 tid)
-{
-	struct ath_node *an;
-
-	spin_lock_bh(&sc->node_lock);
-	an = ath_node_find(sc, (u8 *) addr);
-	spin_unlock_bh(&sc->node_lock);
-
-	if (!an) {
-		DPRINTF(sc, ATH_DBG_AGGR,
-			"%s: RX aggr stop for non-existent node\n", __func__);
-		return -1;
-	}
-
-	ath_rx_aggr_teardown(sc, an, tid);
-	return 0;
-}
-
-/* Rx aggregation tear down */
-
-void ath_rx_aggr_teardown(struct ath_softc *sc,
-	struct ath_node *an, u8 tid)
-{
-	struct ath_arx_tid *rxtid = &an->an_aggr.rx.tid[tid];
-
-	if (!rxtid->addba_exchangecomplete)
-		return;
-
-	del_timer_sync(&rxtid->timer);
-	ath_rx_flush_tid(sc, rxtid, 0);
-	rxtid->addba_exchangecomplete = 0;
-
-	/* De-allocate the receive buffer array allocated when addba started */
-
-	if (rxtid->rxbuf) {
-		DPRINTF(sc, ATH_DBG_AGGR,
-			"%s: Deallocating TID %d rxbuff @%p\n",
-			__func__, tid, rxtid->rxbuf);
-		kfree(rxtid->rxbuf);
-
-		/* Set pointer to null to avoid reuse*/
-		rxtid->rxbuf = NULL;
-	}
-}
-
-/* Initialize per-node receive state */
-
-void ath_rx_node_init(struct ath_softc *sc, struct ath_node *an)
-{
-	if (sc->sc_rxaggr) {
-		struct ath_arx_tid *rxtid;
-		int tidno;
-
-		/* Init per tid rx state */
-		for (tidno = 0, rxtid = &an->an_aggr.rx.tid[tidno];
-				tidno < WME_NUM_TID;
-				tidno++, rxtid++) {
-			rxtid->an        = an;
-			rxtid->seq_reset = 1;
-			rxtid->seq_next  = 0;
-			rxtid->baw_size  = WME_MAX_BA;
-			rxtid->baw_head  = rxtid->baw_tail = 0;
-
-			/*
-			 * Ensure the buffer pointer is null at this point
-			 * (needs to be allocated when addba is received)
-			*/
-
-			rxtid->rxbuf     = NULL;
-			setup_timer(&rxtid->timer, ath_rx_timer,
-				(unsigned long)rxtid);
-			spin_lock_init(&rxtid->tidlock);
-
-			/* ADDBA state */
-			rxtid->addba_exchangecomplete = 0;
-		}
-	}
-}
-
-void ath_rx_node_cleanup(struct ath_softc *sc, struct ath_node *an)
-{
-	if (sc->sc_rxaggr) {
-		struct ath_arx_tid *rxtid;
-		int tidno, i;
-
-		/* Init per tid rx state */
-		for (tidno = 0, rxtid = &an->an_aggr.rx.tid[tidno];
-				tidno < WME_NUM_TID;
-				tidno++, rxtid++) {
-
-			if (!rxtid->addba_exchangecomplete)
-				continue;
-
-			/* must cancel timer first */
-			del_timer_sync(&rxtid->timer);
-
-			/* drop any pending sub-frames */
-			ath_rx_flush_tid(sc, rxtid, 1);
-
-			for (i = 0; i < ATH_TID_MAX_BUFS; i++)
-				ASSERT(rxtid->rxbuf[i].rx_wbuf == NULL);
-
-			rxtid->addba_exchangecomplete = 0;
-		}
-	}
-
-}
-
-/* Cleanup per-node receive state */
-
-void ath_rx_node_free(struct ath_softc *sc, struct ath_node *an)
-{
-	ath_rx_node_cleanup(sc, an);
-}
-
-dma_addr_t ath_skb_map_single(struct ath_softc *sc,
-			      struct sk_buff *skb,
-			      int direction,
-			      dma_addr_t *pa)
-{
-	/*
-	 * NB: do NOT use skb->len, which is 0 on initialization.
-	 * Use skb's entire data area instead.
-	 */
-	*pa = pci_map_single(sc->pdev, skb->data,
-		skb_end_pointer(skb) - skb->head, direction);
-	return *pa;
-}
-
-void ath_skb_unmap_single(struct ath_softc *sc,
-			  struct sk_buff *skb,
-			  int direction,
-			  dma_addr_t *pa)
-{
-	/* Unmap skb's entire data area */
-	pci_unmap_single(sc->pdev, *pa,
-		skb_end_pointer(skb) - skb->head, direction);
 }

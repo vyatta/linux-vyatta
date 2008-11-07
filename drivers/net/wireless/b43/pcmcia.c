@@ -23,6 +23,7 @@
 
 #include "pcmcia.h"
 
+#include <linux/version.h>
 #include <linux/ssb/ssb.h>
 
 #include <pcmcia/cs_types.h>
@@ -82,13 +83,17 @@ static int __devinit b43_pcmcia_probe(struct pcmcia_device *dev)
 	tuple.TupleOffset = 0;
 
 	res = pcmcia_get_first_tuple(dev, &tuple);
-	if (res != CS_SUCCESS)
+	if (res != 0)
 		goto err_kfree_ssb;
 	res = pcmcia_get_tuple_data(dev, &tuple);
-	if (res != CS_SUCCESS)
+	if (res != 0)
 		goto err_kfree_ssb;
-	res = pcmcia_parse_tuple(dev, &tuple, &parse);
-	if (res != CS_SUCCESS)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28))
+	res = pcmcia_parse_tuple(NULL,&tuple, &parse);
+#else
+	res = pcmcia_parse_tuple(&tuple, &parse);
+#endif
+	if (res != 0)
 		goto err_kfree_ssb;
 
 	dev->conf.ConfigBase = parse.config.base;
@@ -107,13 +112,13 @@ static int __devinit b43_pcmcia_probe(struct pcmcia_device *dev)
 	win.Size = SSB_CORE_SIZE;
 	win.AccessSpeed = 250;
 	res = pcmcia_request_window(&dev, &win, &dev->win);
-	if (res != CS_SUCCESS)
+	if (res != 0)
 		goto err_kfree_ssb;
 
 	mem.CardOffset = 0;
 	mem.Page = 0;
 	res = pcmcia_map_mem_page(dev->win, &mem);
-	if (res != CS_SUCCESS)
+	if (res != 0)
 		goto err_disable;
 
 	dev->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING;
@@ -121,11 +126,11 @@ static int __devinit b43_pcmcia_probe(struct pcmcia_device *dev)
 	dev->irq.Handler = NULL; /* The handler is registered later. */
 	dev->irq.Instance = NULL;
 	res = pcmcia_request_irq(dev, &dev->irq);
-	if (res != CS_SUCCESS)
+	if (res != 0)
 		goto err_disable;
 
 	res = pcmcia_request_configuration(dev, &dev->conf);
-	if (res != CS_SUCCESS)
+	if (res != 0)
 		goto err_disable;
 
 	err = ssb_bus_pcmciabus_register(ssb, dev, win.Base);
