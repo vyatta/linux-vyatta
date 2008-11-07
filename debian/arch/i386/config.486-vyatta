@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.27
-# Fri Nov  7 08:19:12 2008
+# Fri Nov  7 08:21:57 2008
 #
 # CONFIG_64BIT is not set
 CONFIG_X86_32=y
@@ -1140,7 +1140,7 @@ CONFIG_PNPBIOS=y
 CONFIG_PNPBIOS_PROC_FS=y
 CONFIG_PNPACPI=y
 CONFIG_BLK_DEV=y
-CONFIG_BLK_DEV_FD=m
+CONFIG_BLK_DEV_FD=y
 CONFIG_BLK_DEV_XD=m
 CONFIG_PARIDE=m
 
