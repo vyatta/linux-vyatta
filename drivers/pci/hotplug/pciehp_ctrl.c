@@ -172,14 +172,13 @@ static void set_slot_off(struct controller *ctrl, struct slot * pslot)
 			    __func__);
 			return;
 		}
+		/*
+		 * After turning power off, we must wait for at least 1 second
+		 * before taking any action that relies on power having been
+		 * removed from the slot/adapter.
+		 */
+		msleep(1000);
 	}
-
-	/*
-	 * After turning power off, we must wait for at least 1 second
-	 * before taking any action that relies on power having been
-	 * removed from the slot/adapter.
-	 */
-	msleep(1000);
 
 	if (PWR_LED(ctrl))
 		pslot->hpc_ops->green_led_off(pslot);
