@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.27
-# Fri Nov  7 15:02:56 2008
+# Tue Nov 11 15:01:16 2008
 #
 # CONFIG_64BIT is not set
 CONFIG_X86_32=y
@@ -2530,7 +2530,11 @@ CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
 # CONFIG_FONTS is not set
 CONFIG_FONT_8x8=y
 CONFIG_FONT_8x16=y
-# CONFIG_LOGO is not set
+CONFIG_LOGO=y
+# CONFIG_LOGO_LINUX_MONO is not set
+CONFIG_LOGO_LINUX_VGA16=y
+# CONFIG_LOGO_LINUX_CLUT224 is not set
+CONFIG_LOGO_VYATTA=y
 # CONFIG_SOUND is not set
 CONFIG_HID_SUPPORT=y
 CONFIG_HID=y
