@@ -130,5 +130,16 @@ struct iwl5000_shared {
 	__le32 padding2;
 } __attribute__ ((packed));
 
+<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-5000-hw.h
+=======
+/* calibrations defined for 5000 */
+/* defines the order in which results should be sent to the runtime uCode */
+enum iwl5000_calib {
+	IWL5000_CALIB_LO,
+	IWL5000_CALIB_TX_IQ,
+	IWL5000_CALIB_TX_IQ_PERD,
+};
+
+>>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-5000-hw.h
 #endif /* __iwl_5000_hw_h__ */
 

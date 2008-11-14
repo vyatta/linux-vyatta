@@ -690,6 +690,7 @@ struct statistics_general_data {
 	u32 beacon_energy_c;
 };
 
+<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-dev.h
 
 /*
  * enum iwl_calib
@@ -704,6 +705,8 @@ enum iwl_calib {
 	IWL_CALIB_MAX
 };
 
+=======
+>>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-dev.h
 /* Opaque calibration results */
 struct iwl_calib_result {
 	void *buf;
@@ -770,6 +773,7 @@ enum {
 
 
 #define IWL_MAX_NUM_QUEUES	20 /* FIXME: do dynamic allocation */
+#define IWL_CALIB_MAX  3
 
 struct iwl_priv {
 

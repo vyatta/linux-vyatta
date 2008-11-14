@@ -2546,18 +2546,43 @@ static void iwl_post_associate(struct iwl_priv *priv)
 		break;
 	}
 
+<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-agn.c
 	if (priv->iw_mode == NL80211_IFTYPE_ADHOC)
+=======
+	if (priv->iw_mode == IEEE80211_IF_TYPE_IBSS)
+>>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-agn.c
 		priv->assoc_station_added = 1;
 
 	spin_lock_irqsave(&priv->lock, flags);
 	iwl_activate_qos(priv, 0);
 	spin_unlock_irqrestore(&priv->lock, flags);
 
+<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-agn.c
 	/* the chain noise calibration will enabled PM upon completion
 	 * If chain noise has already been run, then we need to enable
 	 * power management here */
 	if (priv->chain_noise_data.state == IWL_CHAIN_NOISE_DONE)
 		iwl_power_enable_management(priv);
+=======
+	iwl_power_enable_management(priv);
+
+	/* Enable Rx differential gain and sensitivity calibrations */
+	iwl_chain_noise_reset(priv);
+	priv->start_calib = 1;
+
+	/* we have just associated, don't start scan too early */
+	priv->next_scan_jiffies = jiffies + IWL_DELAY_NEXT_SCAN;
+}
+
+static int iwl4965_mac_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf);
+
+static void iwl_bg_scan_completed(struct work_struct *work)
+{
+	struct iwl_priv *priv =
+	    container_of(work, struct iwl_priv, scan_completed);
+
+	IWL_DEBUG_SCAN("SCAN complete scan\n");
+>>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-agn.c
 
 	/* Enable Rx differential gain and sensitivity calibrations */
 	iwl_chain_noise_reset(priv);
@@ -3179,7 +3204,11 @@ static int iwl_mac_hw_scan(struct ieee80211_hw *hw, u8 *ssid, size_t ssid_len)
 	    time_after(priv->next_scan_jiffies, jiffies)) {
 		IWL_DEBUG_SCAN("scan rejected: within next scan period\n");
 		queue_work(priv->workqueue, &priv->scan_completed);
+<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-agn.c
 		ret = 0;
+=======
+		rc = 0;
+>>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-agn.c
 		goto out_unlock;
 	}
 
@@ -3188,9 +3217,20 @@ static int iwl_mac_hw_scan(struct ieee80211_hw *hw, u8 *ssid, size_t ssid_len)
 	    time_after(priv->last_scan_jiffies + IWL_DELAY_NEXT_SCAN, jiffies)) {
 		IWL_DEBUG_SCAN("scan rejected: within previous scan period\n");
 		queue_work(priv->workqueue, &priv->scan_completed);
+<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-agn.c
 		ret = 0;
+=======
+		rc = 0;
+>>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-agn.c
 		goto out_unlock;
 	}
+<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-agn.c
+=======
+
+	if (len) {
+		IWL_DEBUG_SCAN("direct scan for %s [%d]\n ",
+			       iwl_escape_essid(ssid, len), (int)len);
+>>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-agn.c
 
 	if (ssid_len) {
 		priv->one_direct_scan = 1;
@@ -3514,6 +3554,16 @@ static void iwl_mac_reset_tsf(struct ieee80211_hw *hw)
 
 	/* Per mac80211.h: This is only used in IBSS mode... */
 	if (priv->iw_mode != NL80211_IFTYPE_ADHOC) {
+
+		/* switch to CAM during association period.
+		 * the ucode will block any association/authentication
+		 * frome during assiciation period if it can not hear
+		 * the AP because of PM. the timer enable PM back is
+		 * association do not complete
+		 */
+		if (priv->hw->conf.channel->flags & (IEEE80211_CHAN_PASSIVE_SCAN |
+						     IEEE80211_CHAN_RADAR))
+				iwl_power_disable_management(priv, 3000);
 
 		/* switch to CAM during association period.
 		 * the ucode will block any association/authentication
