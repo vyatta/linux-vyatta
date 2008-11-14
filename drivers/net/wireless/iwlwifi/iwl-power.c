@@ -257,15 +257,11 @@ int iwl_power_update_mode(struct iwl_priv *priv, bool force)
 	struct iwl_power_mgr *setting = &(priv->power_data);
 	int ret = 0;
 	u16 uninitialized_var(final_mode);
+	bool update_chains;
 
 	/* Don't update the RX chain when chain noise calibration is running */
-	if (priv->chain_noise_data.state != IWL_CHAIN_NOISE_DONE &&
-	    priv->chain_noise_data.state != IWL_CHAIN_NOISE_ALIVE) {
-		IWL_DEBUG_POWER("Cannot update the power, chain noise "
-			"calibration running: %d\n",
-			priv->chain_noise_data.state);
-		return -EAGAIN;
-	}
+	update_chains = priv->chain_noise_data.state == IWL_CHAIN_NOISE_DONE ||
+			priv->chain_noise_data.state == IWL_CHAIN_NOISE_ALIVE;
 
 	/* If on battery, set to 3,
 	 * if plugged into AC power, set to CAM ("continuously aware mode"),
@@ -313,9 +309,12 @@ int iwl_power_update_mode(struct iwl_priv *priv, bool force)
 		else
 			set_bit(STATUS_POWER_PMI, &priv->status);
 
-		if (priv->cfg->ops->lib->update_chain_flags)
+		if (priv->cfg->ops->lib->update_chain_flags && update_chains)
 			priv->cfg->ops->lib->update_chain_flags(priv);
-
+		else
+			IWL_DEBUG_POWER("Cannot update the power, chain noise "
+					"calibration running: %d\n",
+					priv->chain_noise_data.state);
 		if (!ret)
 			setting->power_mode = final_mode;
 	}
@@ -443,11 +442,7 @@ static void iwl_bg_set_power_save(struct work_struct *work)
 
 	mutex_lock(&priv->mutex);
 
-<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-power.c
 	/* on starting association we disable power management
-=======
-	/* on starting association we disable power managment
->>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-power.c
 	 * until association, if association failed then this
 	 * timer will expire and enable PM again.
 	 */

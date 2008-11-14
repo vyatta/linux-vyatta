@@ -70,11 +70,7 @@
  * INIT calibrations framework
  *****************************************************************************/
 
-<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-calib.c
 int iwl_send_calib_results(struct iwl_priv *priv)
-=======
- int iwl_send_calib_results(struct iwl_priv *priv)
->>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-calib.c
 {
 	int ret = 0;
 	int i = 0;
@@ -84,24 +80,16 @@ int iwl_send_calib_results(struct iwl_priv *priv)
 		.meta.flags = CMD_SIZE_HUGE,
 	};
 
-<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-calib.c
 	for (i = 0; i < IWL_CALIB_MAX; i++) {
 		if ((BIT(i) & priv->hw_params.calib_init_cfg) &&
 		    priv->calib_results[i].buf) {
-=======
-	for (i = 0; i < IWL_CALIB_MAX; i++)
-		if (priv->calib_results[i].buf) {
->>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-calib.c
 			hcmd.len = priv->calib_results[i].buf_len;
 			hcmd.data = priv->calib_results[i].buf;
 			ret = iwl_send_cmd_sync(priv, &hcmd);
 			if (ret)
 				goto err;
 		}
-<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-calib.c
 	}
-=======
->>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-calib.c
 
 	return 0;
 err:

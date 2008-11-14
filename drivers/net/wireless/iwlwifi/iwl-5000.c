@@ -426,24 +426,11 @@ static int iwl5000_set_Xtal_calib(struct iwl_priv *priv)
 	struct iwl_cal_xtal_freq *xtal = (struct iwl_cal_xtal_freq *)cmd->data;
 	u16 *xtal_calib = (u16 *)iwl_eeprom_query_addr(priv, EEPROM_5000_XTAL);
 
-<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-5000.c
 	cmd->hdr.op_code = IWL_PHY_CALIBRATE_CRYSTAL_FRQ_CMD;
 	xtal->cap_pin1 = (u8)xtal_calib[0];
 	xtal->cap_pin2 = (u8)xtal_calib[1];
 	return iwl_calib_set(&priv->calib_results[IWL_CALIB_XTAL],
 			     data, sizeof(data));
-=======
-	struct iwl5000_calibration cal_cmd = {
-		.op_code = IWL5000_PHY_CALIBRATE_CRYSTAL_FRQ_CMD,
-		.data = {
-			(u8)xtal_calib[0],
-			(u8)xtal_calib[1],
-		}
-	};
-
-	return iwl_send_cmd_pdu(priv, REPLY_PHY_CALIBRATION_CMD,
-				sizeof(cal_cmd), &cal_cmd);
->>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-5000.c
 }
 
 static int iwl5000_send_calib_cfg(struct iwl_priv *priv)
@@ -479,29 +466,14 @@ static void iwl5000_rx_calib_result(struct iwl_priv *priv,
 	 * uCode. iwl_send_calib_results sends them in a row according to their
 	 * index. We sort them here */
 	switch (hdr->op_code) {
-<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-5000.c
 	case IWL_PHY_CALIBRATE_LO_CMD:
 		index = IWL_CALIB_LO;
-=======
-	case IWL5000_PHY_CALIBRATE_LO_CMD:
-		index = IWL5000_CALIB_LO;
->>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-5000.c
 		break;
-<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-5000.c
 	case IWL_PHY_CALIBRATE_TX_IQ_CMD:
 		index = IWL_CALIB_TX_IQ;
-=======
-	case IWL5000_PHY_CALIBRATE_TX_IQ_CMD:
-		index = IWL5000_CALIB_TX_IQ;
->>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-5000.c
 		break;
-<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-5000.c
 	case IWL_PHY_CALIBRATE_TX_IQ_PERD_CMD:
 		index = IWL_CALIB_TX_IQ_PERD;
-=======
-	case IWL5000_PHY_CALIBRATE_TX_IQ_PERD_CMD:
-		index = IWL5000_CALIB_TX_IQ_PERD;
->>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-5000.c
 		break;
 	default:
 		IWL_ERROR("Unknown calibration notification %d\n",
@@ -749,11 +721,9 @@ static int iwl5000_alive_notify(struct iwl_priv *priv)
 		iwl_write_targ_mem(priv, a, 0);
 
 	iwl_write_prph(priv, IWL50_SCD_DRAM_BASE_ADDR,
-		(priv->shared_phys +
-		 offsetof(struct iwl5000_shared, queues_bc_tbls)) >> 10);
+		       priv->scd_bc_tbls.dma >> 10);
 	iwl_write_prph(priv, IWL50_SCD_QUEUECHAIN_SEL,
-		IWL50_SCD_QUEUECHAIN_SEL_ALL(
-			priv->hw_params.max_txq_num));
+		IWL50_SCD_QUEUECHAIN_SEL_ALL(priv->hw_params.max_txq_num));
 	iwl_write_prph(priv, IWL50_SCD_AGGR_SEL, 0);
 
 	/* initiate the queues */
@@ -800,15 +770,8 @@ static int iwl5000_alive_notify(struct iwl_priv *priv)
 
 	iwl5000_send_wimax_coex(priv);
 
-<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-5000.c
 	iwl5000_set_Xtal_calib(priv);
 	iwl_send_calib_results(priv);
-=======
-	iwl5000_send_Xtal_calib(priv);
-
-	if (priv->ucode_type == UCODE_RT)
-		iwl_send_calib_results(priv);
->>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-5000.c
 
 	return 0;
 }
@@ -823,6 +786,8 @@ static int iwl5000_hw_set_hw_params(struct iwl_priv *priv)
 	}
 
 	priv->hw_params.max_txq_num = priv->cfg->mod_params->num_of_queues;
+	priv->hw_params.scd_bc_tbls_size =
+			IWL50_NUM_QUEUES * sizeof(struct iwl5000_scd_bc_tbl);
 	priv->hw_params.max_stations = IWL5000_STATION_COUNT;
 	priv->hw_params.bcast_sta_id = IWL5000_BROADCAST_ID;
 	priv->hw_params.max_data_size = IWL50_RTC_DATA_SIZE;
@@ -888,36 +853,6 @@ static int iwl5000_hw_set_hw_params(struct iwl_priv *priv)
 	return 0;
 }
 
-static int iwl5000_alloc_shared_mem(struct iwl_priv *priv)
-{
-	priv->shared_virt = pci_alloc_consistent(priv->pci_dev,
-					sizeof(struct iwl5000_shared),
-					&priv->shared_phys);
-	if (!priv->shared_virt)
-		return -ENOMEM;
-
-	memset(priv->shared_virt, 0, sizeof(struct iwl5000_shared));
-
-	priv->rb_closed_offset = offsetof(struct iwl5000_shared, rb_closed);
-
-	return 0;
-}
-
-static void iwl5000_free_shared_mem(struct iwl_priv *priv)
-{
-	if (priv->shared_virt)
-		pci_free_consistent(priv->pci_dev,
-				    sizeof(struct iwl5000_shared),
-				    priv->shared_virt,
-				    priv->shared_phys);
-}
-
-static int iwl5000_shared_mem_rx_idx(struct iwl_priv *priv)
-{
-	struct iwl5000_shared *s = priv->shared_virt;
-	return le32_to_cpu(s->rb_closed) & 0xFFF;
-}
-
 /**
  * iwl5000_txq_update_byte_cnt_tbl - Set up entry in Tx byte-count array
  */
@@ -925,7 +860,7 @@ static void iwl5000_txq_update_byte_cnt_tbl(struct iwl_priv *priv,
 					    struct iwl_tx_queue *txq,
 					    u16 byte_cnt)
 {
-	struct iwl5000_shared *shared_data = priv->shared_virt;
+	struct iwl5000_scd_bc_tbl *scd_bc_tbl = priv->scd_bc_tbls.addr;
 	int write_ptr = txq->q.write_ptr;
 	int txq_id = txq->q.id;
 	u8 sec_ctl = 0;
@@ -954,17 +889,17 @@ static void iwl5000_txq_update_byte_cnt_tbl(struct iwl_priv *priv,
 
 	bc_ent = cpu_to_le16((len & 0xFFF) | (sta_id << 12));
 
-	shared_data->queues_bc_tbls[txq_id].tfd_offset[write_ptr] = bc_ent;
+	scd_bc_tbl[txq_id].tfd_offset[write_ptr] = bc_ent;
 
 	if (txq->q.write_ptr < TFD_QUEUE_SIZE_BC_DUP)
-		shared_data->queues_bc_tbls[txq_id].
+		scd_bc_tbl[txq_id].
 			tfd_offset[TFD_QUEUE_SIZE_MAX + write_ptr] = bc_ent;
 }
 
 static void iwl5000_txq_inval_byte_cnt_tbl(struct iwl_priv *priv,
 					   struct iwl_tx_queue *txq)
 {
-	struct iwl5000_shared *shared_data = priv->shared_virt;
+	struct iwl5000_scd_bc_tbl *scd_bc_tbl = priv->scd_bc_tbls.addr;
 	int txq_id = txq->q.id;
 	int read_ptr = txq->q.read_ptr;
 	u8 sta_id = 0;
@@ -976,11 +911,10 @@ static void iwl5000_txq_inval_byte_cnt_tbl(struct iwl_priv *priv,
 		sta_id = txq->cmd[read_ptr]->cmd.tx.sta_id;
 
 	bc_ent =  cpu_to_le16(1 | (sta_id << 12));
-	shared_data->queues_bc_tbls[txq_id].
-			tfd_offset[read_ptr] = bc_ent;
+	scd_bc_tbl[txq_id].tfd_offset[read_ptr] = bc_ent;
 
 	if (txq->q.write_ptr < TFD_QUEUE_SIZE_BC_DUP)
-		shared_data->queues_bc_tbls[txq_id].
+		scd_bc_tbl[txq_id].
 			tfd_offset[TFD_QUEUE_SIZE_MAX + read_ptr] =  bc_ent;
 }
 
@@ -1493,9 +1427,6 @@ static struct iwl_hcmd_utils_ops iwl5000_hcmd_utils = {
 
 static struct iwl_lib_ops iwl5000_lib = {
 	.set_hw_params = iwl5000_hw_set_hw_params,
-	.alloc_shared_mem = iwl5000_alloc_shared_mem,
-	.free_shared_mem = iwl5000_free_shared_mem,
-	.shared_mem_rx_idx = iwl5000_shared_mem_rx_idx,
 	.txq_update_byte_cnt_tbl = iwl5000_txq_update_byte_cnt_tbl,
 	.txq_inval_byte_cnt_tbl = iwl5000_txq_inval_byte_cnt_tbl,
 	.txq_set_sched = iwl5000_txq_set_sched,
