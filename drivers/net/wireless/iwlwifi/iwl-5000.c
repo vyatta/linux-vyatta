@@ -426,11 +426,24 @@ static int iwl5000_set_Xtal_calib(struct iwl_priv *priv)
 	struct iwl_cal_xtal_freq *xtal = (struct iwl_cal_xtal_freq *)cmd->data;
 	u16 *xtal_calib = (u16 *)iwl_eeprom_query_addr(priv, EEPROM_5000_XTAL);
 
+<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-5000.c
 	cmd->hdr.op_code = IWL_PHY_CALIBRATE_CRYSTAL_FRQ_CMD;
 	xtal->cap_pin1 = (u8)xtal_calib[0];
 	xtal->cap_pin2 = (u8)xtal_calib[1];
 	return iwl_calib_set(&priv->calib_results[IWL_CALIB_XTAL],
 			     data, sizeof(data));
+=======
+	struct iwl5000_calibration cal_cmd = {
+		.op_code = IWL5000_PHY_CALIBRATE_CRYSTAL_FRQ_CMD,
+		.data = {
+			(u8)xtal_calib[0],
+			(u8)xtal_calib[1],
+		}
+	};
+
+	return iwl_send_cmd_pdu(priv, REPLY_PHY_CALIBRATION_CMD,
+				sizeof(cal_cmd), &cal_cmd);
+>>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-5000.c
 }
 
 static int iwl5000_send_calib_cfg(struct iwl_priv *priv)
@@ -466,14 +479,29 @@ static void iwl5000_rx_calib_result(struct iwl_priv *priv,
 	 * uCode. iwl_send_calib_results sends them in a row according to their
 	 * index. We sort them here */
 	switch (hdr->op_code) {
+<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-5000.c
 	case IWL_PHY_CALIBRATE_LO_CMD:
 		index = IWL_CALIB_LO;
+=======
+	case IWL5000_PHY_CALIBRATE_LO_CMD:
+		index = IWL5000_CALIB_LO;
+>>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-5000.c
 		break;
+<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-5000.c
 	case IWL_PHY_CALIBRATE_TX_IQ_CMD:
 		index = IWL_CALIB_TX_IQ;
+=======
+	case IWL5000_PHY_CALIBRATE_TX_IQ_CMD:
+		index = IWL5000_CALIB_TX_IQ;
+>>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-5000.c
 		break;
+<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-5000.c
 	case IWL_PHY_CALIBRATE_TX_IQ_PERD_CMD:
 		index = IWL_CALIB_TX_IQ_PERD;
+=======
+	case IWL5000_PHY_CALIBRATE_TX_IQ_PERD_CMD:
+		index = IWL5000_CALIB_TX_IQ_PERD;
+>>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-5000.c
 		break;
 	default:
 		IWL_ERROR("Unknown calibration notification %d\n",
@@ -772,8 +800,15 @@ static int iwl5000_alive_notify(struct iwl_priv *priv)
 
 	iwl5000_send_wimax_coex(priv);
 
+<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-5000.c
 	iwl5000_set_Xtal_calib(priv);
 	iwl_send_calib_results(priv);
+=======
+	iwl5000_send_Xtal_calib(priv);
+
+	if (priv->ucode_type == UCODE_RT)
+		iwl_send_calib_results(priv);
+>>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-5000.c
 
 	return 0;
 }

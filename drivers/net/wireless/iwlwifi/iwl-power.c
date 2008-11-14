@@ -443,7 +443,11 @@ static void iwl_bg_set_power_save(struct work_struct *work)
 
 	mutex_lock(&priv->mutex);
 
+<<<<<<< HEAD:drivers/net/wireless/iwlwifi/iwl-power.c
 	/* on starting association we disable power management
+=======
+	/* on starting association we disable power managment
+>>>>>>> 3846b8e059ac7461ee2ea121d3dff9b38e596e55:drivers/net/wireless/iwlwifi/iwl-power.c
 	 * until association, if association failed then this
 	 * timer will expire and enable PM again.
 	 */
