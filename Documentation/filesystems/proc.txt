@@ -1989,6 +1989,15 @@ log_martians
 
 Log packets with source addresses with no known route to kernel log.
 
+loop 
+----
+
+By default (loop=0) the traffic between local IP addresses
+is routed via interface "lo". Setting this flag for two
+interfaces allows traffic between their IP addresses to
+be looped externally. This is useful for setups where the
+interfaces are attached to same broadcast medium.
+
 mc_forwarding
 -------------
 
