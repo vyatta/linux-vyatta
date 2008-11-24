@@ -1834,7 +1834,6 @@ static void hp100_rx(struct net_device *dev)
 					ptr[9], ptr[10], ptr[11]);
 #endif
 			netif_rx(skb);
-			dev->last_rx = jiffies;
 			lp->stats.rx_packets++;
 			lp->stats.rx_bytes += pkt_len;
 		}
@@ -1925,7 +1924,6 @@ static void hp100_rx_bm(struct net_device *dev)
 
 				netif_rx(ptr->skb);	/* Up and away... */
 
-				dev->last_rx = jiffies;
 				lp->stats.rx_packets++;
 				lp->stats.rx_bytes += pkt_len;
 			}
@@ -2093,9 +2091,8 @@ static void hp100_set_multicast_list(struct net_device *dev)
 				addrs = dmi->dmi_addr;
 				if ((*addrs & 0x01) == 0x01) {	/* multicast address? */
 #ifdef HP100_DEBUG
-					DECLARE_MAC_BUF(mac);
-					printk("hp100: %s: multicast = %s, ",
-						     dev->name, print_mac(mac, addrs));
+					printk("hp100: %s: multicast = %pM, ",
+						     dev->name, addrs);
 #endif
 					for (j = idx = 0; j < 6; j++) {
 						idx ^= *addrs++ & 0x3f;

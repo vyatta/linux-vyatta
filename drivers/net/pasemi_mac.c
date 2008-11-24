@@ -1105,7 +1105,8 @@ static int pasemi_mac_phy_init(struct net_device *dev)
 		goto err;
 
 	phy_id = *prop;
-	snprintf(mac->phy_id, BUS_ID_SIZE, "%x:%02x", (int)r.start, phy_id);
+	snprintf(mac->phy_id, sizeof(mac->phy_id), "%x:%02x",
+		 (int)r.start, phy_id);
 
 	of_node_put(phy_dn);
 
@@ -1742,7 +1743,6 @@ pasemi_mac_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct net_device *dev;
 	struct pasemi_mac *mac;
 	int err;
-	DECLARE_MAC_BUF(mac_buf);
 
 	err = pci_enable_device(pdev);
 	if (err)
@@ -1849,9 +1849,9 @@ pasemi_mac_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 			err);
 		goto out;
 	} else if netif_msg_probe(mac)
-		printk(KERN_INFO "%s: PA Semi %s: intf %d, hw addr %s\n",
+		printk(KERN_INFO "%s: PA Semi %s: intf %d, hw addr %pM\n",
 		       dev->name, mac->type == MAC_TYPE_GMAC ? "GMAC" : "XAUI",
-		       mac->dma_if, print_mac(mac_buf, dev->dev_addr));
+		       mac->dma_if, dev->dev_addr);
 
 	return err;
 

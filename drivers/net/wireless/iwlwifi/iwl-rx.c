@@ -218,8 +218,7 @@ int iwl_rx_queue_restock(struct iwl_priv *priv)
 
 	/* If we've added more space for the firmware to place data, tell it.
 	 * Increment device's write pointer in multiples of 8. */
-	if ((write != (rxq->write & ~0x7))
-	    || (abs(rxq->write - rxq->read) > 7)) {
+	if (write != (rxq->write & ~0x7)) {
 		spin_lock_irqsave(&rxq->lock, flags);
 		rxq->need_update = 1;
 		spin_unlock_irqrestore(&rxq->lock, flags);
@@ -317,7 +316,10 @@ void iwl_rx_queue_free(struct iwl_priv *priv, struct iwl_rx_queue *rxq)
 
 	pci_free_consistent(priv->pci_dev, 4 * RX_QUEUE_SIZE, rxq->bd,
 			    rxq->dma_addr);
+	pci_free_consistent(priv->pci_dev, sizeof(struct iwl_rb_status),
+			    rxq->rb_stts, rxq->rb_stts_dma);
 	rxq->bd = NULL;
+	rxq->rb_stts  = NULL;
 }
 EXPORT_SYMBOL(iwl_rx_queue_free);
 
@@ -334,7 +336,12 @@ int iwl_rx_queue_alloc(struct iwl_priv *priv)
 	/* Alloc the circular buffer of Read Buffer Descriptors (RBDs) */
 	rxq->bd = pci_alloc_consistent(dev, 4 * RX_QUEUE_SIZE, &rxq->dma_addr);
 	if (!rxq->bd)
-		return -ENOMEM;
+		goto err_bd;
+
+	rxq->rb_stts = pci_alloc_consistent(dev, sizeof(struct iwl_rb_status),
+					&rxq->rb_stts_dma);
+	if (!rxq->rb_stts)
+		goto err_rb;
 
 	/* Fill the rx_used queue with _all_ of the Rx buffers */
 	for (i = 0; i < RX_FREE_BUFFERS + RX_QUEUE_SIZE; i++)
@@ -346,6 +353,12 @@ int iwl_rx_queue_alloc(struct iwl_priv *priv)
 	rxq->free_count = 0;
 	rxq->need_update = 0;
 	return 0;
+
+err_rb:
+	pci_free_consistent(priv->pci_dev, 4 * RX_QUEUE_SIZE, rxq->bd,
+			    rxq->dma_addr);
+err_bd:
+	return -ENOMEM;
 }
 EXPORT_SYMBOL(iwl_rx_queue_alloc);
 
@@ -412,10 +425,10 @@ int iwl_rx_init(struct iwl_priv *priv, struct iwl_rx_queue *rxq)
 
 	/* Tell device where in DRAM to update its Rx status */
 	iwl_write_direct32(priv, FH_RSCSR_CHNL0_STTS_WPTR_REG,
-			   (priv->shared_phys + priv->rb_closed_offset) >> 4);
+			   rxq->rb_stts_dma >> 4);
 
 	/* Enable Rx DMA
-	 * FH_RCSR_CHNL0_RX_IGNORE_RXF_EMPTY is set becuase of HW bug in
+	 * FH_RCSR_CHNL0_RX_IGNORE_RXF_EMPTY is set because of HW bug in
 	 *      the credit mechanism in 5000 HW RX FIFO
 	 * Direct rx interrupts to hosts
 	 * Rx buffer size 4 or 8k
@@ -426,6 +439,7 @@ int iwl_rx_init(struct iwl_priv *priv, struct iwl_rx_queue *rxq)
 			   FH_RCSR_RX_CONFIG_CHNL_EN_ENABLE_VAL |
 			   FH_RCSR_CHNL0_RX_IGNORE_RXF_EMPTY |
 			   FH_RCSR_CHNL0_RX_CONFIG_IRQ_DEST_INT_HOST_VAL |
+			   FH_RCSR_CHNL0_RX_CONFIG_SINGLE_FRAME |
 			   rb_size|
 			   (rb_timeout << FH_RCSR_RX_CONFIG_REG_IRQ_RBTH_POS)|
 			   (rfdnlog << FH_RCSR_RX_CONFIG_RBDCB_SIZE_POS));
@@ -1157,7 +1171,7 @@ void iwl_rx_reply_rx(struct iwl_priv *priv,
 		priv->last_rx_noise = IWL_NOISE_MEAS_NOT_AVAILABLE;
 
 	/* Set "1" to report good data frames in groups of 100 */
-	/* FIXME: need to optimze the call: */
+	/* FIXME: need to optimize the call: */
 	iwl_dbg_report_frame(priv, pkt, header, 1);
 
 	IWL_DEBUG_STATS_LIMIT("Rssi %d, noise %d, qual %d, TSF %llu\n",
@@ -1168,12 +1182,12 @@ void iwl_rx_reply_rx(struct iwl_priv *priv,
 	 * "antenna number"
 	 *
 	 * It seems that the antenna field in the phy flags value
-	 * is actually a bitfield. This is undefined by radiotap,
+	 * is actually a bit field. This is undefined by radiotap,
 	 * it wants an actual antenna number but I always get "7"
 	 * for most legacy frames I receive indicating that the
 	 * same frame was received on all three RX chains.
 	 *
-	 * I think this field should be removed in favour of a
+	 * I think this field should be removed in favor of a
 	 * new 802.11n radiotap field "RX chains" that is defined
 	 * as a bitmask.
 	 */

@@ -162,7 +162,6 @@ static int gfar_probe(struct platform_device *pdev)
 	struct gianfar_platform_data *einfo;
 	struct resource *r;
 	int err = 0, irq;
-	DECLARE_MAC_BUF(mac);
 
 	einfo = (struct gianfar_platform_data *) pdev->dev.platform_data;
 
@@ -364,8 +363,7 @@ static int gfar_probe(struct platform_device *pdev)
 	gfar_init_sysfs(dev);
 
 	/* Print out the device info */
-	printk(KERN_INFO DEVICE_NAME "%s\n",
-	       dev->name, print_mac(mac, dev->dev_addr));
+	printk(KERN_INFO DEVICE_NAME "%pM\n", dev->name, dev->dev_addr);
 
 	/* Even more device info helps when determining which kernel */
 	/* provided which set of benchmarks. */
@@ -548,7 +546,7 @@ static int init_phy(struct net_device *dev)
 	priv->oldspeed = 0;
 	priv->oldduplex = -1;
 
-	snprintf(phy_id, BUS_ID_SIZE, PHY_ID_FMT, priv->einfo->bus_id, priv->einfo->phy_id);
+	snprintf(phy_id, sizeof(phy_id), PHY_ID_FMT, priv->einfo->bus_id, priv->einfo->phy_id);
 
 	interface = gfar_get_interface(dev);
 
@@ -1695,8 +1693,6 @@ int gfar_clean_rx_ring(struct net_device *dev, int rx_work_limit)
 
 			dev->stats.rx_bytes += pkt_len;
 		}
-
-		dev->last_rx = jiffies;
 
 		priv->rx_skbuff[priv->skb_currx] = newskb;
 

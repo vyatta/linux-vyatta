@@ -1328,7 +1328,6 @@ static void bnx2x_tpa_stop(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 			dev_kfree_skb(skb);
 		}
 
-		bp->dev->last_rx = jiffies;
 
 		/* put new skb in bin */
 		fp->tpa_pool[queue].skb = new_skb;
@@ -1557,7 +1556,6 @@ reuse_rx:
 #endif
 			netif_receive_skb(skb);
 
-		bp->dev->last_rx = jiffies;
 
 next_rx:
 		rx_buf->skb = NULL;
@@ -8769,7 +8767,6 @@ static int bnx2x_run_loopback(struct bnx2x *bp, int loopback_mode, u8 link_up)
 	rc = 0;
 
 test_loopback_rx_exit:
-	bp->dev->last_rx = jiffies;
 
 	fp->rx_bd_cons = NEXT_RX_IDX(fp->rx_bd_cons);
 	fp->rx_bd_prod = NEXT_RX_IDX(fp->rx_bd_prod);
@@ -9853,11 +9850,8 @@ static void bnx2x_set_rx_mode(struct net_device *dev)
 			     mclist && (i < dev->mc_count);
 			     i++, mclist = mclist->next) {
 
-				DP(NETIF_MSG_IFUP, "Adding mcast MAC: "
-				   "%02x:%02x:%02x:%02x:%02x:%02x\n",
-				   mclist->dmi_addr[0], mclist->dmi_addr[1],
-				   mclist->dmi_addr[2], mclist->dmi_addr[3],
-				   mclist->dmi_addr[4], mclist->dmi_addr[5]);
+				DP(NETIF_MSG_IFUP, "Adding mcast MAC: %pM\n",
+				   mclist->dmi_addr);
 
 				crc = crc32c_le(0, mclist->dmi_addr, ETH_ALEN);
 				bit = (crc >> 24) & 0xff;
@@ -10008,6 +10002,25 @@ static void poll_bnx2x(struct net_device *dev)
 }
 #endif
 
+static const struct net_device_ops bnx2x_netdev_ops = {
+	.ndo_open		= bnx2x_open,
+	.ndo_stop		= bnx2x_close,
+	.ndo_start_xmit		= bnx2x_start_xmit,
+	.ndo_set_multicast_list = bnx2x_set_rx_mode,
+	.ndo_set_mac_address	= bnx2x_change_mac_addr,
+	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_do_ioctl		= bnx2x_ioctl,
+	.ndo_change_mtu		= bnx2x_change_mtu,
+	.ndo_tx_timeout		= bnx2x_tx_timeout,
+#ifdef BCM_VLAN
+	.ndo_vlan_rx_register	= bnx2x_vlan_rx_register,
+#endif
+#if defined(HAVE_POLL_CONTROLLER) || defined(CONFIG_NET_POLL_CONTROLLER)
+	.ndo_poll_controller	= poll_bnx2x,
+#endif
+};
+
+
 static int __devinit bnx2x_init_dev(struct pci_dev *pdev,
 				    struct net_device *dev)
 {
@@ -10092,8 +10105,7 @@ static int __devinit bnx2x_init_dev(struct pci_dev *pdev,
 
 	dev->irq = pdev->irq;
 
-	bp->regview = ioremap_nocache(dev->base_addr,
-				      pci_resource_len(pdev, 0));
+	bp->regview = pci_ioremap_bar(pdev, 0);
 	if (!bp->regview) {
 		printk(KERN_ERR PFX "Cannot map register space, aborting\n");
 		rc = -ENOMEM;
@@ -10119,23 +10131,10 @@ static int __devinit bnx2x_init_dev(struct pci_dev *pdev,
 	REG_WR(bp, PXP2_REG_PGL_ADDR_90_F0 + BP_PORT(bp)*16, 0);
 	REG_WR(bp, PXP2_REG_PGL_ADDR_94_F0 + BP_PORT(bp)*16, 0);
 
-	dev->hard_start_xmit = bnx2x_start_xmit;
 	dev->watchdog_timeo = TX_TIMEOUT;
 
+	dev->netdev_ops = &bnx2x_netdev_ops;
 	dev->ethtool_ops = &bnx2x_ethtool_ops;
-	dev->open = bnx2x_open;
-	dev->stop = bnx2x_close;
-	dev->set_multicast_list = bnx2x_set_rx_mode;
-	dev->set_mac_address = bnx2x_change_mac_addr;
-	dev->do_ioctl = bnx2x_ioctl;
-	dev->change_mtu = bnx2x_change_mtu;
-	dev->tx_timeout = bnx2x_tx_timeout;
-#ifdef BCM_VLAN
-	dev->vlan_rx_register = bnx2x_vlan_rx_register;
-#endif
-#if defined(HAVE_POLL_CONTROLLER) || defined(CONFIG_NET_POLL_CONTROLLER)
-	dev->poll_controller = poll_bnx2x;
-#endif
 	dev->features |= NETIF_F_SG;
 	dev->features |= NETIF_F_HW_CSUM;
 	if (bp->flags & USING_DAC_FLAG)
@@ -10194,7 +10193,6 @@ static int __devinit bnx2x_init_one(struct pci_dev *pdev,
 	struct net_device *dev = NULL;
 	struct bnx2x *bp;
 	int rc;
-	DECLARE_MAC_BUF(mac);
 
 	if (version_printed++ == 0)
 		printk(KERN_INFO "%s", version);
@@ -10238,7 +10236,7 @@ static int __devinit bnx2x_init_one(struct pci_dev *pdev,
 	       bnx2x_get_pcie_width(bp),
 	       (bnx2x_get_pcie_speed(bp) == 2) ? "5GHz (Gen2)" : "2.5GHz",
 	       dev->base_addr, bp->pdev->irq);
-	printk(KERN_CONT "node addr %s\n", print_mac(mac, dev->dev_addr));
+	printk(KERN_CONT "node addr %pM\n", dev->dev_addr);
 	return 0;
 
 init_one_exit:

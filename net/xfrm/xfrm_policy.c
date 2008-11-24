@@ -521,7 +521,7 @@ static DECLARE_WORK(xfrm_hash_work, xfrm_hash_resize);
 
 /* Generate new index... KAME seems to generate them ordered by cost
  * of an absolute inpredictability of ordering of rules. This will not pass. */
-static u32 xfrm_gen_index(u8 type, int dir)
+static u32 xfrm_gen_index(int dir)
 {
 	static u32 idx_generator;
 
@@ -608,7 +608,7 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 		list_del(&delpol->walk.all);
 		xfrm_policy_count[dir]--;
 	}
-	policy->index = delpol ? delpol->index : xfrm_gen_index(policy->type, dir);
+	policy->index = delpol ? delpol->index : xfrm_gen_index(dir);
 	hlist_add_head(&policy->byidx, xfrm_policy_byidx+idx_hash(policy->index));
 	policy->curlft.add_time = get_seconds();
 	policy->curlft.use_time = 0;
@@ -1138,7 +1138,7 @@ int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol)
 	sk->sk_policy[dir] = pol;
 	if (pol) {
 		pol->curlft.add_time = get_seconds();
-		pol->index = xfrm_gen_index(pol->type, XFRM_POLICY_MAX+dir);
+		pol->index = xfrm_gen_index(XFRM_POLICY_MAX+dir);
 		__xfrm_policy_link(pol, XFRM_POLICY_MAX+dir);
 	}
 	if (old_pol)
@@ -2381,9 +2381,7 @@ static int xfrm_dev_event(struct notifier_block *this, unsigned long event, void
 }
 
 static struct notifier_block xfrm_dev_notifier = {
-	xfrm_dev_event,
-	NULL,
-	0
+	.notifier_call	= xfrm_dev_event,
 };
 
 #ifdef CONFIG_XFRM_STATISTICS
@@ -2457,25 +2455,21 @@ static void xfrm_audit_common_policyinfo(struct xfrm_policy *xp,
 
 	switch(sel->family) {
 	case AF_INET:
-		audit_log_format(audit_buf, " src=" NIPQUAD_FMT,
-				 NIPQUAD(sel->saddr.a4));
+		audit_log_format(audit_buf, " src=%pI4", &sel->saddr.a4);
 		if (sel->prefixlen_s != 32)
 			audit_log_format(audit_buf, " src_prefixlen=%d",
 					 sel->prefixlen_s);
-		audit_log_format(audit_buf, " dst=" NIPQUAD_FMT,
-				 NIPQUAD(sel->daddr.a4));
+		audit_log_format(audit_buf, " dst=%pI4", &sel->daddr.a4);
 		if (sel->prefixlen_d != 32)
 			audit_log_format(audit_buf, " dst_prefixlen=%d",
 					 sel->prefixlen_d);
 		break;
 	case AF_INET6:
-		audit_log_format(audit_buf, " src=" NIP6_FMT,
-				 NIP6(*(struct in6_addr *)sel->saddr.a6));
+		audit_log_format(audit_buf, " src=%pI6", sel->saddr.a6);
 		if (sel->prefixlen_s != 128)
 			audit_log_format(audit_buf, " src_prefixlen=%d",
 					 sel->prefixlen_s);
-		audit_log_format(audit_buf, " dst=" NIP6_FMT,
-				 NIP6(*(struct in6_addr *)sel->daddr.a6));
+		audit_log_format(audit_buf, " dst=%pI6", sel->daddr.a6);
 		if (sel->prefixlen_d != 128)
 			audit_log_format(audit_buf, " dst_prefixlen=%d",
 					 sel->prefixlen_d);

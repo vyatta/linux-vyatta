@@ -77,11 +77,6 @@ static int napi_weight = 64;
  */
 unsigned int efx_monitor_interval = 1 * HZ;
 
-/* This controls whether or not the hardware monitor will trigger a
- * reset when it detects an error condition.
- */
-static unsigned int monitor_reset = true;
-
 /* This controls whether or not the driver will initialise devices
  * with invalid MAC addresses stored in the EEPROM or flash.  If true,
  * such devices will be initialised with a random locally-generated
@@ -612,17 +607,15 @@ static int efx_probe_port(struct efx_nic *efx)
 	if (is_valid_ether_addr(efx->mac_address)) {
 		memcpy(efx->net_dev->dev_addr, efx->mac_address, ETH_ALEN);
 	} else {
-		DECLARE_MAC_BUF(mac);
-
-		EFX_ERR(efx, "invalid MAC address %s\n",
-			print_mac(mac, efx->mac_address));
+		EFX_ERR(efx, "invalid MAC address %pM\n",
+			efx->mac_address);
 		if (!allow_bad_hwaddr) {
 			rc = -EINVAL;
 			goto err;
 		}
 		random_ether_addr(efx->net_dev->dev_addr);
-		EFX_INFO(efx, "using locally-generated MAC %s\n",
-			 print_mac(mac, efx->net_dev->dev_addr));
+		EFX_INFO(efx, "using locally-generated MAC %pM\n",
+			 efx->net_dev->dev_addr);
 	}
 
 	return 0;
@@ -1178,17 +1171,6 @@ static void efx_monitor(struct work_struct *data)
 		rc = falcon_check_xmac(efx);
 	mutex_unlock(&efx->mac_lock);
 
-	if (rc) {
-		if (monitor_reset) {
-			EFX_ERR(efx, "hardware monitor detected a fault: "
-				"triggering reset\n");
-			efx_schedule_reset(efx, RESET_TYPE_MONITOR);
-		} else {
-			EFX_ERR(efx, "hardware monitor detected a fault, "
-				"skipping reset\n");
-		}
-	}
-
 	queue_delayed_work(efx->workqueue, &efx->monitor_work,
 			   efx_monitor_interval);
 }
@@ -1360,12 +1342,11 @@ static void efx_watchdog(struct net_device *net_dev)
 {
 	struct efx_nic *efx = netdev_priv(net_dev);
 
-	EFX_ERR(efx, "TX stuck with stop_count=%d port_enabled=%d: %s\n",
-		atomic_read(&efx->netif_stop_count), efx->port_enabled,
-		monitor_reset ? "resetting channels" : "skipping reset");
+	EFX_ERR(efx, "TX stuck with stop_count=%d port_enabled=%d:"
+		" resetting channels\n",
+		atomic_read(&efx->netif_stop_count), efx->port_enabled);
 
-	if (monitor_reset)
-		efx_schedule_reset(efx, RESET_TYPE_MONITOR);
+	efx_schedule_reset(efx, RESET_TYPE_TX_WATCHDOG);
 }
 
 
@@ -1401,9 +1382,8 @@ static int efx_set_mac_address(struct net_device *net_dev, void *data)
 	EFX_ASSERT_RESET_SERIALISED(efx);
 
 	if (!is_valid_ether_addr(new_addr)) {
-		DECLARE_MAC_BUF(mac);
-		EFX_ERR(efx, "invalid ethernet MAC address requested: %s\n",
-			print_mac(mac, new_addr));
+		EFX_ERR(efx, "invalid ethernet MAC address requested: %pM\n",
+			new_addr);
 		return -EINVAL;
 	}
 
@@ -1453,15 +1433,32 @@ static void efx_set_multicast_list(struct net_device *net_dev)
 	falcon_set_multicast_hash(efx);
 }
 
+static const struct net_device_ops efx_netdev_ops = {
+	.ndo_open		= efx_net_open,
+	.ndo_stop		= efx_net_stop,
+	.ndo_get_stats		= efx_net_stats,
+	.ndo_tx_timeout		= efx_watchdog,
+	.ndo_start_xmit		= efx_hard_start_xmit,
+	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_do_ioctl		= efx_ioctl,
+	.ndo_change_mtu		= efx_change_mtu,
+	.ndo_set_mac_address	= efx_set_mac_address,
+	.ndo_set_multicast_list = efx_set_multicast_list,
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	.ndo_poll_controller = efx_netpoll,
+#endif
+};
+
 static int efx_netdev_event(struct notifier_block *this,
 			    unsigned long event, void *ptr)
 {
 	struct net_device *net_dev = ptr;
 
-	if (net_dev->open == efx_net_open && event == NETDEV_CHANGENAME) {
+	if (net_dev->netdev_ops == &efx_netdev_ops && event == NETDEV_CHANGENAME) {
 		struct efx_nic *efx = netdev_priv(net_dev);
 
 		strcpy(efx->name, net_dev->name);
+		efx_mtd_rename(efx);
 	}
 
 	return NOTIFY_DONE;
@@ -1478,18 +1475,7 @@ static int efx_register_netdev(struct efx_nic *efx)
 
 	net_dev->watchdog_timeo = 5 * HZ;
 	net_dev->irq = efx->pci_dev->irq;
-	net_dev->open = efx_net_open;
-	net_dev->stop = efx_net_stop;
-	net_dev->get_stats = efx_net_stats;
-	net_dev->tx_timeout = &efx_watchdog;
-	net_dev->hard_start_xmit = efx_hard_start_xmit;
-	net_dev->do_ioctl = efx_ioctl;
-	net_dev->change_mtu = efx_change_mtu;
-	net_dev->set_mac_address = efx_set_mac_address;
-	net_dev->set_multicast_list = efx_set_multicast_list;
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	net_dev->poll_controller = efx_netpoll;
-#endif
+	net_dev->netdev_ops = &efx_netdev_ops;
 	SET_NETDEV_DEV(net_dev, &efx->pci_dev->dev);
 	SET_ETHTOOL_OPS(net_dev, &efx_ethtool_ops);
 
@@ -1553,6 +1539,7 @@ void efx_reset_down(struct efx_nic *efx, struct ethtool_cmd *ecmd)
 
 	efx_stop_all(efx);
 	mutex_lock(&efx->mac_lock);
+	mutex_lock(&efx->spi_lock);
 
 	rc = falcon_xmac_get_settings(efx, ecmd);
 	if (rc)
@@ -1585,6 +1572,7 @@ int efx_reset_up(struct efx_nic *efx, struct ethtool_cmd *ecmd, bool ok)
 			EFX_ERR(efx, "could not restore PHY settings\n");
 	}
 
+	mutex_unlock(&efx->spi_lock);
 	mutex_unlock(&efx->mac_lock);
 
 	if (ok) {
@@ -1780,6 +1768,7 @@ static int efx_init_struct(struct efx_nic *efx, struct efx_nic_type *type,
 	memset(efx, 0, sizeof(*efx));
 	spin_lock_init(&efx->biu_lock);
 	spin_lock_init(&efx->phy_lock);
+	mutex_init(&efx->spi_lock);
 	INIT_WORK(&efx->reset_work, efx_reset_work);
 	INIT_DELAYED_WORK(&efx->monitor_work, efx_monitor);
 	efx->pci_dev = pci_dev;
@@ -1913,6 +1902,8 @@ static void efx_pci_remove(struct pci_dev *pci_dev)
 	efx = pci_get_drvdata(pci_dev);
 	if (!efx)
 		return;
+
+	efx_mtd_remove(efx);
 
 	/* Mark the NIC as fini, then stop the interface */
 	rtnl_lock();
@@ -2080,6 +2071,7 @@ static int __devinit efx_pci_probe(struct pci_dev *pci_dev,
 
 	EFX_LOG(efx, "initialisation successful\n");
 
+	efx_mtd_probe(efx); /* allowed to fail */
 	return 0;
 
  fail5:

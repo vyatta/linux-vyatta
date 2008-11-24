@@ -229,7 +229,7 @@ static inline void enable_parport_interrupts (struct net_device *dev)
 	if (dev->irq != -1)
 	{
 		struct parport *port =
-		   ((struct net_local *)dev->priv)->pardev->port;
+		   ((struct net_local *)netdev_priv(dev))->pardev->port;
 		port->ops->enable_irq (port);
 	}
 }
@@ -239,7 +239,7 @@ static inline void disable_parport_interrupts (struct net_device *dev)
 	if (dev->irq != -1)
 	{
 		struct parport *port =
-		   ((struct net_local *)dev->priv)->pardev->port;
+		   ((struct net_local *)netdev_priv(dev))->pardev->port;
 		port->ops->disable_irq (port);
 	}
 }
@@ -247,7 +247,7 @@ static inline void disable_parport_interrupts (struct net_device *dev)
 static inline void write_data (struct net_device *dev, unsigned char data)
 {
 	struct parport *port =
-	   ((struct net_local *)dev->priv)->pardev->port;
+	   ((struct net_local *)netdev_priv(dev))->pardev->port;
 
 	port->ops->write_data (port, data);
 }
@@ -255,7 +255,7 @@ static inline void write_data (struct net_device *dev, unsigned char data)
 static inline unsigned char read_status (struct net_device *dev)
 {
 	struct parport *port =
-	   ((struct net_local *)dev->priv)->pardev->port;
+	   ((struct net_local *)netdev_priv(dev))->pardev->port;
 
 	return port->ops->read_status (port);
 }
@@ -664,7 +664,6 @@ plip_receive_packet(struct net_device *dev, struct net_local *nl,
 		/* Inform the upper layer for the arrival of a packet. */
 		rcv->skb->protocol=plip_type_trans(rcv->skb, dev);
 		netif_rx_ni(rcv->skb);
-		dev->last_rx = jiffies;
 		dev->stats.rx_bytes += rcv->length.h;
 		dev->stats.rx_packets++;
 		rcv->skb = NULL;

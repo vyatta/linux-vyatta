@@ -357,7 +357,6 @@ static int __init el16_probe1(struct net_device *dev, int ioaddr)
 	static unsigned char init_ID_done, version_printed;
 	int i, irq, irqval, retval;
 	struct net_local *lp;
-	DECLARE_MAC_BUF(mac);
 
 	if (init_ID_done == 0) {
 		ushort lrs_state = 0xff;
@@ -405,7 +404,7 @@ static int __init el16_probe1(struct net_device *dev, int ioaddr)
 	outb(0x01, ioaddr + MISC_CTRL);
 	for (i = 0; i < 6; i++)
 		dev->dev_addr[i] = inb(ioaddr + i);
-	printk(" %s", print_mac(mac, dev->dev_addr));
+	printk(" %pM", dev->dev_addr);
 
 	if (mem_start)
 		net_debug = mem_start & 7;
@@ -866,7 +865,6 @@ static void el16_rx(struct net_device *dev)
 
 			skb->protocol=eth_type_trans(skb,dev);
 			netif_rx(skb);
-			dev->last_rx = jiffies;
 			dev->stats.rx_packets++;
 			dev->stats.rx_bytes += pkt_len;
 		}

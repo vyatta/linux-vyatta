@@ -2109,16 +2109,12 @@ static void xfrm_audit_helper_sainfo(struct xfrm_state *x,
 
 	switch(x->props.family) {
 	case AF_INET:
-		audit_log_format(audit_buf,
-				 " src=" NIPQUAD_FMT " dst=" NIPQUAD_FMT,
-				 NIPQUAD(x->props.saddr.a4),
-				 NIPQUAD(x->id.daddr.a4));
+		audit_log_format(audit_buf, " src=%pI4 dst=%pI4",
+				 &x->props.saddr.a4, &x->id.daddr.a4);
 		break;
 	case AF_INET6:
-		audit_log_format(audit_buf,
-				 " src=" NIP6_FMT " dst=" NIP6_FMT,
-				 NIP6(*(struct in6_addr *)x->props.saddr.a6),
-				 NIP6(*(struct in6_addr *)x->id.daddr.a6));
+		audit_log_format(audit_buf, " src=%pI6 dst=%pI6",
+				 x->props.saddr.a6, x->id.daddr.a6);
 		break;
 	}
 
@@ -2134,18 +2130,14 @@ static void xfrm_audit_helper_pktinfo(struct sk_buff *skb, u16 family,
 	switch (family) {
 	case AF_INET:
 		iph4 = ip_hdr(skb);
-		audit_log_format(audit_buf,
-				 " src=" NIPQUAD_FMT " dst=" NIPQUAD_FMT,
-				 NIPQUAD(iph4->saddr),
-				 NIPQUAD(iph4->daddr));
+		audit_log_format(audit_buf, " src=%pI4 dst=%pI4",
+				 &iph4->saddr, &iph4->daddr);
 		break;
 	case AF_INET6:
 		iph6 = ipv6_hdr(skb);
 		audit_log_format(audit_buf,
-				 " src=" NIP6_FMT " dst=" NIP6_FMT
-				 " flowlbl=0x%x%02x%02x",
-				 NIP6(iph6->saddr),
-				 NIP6(iph6->daddr),
+				 " src=%pI6 dst=%pI6 flowlbl=0x%x%02x%02x",
+				 &iph6->saddr,&iph6->daddr,
 				 iph6->flow_lbl[0] & 0x0f,
 				 iph6->flow_lbl[1],
 				 iph6->flow_lbl[2]);

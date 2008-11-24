@@ -65,7 +65,7 @@ __xfrm4_find_bundle(struct flowi *fl, struct xfrm_policy *policy)
 
 	read_lock_bh(&policy->lock);
 	for (dst = policy->bundles; dst; dst = dst->next) {
-		struct xfrm_dst *xdst = (struct xfrm_dst*)dst;
+		struct xfrm_dst *xdst = (struct xfrm_dst *)dst;
 		if (xdst->u.rt.fl.oif == fl->oif &&	/*XXX*/
 		    xdst->u.rt.fl.fl4_dst == fl->fl4_dst &&
 		    xdst->u.rt.fl.fl4_src == fl->fl4_src &&
@@ -246,7 +246,6 @@ static struct dst_ops xfrm4_dst_ops = {
 	.ifdown =		xfrm4_dst_ifdown,
 	.local_out =		__ip_local_out,
 	.gc_thresh =		1024,
-	.entry_size =		sizeof(struct xfrm_dst),
 	.entries =		ATOMIC_INIT(0),
 };
 

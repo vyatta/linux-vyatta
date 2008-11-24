@@ -1615,8 +1615,8 @@ static int init_phy(struct net_device *dev)
 	priv->oldspeed = 0;
 	priv->oldduplex = -1;
 
-	snprintf(phy_id, BUS_ID_SIZE, PHY_ID_FMT, priv->ug_info->mdio_bus,
-			priv->ug_info->phy_address);
+	snprintf(phy_id, sizeof(phy_id), PHY_ID_FMT, priv->ug_info->mdio_bus,
+		 priv->ug_info->phy_address);
 
 	phydev = phy_connect(dev, phy_id, &adjust_link, 0, priv->phy_interface);
 
@@ -3501,8 +3501,6 @@ static int ucc_geth_rx(struct ucc_geth_private *ugeth, u8 rxQ, int rx_work_limit
 			/* Send the packet up the stack */
 			netif_receive_skb(skb);
 		}
-
-		ugeth->dev->last_rx = jiffies;
 
 		skb = get_new_skb(ugeth, bd);
 		if (!skb) {

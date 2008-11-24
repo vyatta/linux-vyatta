@@ -23,6 +23,7 @@
 #include <linux/types.h>
 #include <linux/spinlock.h>
 #include <linux/etherdevice.h>
+#include <net/cfg80211.h>
 #include <net/wireless.h>
 #include <net/iw_handler.h>
 #include <net/mac80211.h>
@@ -142,7 +143,6 @@ typedef unsigned __bitwise__ ieee80211_tx_result;
 #define IEEE80211_TX_FRAGMENTED		BIT(0)
 #define IEEE80211_TX_UNICAST		BIT(1)
 #define IEEE80211_TX_PS_BUFFERED	BIT(2)
-#define IEEE80211_TX_PROBE_LAST_FRAG	BIT(3)
 
 struct ieee80211_tx_data {
 	struct sk_buff *skb;
@@ -153,11 +153,6 @@ struct ieee80211_tx_data {
 	struct ieee80211_key *key;
 
 	struct ieee80211_channel *channel;
-	s8 rate_idx;
-	/* use this rate (if set) for last fragment; rate can
-	 * be set to lower rate for the first fragments, e.g.,
-	 * when using CTS protection with IEEE 802.11g. */
-	s8 last_frag_rate_idx;
 
 	/* Extra fragments (in addition to the first fragment
 	 * in skb) */
@@ -203,9 +198,7 @@ struct ieee80211_rx_data {
 struct ieee80211_tx_stored_packet {
 	struct sk_buff *skb;
 	struct sk_buff **extra_frag;
-	s8 last_frag_rate_idx;
 	int num_extra_frag;
-	bool last_frag_rate_ctrl_probe;
 };
 
 struct beacon_data {
@@ -218,9 +211,6 @@ struct ieee80211_if_ap {
 	struct beacon_data *beacon;
 
 	struct list_head vlans;
-
-	u8 ssid[IEEE80211_MAX_SSID_LEN];
-	size_t ssid_len;
 
 	/* yes, this looks ugly, but guarantees that we can later use
 	 * bitmap_empty :)
@@ -254,26 +244,6 @@ struct mesh_preq_queue {
 	u8 dst[ETH_ALEN];
 	u8 flags;
 };
-
-struct mesh_config {
-	/* Timeouts in ms */
-	/* Mesh plink management parameters */
-	u16 dot11MeshRetryTimeout;
-	u16 dot11MeshConfirmTimeout;
-	u16 dot11MeshHoldingTimeout;
-	u16 dot11MeshMaxPeerLinks;
-	u8  dot11MeshMaxRetries;
-	u8  dot11MeshTTL;
-	bool auto_open_plinks;
-	/* HWMP parameters */
-	u8  dot11MeshHWMPmaxPREQretries;
-	u32 path_refresh_time;
-	u16 min_discovery_timeout;
-	u32 dot11MeshHWMPactivePathTimeout;
-	u16 dot11MeshHWMPpreqMinInterval;
-	u16 dot11MeshHWMPnetDiameterTraversalTime;
-};
-
 
 /* flags used in struct ieee80211_if_sta.flags */
 #define IEEE80211_STA_SSID_SET		BIT(0)
@@ -438,8 +408,7 @@ struct ieee80211_sub_if_data {
 	struct ieee80211_key *keys[NUM_DEFAULT_KEYS];
 	struct ieee80211_key *default_key;
 
-	/* BSS configuration for this interface. */
-	struct ieee80211_bss_conf bss_conf;
+	u16 sequence_number;
 
 	/*
 	 * AP this belongs to: self in AP mode and
@@ -633,8 +602,6 @@ struct ieee80211_local {
 
 	int rts_threshold;
 	int fragmentation_threshold;
-	int short_retry_limit; /* dot11ShortRetryLimit */
-	int long_retry_limit; /* dot11LongRetryLimit */
 
 	struct crypto_blkcipher *wep_tx_tfm;
 	struct crypto_blkcipher *wep_rx_tfm;
@@ -727,8 +694,6 @@ struct ieee80211_local {
 		struct dentry *rcdir;
 		struct dentry *rcname;
 		struct dentry *frequency;
-		struct dentry *antenna_sel_tx;
-		struct dentry *antenna_sel_rx;
 		struct dentry *rts_threshold;
 		struct dentry *fragmentation_threshold;
 		struct dentry *short_retry_limit;
@@ -817,7 +782,7 @@ struct ieee802_11_elems {
 	u8 *wmm_info;
 	u8 *wmm_param;
 	struct ieee80211_ht_cap *ht_cap_elem;
-	struct ieee80211_ht_addt_info *ht_info_elem;
+	struct ieee80211_ht_info *ht_info_elem;
 	u8 *mesh_config;
 	u8 *mesh_id;
 	u8 *peer_link;
@@ -869,11 +834,6 @@ static inline struct ieee80211_hw *local_to_hw(
 	return &local->hw;
 }
 
-struct sta_attribute {
-	struct attribute attr;
-	ssize_t (*show)(const struct sta_info *, char *buf);
-	ssize_t (*store)(struct sta_info *, const char *buf, size_t count);
-};
 
 static inline int ieee80211_bssid_match(const u8 *raddr, const u8 *addr)
 {
@@ -882,12 +842,9 @@ static inline int ieee80211_bssid_match(const u8 *raddr, const u8 *addr)
 }
 
 
-int ieee80211_hw_config(struct ieee80211_local *local);
+int ieee80211_hw_config(struct ieee80211_local *local, u32 changed);
 int ieee80211_if_config(struct ieee80211_sub_if_data *sdata, u32 changed);
 void ieee80211_tx_set_protected(struct ieee80211_tx_data *tx);
-u32 ieee80211_handle_ht(struct ieee80211_local *local, int enable_ht,
-			struct ieee80211_ht_info *req_ht_cap,
-			struct ieee80211_ht_bss_info *req_bss_cap);
 void ieee80211_bss_info_change_notify(struct ieee80211_sub_if_data *sdata,
 				      u32 changed);
 void ieee80211_configure_filter(struct ieee80211_local *local);
@@ -968,11 +925,12 @@ int ieee80211_monitor_start_xmit(struct sk_buff *skb, struct net_device *dev);
 int ieee80211_subif_start_xmit(struct sk_buff *skb, struct net_device *dev);
 
 /* HT */
-int ieee80211_ht_cap_ie_to_ht_info(struct ieee80211_ht_cap *ht_cap_ie,
-				   struct ieee80211_ht_info *ht_info);
-int ieee80211_ht_addt_info_ie_to_ht_bss_info(
-			struct ieee80211_ht_addt_info *ht_add_info_ie,
-			struct ieee80211_ht_bss_info *bss_info);
+void ieee80211_ht_cap_ie_to_sta_ht_cap(struct ieee80211_supported_band *sband,
+				       struct ieee80211_ht_cap *ht_cap_ie,
+				       struct ieee80211_sta_ht_cap *ht_cap);
+u32 ieee80211_enable_ht(struct ieee80211_sub_if_data *sdata,
+			struct ieee80211_ht_info *hti,
+			u16 ap_ht_cap_flags);
 void ieee80211_send_bar(struct ieee80211_sub_if_data *sdata, u8 *ra, u16 tid, u16 ssn);
 
 void ieee80211_sta_stop_rx_ba_session(struct ieee80211_sub_if_data *sdata, u8 *da,

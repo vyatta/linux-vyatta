@@ -250,6 +250,9 @@ typedef unsigned char *sk_buff_data_t;
  *	@tc_verd: traffic control verdict
  *	@ndisc_nodetype: router type (from link layer)
  *	@do_not_encrypt: set to prevent encryption of this frame
+ *	@requeue: set to indicate that the wireless core should attempt
+ *		a software retry on this frame if we failed to
+ *		receive an ACK for it
  *	@dma_cookie: a cookie to one of several possible DMA operations
  *		done by skb DMA functions
  *	@secmark: security marking
@@ -269,8 +272,9 @@ struct sk_buff {
 		struct  dst_entry	*dst;
 		struct  rtable		*rtable;
 	};
+#ifdef CONFIG_XFRM
 	struct	sec_path	*sp;
-
+#endif
 	/*
 	 * This is the control buffer. It is free to use for every
 	 * layer. Please put your private variables there. If you
@@ -325,6 +329,7 @@ struct sk_buff {
 #endif
 #if defined(CONFIG_MAC80211) || defined(CONFIG_MAC80211_MODULE)
 	__u8			do_not_encrypt:1;
+	__u8			requeue:1;
 #endif
 	/* 0/13/14 bit hole */
 
@@ -1863,6 +1868,18 @@ static inline void skb_copy_queue_mapping(struct sk_buff *to, const struct sk_bu
 {
 	to->queue_mapping = from->queue_mapping;
 }
+
+#ifdef CONFIG_XFRM
+static inline struct sec_path *skb_sec_path(struct sk_buff *skb)
+{
+	return skb->sp;
+}
+#else
+static inline struct sec_path *skb_sec_path(struct sk_buff *skb)
+{
+	return NULL;
+}
+#endif
 
 static inline int skb_is_gso(const struct sk_buff *skb)
 {

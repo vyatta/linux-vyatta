@@ -2127,7 +2127,6 @@ static void ql_process_mac_rx_intr(struct ql3_adapter *qdev,
 	skb->protocol = eth_type_trans(skb, qdev->ndev);
 
 	netif_receive_skb(skb);
-	qdev->ndev->last_rx = jiffies;
 	lrg_buf_cb2->skb = NULL;
 
 	if (qdev->device_id == QL3022_DEVICE_ID)
@@ -2201,7 +2200,6 @@ static void ql_process_macip_rx_intr(struct ql3_adapter *qdev,
 	netif_receive_skb(skb2);
 	ndev->stats.rx_packets++;
 	ndev->stats.rx_bytes += length;
-	ndev->last_rx = jiffies;
 	lrg_buf_cb2->skb = NULL;
 
 	if (qdev->device_id == QL3022_DEVICE_ID)
@@ -3520,7 +3518,6 @@ static void ql_display_dev_info(struct net_device *ndev)
 {
 	struct ql3_adapter *qdev = (struct ql3_adapter *)netdev_priv(ndev);
 	struct pci_dev *pdev = qdev->pdev;
-	DECLARE_MAC_BUF(mac);
 
 	printk(KERN_INFO PFX
 	       "\n%s Adapter %d RevisionID %d found %s on PCI slot %d.\n",
@@ -3546,8 +3543,8 @@ static void ql_display_dev_info(struct net_device *ndev)
 
 	if (netif_msg_probe(qdev))
 		printk(KERN_INFO PFX
-		       "%s: MAC address %s\n",
-		       ndev->name, print_mac(mac, ndev->dev_addr));
+		       "%s: MAC address %pM\n",
+		       ndev->name, ndev->dev_addr);
 }
 
 static int ql_adapter_down(struct ql3_adapter *qdev, int do_reset)
@@ -3903,6 +3900,17 @@ static void ql3xxx_timer(unsigned long ptr)
 	queue_delayed_work(qdev->workqueue, &qdev->link_state_work, 0);
 }
 
+static const struct net_device_ops ql3xxx_netdev_ops = {
+	.ndo_open		= ql3xxx_open,
+	.ndo_start_xmit		= ql3xxx_send,
+	.ndo_stop		= ql3xxx_close,
+	.ndo_set_multicast_list = NULL, /* not allowed on NIC side */
+	.ndo_change_mtu		= eth_change_mtu,
+	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_set_mac_address	= ql3xxx_set_mac_address,
+	.ndo_tx_timeout		= ql3xxx_tx_timeout,
+};
+
 static int __devinit ql3xxx_probe(struct pci_dev *pdev,
 				  const struct pci_device_id *pci_entry)
 {
@@ -3969,9 +3977,7 @@ static int __devinit ql3xxx_probe(struct pci_dev *pdev,
 	if (qdev->device_id == QL3032_DEVICE_ID)
 		ndev->features |= NETIF_F_IP_CSUM | NETIF_F_SG;
 
-	qdev->mem_map_registers =
-	    ioremap_nocache(pci_resource_start(pdev, 1),
-			    pci_resource_len(qdev->pdev, 1));
+	qdev->mem_map_registers = pci_ioremap_bar(pdev, 1);
 	if (!qdev->mem_map_registers) {
 		printk(KERN_ERR PFX "%s: cannot map device registers\n",
 		       pci_name(pdev));
@@ -3983,17 +3989,8 @@ static int __devinit ql3xxx_probe(struct pci_dev *pdev,
 	spin_lock_init(&qdev->hw_lock);
 
 	/* Set driver entry points */
-	ndev->open = ql3xxx_open;
-	ndev->hard_start_xmit = ql3xxx_send;
-	ndev->stop = ql3xxx_close;
-	/* ndev->set_multicast_list
-	 * This device is one side of a two-function adapter
-	 * (NIC and iSCSI).  Promiscuous mode setting/clearing is
-	 * not allowed from the NIC side.
-	 */
+	ndev->netdev_ops = &ql3xxx_netdev_ops;
 	SET_ETHTOOL_OPS(ndev, &ql3xxx_ethtool_ops);
-	ndev->set_mac_address = ql3xxx_set_mac_address;
-	ndev->tx_timeout = ql3xxx_tx_timeout;
 	ndev->watchdog_timeo = 5 * HZ;
 
 	netif_napi_add(ndev, &qdev->napi, ql_poll, 64);

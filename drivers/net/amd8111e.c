@@ -809,7 +809,6 @@ static int amd8111e_rx_poll(struct napi_struct *napi, int budget)
 			lp->coal_conf.rx_packets++;
 			lp->coal_conf.rx_bytes += pkt_len;
 			num_rx_pkt++;
-			dev->last_rx = jiffies;
 
 		err_next_pkt:
 			lp->rx_ring[rx_index].buff_phy_addr
@@ -1821,7 +1820,6 @@ static int __devinit amd8111e_probe_one(struct pci_dev *pdev,
 	unsigned long reg_addr,reg_len;
 	struct amd8111e_priv* lp;
 	struct net_device* dev;
-	DECLARE_MAC_BUF(mac);
 
 	err = pci_enable_device(pdev);
 	if(err){
@@ -1963,8 +1961,8 @@ static int __devinit amd8111e_probe_one(struct pci_dev *pdev,
     	chip_version = (readl(lp->mmio + CHIPID) & 0xf0000000)>>28;
 	printk(KERN_INFO "%s: AMD-8111e Driver Version: %s\n",
 	       dev->name,MODULE_VERS);
-	printk(KERN_INFO "%s: [ Rev %x ] PCI 10/100BaseT Ethernet %s\n",
-	       dev->name, chip_version, print_mac(mac, dev->dev_addr));
+	printk(KERN_INFO "%s: [ Rev %x ] PCI 10/100BaseT Ethernet %pM\n",
+	       dev->name, chip_version, dev->dev_addr);
 	if (lp->ext_phy_id)
 		printk(KERN_INFO "%s: Found MII PHY ID 0x%08x at address 0x%02x\n",
 		       dev->name, lp->ext_phy_id, lp->ext_phy_addr);

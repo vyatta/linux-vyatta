@@ -788,7 +788,6 @@ static int tsi108_complete_rx(struct net_device *dev, int budget)
 		skb_put(skb, data->rxring[rx].len);
 		skb->protocol = eth_type_trans(skb, dev);
 		netif_receive_skb(skb);
-		dev->last_rx = jiffies;
 	}
 
 	return done;
@@ -1569,7 +1568,6 @@ tsi108_init_one(struct platform_device *pdev)
 	struct tsi108_prv_data *data = NULL;
 	hw_info *einfo;
 	int err = 0;
-	DECLARE_MAC_BUF(mac);
 
 	einfo = pdev->dev.platform_data;
 
@@ -1659,8 +1657,8 @@ tsi108_init_one(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, dev);
-	printk(KERN_INFO "%s: Tsi108 Gigabit Ethernet, MAC: %s\n",
-	       dev->name, print_mac(mac, dev->dev_addr));
+	printk(KERN_INFO "%s: Tsi108 Gigabit Ethernet, MAC: %pM\n",
+	       dev->name, dev->dev_addr);
 #ifdef DEBUG
 	data->msg_enable = DEBUG;
 	dump_eth_one(dev);

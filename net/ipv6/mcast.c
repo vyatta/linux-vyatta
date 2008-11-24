@@ -1817,7 +1817,7 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 
 	hdr->icmp6_cksum = csum_ipv6_magic(saddr, snd_addr, len,
 					   IPPROTO_ICMPV6,
-					   csum_partial((__u8 *) hdr, len, 0));
+					   csum_partial(hdr, len, 0));
 
 	idev = in6_dev_get(skb->dev);
 
@@ -2430,9 +2430,9 @@ static int igmp6_mc_seq_show(struct seq_file *seq, void *v)
 	struct igmp6_mc_iter_state *state = igmp6_mc_seq_private(seq);
 
 	seq_printf(seq,
-		   "%-4d %-15s " NIP6_SEQFMT " %5d %08X %ld\n",
+		   "%-4d %-15s %pi6 %5d %08X %ld\n",
 		   state->dev->ifindex, state->dev->name,
-		   NIP6(im->mca_addr),
+		   &im->mca_addr,
 		   im->mca_users, im->mca_flags,
 		   (im->mca_flags&MAF_TIMER_RUNNING) ?
 		   jiffies_to_clock_t(im->mca_timer.expires-jiffies) : 0);
@@ -2591,10 +2591,10 @@ static int igmp6_mcf_seq_show(struct seq_file *seq, void *v)
 			   "Source Address", "INC", "EXC");
 	} else {
 		seq_printf(seq,
-			   "%3d %6.6s " NIP6_SEQFMT " " NIP6_SEQFMT " %6lu %6lu\n",
+			   "%3d %6.6s %pi6 %pi6 %6lu %6lu\n",
 			   state->dev->ifindex, state->dev->name,
-			   NIP6(state->im->mca_addr),
-			   NIP6(psf->sf_addr),
+			   &state->im->mca_addr,
+			   &psf->sf_addr,
 			   psf->sf_count[MCAST_INCLUDE],
 			   psf->sf_count[MCAST_EXCLUDE]);
 	}

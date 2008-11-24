@@ -346,14 +346,18 @@ static void rlb_update_entry_from_arp(struct bonding *bond, struct arp_pkt *arp)
 
 static int rlb_arp_recv(struct sk_buff *skb, struct net_device *bond_dev, struct packet_type *ptype, struct net_device *orig_dev)
 {
-	struct bonding *bond = bond_dev->priv;
+	struct bonding *bond;
 	struct arp_pkt *arp = (struct arp_pkt *)skb->data;
 	int res = NET_RX_DROP;
 
 	if (dev_net(bond_dev) != &init_net)
 		goto out;
 
-	if (!(bond_dev->flags & IFF_MASTER))
+	while (bond_dev->priv_flags & IFF_802_1Q_VLAN)
+		bond_dev = vlan_dev_real_dev(bond_dev);
+
+	if (!(bond_dev->priv_flags & IFF_BONDING) ||
+	    !(bond_dev->flags & IFF_MASTER))
 		goto out;
 
 	if (!arp) {
@@ -368,6 +372,9 @@ static int rlb_arp_recv(struct sk_buff *skb, struct net_device *bond_dev, struct
 
 	if (arp->op_code == htons(ARPOP_REPLY)) {
 		/* update rx hash table for this ARP */
+		printk("rar: update orig %s bond_dev %s\n", orig_dev->name,
+		       bond_dev->name);
+		bond = netdev_priv(bond_dev);
 		rlb_update_entry_from_arp(bond, arp);
 		dprintk("Server received an ARP Reply from client\n");
 	}
@@ -818,7 +825,7 @@ static int rlb_initialize(struct bonding *bond)
 
 	/*initialize packet type*/
 	pk_type->type = __constant_htons(ETH_P_ARP);
-	pk_type->dev = bond->dev;
+	pk_type->dev = NULL;
 	pk_type->func = rlb_arp_recv;
 
 	/* register to receive ARPs */
@@ -1211,11 +1218,6 @@ static int alb_set_mac_address(struct bonding *bond, void *addr)
 	}
 
 	bond_for_each_slave(bond, slave, i) {
-		if (slave->dev->set_mac_address == NULL) {
-			res = -EOPNOTSUPP;
-			goto unwind;
-		}
-
 		/* save net_device's current hw address */
 		memcpy(tmp_addr, slave->dev->dev_addr, ETH_ALEN);
 
@@ -1224,9 +1226,8 @@ static int alb_set_mac_address(struct bonding *bond, void *addr)
 		/* restore net_device's hw address */
 		memcpy(slave->dev->dev_addr, tmp_addr, ETH_ALEN);
 
-		if (res) {
+		if (res)
 			goto unwind;
-		}
 	}
 
 	return 0;
@@ -1285,7 +1286,7 @@ void bond_alb_deinitialize(struct bonding *bond)
 
 int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 {
-	struct bonding *bond = bond_dev->priv;
+	struct bonding *bond = netdev_priv(bond_dev);
 	struct ethhdr *eth_data;
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	struct slave *tx_slave = NULL;
@@ -1706,7 +1707,7 @@ void bond_alb_handle_active_change(struct bonding *bond, struct slave *new_slave
  */
 int bond_alb_set_mac_address(struct net_device *bond_dev, void *addr)
 {
-	struct bonding *bond = bond_dev->priv;
+	struct bonding *bond = netdev_priv(bond_dev);
 	struct sockaddr *sa = addr;
 	struct slave *slave, *swap_slave;
 	int res;

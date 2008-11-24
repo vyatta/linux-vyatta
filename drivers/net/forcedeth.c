@@ -818,7 +818,7 @@ struct fe_priv {
  * Maximum number of loops until we assume that a bit in the irq mask
  * is stuck. Overridable with module param.
  */
-static int max_interrupt_work = 5;
+static int max_interrupt_work = 15;
 
 /*
  * Optimization can be either throuput mode or cpu mode
@@ -2735,7 +2735,6 @@ static int nv_rx_process(struct net_device *dev, int limit)
 #else
 		netif_rx(skb);
 #endif
-		dev->last_rx = jiffies;
 		dev->stats.rx_packets++;
 		dev->stats.rx_bytes += len;
 next_pkt:
@@ -2848,7 +2847,6 @@ static int nv_rx_process_optimized(struct net_device *dev, int limit)
 				}
 			}
 
-			dev->last_rx = jiffies;
 			dev->stats.rx_packets++;
 			dev->stats.rx_bytes += len;
 		} else {
@@ -5410,6 +5408,38 @@ static int nv_close(struct net_device *dev)
 	return 0;
 }
 
+static const struct net_device_ops nv_netdev_ops = {
+	.ndo_open		= nv_open,
+	.ndo_stop		= nv_close,
+	.ndo_get_stats		= nv_get_stats,
+	.ndo_start_xmit		= nv_start_xmit,
+	.ndo_tx_timeout		= nv_tx_timeout,
+	.ndo_change_mtu		= nv_change_mtu,
+	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_set_mac_address	= nv_set_mac_address,
+	.ndo_set_multicast_list	= nv_set_multicast,
+	.ndo_vlan_rx_register	= nv_vlan_rx_register,
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	.ndo_poll_controller	= nv_poll_controller,
+#endif
+};
+
+static const struct net_device_ops nv_netdev_ops_optimized = {
+	.ndo_open		= nv_open,
+	.ndo_stop		= nv_close,
+	.ndo_get_stats		= nv_get_stats,
+	.ndo_start_xmit		= nv_start_xmit_optimized,
+	.ndo_tx_timeout		= nv_tx_timeout,
+	.ndo_change_mtu		= nv_change_mtu,
+	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_set_mac_address	= nv_set_mac_address,
+	.ndo_set_multicast_list	= nv_set_multicast,
+	.ndo_vlan_rx_register	= nv_vlan_rx_register,
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	.ndo_poll_controller	= nv_poll_controller,
+#endif
+};
+
 static int __devinit nv_probe(struct pci_dev *pci_dev, const struct pci_device_id *id)
 {
 	struct net_device *dev;
@@ -5420,7 +5450,6 @@ static int __devinit nv_probe(struct pci_dev *pci_dev, const struct pci_device_i
 	u32 powerstate, txreg;
 	u32 phystate_orig = 0, phystate;
 	int phyinitialized = 0;
-	DECLARE_MAC_BUF(mac);
 	static int printed_version;
 
 	if (!printed_version++)
@@ -5530,7 +5559,6 @@ static int __devinit nv_probe(struct pci_dev *pci_dev, const struct pci_device_i
 	if (id->driver_data & DEV_HAS_VLAN) {
 		np->vlanctl_bits = NVREG_VLANCONTROL_ENABLE;
 		dev->features |= NETIF_F_HW_VLAN_RX | NETIF_F_HW_VLAN_TX;
-		dev->vlan_rx_register = nv_vlan_rx_register;
 	}
 
 	np->msi_flags = 0;
@@ -5580,25 +5608,15 @@ static int __devinit nv_probe(struct pci_dev *pci_dev, const struct pci_device_i
 	if (!np->rx_skb || !np->tx_skb)
 		goto out_freering;
 
-	dev->open = nv_open;
-	dev->stop = nv_close;
-
 	if (!nv_optimized(np))
-		dev->hard_start_xmit = nv_start_xmit;
+		dev->netdev_ops = &nv_netdev_ops;
 	else
-		dev->hard_start_xmit = nv_start_xmit_optimized;
-	dev->get_stats = nv_get_stats;
-	dev->change_mtu = nv_change_mtu;
-	dev->set_mac_address = nv_set_mac_address;
-	dev->set_multicast_list = nv_set_multicast;
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	dev->poll_controller = nv_poll_controller;
-#endif
+		dev->netdev_ops = &nv_netdev_ops_optimized;
+
 #ifdef CONFIG_FORCEDETH_NAPI
 	netif_napi_add(dev, &np->napi, nv_napi_poll, RX_WORK_PER_LOOP);
 #endif
 	SET_ETHTOOL_OPS(dev, &ops);
-	dev->tx_timeout = nv_tx_timeout;
 	dev->watchdog_timeo = NV_WATCHDOG_TIMEO;
 
 	pci_set_drvdata(pci_dev, dev);
@@ -5653,8 +5671,8 @@ static int __devinit nv_probe(struct pci_dev *pci_dev, const struct pci_device_i
 		 * to 01:23:45:67:89:ab
 		 */
 		dev_printk(KERN_ERR, &pci_dev->dev,
-			"Invalid Mac address detected: %s\n",
-		        print_mac(mac, dev->dev_addr));
+			"Invalid Mac address detected: %pM\n",
+		        dev->dev_addr);
 		dev_printk(KERN_ERR, &pci_dev->dev,
 			"Please complain to your hardware vendor. Switching to a random MAC.\n");
 		dev->dev_addr[0] = 0x00;
@@ -5663,8 +5681,8 @@ static int __devinit nv_probe(struct pci_dev *pci_dev, const struct pci_device_i
 		get_random_bytes(&dev->dev_addr[3], 3);
 	}
 
-	dprintk(KERN_DEBUG "%s: MAC Address %s\n",
-		pci_name(pci_dev), print_mac(mac, dev->dev_addr));
+	dprintk(KERN_DEBUG "%s: MAC Address %pM\n",
+		pci_name(pci_dev), dev->dev_addr);
 
 	/* set mac address */
 	nv_copy_mac_to_hw(dev);

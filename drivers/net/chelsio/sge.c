@@ -1385,7 +1385,6 @@ static void sge_rx(struct sge *sge, struct freelQ *fl, unsigned int len)
 	st = per_cpu_ptr(sge->port_stats[p->iff], smp_processor_id());
 
 	skb->protocol = eth_type_trans(skb, adapter->port[p->iff].dev);
-	skb->dev->last_rx = jiffies;
 	if ((adapter->flags & RX_CSUM_ENABLED) && p->csum == 0xffff &&
 	    skb->protocol == htons(ETH_P_IP) &&
 	    (skb->data[9] == IPPROTO_TCP || skb->data[9] == IPPROTO_UDP)) {
@@ -1786,7 +1785,7 @@ static inline int eth_hdr_len(const void *data)
  */
 int t1_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct adapter *adapter = dev->priv;
+	struct adapter *adapter = dev->ml_priv;
 	struct sge *sge = adapter->sge;
 	struct sge_port_stats *st = per_cpu_ptr(sge->port_stats[dev->if_port],
 						smp_processor_id());

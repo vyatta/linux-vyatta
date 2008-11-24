@@ -3392,8 +3392,6 @@ static int niu_process_rx_pkt(struct niu *np, struct rx_ring_info *rp)
 	skb->protocol = eth_type_trans(skb, np->dev);
 	netif_receive_skb(skb);
 
-	np->dev->last_rx = jiffies;
-
 	return num_rcr;
 }
 
@@ -8891,28 +8889,31 @@ static struct net_device * __devinit niu_alloc_and_init(
 	return dev;
 }
 
+static const struct net_device_ops niu_netdev_ops = {
+	.ndo_open		= niu_open,
+	.ndo_stop		= niu_close,
+	.ndo_start_xmit		= niu_start_xmit,
+	.ndo_get_stats		= niu_get_stats,
+	.ndo_set_multicast_list	= niu_set_rx_mode,
+	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_set_mac_address	= niu_set_mac_addr,
+	.ndo_do_ioctl		= niu_ioctl,
+	.ndo_tx_timeout		= niu_tx_timeout,
+	.ndo_change_mtu		= niu_change_mtu,
+};
+
 static void __devinit niu_assign_netdev_ops(struct net_device *dev)
 {
-	dev->open = niu_open;
-	dev->stop = niu_close;
-	dev->get_stats = niu_get_stats;
-	dev->set_multicast_list = niu_set_rx_mode;
-	dev->set_mac_address = niu_set_mac_addr;
-	dev->do_ioctl = niu_ioctl;
-	dev->tx_timeout = niu_tx_timeout;
-	dev->hard_start_xmit = niu_start_xmit;
+	dev->netdev_ops = &niu_netdev_ops;
 	dev->ethtool_ops = &niu_ethtool_ops;
 	dev->watchdog_timeo = NIU_TX_TIMEOUT;
-	dev->change_mtu = niu_change_mtu;
 }
 
 static void __devinit niu_device_announce(struct niu *np)
 {
 	struct net_device *dev = np->dev;
-	DECLARE_MAC_BUF(mac);
 
-	pr_info("%s: NIU Ethernet %s\n",
-		dev->name, print_mac(mac, dev->dev_addr));
+	pr_info("%s: NIU Ethernet %pM\n", dev->name, dev->dev_addr);
 
 	if (np->parent->plat_type == PLAT_TYPE_ATCA_CP3220) {
 		pr_info("%s: Port type[%s] mode[%s:%s] XCVR[%s] phy[%s]\n",

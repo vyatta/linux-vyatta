@@ -1729,7 +1729,6 @@ typhoon_rx(struct typhoon *tp, struct basic_ring *rxRing, volatile __le32 * read
 			netif_receive_skb(new_skb);
 		spin_unlock(&tp->state_lock);
 
-		tp->dev->last_rx = jiffies;
 		received++;
 		budget--;
 	}
@@ -1798,7 +1797,7 @@ static irqreturn_t
 typhoon_interrupt(int irq, void *dev_instance)
 {
 	struct net_device *dev = dev_instance;
-	struct typhoon *tp = dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	void __iomem *ioaddr = tp->ioaddr;
 	u32 intr_status;
 
@@ -2311,7 +2310,6 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct cmd_desc xp_cmd;
 	struct resp_desc xp_resp[3];
 	int err = 0;
-	DECLARE_MAC_BUF(mac);
 
 	if(!did_version++)
 		printk(KERN_INFO "%s", version);
@@ -2526,11 +2524,11 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	pci_set_drvdata(pdev, dev);
 
-	printk(KERN_INFO "%s: %s at %s 0x%llx, %s\n",
+	printk(KERN_INFO "%s: %s at %s 0x%llx, %pM\n",
 	       dev->name, typhoon_card_info[card_id].name,
 	       use_mmio ? "MMIO" : "IO",
 	       (unsigned long long)pci_resource_start(pdev, use_mmio),
-	       print_mac(mac, dev->dev_addr));
+	       dev->dev_addr);
 
 	/* xp_resp still contains the response to the READ_VERSIONS command.
 	 * For debugging, let the user know what version he has.

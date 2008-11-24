@@ -108,7 +108,6 @@
 #include <linux/init.h>
 #include <linux/kmod.h>
 #include <linux/module.h>
-#include <linux/kallsyms.h>
 #include <linux/netpoll.h>
 #include <linux/rcupdate.h>
 #include <linux/delay.h>
@@ -924,10 +923,15 @@ int dev_change_name(struct net_device *dev, const char *newname)
 		strlcpy(dev->name, newname, IFNAMSIZ);
 
 rollback:
-	ret = device_rename(&dev->dev, dev->name);
-	if (ret) {
-		memcpy(dev->name, oldname, IFNAMSIZ);
-		return ret;
+	/* For now only devices in the initial network namespace
+	 * are in sysfs.
+	 */
+	if (net == &init_net) {
+		ret = device_rename(&dev->dev, dev->name);
+		if (ret) {
+			memcpy(dev->name, oldname, IFNAMSIZ);
+			return ret;
+		}
 	}
 
 	write_lock_bh(&dev_base_lock);
@@ -1055,6 +1059,7 @@ void dev_load(struct net *net, const char *name)
  */
 int dev_open(struct net_device *dev)
 {
+	const struct net_device_ops *ops = dev->netdev_ops;
 	int ret = 0;
 
 	ASSERT_RTNL();
@@ -1077,11 +1082,11 @@ int dev_open(struct net_device *dev)
 	 */
 	set_bit(__LINK_STATE_START, &dev->state);
 
-	if (dev->validate_addr)
-		ret = dev->validate_addr(dev);
+	if (ops->ndo_validate_addr)
+		ret = ops->ndo_validate_addr(dev);
 
-	if (!ret && dev->open)
-		ret = dev->open(dev);
+	if (!ret && ops->ndo_open)
+		ret = ops->ndo_open(dev);
 
 	/*
 	 *	If it went open OK then:
@@ -1125,6 +1130,7 @@ int dev_open(struct net_device *dev)
  */
 int dev_close(struct net_device *dev)
 {
+	const struct net_device_ops *ops = dev->netdev_ops;
 	ASSERT_RTNL();
 
 	might_sleep();
@@ -1157,8 +1163,8 @@ int dev_close(struct net_device *dev)
 	 *	We allow it to be called even after a DETACH hot-plug
 	 *	event.
 	 */
-	if (dev->stop)
-		dev->stop(dev);
+	if (ops->ndo_stop)
+		ops->ndo_stop(dev);
 
 	/*
 	 *	Device is now down.
@@ -1654,6 +1660,9 @@ static int dev_gso_segment(struct sk_buff *skb)
 int dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev,
 			struct netdev_queue *txq)
 {
+	const struct net_device_ops *ops = dev->netdev_ops;
+
+	prefetch(&dev->netdev_ops->ndo_start_xmit);
 	if (likely(!skb->next)) {
 		if (!list_empty(&ptype_all))
 			dev_queue_xmit_nit(skb, dev);
@@ -1665,7 +1674,7 @@ int dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev,
 				goto gso;
 		}
 
-		return dev->hard_start_xmit(skb, dev);
+		return ops->ndo_start_xmit(skb, dev);
 	}
 
 gso:
@@ -1675,7 +1684,7 @@ gso:
 
 		skb->next = nskb->next;
 		nskb->next = NULL;
-		rc = dev->hard_start_xmit(nskb, dev);
+		rc = ops->ndo_start_xmit(nskb, dev);
 		if (unlikely(rc)) {
 			nskb->next = skb->next;
 			skb->next = nskb;
@@ -1749,10 +1758,11 @@ static u16 simple_tx_hash(struct net_device *dev, struct sk_buff *skb)
 static struct netdev_queue *dev_pick_tx(struct net_device *dev,
 					struct sk_buff *skb)
 {
+	const struct net_device_ops *ops = dev->netdev_ops;
 	u16 queue_index = 0;
 
-	if (dev->select_queue)
-		queue_index = dev->select_queue(dev, skb);
+	if (ops->ndo_select_queue)
+		queue_index = ops->ndo_select_queue(dev, skb);
 	else if (dev->real_num_tx_queues > 1)
 		queue_index = simple_tx_hash(dev, skb);
 
@@ -2251,8 +2261,10 @@ int netif_receive_skb(struct sk_buff *skb)
 	rcu_read_lock();
 
 	/* Don't receive packets in an exiting network namespace */
-	if (!net_alive(dev_net(skb->dev)))
+	if (!net_alive(dev_net(skb->dev))) {
+		kfree_skb(skb);
 		goto out;
+	}
 
 #ifdef CONFIG_NET_CLS_ACT
 	if (skb->tc_verd & TC_NCLS) {
@@ -2371,7 +2383,7 @@ EXPORT_SYMBOL(__napi_schedule);
 static void net_rx_action(struct softirq_action *h)
 {
 	struct list_head *list = &__get_cpu_var(softnet_data).poll_list;
-	unsigned long start_time = jiffies;
+	unsigned long time_limit = jiffies + 2;
 	int budget = netdev_budget;
 	void *have;
 
@@ -2382,13 +2394,10 @@ static void net_rx_action(struct softirq_action *h)
 		int work, weight;
 
 		/* If softirq window is exhuasted then punt.
-		 *
-		 * Note that this is a slight policy change from the
-		 * previous NAPI code, which would allow up to 2
-		 * jiffies to pass before breaking out.  The test
-		 * used to be "jiffies - start_time > 1".
+		 * Allow this to run for 2 jiffies since which will allow
+		 * an average latency of 1.5/HZ.
 		 */
-		if (unlikely(budget <= 0 || jiffies != start_time))
+		if (unlikely(budget <= 0 || time_after(jiffies, time_limit)))
 			goto softnet_break;
 
 		local_irq_enable();
@@ -2615,7 +2624,7 @@ void dev_seq_stop(struct seq_file *seq, void *v)
 
 static void dev_seq_printf_stats(struct seq_file *seq, struct net_device *dev)
 {
-	struct net_device_stats *stats = dev->get_stats(dev);
+	const struct net_device_stats *stats = dev_get_stats(dev);
 
 	seq_printf(seq, "%6s:%8lu %7lu %4lu %4lu %4lu %5lu %10lu %9lu "
 		   "%8lu %7lu %4lu %4lu %4lu %5lu %7lu %10lu\n",
@@ -2797,31 +2806,6 @@ static void ptype_seq_stop(struct seq_file *seq, void *v)
 	rcu_read_unlock();
 }
 
-static void ptype_seq_decode(struct seq_file *seq, void *sym)
-{
-#ifdef CONFIG_KALLSYMS
-	unsigned long offset = 0, symsize;
-	const char *symname;
-	char *modname;
-	char namebuf[128];
-
-	symname = kallsyms_lookup((unsigned long)sym, &symsize, &offset,
-				  &modname, namebuf);
-
-	if (symname) {
-		char *delim = ":";
-
-		if (!modname)
-			modname = delim = "";
-		seq_printf(seq, "%s%s%s%s+0x%lx", delim, modname, delim,
-			   symname, offset);
-		return;
-	}
-#endif
-
-	seq_printf(seq, "[%p]", sym);
-}
-
 static int ptype_seq_show(struct seq_file *seq, void *v)
 {
 	struct packet_type *pt = v;
@@ -2834,10 +2818,8 @@ static int ptype_seq_show(struct seq_file *seq, void *v)
 		else
 			seq_printf(seq, "%04x", ntohs(pt->type));
 
-		seq_printf(seq, " %-8s ",
-			   pt->dev ? pt->dev->name : "");
-		ptype_seq_decode(seq,  pt->func);
-		seq_putc(seq, '\n');
+		seq_printf(seq, " %-8s %pF\n",
+			   pt->dev ? pt->dev->name : "", pt->func);
 	}
 
 	return 0;
@@ -2954,8 +2936,10 @@ int netdev_set_master(struct net_device *slave, struct net_device *master)
 
 static void dev_change_rx_flags(struct net_device *dev, int flags)
 {
-	if (dev->flags & IFF_UP && dev->change_rx_flags)
-		dev->change_rx_flags(dev, flags);
+	const struct net_device_ops *ops = dev->netdev_ops;
+
+	if ((dev->flags & IFF_UP) && ops->ndo_change_rx_flags)
+		ops->ndo_change_rx_flags(dev, flags);
 }
 
 static int __dev_set_promiscuity(struct net_device *dev, int inc)
@@ -3075,6 +3059,8 @@ int dev_set_allmulti(struct net_device *dev, int inc)
  */
 void __dev_set_rx_mode(struct net_device *dev)
 {
+	const struct net_device_ops *ops = dev->netdev_ops;
+
 	/* dev_open will call this function so the list will stay sane. */
 	if (!(dev->flags&IFF_UP))
 		return;
@@ -3082,8 +3068,8 @@ void __dev_set_rx_mode(struct net_device *dev)
 	if (!netif_device_present(dev))
 		return;
 
-	if (dev->set_rx_mode)
-		dev->set_rx_mode(dev);
+	if (ops->ndo_set_rx_mode)
+		ops->ndo_set_rx_mode(dev);
 	else {
 		/* Unicast addresses changes may only happen under the rtnl,
 		 * therefore calling __dev_set_promiscuity here is safe.
@@ -3096,8 +3082,8 @@ void __dev_set_rx_mode(struct net_device *dev)
 			dev->uc_promisc = 0;
 		}
 
-		if (dev->set_multicast_list)
-			dev->set_multicast_list(dev);
+		if (ops->ndo_set_multicast_list)
+			ops->ndo_set_multicast_list(dev);
 	}
 }
 
@@ -3456,6 +3442,7 @@ int dev_change_flags(struct net_device *dev, unsigned flags)
  */
 int dev_set_mtu(struct net_device *dev, int new_mtu)
 {
+	const struct net_device_ops *ops = dev->netdev_ops;
 	int err;
 
 	if (new_mtu == dev->mtu)
@@ -3469,10 +3456,11 @@ int dev_set_mtu(struct net_device *dev, int new_mtu)
 		return -ENODEV;
 
 	err = 0;
-	if (dev->change_mtu)
-		err = dev->change_mtu(dev, new_mtu);
+	if (ops->ndo_change_mtu)
+		err = ops->ndo_change_mtu(dev, new_mtu);
 	else
 		dev->mtu = new_mtu;
+
 	if (!err && dev->flags & IFF_UP)
 		call_netdevice_notifiers(NETDEV_CHANGEMTU, dev);
 	return err;
@@ -3487,15 +3475,16 @@ int dev_set_mtu(struct net_device *dev, int new_mtu)
  */
 int dev_set_mac_address(struct net_device *dev, struct sockaddr *sa)
 {
+	const struct net_device_ops *ops = dev->netdev_ops;
 	int err;
 
-	if (!dev->set_mac_address)
+	if (!ops->ndo_set_mac_address)
 		return -EOPNOTSUPP;
 	if (sa->sa_family != dev->type)
 		return -EINVAL;
 	if (!netif_device_present(dev))
 		return -ENODEV;
-	err = dev->set_mac_address(dev, sa);
+	err = ops->ndo_set_mac_address(dev, sa);
 	if (!err)
 		call_netdevice_notifiers(NETDEV_CHANGEADDR, dev);
 	return err;
@@ -3575,6 +3564,7 @@ static int dev_ifsioc(struct net *net, struct ifreq *ifr, unsigned int cmd)
 {
 	int err;
 	struct net_device *dev = __dev_get_by_name(net, ifr->ifr_name);
+	const struct net_device_ops *ops = dev->netdev_ops;
 
 	if (!dev)
 		return -ENODEV;
@@ -3602,15 +3592,15 @@ static int dev_ifsioc(struct net *net, struct ifreq *ifr, unsigned int cmd)
 			return 0;
 
 		case SIOCSIFMAP:
-			if (dev->set_config) {
+			if (ops->ndo_set_config) {
 				if (!netif_device_present(dev))
 					return -ENODEV;
-				return dev->set_config(dev, &ifr->ifr_map);
+				return ops->ndo_set_config(dev, &ifr->ifr_map);
 			}
 			return -EOPNOTSUPP;
 
 		case SIOCADDMULTI:
-			if ((!dev->set_multicast_list && !dev->set_rx_mode) ||
+			if ((!ops->ndo_set_multicast_list && !ops->ndo_set_rx_mode) ||
 			    ifr->ifr_hwaddr.sa_family != AF_UNSPEC)
 				return -EINVAL;
 			if (!netif_device_present(dev))
@@ -3619,7 +3609,7 @@ static int dev_ifsioc(struct net *net, struct ifreq *ifr, unsigned int cmd)
 					  dev->addr_len, 1);
 
 		case SIOCDELMULTI:
-			if ((!dev->set_multicast_list && !dev->set_rx_mode) ||
+			if ((!ops->ndo_set_multicast_list && !ops->ndo_set_rx_mode) ||
 			    ifr->ifr_hwaddr.sa_family != AF_UNSPEC)
 				return -EINVAL;
 			if (!netif_device_present(dev))
@@ -3657,10 +3647,9 @@ static int dev_ifsioc(struct net *net, struct ifreq *ifr, unsigned int cmd)
 			    cmd == SIOCBRDELIF ||
 			    cmd == SIOCWANDEV) {
 				err = -EOPNOTSUPP;
-				if (dev->do_ioctl) {
+				if (ops->ndo_do_ioctl) {
 					if (netif_device_present(dev))
-						err = dev->do_ioctl(dev, ifr,
-								    cmd);
+						err = ops->ndo_do_ioctl(dev, ifr, cmd);
 					else
 						err = -ENODEV;
 				}
@@ -3921,8 +3910,8 @@ static void rollback_registered(struct net_device *dev)
 	 */
 	dev_addr_discard(dev);
 
-	if (dev->uninit)
-		dev->uninit(dev);
+	if (dev->netdev_ops->ndo_uninit)
+		dev->netdev_ops->ndo_uninit(dev);
 
 	/* Notifier chain MUST detach us from master device. */
 	WARN_ON(dev->master);
@@ -4012,7 +4001,7 @@ int register_netdevice(struct net_device *dev)
 	struct hlist_head *head;
 	struct hlist_node *p;
 	int ret;
-	struct net *net;
+	struct net *net = dev_net(dev);
 
 	BUG_ON(dev_boot_phase);
 	ASSERT_RTNL();
@@ -4021,8 +4010,7 @@ int register_netdevice(struct net_device *dev)
 
 	/* When net_device's are persistent, this will be fatal. */
 	BUG_ON(dev->reg_state != NETREG_UNINITIALIZED);
-	BUG_ON(!dev_net(dev));
-	net = dev_net(dev);
+	BUG_ON(!net);
 
 	spin_lock_init(&dev->addr_list_lock);
 	netdev_set_addr_lockdep_class(dev);
@@ -4030,9 +4018,46 @@ int register_netdevice(struct net_device *dev)
 
 	dev->iflink = -1;
 
+#ifdef CONFIG_COMPAT_NET_DEV_OPS
+	/* Netdevice_ops API compatiability support.
+	 * This is temporary until all network devices are converted.
+	 */
+	if (dev->netdev_ops) {
+		const struct net_device_ops *ops = dev->netdev_ops;
+
+		dev->init = ops->ndo_init;
+		dev->uninit = ops->ndo_uninit;
+		dev->open = ops->ndo_open;
+		dev->change_rx_flags = ops->ndo_change_rx_flags;
+		dev->set_rx_mode = ops->ndo_set_rx_mode;
+		dev->set_multicast_list = ops->ndo_set_multicast_list;
+		dev->set_mac_address = ops->ndo_set_mac_address;
+		dev->validate_addr = ops->ndo_validate_addr;
+		dev->do_ioctl = ops->ndo_do_ioctl;
+		dev->set_config = ops->ndo_set_config;
+		dev->change_mtu = ops->ndo_change_mtu;
+		dev->tx_timeout = ops->ndo_tx_timeout;
+		dev->get_stats = ops->ndo_get_stats;
+		dev->vlan_rx_register = ops->ndo_vlan_rx_register;
+		dev->vlan_rx_add_vid = ops->ndo_vlan_rx_add_vid;
+		dev->vlan_rx_kill_vid = ops->ndo_vlan_rx_kill_vid;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+		dev->poll_controller = ops->ndo_poll_controller;
+#endif
+	} else {
+		char drivername[64];
+		pr_info("%s (%s): not using net_device_ops yet\n",
+			dev->name, netdev_drivername(dev, drivername, 64));
+
+		/* This works only because net_device_ops and the
+		   compatiablity structure are the same. */
+		dev->netdev_ops = (void *) &(dev->init);
+	}
+#endif
+
 	/* Init, if this function is available */
-	if (dev->init) {
-		ret = dev->init(dev);
+	if (dev->netdev_ops->ndo_init) {
+		ret = dev->netdev_ops->ndo_init(dev);
 		if (ret) {
 			if (ret > 0)
 				ret = -EIO;
@@ -4110,8 +4135,8 @@ out:
 	return ret;
 
 err_uninit:
-	if (dev->uninit)
-		dev->uninit(dev);
+	if (dev->netdev_ops->ndo_uninit)
+		dev->netdev_ops->ndo_uninit(dev);
 	goto out;
 }
 
@@ -4267,10 +4292,24 @@ void netdev_run_todo(void)
 	}
 }
 
-static struct net_device_stats *internal_stats(struct net_device *dev)
-{
-	return &dev->stats;
+/**
+ *	dev_get_stats	- get network device statistics
+ *	@dev: device to get statistics from
+ *
+ *	Get network statistics from device. The device driver may provide
+ *	its own method by setting dev->netdev_ops->get_stats; otherwise
+ *	the internal statistics structure is used.
+ */
+const struct net_device_stats *dev_get_stats(struct net_device *dev)
+ {
+	const struct net_device_ops *ops = dev->netdev_ops;
+
+	if (ops->ndo_get_stats)
+		return ops->ndo_get_stats(dev);
+	else
+		return &dev->stats;
 }
+EXPORT_SYMBOL(dev_get_stats);
 
 static void netdev_init_one_queue(struct net_device *dev,
 				  struct netdev_queue *queue,
@@ -4349,7 +4388,6 @@ struct net_device *alloc_netdev_mq(int sizeof_priv, const char *name,
 
 	netdev_init_queues(dev);
 
-	dev->get_stats = internal_stats;
 	netpoll_netdev_init(dev);
 	setup(dev);
 	strcpy(dev->name, name);
@@ -4463,6 +4501,15 @@ int dev_change_net_namespace(struct net_device *dev, struct net *net, const char
 	if (dev->features & NETIF_F_NETNS_LOCAL)
 		goto out;
 
+#ifdef CONFIG_SYSFS
+	/* Don't allow real devices to be moved when sysfs
+	 * is enabled.
+	 */
+	err = -EINVAL;
+	if (dev->dev.parent)
+		goto out;
+#endif
+
 	/* Ensure the device has been registrered */
 	err = -EINVAL;
 	if (dev->reg_state != NETREG_REGISTERED)
@@ -4520,6 +4567,8 @@ int dev_change_net_namespace(struct net_device *dev, struct net *net, const char
 	 */
 	dev_addr_discard(dev);
 
+	netdev_unregister_kobject(dev);
+
 	/* Actually switch the network namespace */
 	dev_net_set(dev, net);
 
@@ -4536,7 +4585,6 @@ int dev_change_net_namespace(struct net_device *dev, struct net *net, const char
 	}
 
 	/* Fixup kobjects */
-	netdev_unregister_kobject(dev);
 	err = netdev_register_kobject(dev);
 	WARN_ON(err);
 
@@ -4843,6 +4891,12 @@ static void __net_exit default_device_exit(struct net *net)
 		if (dev->features & NETIF_F_NETNS_LOCAL)
 			continue;
 
+		/* Delete virtual devices */
+		if (dev->rtnl_link_ops && dev->rtnl_link_ops->dellink) {
+			dev->rtnl_link_ops->dellink(dev);
+			continue;
+		}
+
 		/* Push remaing network devices to init_net */
 		snprintf(fb_name, IFNAMSIZ, "dev%d", dev->ifindex);
 		err = dev_change_net_namespace(dev, &init_net, fb_name);
@@ -4889,9 +4943,6 @@ static int __init net_dev_init(void)
 	if (register_pernet_subsys(&netdev_net_ops))
 		goto out;
 
-	if (register_pernet_device(&default_device_ops))
-		goto out;
-
 	/*
 	 *	Initialise the packet receive queues.
 	 */
@@ -4908,9 +4959,24 @@ static int __init net_dev_init(void)
 		queue->backlog.weight = weight_p;
 	}
 
-	netdev_dma_register();
-
 	dev_boot_phase = 0;
+
+	/* The loopback device is special if any other network devices
+	 * is present in a network namespace the loopback device must
+	 * be present. Since we now dynamically allocate and free the
+	 * loopback device ensure this invariant is maintained by
+	 * keeping the loopback device as the first device on the
+	 * list of network devices.  Ensuring the loopback devices
+	 * is the first device that appears and the last network device
+	 * that disappears.
+	 */
+	if (register_pernet_device(&loopback_net_ops))
+		goto out;
+
+	if (register_pernet_device(&default_device_ops))
+		goto out;
+
+	netdev_dma_register();
 
 	open_softirq(NET_TX_SOFTIRQ, net_tx_action);
 	open_softirq(NET_RX_SOFTIRQ, net_rx_action);

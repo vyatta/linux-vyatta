@@ -686,7 +686,6 @@ static int de620_rx_intr(struct net_device *dev)
 			PRINTK(("Read %d bytes\n", size));
 			skb->protocol=eth_type_trans(skb,dev);
 			netif_rx(skb); /* deliver it "upstairs" */
-			dev->last_rx = jiffies;
 			/* count all receives */
 			dev->stats.rx_packets++;
 			dev->stats.rx_bytes += size;
@@ -800,7 +799,6 @@ struct net_device * __init de620_probe(int unit)
 	struct net_device *dev;
 	int err = -ENOMEM;
 	int i;
-	DECLARE_MAC_BUF(mac);
 
 	dev = alloc_etherdev(0);
 	if (!dev)
@@ -853,7 +851,7 @@ struct net_device * __init de620_probe(int unit)
 		dev->broadcast[i] = 0xff;
 	}
 
-	printk(", Ethernet Address: %s", print_mac(mac, dev->dev_addr));
+	printk(", Ethernet Address: %pM", dev->dev_addr);
 
 	printk(" (%dk RAM,",
 		(nic_data.RAM_Size) ? (nic_data.RAM_Size >> 2) : 64);
@@ -876,10 +874,7 @@ struct net_device * __init de620_probe(int unit)
 	if (de620_debug) {
 		printk("\nEEPROM contents:\n");
 		printk("RAM_Size = 0x%02X\n", nic_data.RAM_Size);
-		printk("NodeID = %02X:%02X:%02X:%02X:%02X:%02X\n",
-			nic_data.NodeID[0], nic_data.NodeID[1],
-			nic_data.NodeID[2], nic_data.NodeID[3],
-			nic_data.NodeID[4], nic_data.NodeID[5]);
+		printk("NodeID = %pM\n", nic_data.NodeID);
 		printk("Model = %d\n", nic_data.Model);
 		printk("Media = %d\n", nic_data.Media);
 		printk("SCR = 0x%02x\n", nic_data.SCR);

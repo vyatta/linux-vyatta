@@ -297,9 +297,8 @@ static int ipmr_mfc_seq_show(struct seq_file *seq, void *v)
 		const struct mfc6_cache *mfc = v;
 		const struct ipmr_mfc_iter *it = seq->private;
 
-		seq_printf(seq,
-			   NIP6_FMT " " NIP6_FMT " %-3d %8ld %8ld %8ld",
-			   NIP6(mfc->mf6c_mcastgrp), NIP6(mfc->mf6c_origin),
+		seq_printf(seq, "%pI6 %pI6 %-3d %8ld %8ld %8ld",
+			   &mfc->mf6c_mcastgrp, &mfc->mf6c_origin,
 			   mfc->mf6c_parent,
 			   mfc->mfc_un.res.pkt,
 			   mfc->mfc_un.res.bytes,
@@ -417,12 +416,16 @@ static int reg_vif_xmit(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 }
 
+static const struct net_device_ops reg_vif_netdev_ops = {
+	.ndo_start_xmit	= reg_vif_xmit,
+};
+
 static void reg_vif_setup(struct net_device *dev)
 {
 	dev->type		= ARPHRD_PIMREG;
 	dev->mtu		= 1500 - sizeof(struct ipv6hdr) - 8;
 	dev->flags		= IFF_NOARP;
-	dev->hard_start_xmit	= reg_vif_xmit;
+	dev->netdev_ops		= &reg_vif_netdev_ops;
 	dev->destructor		= free_netdev;
 }
 

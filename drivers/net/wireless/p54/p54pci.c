@@ -28,6 +28,7 @@ MODULE_AUTHOR("Michael Wu <flamingice@sourmilk.net>");
 MODULE_DESCRIPTION("Prism54 PCI wireless driver");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("prism54pci");
+MODULE_FIRMWARE("isl3886pci");
 
 static struct pci_device_id p54p_table[] __devinitdata = {
 	/* Intersil PRISM Duette/Prism GT Wireless LAN adapter */
@@ -72,11 +73,13 @@ static int p54p_upload_firmware(struct ieee80211_hw *dev)
 	P54P_WRITE(ctrl_stat, reg);
 	wmb();
 
-	err = request_firmware(&fw_entry, "isl3886", &priv->pdev->dev);
+	err = request_firmware(&fw_entry, "isl3886pci", &priv->pdev->dev);
 	if (err) {
 		printk(KERN_ERR "%s (p54pci): cannot find firmware "
-		       "(isl3886)\n", pci_name(priv->pdev));
-		return err;
+		       "(isl3886pci)\n", pci_name(priv->pdev));
+		err = request_firmware(&fw_entry, "isl3886", &priv->pdev->dev);
+		if (err)
+			return err;
 	}
 
 	err = p54_parse_firmware(dev, fw_entry);
@@ -235,7 +238,7 @@ static void p54p_check_tx_ring(struct ieee80211_hw *dev, u32 *index,
 
 	while (i != idx) {
 		desc = &ring[i];
-		kfree(tx_buf[i]);
+		p54_free_skb(dev, tx_buf[i]);
 		tx_buf[i] = NULL;
 
 		pci_unmap_single(priv->pdev, le32_to_cpu(desc->host_addr),
@@ -306,8 +309,8 @@ static irqreturn_t p54p_interrupt(int irq, void *dev_id)
 	return reg ? IRQ_HANDLED : IRQ_NONE;
 }
 
-static void p54p_tx(struct ieee80211_hw *dev, struct p54_control_hdr *data,
-		    size_t len, int free_on_tx)
+static void p54p_tx(struct ieee80211_hw *dev, struct sk_buff *skb,
+		    int free_on_tx)
 {
 	struct p54p_priv *priv = dev->priv;
 	struct p54p_ring_control *ring_control = priv->ring_control;
@@ -322,18 +325,19 @@ static void p54p_tx(struct ieee80211_hw *dev, struct p54_control_hdr *data,
 	idx = le32_to_cpu(ring_control->host_idx[1]);
 	i = idx % ARRAY_SIZE(ring_control->tx_data);
 
-	mapping = pci_map_single(priv->pdev, data, len, PCI_DMA_TODEVICE);
+	mapping = pci_map_single(priv->pdev, skb->data, skb->len,
+				 PCI_DMA_TODEVICE);
 	desc = &ring_control->tx_data[i];
 	desc->host_addr = cpu_to_le32(mapping);
-	desc->device_addr = data->req_id;
-	desc->len = cpu_to_le16(len);
+	desc->device_addr = ((struct p54_hdr *)skb->data)->req_id;
+	desc->len = cpu_to_le16(skb->len);
 	desc->flags = 0;
 
 	wmb();
 	ring_control->host_idx[1] = cpu_to_le32(idx + 1);
 
 	if (free_on_tx)
-		priv->tx_buf_data[i] = data;
+		priv->tx_buf_data[i] = skb;
 
 	spin_unlock_irqrestore(&priv->lock, flags);
 
@@ -342,8 +346,10 @@ static void p54p_tx(struct ieee80211_hw *dev, struct p54_control_hdr *data,
 
 	/* FIXME: unlikely to happen because the device usually runs out of
 	   memory before we fill the ring up, but we can make it impossible */
-	if (idx - device_idx > ARRAY_SIZE(ring_control->tx_data) - 2)
+	if (idx - device_idx > ARRAY_SIZE(ring_control->tx_data) - 2) {
+		p54_free_skb(dev, skb);
 		printk(KERN_INFO "%s: tx overflow.\n", wiphy_name(dev->wiphy));
+	}
 }
 
 static void p54p_stop(struct ieee80211_hw *dev)
@@ -393,7 +399,7 @@ static void p54p_stop(struct ieee80211_hw *dev)
 					 le16_to_cpu(desc->len),
 					 PCI_DMA_TODEVICE);
 
-		kfree(priv->tx_buf_data[i]);
+		p54_free_skb(dev, priv->tx_buf_data[i]);
 		priv->tx_buf_data[i] = NULL;
 	}
 
@@ -405,7 +411,7 @@ static void p54p_stop(struct ieee80211_hw *dev)
 					 le16_to_cpu(desc->len),
 					 PCI_DMA_TODEVICE);
 
-		kfree(priv->tx_buf_mgmt[i]);
+		p54_free_skb(dev, priv->tx_buf_mgmt[i]);
 		priv->tx_buf_mgmt[i] = NULL;
 	}
 
@@ -481,7 +487,6 @@ static int __devinit p54p_probe(struct pci_dev *pdev,
 	struct ieee80211_hw *dev;
 	unsigned long mem_addr, mem_len;
 	int err;
-	DECLARE_MAC_BUF(mac);
 
 	err = pci_enable_device(pdev);
 	if (err) {

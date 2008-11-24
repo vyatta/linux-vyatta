@@ -236,7 +236,7 @@ struct tc35815_regs {
 #define Rx_Halted	       0x00008000 /* Rx Halted			     */
 #define Rx_Good		       0x00004000 /* Rx Good			     */
 #define Rx_RxPar	       0x00002000 /* Rx Parity Error		     */
-			    /* 0x00001000    not use			     */
+#define Rx_TypePkt	       0x00001000 /* Rx Type Packet		     */
 #define Rx_LongErr	       0x00000800 /* Rx Long Error		     */
 #define Rx_Over		       0x00000400 /* Rx Overflow		     */
 #define Rx_CRCErr	       0x00000200 /* Rx CRC Error		     */
@@ -244,8 +244,9 @@ struct tc35815_regs {
 #define Rx_10Stat	       0x00000080 /* Rx 10Mbps Status		     */
 #define Rx_IntRx	       0x00000040 /* Rx Interrupt		     */
 #define Rx_CtlRecd	       0x00000020 /* Rx Control Receive		     */
+#define Rx_InLenErr	       0x00000010 /* Rx In Range Frame Length Error  */
 
-#define Rx_Stat_Mask	       0x0000EFC0 /* Rx All Status Mask		     */
+#define Rx_Stat_Mask	       0x0000FFF0 /* Rx All Status Mask		     */
 
 /* Int_En bit asign -------------------------------------------------------- */
 #define Int_NRAbtEn	       0x00000800 /* 1:Non-recoverable Abort Enable  */
@@ -865,7 +866,6 @@ static int __devinit tc35815_init_one(struct pci_dev *pdev,
 	struct net_device *dev;
 	struct tc35815_local *lp;
 	int rc;
-	DECLARE_MAC_BUF(mac);
 
 	static int printed_version;
 	if (!printed_version++) {
@@ -942,11 +942,11 @@ static int __devinit tc35815_init_one(struct pci_dev *pdev,
 		goto err_out;
 
 	memcpy(dev->perm_addr, dev->dev_addr, dev->addr_len);
-	printk(KERN_INFO "%s: %s at 0x%lx, %s, IRQ %d\n",
+	printk(KERN_INFO "%s: %s at 0x%lx, %pM, IRQ %d\n",
 		dev->name,
 		chip_info[ent->driver_data].name,
 		dev->base_addr,
-		print_mac(mac, dev->dev_addr),
+		dev->dev_addr,
 		dev->irq);
 
 	rc = tc_mii_init(dev);
@@ -1288,12 +1288,9 @@ panic_queues(struct net_device *dev)
 
 static void print_eth(const u8 *add)
 {
-	DECLARE_MAC_BUF(mac);
-
 	printk(KERN_DEBUG "print_eth(%p)\n", add);
-	printk(KERN_DEBUG " %s =>", print_mac(mac, add + 6));
-	printk(KERN_CONT " %s : %02x%02x\n",
-		print_mac(mac, add), add[12], add[13]);
+	printk(KERN_DEBUG " %pM => %pM : %02x%02x\n",
+		add + 6, add, add[12], add[13]);
 }
 
 static int tc35815_tx_full(struct net_device *dev)
@@ -1760,7 +1757,6 @@ tc35815_rx(struct net_device *dev)
 #else
 			netif_rx(skb);
 #endif
-			dev->last_rx = jiffies;
 			dev->stats.rx_packets++;
 			dev->stats.rx_bytes += pkt_len;
 		} else {
@@ -2153,13 +2149,12 @@ static void tc35815_set_cam_entry(struct net_device *dev, int index, unsigned ch
 	int cam_index = index * 6;
 	u32 cam_data;
 	u32 saved_addr;
-	DECLARE_MAC_BUF(mac);
 
 	saved_addr = tc_readl(&tr->CAM_Adr);
 
 	if (netif_msg_hw(lp))
-		printk(KERN_DEBUG "%s: CAM %d: %s\n",
-			dev->name, index, print_mac(mac, addr));
+		printk(KERN_DEBUG "%s: CAM %d: %pM\n",
+			dev->name, index, addr);
 	if (index & 1) {
 		/* read modify write */
 		tc_writel(cam_index - 2, &tr->CAM_Adr);

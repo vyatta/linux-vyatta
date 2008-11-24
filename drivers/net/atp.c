@@ -248,7 +248,6 @@ static int __init atp_probe1(long ioaddr)
 	struct net_local *lp;
 	int saved_ctrl_reg, status, i;
 	int res;
-	DECLARE_MAC_BUF(mac);
 
 	outb(0xff, ioaddr + PAR_DATA);
 	/* Save the original value of the Control register, in case we guessed
@@ -324,8 +323,8 @@ static int __init atp_probe1(long ioaddr)
 #endif
 
 	printk(KERN_NOTICE "%s: Pocket adapter found at %#3lx, IRQ %d, "
-	       "SAPROM %s.\n",
-	       dev->name, dev->base_addr, dev->irq, print_mac(mac, dev->dev_addr));
+	       "SAPROM %pM.\n",
+	       dev->name, dev->base_addr, dev->irq, dev->dev_addr);
 
 	/* Reset the ethernet hardware and activate the printer pass-through. */
 	write_reg_high(ioaddr, CMR1, CMR1h_RESET | CMR1h_MUX);
@@ -913,7 +912,8 @@ static void __exit atp_cleanup_module(void) {
 	struct net_device *next_dev;
 
 	while (root_atp_dev) {
-		next_dev = ((struct net_local *)root_atp_dev->priv)->next_module;
+		struct net_local *atp_local = netdev_priv(root_atp_dev);
+		next_dev = atp_local->next_module;
 		unregister_netdev(root_atp_dev);
 		/* No need to release_region(), since we never snarf it. */
 		free_netdev(root_atp_dev);

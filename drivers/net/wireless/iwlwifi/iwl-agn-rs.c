@@ -188,7 +188,7 @@ static void rs_dbgfs_set_mcs(struct iwl_lq_sta *lq_sta,
  * 1, 2, 5.5, 11, 6, 9, 12, 18, 24, 36, 48, 54, 60 MBits
  * "G" is the only table that supports CCK (the first 4 rates).
  */
-/*FIXME:RS:need to spearate tables for MIMO2/MIMO3*/
+/*FIXME:RS:need to separate tables for MIMO2/MIMO3*/
 static s32 expected_tpt_A[IWL_RATE_COUNT] = {
 	0, 0, 0, 0, 40, 57, 72, 98, 121, 154, 177, 186, 186
 };
@@ -357,11 +357,9 @@ static void rs_tl_turn_on_agg_for_tid(struct iwl_priv *priv,
 				      struct iwl_lq_sta *lq_data, u8 tid,
 				      struct ieee80211_sta *sta)
 {
-	DECLARE_MAC_BUF(mac);
-
 	if (rs_tl_get_load(lq_data, tid) > IWL_AGG_LOAD_THRESHOLD) {
-		IWL_DEBUG_HT("Starting Tx agg: STA: %s tid: %d\n",
-				print_mac(mac, sta->addr), tid);
+		IWL_DEBUG_HT("Starting Tx agg: STA: %pM tid: %d\n",
+				sta->addr, tid);
 		ieee80211_start_tx_ba_session(priv->hw, sta->addr, tid);
 	}
 }
@@ -800,7 +798,7 @@ static void rs_tx_status(void *priv_r, struct ieee80211_supported_band *sband,
 	    !(info->flags & IEEE80211_TX_STAT_AMPDU))
 		return;
 
-	retries = info->status.retry_count;
+	retries = info->status.rates[0].count - 1;
 
 	if (retries > 15)
 		retries = 15;
@@ -832,20 +830,15 @@ static void rs_tx_status(void *priv_r, struct ieee80211_supported_band *sband,
 	if (priv->band == IEEE80211_BAND_5GHZ)
 		rs_index -= IWL_FIRST_OFDM_RATE;
 
-	if ((info->tx_rate_idx < 0) ||
-	    (tbl_type.is_SGI ^
-		!!(info->flags & IEEE80211_TX_CTL_SHORT_GI)) ||
-	    (tbl_type.is_fat ^
-		!!(info->flags & IEEE80211_TX_CTL_40_MHZ_WIDTH)) ||
-	    (tbl_type.is_dup ^
-		!!(info->flags & IEEE80211_TX_CTL_DUP_DATA)) ||
-	    (tbl_type.ant_type ^ info->antenna_sel_tx) ||
-	    (!!(tx_rate & RATE_MCS_HT_MSK) ^
-		!!(info->flags & IEEE80211_TX_CTL_OFDM_HT)) ||
-	    (!!(tx_rate & RATE_MCS_GF_MSK) ^
-		!!(info->flags & IEEE80211_TX_CTL_GREEN_FIELD)) ||
+	if ((info->status.rates[0].idx < 0) ||
+	    (tbl_type.is_SGI != !!(info->status.rates[0].flags & IEEE80211_TX_RC_SHORT_GI)) ||
+	    (tbl_type.is_fat != !!(info->status.rates[0].flags & IEEE80211_TX_RC_40_MHZ_WIDTH)) ||
+	    (tbl_type.is_dup != !!(info->status.rates[0].flags & IEEE80211_TX_RC_DUP_DATA)) ||
+	    (tbl_type.ant_type != info->antenna_sel_tx) ||
+	    (!!(tx_rate & RATE_MCS_HT_MSK) != !!(info->status.rates[0].flags & IEEE80211_TX_RC_MCS)) ||
+	    (!!(tx_rate & RATE_MCS_GF_MSK) != !!(info->status.rates[0].flags & IEEE80211_TX_RC_GREEN_FIELD)) ||
 	    (hw->wiphy->bands[priv->band]->bitrates[rs_index].bitrate !=
-	     hw->wiphy->bands[info->band]->bitrates[info->tx_rate_idx].bitrate)) {
+	     hw->wiphy->bands[info->band]->bitrates[info->status.rates[0].idx].bitrate)) {
 		IWL_DEBUG_RATE("initial rate does not match 0x%x\n", tx_rate);
 		goto out;
 	}
@@ -1135,11 +1128,10 @@ static int rs_switch_to_mimo2(struct iwl_priv *priv,
 	s32 rate;
 	s8 is_green = lq_sta->is_green;
 
-	if (!(conf->flags & IEEE80211_CONF_SUPPORT_HT_MODE) ||
-	    !sta->ht_info.ht_supported)
+	if (!conf->ht.enabled || !sta->ht_cap.ht_supported)
 		return -1;
 
-	if (((sta->ht_info.cap & IEEE80211_HT_CAP_SM_PS) >> 2)
+	if (((sta->ht_cap.cap & IEEE80211_HT_CAP_SM_PS) >> 2)
 						== WLAN_HT_CAP_SM_PS_STATIC)
 		return -1;
 
@@ -1203,8 +1195,7 @@ static int rs_switch_to_siso(struct iwl_priv *priv,
 	u8 is_green = lq_sta->is_green;
 	s32 rate;
 
-	if (!(conf->flags & IEEE80211_CONF_SUPPORT_HT_MODE) ||
-	    !sta->ht_info.ht_supported)
+	if (!conf->ht.enabled || !sta->ht_cap.ht_supported)
 		return -1;
 
 	IWL_DEBUG_RATE("LQ: try to switch to SISO\n");
@@ -2003,9 +1994,8 @@ lq_update:
 		 * stay with best antenna legacy modulation for a while
 		 * before next round of mode comparisons. */
 		tbl1 = &(lq_sta->lq_info[lq_sta->active_tbl]);
-		if (is_legacy(tbl1->lq_type) &&
-		   (!(conf->flags & IEEE80211_CONF_SUPPORT_HT_MODE)) &&
-		    (lq_sta->action_counter >= 1)) {
+		if (is_legacy(tbl1->lq_type) && !conf->ht.enabled &&
+		    lq_sta->action_counter >= 1) {
 			lq_sta->action_counter = 0;
 			IWL_DEBUG_RATE("LQ: STAY in legacy table\n");
 			rs_set_stay_in_table(priv, 1, lq_sta);
@@ -2081,15 +2071,13 @@ static void rs_initialize_lq(struct iwl_priv *priv,
 	if ((i < 0) || (i >= IWL_RATE_COUNT))
 		i = 0;
 
-	/* FIXME:RS: This is also wrong in 4965 */
 	rate = iwl_rates[i].plcp;
-	rate |= RATE_MCS_ANT_B_MSK;
-	rate &= ~RATE_MCS_ANT_A_MSK;
+	tbl->ant_type = first_antenna(valid_tx_ant);
+	rate |= tbl->ant_type << RATE_MCS_ANT_POS;
 
 	if (i >= IWL_FIRST_CCK_RATE && i <= IWL_LAST_CCK_RATE)
 		rate |= RATE_MCS_CCK_MSK;
 
-	tbl->ant_type = ANT_B;
 	rs_get_tbl_info_from_mcs(rate, priv->band, tbl, &rate_idx);
 	if (!rs_is_valid_ant(valid_tx_ant, tbl->ant_type))
 	    rs_toggle_antenna(valid_tx_ant, &rate, tbl);
@@ -2103,15 +2091,17 @@ static void rs_initialize_lq(struct iwl_priv *priv,
 	return;
 }
 
-static void rs_get_rate(void *priv_r, struct ieee80211_supported_band *sband,
-			struct ieee80211_sta *sta, void *priv_sta,
-			struct sk_buff *skb, struct rate_selection *sel)
+static void rs_get_rate(void *priv_r, struct ieee80211_sta *sta, void *priv_sta,
+			struct ieee80211_tx_rate_control *txrc)
 {
 
 	int i;
+	struct sk_buff *skb = txrc->skb;
+	struct ieee80211_supported_band *sband = txrc->sband;
 	struct iwl_priv *priv = (struct iwl_priv *)priv_r;
 	struct ieee80211_conf *conf = &priv->hw->conf;
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
+	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	__le16 fc;
 	struct iwl_lq_sta *lq_sta;
 
@@ -2122,7 +2112,7 @@ static void rs_get_rate(void *priv_r, struct ieee80211_supported_band *sband,
 	fc = hdr->frame_control;
 	if (!ieee80211_is_data(fc) || is_multicast_ether_addr(hdr->addr1) ||
 	    !sta || !priv_sta) {
-		sel->rate_idx = rate_lowest_index(sband, sta);
+		info->control.rates[0].idx = rate_lowest_index(sband, sta);
 		return;
 	}
 
@@ -2132,11 +2122,10 @@ static void rs_get_rate(void *priv_r, struct ieee80211_supported_band *sband,
 	if ((priv->iw_mode == NL80211_IFTYPE_ADHOC) &&
 	    !lq_sta->ibss_sta_added) {
 		u8 sta_id = iwl_find_station(priv, hdr->addr1);
-		DECLARE_MAC_BUF(mac);
 
 		if (sta_id == IWL_INVALID_STATION) {
-			IWL_DEBUG_RATE("LQ: ADD station %s\n",
-				       print_mac(mac, hdr->addr1));
+			IWL_DEBUG_RATE("LQ: ADD station %pM\n",
+				       hdr->addr1);
 			sta_id = iwl_add_station_flags(priv, hdr->addr1,
 							0, CMD_ASYNC, NULL);
 		}
@@ -2149,13 +2138,13 @@ static void rs_get_rate(void *priv_r, struct ieee80211_supported_band *sband,
 	}
 
 	if ((i < 0) || (i > IWL_RATE_COUNT)) {
-		sel->rate_idx = rate_lowest_index(sband, sta);
+		info->control.rates[0].idx = rate_lowest_index(sband, sta);
 		return;
 	}
 
 	if (sband->band == IEEE80211_BAND_5GHZ)
 		i -= IWL_FIRST_OFDM_RATE;
-	sel->rate_idx = i;
+	info->control.rates[0].idx = i;
 }
 
 static void *rs_alloc_sta(void *priv_rate, struct ieee80211_sta *sta,
@@ -2205,15 +2194,12 @@ static void rs_rate_init(void *priv_r, struct ieee80211_supported_band *sband,
 	lq_sta->ibss_sta_added = 0;
 	if (priv->iw_mode == NL80211_IFTYPE_AP) {
 		u8 sta_id = iwl_find_station(priv, sta->addr);
-		DECLARE_MAC_BUF(mac);
 
 		/* for IBSS the call are from tasklet */
-		IWL_DEBUG_RATE("LQ: ADD station %s\n",
-			     print_mac(mac, sta->addr));
+		IWL_DEBUG_RATE("LQ: ADD station %pM\n", sta->addr);
 
 		if (sta_id == IWL_INVALID_STATION) {
-			IWL_DEBUG_RATE("LQ: ADD station %s\n",
-				       print_mac(mac, sta->addr));
+			IWL_DEBUG_RATE("LQ: ADD station %pM\n", sta->addr);
 			sta_id = iwl_add_station_flags(priv, sta->addr,
 							0, CMD_ASYNC, NULL);
 		}
@@ -2244,19 +2230,19 @@ static void rs_rate_init(void *priv_r, struct ieee80211_supported_band *sband,
 	 * active_siso_rate mask includes 9 MBits (bit 5), and CCK (bits 0-3),
 	 * supp_rates[] does not; shift to convert format, force 9 MBits off.
 	 */
-	lq_sta->active_siso_rate = conf->ht_conf.supp_mcs_set[0] << 1;
-	lq_sta->active_siso_rate |= conf->ht_conf.supp_mcs_set[0] & 0x1;
+	lq_sta->active_siso_rate = sta->ht_cap.mcs.rx_mask[0] << 1;
+	lq_sta->active_siso_rate |= sta->ht_cap.mcs.rx_mask[0] & 0x1;
 	lq_sta->active_siso_rate &= ~((u16)0x2);
 	lq_sta->active_siso_rate <<= IWL_FIRST_OFDM_RATE;
 
 	/* Same here */
-	lq_sta->active_mimo2_rate = conf->ht_conf.supp_mcs_set[1] << 1;
-	lq_sta->active_mimo2_rate |= conf->ht_conf.supp_mcs_set[1] & 0x1;
+	lq_sta->active_mimo2_rate = sta->ht_cap.mcs.rx_mask[1] << 1;
+	lq_sta->active_mimo2_rate |= sta->ht_cap.mcs.rx_mask[1] & 0x1;
 	lq_sta->active_mimo2_rate &= ~((u16)0x2);
 	lq_sta->active_mimo2_rate <<= IWL_FIRST_OFDM_RATE;
 
-	lq_sta->active_mimo3_rate = conf->ht_conf.supp_mcs_set[2] << 1;
-	lq_sta->active_mimo3_rate |= conf->ht_conf.supp_mcs_set[2] & 0x1;
+	lq_sta->active_mimo3_rate = sta->ht_cap.mcs.rx_mask[2] << 1;
+	lq_sta->active_mimo3_rate |= sta->ht_cap.mcs.rx_mask[2] & 0x1;
 	lq_sta->active_mimo3_rate &= ~((u16)0x2);
 	lq_sta->active_mimo3_rate <<= IWL_FIRST_OFDM_RATE;
 
@@ -2265,7 +2251,7 @@ static void rs_rate_init(void *priv_r, struct ieee80211_supported_band *sband,
 		     lq_sta->active_mimo2_rate,
 		     lq_sta->active_mimo3_rate);
 
-	/* These values will be overriden later */
+	/* These values will be overridden later */
 	lq_sta->lq.general_params.single_stream_ant_msk = ANT_A;
 	lq_sta->lq.general_params.dual_stream_ant_msk = ANT_AB;
 
@@ -2403,19 +2389,6 @@ static void *rs_alloc(struct ieee80211_hw *hw, struct dentry *debugfsdir)
 static void rs_free(void *priv_rate)
 {
 	return;
-}
-
-static void rs_clear(void *priv_rate)
-{
-#ifdef CONFIG_IWLWIFI_DEBUG
-	struct iwl_priv *priv = (struct iwl_priv *) priv_rate;
-
-	IWL_DEBUG_RATE("enter\n");
-
-	/* TODO - add rate scale state reset */
-
-	IWL_DEBUG_RATE("leave\n");
-#endif /* CONFIG_IWLWIFI_DEBUG */
 }
 
 static void rs_free_sta(void *priv_r, struct ieee80211_sta *sta,
@@ -2605,7 +2578,6 @@ static struct rate_control_ops rs_ops = {
 	.tx_status = rs_tx_status,
 	.get_rate = rs_get_rate,
 	.rate_init = rs_rate_init,
-	.clear = rs_clear,
 	.alloc = rs_alloc,
 	.free = rs_free,
 	.alloc_sta = rs_alloc_sta,

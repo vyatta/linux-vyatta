@@ -477,12 +477,10 @@ static int enc28j60_set_hw_macaddr(struct net_device *ndev)
 
 	mutex_lock(&priv->lock);
 	if (!priv->hw_enable) {
-		if (netif_msg_drv(priv)) {
-			DECLARE_MAC_BUF(mac);
+		if (netif_msg_drv(priv))
 			printk(KERN_INFO DRV_NAME
-				": %s: Setting MAC address to %s\n",
-				ndev->name, print_mac(mac, ndev->dev_addr));
-		}
+				": %s: Setting MAC address to %pM\n",
+				ndev->name, ndev->dev_addr);
 		/* NOTE: MAC address in ENC28J60 is byte-backward */
 		nolock_regb_write(priv, MAADR5, ndev->dev_addr[0]);
 		nolock_regb_write(priv, MAADR4, ndev->dev_addr[1]);
@@ -946,7 +944,6 @@ static void enc28j60_hw_rx(struct net_device *ndev)
 			/* update statistics */
 			ndev->stats.rx_packets++;
 			ndev->stats.rx_bytes += len;
-			ndev->last_rx = jiffies;
 			netif_rx(skb);
 		}
 	}
@@ -1328,11 +1325,9 @@ static int enc28j60_net_open(struct net_device *dev)
 		printk(KERN_DEBUG DRV_NAME ": %s() enter\n", __func__);
 
 	if (!is_valid_ether_addr(dev->dev_addr)) {
-		if (netif_msg_ifup(priv)) {
-			DECLARE_MAC_BUF(mac);
-			dev_err(&dev->dev, "invalid MAC address %s\n",
-				print_mac(mac, dev->dev_addr));
-		}
+		if (netif_msg_ifup(priv))
+			dev_err(&dev->dev, "invalid MAC address %pM\n",
+				dev->dev_addr);
 		return -EADDRNOTAVAIL;
 	}
 	/* Reset the hardware here (and take it out of low power mode) */
@@ -1453,7 +1448,7 @@ enc28j60_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 	strlcpy(info->driver, DRV_NAME, sizeof(info->driver));
 	strlcpy(info->version, DRV_VERSION, sizeof(info->version));
 	strlcpy(info->bus_info,
-		dev->dev.parent->bus_id, sizeof(info->bus_info));
+		dev_name(dev->dev.parent), sizeof(info->bus_info));
 }
 
 static int

@@ -239,7 +239,7 @@ __le16 ieee80211_generic_frame_duration(struct ieee80211_hw *hw,
 	erp = 0;
 	if (vif) {
 		sdata = vif_to_sdata(vif);
-		short_preamble = sdata->bss_conf.use_short_preamble;
+		short_preamble = sdata->vif.bss_conf.use_short_preamble;
 		if (sdata->flags & IEEE80211_SDATA_OPERATING_GMODE)
 			erp = rate->flags & IEEE80211_RATE_ERP_G;
 	}
@@ -272,7 +272,7 @@ __le16 ieee80211_rts_duration(struct ieee80211_hw *hw,
 	erp = 0;
 	if (vif) {
 		sdata = vif_to_sdata(vif);
-		short_preamble = sdata->bss_conf.use_short_preamble;
+		short_preamble = sdata->vif.bss_conf.use_short_preamble;
 		if (sdata->flags & IEEE80211_SDATA_OPERATING_GMODE)
 			erp = rate->flags & IEEE80211_RATE_ERP_G;
 	}
@@ -312,7 +312,7 @@ __le16 ieee80211_ctstoself_duration(struct ieee80211_hw *hw,
 	erp = 0;
 	if (vif) {
 		sdata = vif_to_sdata(vif);
-		short_preamble = sdata->bss_conf.use_short_preamble;
+		short_preamble = sdata->vif.bss_conf.use_short_preamble;
 		if (sdata->flags & IEEE80211_SDATA_OPERATING_GMODE)
 			erp = rate->flags & IEEE80211_RATE_ERP_G;
 	}
@@ -532,8 +532,8 @@ void ieee802_11_parse_elems(u8 *start, size_t len,
 			if (elen >= sizeof(struct ieee80211_ht_cap))
 				elems->ht_cap_elem = (void *)pos;
 			break;
-		case WLAN_EID_HT_EXTRA_INFO:
-			if (elen >= sizeof(struct ieee80211_ht_addt_info))
+		case WLAN_EID_HT_INFORMATION:
+			if (elen >= sizeof(struct ieee80211_ht_info))
 				elems->ht_info_elem = (void *)pos;
 			break;
 		case WLAN_EID_MESH_ID:
@@ -638,19 +638,15 @@ int ieee80211_set_freq(struct ieee80211_sub_if_data *sdata, int freqMHz)
 
 	if (chan && !(chan->flags & IEEE80211_CHAN_DISABLED)) {
 		if (sdata->vif.type == NL80211_IFTYPE_ADHOC &&
-		    chan->flags & IEEE80211_CHAN_NO_IBSS) {
-			printk(KERN_DEBUG "%s: IBSS not allowed on frequency "
-				"%d MHz\n", sdata->dev->name, chan->center_freq);
+		    chan->flags & IEEE80211_CHAN_NO_IBSS)
 			return ret;
-		}
 		local->oper_channel = chan;
 
 		if (local->sw_scanning || local->hw_scanning)
 			ret = 0;
 		else
-			ret = ieee80211_hw_config(local);
-
-		rate_control_clear(local);
+			ret = ieee80211_hw_config(
+				local, IEEE80211_CONF_CHANGE_CHANNEL);
 	}
 
 	return ret;
