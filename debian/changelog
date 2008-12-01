@@ -1,5 +1,6 @@
-linux-2.6 (2.6.26-1+vyatta+2) UNRELEASED; urgency=low
+linux-2.6 (2.6.26-1+vyatta+2) unstable; urgency=low
 
+	  3.2.0
   [ Greg Kroah-Hartman ]
   * Linux 2.6.26.7
 
@@ -7200,14 +7201,33 @@ linux-2.6 (2.6.26-1+vyatta+2) UNRELEASED; urgency=low
 
   [  ]
 
- --  <rbalocca@firebolt.vyatta.com>  Thu, 23 Oct 2008 16:53:06 -0700
+  [ Patrick McHardy ]
+  * netfilter: restore lost ifdef guarding defrag exception
 
-linux-2.6 (2.6.26-1+vyatta+1) unstable; urgency=low
+  [ Ilpo Järvinen ]
+  * netfilter: snmp nat leaks memory in case of failure
 
-   * Update kernel to 2.6.26.3
-   * Replace unionfs with aufs
+  [ Alexey Dobriyan ]
+  * netfilter: xt_iprange: fix range inversion match
 
- -- Stephen Hemminger <shemminger@vyatta.com>  Thu, 28 Aug 2008 13:57:59 -0700
+  [ Ilpo Järvinen ]
+  * tcpv6: fix option space offsets with md5
+
+  [ Herbert Xu ]
+  * net: Fix netdev_run_todo dead-lock
+
+  [ Johannes Berg ]
+  * libertas: fix buffer overrun
+
+  [ Stephen Hemminger ]
+  * 8139x: reduce message severity on driver overlap
+
+  [ Bob Gilligan ]
+  * Bugfix: 1292: Enable the Vyatta logo again.
+
+  [ Mark O'Brien ]
+
+ -- Mark O'Brien <mobrien@firebolt.vyatta.com>  Tue, 25 Nov 2008 19:08:11 -0800
 
 linux-2.6 (2.6.24-1+vyatta+5) unstable; urgency=low
 
