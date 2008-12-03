@@ -200,7 +200,7 @@ static int		ath5k_pci_resume(struct pci_dev *pdev);
 #endif /* CONFIG_PM */
 
 static struct pci_driver ath5k_pci_driver = {
-	.name		= "ath5k_pci",
+	.name		= KBUILD_MODNAME,
 	.id_table	= ath5k_pci_id_table,
 	.probe		= ath5k_pci_probe,
 	.remove		= __devexit_p(ath5k_pci_remove),
@@ -241,6 +241,10 @@ static int ath5k_get_tx_stats(struct ieee80211_hw *hw,
 static u64 ath5k_get_tsf(struct ieee80211_hw *hw);
 static void ath5k_reset_tsf(struct ieee80211_hw *hw);
 static int ath5k_beacon_update(struct ath5k_softc *sc, struct sk_buff *skb);
+static void ath5k_bss_info_changed(struct ieee80211_hw *hw,
+		struct ieee80211_vif *vif,
+		struct ieee80211_bss_conf *bss_conf,
+		u32 changes);
 
 static struct ieee80211_ops ath5k_hw_ops = {
 	.tx 		= ath5k_tx,
@@ -257,6 +261,7 @@ static struct ieee80211_ops ath5k_hw_ops = {
 	.get_tx_stats 	= ath5k_get_tx_stats,
 	.get_tsf 	= ath5k_get_tsf,
 	.reset_tsf 	= ath5k_reset_tsf,
+	.bss_info_changed = ath5k_bss_info_changed,
 };
 
 /*
@@ -707,7 +712,7 @@ ath5k_attach(struct pci_dev *pdev, struct ieee80211_hw *hw)
 {
 	struct ath5k_softc *sc = hw->priv;
 	struct ath5k_hw *ah = sc->ah;
-	u8 mac[ETH_ALEN];
+	u8 mac[ETH_ALEN] = {};
 	int ret;
 
 	ATH5K_DBG(sc, ATH5K_DEBUG_ANY, "devid 0x%x\n", pdev->device);
@@ -777,7 +782,13 @@ ath5k_attach(struct pci_dev *pdev, struct ieee80211_hw *hw)
 	tasklet_init(&sc->restq, ath5k_tasklet_reset, (unsigned long)sc);
 	setup_timer(&sc->calib_tim, ath5k_calibrate, (unsigned long)sc);
 
-	ath5k_hw_get_lladdr(ah, mac);
+	ret = ath5k_eeprom_read_mac(ah, mac);
+	if (ret) {
+		ATH5K_ERR(sc, "unable to read address from EEPROM: 0x%04x\n",
+			sc->pdev->device);
+		goto err_queues;
+	}
+
 	SET_IEEE80211_PERM_ADDR(hw, mac);
 	/* All MAC address bits matter for ACKs */
 	memset(sc->bssidmask, 0xff, ETH_ALEN);
@@ -2765,6 +2776,7 @@ static int ath5k_add_interface(struct ieee80211_hw *hw,
 	/* Set to a reasonable value. Note that this will
 	 * be set to mac80211's value at ath5k_config(). */
 	sc->bintval = 1000;
+	ath5k_hw_set_lladdr(sc->ah, conf->mac_addr);
 
 	ret = 0;
 end:
@@ -2777,11 +2789,13 @@ ath5k_remove_interface(struct ieee80211_hw *hw,
 			struct ieee80211_if_init_conf *conf)
 {
 	struct ath5k_softc *sc = hw->priv;
+	u8 mac[ETH_ALEN] = {};
 
 	mutex_lock(&sc->lock);
 	if (sc->vif != conf->vif)
 		goto end;
 
+	ath5k_hw_set_lladdr(sc->ah, mac);
 	sc->vif = NULL;
 end:
 	mutex_unlock(&sc->lock);
@@ -2952,7 +2966,7 @@ static void ath5k_configure_filter(struct ieee80211_hw *hw,
 		sc->opmode != NL80211_IFTYPE_MESH_POINT &&
 		test_bit(ATH_STAT_PROMISC, sc->status))
 		rfilt |= AR5K_RX_FILTER_PROM;
-	if (sc->opmode == NL80211_IFTYPE_STATION ||
+	if ((sc->opmode == NL80211_IFTYPE_STATION && sc->assoc) ||
 		sc->opmode == NL80211_IFTYPE_ADHOC ||
 		sc->opmode == NL80211_IFTYPE_AP)
 		rfilt |= AR5K_RX_FILTER_BEACON;
@@ -3092,4 +3106,32 @@ ath5k_beacon_update(struct ath5k_softc *sc, struct sk_buff *skb)
 
 	return ret;
 }
+static void
+set_beacon_filter(struct ieee80211_hw *hw, bool enable)
+{
+	struct ath5k_softc *sc = hw->priv;
+	struct ath5k_hw *ah = sc->ah;
+	u32 rfilt;
+	rfilt = ath5k_hw_get_rx_filter(ah);
+	if (enable)
+		rfilt |= AR5K_RX_FILTER_BEACON;
+	else
+		rfilt &= ~AR5K_RX_FILTER_BEACON;
+	ath5k_hw_set_rx_filter(ah, rfilt);
+	sc->filter_flags = rfilt;
+}
 
+static void ath5k_bss_info_changed(struct ieee80211_hw *hw,
+				    struct ieee80211_vif *vif,
+				    struct ieee80211_bss_conf *bss_conf,
+				    u32 changes)
+{
+	struct ath5k_softc *sc = hw->priv;
+	if (changes & BSS_CHANGED_ASSOC) {
+		mutex_lock(&sc->lock);
+		sc->assoc = bss_conf->assoc;
+		if (sc->opmode == NL80211_IFTYPE_STATION)
+			set_beacon_filter(hw, sc->assoc);
+		mutex_unlock(&sc->lock);
+	}
+}
