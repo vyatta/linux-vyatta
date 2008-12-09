@@ -518,6 +518,7 @@ static inline void  smc_rcv(struct net_device *dev)
 
 		PRINT_PKT(data, packet_len - 4);
 
+		dev->last_rx = jiffies;
 		skb->protocol = eth_type_trans(skb, dev);
 		netif_rx(skb);
 		dev->stats.rx_packets++;
@@ -1695,7 +1696,7 @@ static const struct ethtool_ops smc_ethtool_ops = {
  * I just deleted auto_irq.c, since it was never built...
  *   --jgarzik
  */
-static int __init smc_findirq(struct smc_local *lp)
+static int __devinit smc_findirq(struct smc_local *lp)
 {
 	void __iomem *ioaddr = lp->base;
 	int timeout = 20;
@@ -1769,7 +1770,7 @@ static int __init smc_findirq(struct smc_local *lp)
  * o  actually GRAB the irq.
  * o  GRAB the region
  */
-static int __init smc_probe(struct net_device *dev, void __iomem *ioaddr,
+static int __devinit smc_probe(struct net_device *dev, void __iomem *ioaddr,
 			    unsigned long irq_flags)
 {
 	struct smc_local *lp = netdev_priv(dev);
@@ -1777,6 +1778,7 @@ static int __init smc_probe(struct net_device *dev, void __iomem *ioaddr,
 	int retval;
 	unsigned int val, revision_register;
 	const char *version_string;
+	DECLARE_MAC_BUF(mac);
 
 	DBG(2, "%s: %s\n", CARDNAME, __func__);
 
@@ -1970,8 +1972,8 @@ static int __init smc_probe(struct net_device *dev, void __iomem *ioaddr,
 			       "set using ifconfig\n", dev->name);
 		} else {
 			/* Print the Ethernet address */
-			printk("%s: Ethernet addr: %pM\n",
-			       dev->name, dev->dev_addr);
+			printk("%s: Ethernet addr: %s\n",
+			       dev->name, print_mac(mac, dev->dev_addr));
 		}
 
 		if (lp->phy_type == 0) {
@@ -2124,7 +2126,7 @@ static void smc_release_datacs(struct platform_device *pdev, struct net_device *
  *	0 --> there is a device
  *	anything else, error
  */
-static int __init smc_drv_probe(struct platform_device *pdev)
+static int __devinit smc_drv_probe(struct platform_device *pdev)
 {
 	struct smc91x_platdata *pd = pdev->dev.platform_data;
 	struct smc_local *lp;
@@ -2238,7 +2240,7 @@ static int __init smc_drv_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int smc_drv_remove(struct platform_device *pdev)
+static int __devexit smc_drv_remove(struct platform_device *pdev)
 {
 	struct net_device *ndev = platform_get_drvdata(pdev);
 	struct smc_local *lp = netdev_priv(ndev);
@@ -2303,7 +2305,7 @@ static int smc_drv_resume(struct platform_device *dev)
 
 static struct platform_driver smc_driver = {
 	.probe		= smc_drv_probe,
-	.remove		= smc_drv_remove,
+	.remove		= __devexit_p(smc_drv_remove),
 	.suspend	= smc_drv_suspend,
 	.resume		= smc_drv_resume,
 	.driver		= {

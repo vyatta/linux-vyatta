@@ -245,7 +245,7 @@ static inline int inet_netns_ok(struct net *net, int protocol)
 	int hash;
 	struct net_protocol *ipprot;
 
-	if (net_eq(net, &init_net))
+	if (net == &init_net)
 		return 1;
 
 	hash = protocol & (MAX_INET_PROTOS - 1);
@@ -272,9 +272,10 @@ static int inet_create(struct net *net, struct socket *sock, int protocol)
 	int try_loading_module = 0;
 	int err;
 
-	if (unlikely(!inet_ehash_secret))
-		if (sock->type != SOCK_RAW && sock->type != SOCK_DGRAM)
-			build_ehash_secret();
+	if (sock->type != SOCK_RAW &&
+	    sock->type != SOCK_DGRAM &&
+	    !inet_ehash_secret)
+		build_ehash_secret();
 
 	sock->state = SS_UNCONNECTED;
 
@@ -1069,8 +1070,11 @@ static int inet_sk_reselect_saddr(struct sock *sk)
 		return 0;
 
 	if (sysctl_ip_dynaddr > 1) {
-		printk(KERN_INFO "%s(): shifting inet->saddr from %pI4 to %pI4\n",
-		       __func__, &old_saddr, &new_saddr);
+		printk(KERN_INFO "%s(): shifting inet->"
+				 "saddr from " NIPQUAD_FMT " to " NIPQUAD_FMT "\n",
+		       __func__,
+		       NIPQUAD(old_saddr),
+		       NIPQUAD(new_saddr));
 	}
 
 	inet->saddr = inet->rcv_saddr = new_saddr;

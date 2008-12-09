@@ -62,7 +62,7 @@ struct atm_qdisc_data {
 	struct atm_flow_data	link;		/* unclassified skbs go here */
 	struct atm_flow_data	*flows;		/* NB: "link" is also on this
 						   list */
-	struct tasklet_struct	task;		/* dequeue tasklet */
+	struct tasklet_struct	task;		/* requeue tasklet */
 };
 
 /* ------------------------- Class/flow operations ------------------------- */
@@ -102,8 +102,7 @@ static int atm_tc_graft(struct Qdisc *sch, unsigned long arg,
 		return -EINVAL;
 	if (!new)
 		new = &noop_qdisc;
-	*old = flow->q;
-	flow->q = new;
+	*old = xchg(&flow->q, new);
 	if (*old)
 		qdisc_reset(*old);
 	return 0;
@@ -481,14 +480,11 @@ static void sch_atm_dequeue(unsigned long data)
 		 * If traffic is properly shaped, this won't generate nasty
 		 * little bursts. Otherwise, it may ... (but that's okay)
 		 */
-		while ((skb = flow->q->ops->peek(flow->q))) {
-			if (!atm_may_send(flow->vcc, skb->truesize))
+		while ((skb = flow->q->dequeue(flow->q))) {
+			if (!atm_may_send(flow->vcc, skb->truesize)) {
+				(void)flow->q->ops->requeue(skb, flow->q);
 				break;
-
-			skb = qdisc_dequeue_peeked(flow->q);
-			if (unlikely(!skb))
-				break;
-
+			}
 			pr_debug("atm_tc_dequeue: sending on class %p\n", flow);
 			/* remove any LL header somebody else has attached */
 			skb_pull(skb, skb_network_offset(skb));
@@ -520,19 +516,27 @@ static struct sk_buff *atm_tc_dequeue(struct Qdisc *sch)
 
 	pr_debug("atm_tc_dequeue(sch %p,[qdisc %p])\n", sch, p);
 	tasklet_schedule(&p->task);
-	skb = qdisc_dequeue_peeked(p->link.q);
+	skb = p->link.q->dequeue(p->link.q);
 	if (skb)
 		sch->q.qlen--;
 	return skb;
 }
 
-static struct sk_buff *atm_tc_peek(struct Qdisc *sch)
+static int atm_tc_requeue(struct sk_buff *skb, struct Qdisc *sch)
 {
 	struct atm_qdisc_data *p = qdisc_priv(sch);
+	int ret;
 
-	pr_debug("atm_tc_peek(sch %p,[qdisc %p])\n", sch, p);
-
-	return p->link.q->ops->peek(p->link.q);
+	pr_debug("atm_tc_requeue(skb %p,sch %p,[qdisc %p])\n", skb, sch, p);
+	ret = p->link.q->ops->requeue(skb, p->link.q);
+	if (!ret) {
+		sch->q.qlen++;
+		sch->qstats.requeues++;
+	} else if (net_xmit_drop_count(ret)) {
+		sch->qstats.drops++;
+		p->link.qstats.drops++;
+	}
+	return ret;
 }
 
 static unsigned int atm_tc_drop(struct Qdisc *sch)
@@ -690,7 +694,7 @@ static struct Qdisc_ops atm_qdisc_ops __read_mostly = {
 	.priv_size	= sizeof(struct atm_qdisc_data),
 	.enqueue	= atm_tc_enqueue,
 	.dequeue	= atm_tc_dequeue,
-	.peek		= atm_tc_peek,
+	.requeue	= atm_tc_requeue,
 	.drop		= atm_tc_drop,
 	.init		= atm_tc_init,
 	.reset		= atm_tc_reset,

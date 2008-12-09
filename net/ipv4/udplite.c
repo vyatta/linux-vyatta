@@ -12,17 +12,16 @@
  */
 #include "udp_impl.h"
 
-struct udp_table 	udplite_table;
-EXPORT_SYMBOL(udplite_table);
+struct hlist_head 	udplite_hash[UDP_HTABLE_SIZE];
 
 static int udplite_rcv(struct sk_buff *skb)
 {
-	return __udp4_lib_rcv(skb, &udplite_table, IPPROTO_UDPLITE);
+	return __udp4_lib_rcv(skb, udplite_hash, IPPROTO_UDPLITE);
 }
 
 static void udplite_err(struct sk_buff *skb, u32 info)
 {
-	__udp4_lib_err(skb, info, &udplite_table);
+	__udp4_lib_err(skb, info, udplite_hash);
 }
 
 static	struct net_protocol udplite_protocol = {
@@ -51,8 +50,7 @@ struct proto 	udplite_prot = {
 	.unhash		   = udp_lib_unhash,
 	.get_port	   = udp_v4_get_port,
 	.obj_size	   = sizeof(struct udp_sock),
-	.slab_flags	   = SLAB_DESTROY_BY_RCU,
-	.h.udp_table	   = &udplite_table,
+	.h.udp_hash	   = udplite_hash,
 #ifdef CONFIG_COMPAT
 	.compat_setsockopt = compat_udp_setsockopt,
 	.compat_getsockopt = compat_udp_getsockopt,
@@ -73,7 +71,7 @@ static struct inet_protosw udplite4_protosw = {
 static struct udp_seq_afinfo udplite4_seq_afinfo = {
 	.name		= "udplite",
 	.family		= AF_INET,
-	.udp_table 	= &udplite_table,
+	.hashtable	= udplite_hash,
 	.seq_fops	= {
 		.owner	=	THIS_MODULE,
 	},
@@ -110,7 +108,6 @@ static inline int udplite4_proc_init(void)
 
 void __init udplite4_register(void)
 {
-	udp_table_init(&udplite_table);
 	if (proto_register(&udplite_prot, 1))
 		goto out_register_err;
 
@@ -129,4 +126,5 @@ out_register_err:
 	printk(KERN_CRIT "%s: Cannot add UDP-Lite protocol.\n", __func__);
 }
 
+EXPORT_SYMBOL(udplite_hash);
 EXPORT_SYMBOL(udplite_prot);

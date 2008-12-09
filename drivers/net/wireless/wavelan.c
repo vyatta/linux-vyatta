@@ -134,7 +134,7 @@ static inline void wv_16_on(unsigned long ioaddr, u16 hacr)
  */
 static inline void wv_ints_off(struct net_device * dev)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	unsigned long ioaddr = dev->base_addr;
 	
 	lp->hacr &= ~HACR_INTRON;
@@ -148,7 +148,7 @@ static inline void wv_ints_off(struct net_device * dev)
  */
 static inline void wv_ints_on(struct net_device * dev)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	unsigned long ioaddr = dev->base_addr;
 
 	lp->hacr |= HACR_INTRON;
@@ -526,7 +526,7 @@ static inline void obram_write(unsigned long ioaddr, u16 o, u8 * b, int n)
  */
 static void wv_ack(struct net_device * dev)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	unsigned long ioaddr = dev->base_addr;
 	u16 scb_cs;
 	int i;
@@ -568,7 +568,7 @@ static void wv_ack(struct net_device * dev)
  */
 static int wv_synchronous_cmd(struct net_device * dev, const char *str)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	unsigned long ioaddr = dev->base_addr;
 	u16 scb_cmd;
 	ach_t cb;
@@ -824,7 +824,7 @@ if (lp->tx_n_in_use > 0)
  */
 static void wv_82586_reconfig(struct net_device * dev)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	unsigned long flags;
 
 	/* Arm the flag, will be cleard in wv_82586_config() */
@@ -859,6 +859,8 @@ static void wv_82586_reconfig(struct net_device * dev)
  */
 static void wv_psa_show(psa_t * p)
 {
+	DECLARE_MAC_BUF(mac);
+
 	printk(KERN_DEBUG "##### WaveLAN PSA contents: #####\n");
 	printk(KERN_DEBUG "psa_io_base_addr_1: 0x%02X %02X %02X %02X\n",
 	       p->psa_io_base_addr_1,
@@ -870,10 +872,13 @@ static void wv_psa_show(psa_t * p)
 	printk(KERN_DEBUG "psa_holi_params: 0x%02x, ", p->psa_holi_params);
 	printk("psa_int_req_no: %d\n", p->psa_int_req_no);
 #ifdef DEBUG_SHOW_UNUSED
-	printk(KERN_DEBUG "psa_unused0[]: %pM\n", p->psa_unused0);
+	printk(KERN_DEBUG "psa_unused0[]: %s\n",
+	       print_mac(mac, p->psa_unused0));
 #endif				/* DEBUG_SHOW_UNUSED */
-	printk(KERN_DEBUG "psa_univ_mac_addr[]: %pM\n", p->psa_univ_mac_addr);
-	printk(KERN_DEBUG "psa_local_mac_addr[]: %pM\n", p->psa_local_mac_addr);
+	printk(KERN_DEBUG "psa_univ_mac_addr[]: %s\n",
+	       print_mac(mac, p->psa_univ_mac_addr));
+	printk(KERN_DEBUG "psa_local_mac_addr[]: %s\n",
+	       print_mac(mac, p->psa_local_mac_addr));
 	printk(KERN_DEBUG "psa_univ_local_sel: %d, ",
 	       p->psa_univ_local_sel);
 	printk("psa_comp_number: %d, ", p->psa_comp_number);
@@ -922,7 +927,7 @@ static void wv_psa_show(psa_t * p)
 static void wv_mmc_show(struct net_device * dev)
 {
 	unsigned long ioaddr = dev->base_addr;
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	mmr_t m;
 
 	/* Basic check */
@@ -1102,6 +1107,8 @@ static void wv_scb_show(unsigned long ioaddr)
  */
 static void wv_ru_show(struct net_device * dev)
 {
+	/* net_local *lp = (net_local *) dev->priv; */
+
 	printk(KERN_DEBUG
 	       "##### WaveLAN i82586 receiver unit status: #####\n");
 	printk(KERN_DEBUG "ru:");
@@ -1146,7 +1153,7 @@ static void wv_cu_show_one(struct net_device * dev, net_local * lp, int i, u16 p
  */
 static void wv_cu_show(struct net_device * dev)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	unsigned int i;
 	u16 p;
 
@@ -1188,7 +1195,7 @@ static void wv_local_show(struct net_device * dev)
 {
 	net_local *lp;
 
-	lp = netdev_priv(dev);
+	lp = (net_local *) dev->priv;
 
 	printk(KERN_DEBUG "local:");
 	printk(" tx_n_in_use=%d,", lp->tx_n_in_use);
@@ -1213,13 +1220,14 @@ static inline void wv_packet_info(u8 * p,	/* Packet to dump */
 {				/* Name of the function */
 	int i;
 	int maxi;
+	DECLARE_MAC_BUF(mac);
 
 	printk(KERN_DEBUG
-	       "%s: %s(): dest %pM, length %d\n",
-	       msg1, msg2, p, length);
+	       "%s: %s(): dest %s, length %d\n",
+	       msg1, msg2, print_mac(mac, p), length);
 	printk(KERN_DEBUG
-	       "%s: %s(): src %pM, type 0x%02X%02X\n",
-	       msg1, msg2, &p[6], p[12], p[13]);
+	       "%s: %s(): src %s, type 0x%02X%02X\n",
+	       msg1, msg2, print_mac(mac, &p[6]), p[12], p[13]);
 
 #ifdef DEBUG_PACKET_DUMP
 
@@ -1248,8 +1256,11 @@ static inline void wv_packet_info(u8 * p,	/* Packet to dump */
 static void wv_init_info(struct net_device * dev)
 {
 	short ioaddr = dev->base_addr;
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	psa_t psa;
+#ifdef DEBUG_BASIC_SHOW
+	DECLARE_MAC_BUF(mac);
+#endif
 
 	/* Read the parameter storage area */
 	psa_read(ioaddr, lp->hacr, 0, (unsigned char *) &psa, sizeof(psa));
@@ -1266,8 +1277,8 @@ static void wv_init_info(struct net_device * dev)
 
 #ifdef DEBUG_BASIC_SHOW
 	/* Now, let's go for the basic stuff. */
-	printk(KERN_NOTICE "%s: WaveLAN at %#x, %pM, IRQ %d",
-	       dev->name, ioaddr, dev->dev_addr, dev->irq);
+	printk(KERN_NOTICE "%s: WaveLAN at %#x, %s, IRQ %d",
+	       dev->name, ioaddr, print_mac(mac, dev->dev_addr), dev->irq);
 
 	/* Print current network ID. */
 	if (psa.psa_nwid_select)
@@ -1358,7 +1369,7 @@ static en_stats *wavelan_get_stats(struct net_device * dev)
 	printk(KERN_DEBUG "%s: <>wavelan_get_stats()\n", dev->name);
 #endif
 
-	return &((net_local *)netdev_priv(dev))->stats;
+	return (&((net_local *) dev->priv)->stats);
 }
 
 /*------------------------------------------------------------------*/
@@ -1371,7 +1382,7 @@ static en_stats *wavelan_get_stats(struct net_device * dev)
  */
 static void wavelan_set_multicast_list(struct net_device * dev)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 
 #ifdef DEBUG_IOCTL_TRACE
 	printk(KERN_DEBUG "%s: ->wavelan_set_multicast_list()\n",
@@ -1705,7 +1716,7 @@ static inline void wl_spy_gather(struct net_device * dev,
  */
 static inline void wl_his_gather(struct net_device * dev, u8 * stats)
 {				/* Statistics to gather */
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	u8 level = stats[0] & MMR_SIGNAL_LVL;
 	int i;
 
@@ -1742,7 +1753,7 @@ static int wavelan_set_nwid(struct net_device *dev,
 			    char *extra)
 {
 	unsigned long ioaddr = dev->base_addr;
-	net_local *lp = netdev_priv(dev);	/* lp is not unused */
+	net_local *lp = (net_local *) dev->priv;	/* lp is not unused */
 	psa_t psa;
 	mm_t m;
 	unsigned long flags;
@@ -1801,7 +1812,7 @@ static int wavelan_get_nwid(struct net_device *dev,
 			    char *extra)
 {
 	unsigned long ioaddr = dev->base_addr;
-	net_local *lp = netdev_priv(dev);	/* lp is not unused */
+	net_local *lp = (net_local *) dev->priv;	/* lp is not unused */
 	psa_t psa;
 	unsigned long flags;
 	int ret = 0;
@@ -1833,7 +1844,7 @@ static int wavelan_set_freq(struct net_device *dev,
 			    char *extra)
 {
 	unsigned long ioaddr = dev->base_addr;
-	net_local *lp = netdev_priv(dev);	/* lp is not unused */
+	net_local *lp = (net_local *) dev->priv;	/* lp is not unused */
 	unsigned long flags;
 	int ret;
 
@@ -1863,7 +1874,7 @@ static int wavelan_get_freq(struct net_device *dev,
 			    char *extra)
 {
 	unsigned long ioaddr = dev->base_addr;
-	net_local *lp = netdev_priv(dev);	/* lp is not unused */
+	net_local *lp = (net_local *) dev->priv;	/* lp is not unused */
 	psa_t psa;
 	unsigned long flags;
 	int ret = 0;
@@ -1909,7 +1920,7 @@ static int wavelan_set_sens(struct net_device *dev,
 			    char *extra)
 {
 	unsigned long ioaddr = dev->base_addr;
-	net_local *lp = netdev_priv(dev);	/* lp is not unused */
+	net_local *lp = (net_local *) dev->priv;	/* lp is not unused */
 	psa_t psa;
 	unsigned long flags;
 	int ret = 0;
@@ -1945,7 +1956,7 @@ static int wavelan_get_sens(struct net_device *dev,
 			    char *extra)
 {
 	unsigned long ioaddr = dev->base_addr;
-	net_local *lp = netdev_priv(dev);	/* lp is not unused */
+	net_local *lp = (net_local *) dev->priv;	/* lp is not unused */
 	psa_t psa;
 	unsigned long flags;
 	int ret = 0;
@@ -1976,7 +1987,7 @@ static int wavelan_set_encode(struct net_device *dev,
 			      char *extra)
 {
 	unsigned long ioaddr = dev->base_addr;
-	net_local *lp = netdev_priv(dev);	/* lp is not unused */
+	net_local *lp = (net_local *) dev->priv;	/* lp is not unused */
 	unsigned long flags;
 	psa_t psa;
 	int ret = 0;
@@ -2046,7 +2057,7 @@ static int wavelan_get_encode(struct net_device *dev,
 			      char *extra)
 {
 	unsigned long ioaddr = dev->base_addr;
-	net_local *lp = netdev_priv(dev);	/* lp is not unused */
+	net_local *lp = (net_local *) dev->priv;	/* lp is not unused */
 	psa_t psa;
 	unsigned long flags;
 	int ret = 0;
@@ -2093,7 +2104,7 @@ static int wavelan_get_range(struct net_device *dev,
 			     char *extra)
 {
 	unsigned long ioaddr = dev->base_addr;
-	net_local *lp = netdev_priv(dev);	/* lp is not unused */
+	net_local *lp = (net_local *) dev->priv;	/* lp is not unused */
 	struct iw_range *range = (struct iw_range *) extra;
 	unsigned long flags;
 	int ret = 0;
@@ -2168,7 +2179,7 @@ static int wavelan_set_qthr(struct net_device *dev,
 			    char *extra)
 {
 	unsigned long ioaddr = dev->base_addr;
-	net_local *lp = netdev_priv(dev);	/* lp is not unused */
+	net_local *lp = (net_local *) dev->priv;	/* lp is not unused */
 	psa_t psa;
 	unsigned long flags;
 
@@ -2200,7 +2211,7 @@ static int wavelan_get_qthr(struct net_device *dev,
 			    char *extra)
 {
 	unsigned long ioaddr = dev->base_addr;
-	net_local *lp = netdev_priv(dev);	/* lp is not unused */
+	net_local *lp = (net_local *) dev->priv;	/* lp is not unused */
 	psa_t psa;
 	unsigned long flags;
 
@@ -2228,7 +2239,7 @@ static int wavelan_set_histo(struct net_device *dev,
 			     union iwreq_data *wrqu,
 			     char *extra)
 {
-	net_local *lp = netdev_priv(dev);	/* lp is not unused */
+	net_local *lp = (net_local *) dev->priv;	/* lp is not unused */
 
 	/* Check the number of intervals. */
 	if (wrqu->data.length > 16) {
@@ -2271,7 +2282,7 @@ static int wavelan_get_histo(struct net_device *dev,
 			     union iwreq_data *wrqu,
 			     char *extra)
 {
-	net_local *lp = netdev_priv(dev);	/* lp is not unused */
+	net_local *lp = (net_local *) dev->priv;	/* lp is not unused */
 
 	/* Set the number of intervals. */
 	wrqu->data.length = lp->his_number;
@@ -2375,7 +2386,7 @@ static const struct iw_handler_def	wavelan_handler_def =
 static iw_stats *wavelan_get_wireless_stats(struct net_device * dev)
 {
 	unsigned long ioaddr = dev->base_addr;
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	mmr_t m;
 	iw_stats *wstats;
 	unsigned long flags;
@@ -2450,7 +2461,7 @@ static iw_stats *wavelan_get_wireless_stats(struct net_device * dev)
 static void
 wv_packet_read(struct net_device * dev, u16 buf_off, int sksize)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	unsigned long ioaddr = dev->base_addr;
 	struct sk_buff *skb;
 
@@ -2526,6 +2537,7 @@ wv_packet_read(struct net_device * dev, u16 buf_off, int sksize)
 	netif_rx(skb);
 
 	/* Keep statistics up to date */
+	dev->last_rx = jiffies;
 	lp->stats.rx_packets++;
 	lp->stats.rx_bytes += sksize;
 
@@ -2544,7 +2556,7 @@ wv_packet_read(struct net_device * dev, u16 buf_off, int sksize)
 static void wv_receive(struct net_device * dev)
 {
 	unsigned long ioaddr = dev->base_addr;
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	fd_t fd;
 	rbd_t rbd;
 	int nreaped = 0;
@@ -2726,7 +2738,7 @@ static void wv_receive(struct net_device * dev)
  */
 static int wv_packet_write(struct net_device * dev, void *buf, short length)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	unsigned long ioaddr = dev->base_addr;
 	unsigned short txblock;
 	unsigned short txpred;
@@ -2857,7 +2869,7 @@ static int wv_packet_write(struct net_device * dev, void *buf, short length)
  */
 static int wavelan_packet_xmit(struct sk_buff *skb, struct net_device * dev)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	unsigned long flags;
 	char data[ETH_ZLEN];
 
@@ -2925,7 +2937,7 @@ static int wavelan_packet_xmit(struct sk_buff *skb, struct net_device * dev)
 static int wv_mmc_init(struct net_device * dev)
 {
 	unsigned long ioaddr = dev->base_addr;
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	psa_t psa;
 	mmw_t m;
 	int configured;
@@ -3096,7 +3108,7 @@ static int wv_mmc_init(struct net_device * dev)
  */
 static int wv_ru_start(struct net_device * dev)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	unsigned long ioaddr = dev->base_addr;
 	u16 scb_cs;
 	fd_t fd;
@@ -3188,7 +3200,7 @@ static int wv_ru_start(struct net_device * dev)
  */
 static int wv_cu_start(struct net_device * dev)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	unsigned long ioaddr = dev->base_addr;
 	int i;
 	u16 txblock;
@@ -3289,7 +3301,7 @@ static int wv_cu_start(struct net_device * dev)
  */
 static int wv_82586_start(struct net_device * dev)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	unsigned long ioaddr = dev->base_addr;
 	scp_t scp;		/* system configuration pointer */
 	iscp_t iscp;		/* intermediate scp */
@@ -3421,7 +3433,7 @@ static int wv_82586_start(struct net_device * dev)
  */
 static void wv_82586_config(struct net_device * dev)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	unsigned long ioaddr = dev->base_addr;
 	unsigned short txblock;
 	unsigned short txpred;
@@ -3553,11 +3565,15 @@ static void wv_82586_config(struct net_device * dev)
 			      WAVELAN_ADDR_SIZE >> 1);
 
 #ifdef DEBUG_CONFIG_INFO
+ {
+		DECLARE_MAC_BUF(mac);
 		printk(KERN_DEBUG
 		       "%s: wv_82586_config(): set %d multicast addresses:\n",
 		       dev->name, lp->mc_count);
 		for (dmi = dev->mc_list; dmi; dmi = dmi->next)
-			printk(KERN_DEBUG " %pM\n", dmi->dmi_addr);
+			printk(KERN_DEBUG " %s\n",
+			       print_mac(mac, dmi->dmi_addr));
+ }
 #endif
 	}
 
@@ -3597,7 +3613,7 @@ static void wv_82586_config(struct net_device * dev)
  */
 static void wv_82586_stop(struct net_device * dev)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	unsigned long ioaddr = dev->base_addr;
 	u16 scb_cmd;
 
@@ -3634,7 +3650,7 @@ static void wv_82586_stop(struct net_device * dev)
  */
 static int wv_hw_reset(struct net_device * dev)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	unsigned long ioaddr = dev->base_addr;
 
 #ifdef DEBUG_CONFIG_TRACE
@@ -3735,7 +3751,7 @@ static irqreturn_t wavelan_interrupt(int irq, void *dev_id)
 	printk(KERN_DEBUG "%s: ->wavelan_interrupt()\n", dev->name);
 #endif
 
-	lp = netdev_priv(dev);
+	lp = (net_local *) dev->priv;
 	ioaddr = dev->base_addr;
 
 #ifdef DEBUG_INTERRUPT_INFO
@@ -3878,7 +3894,7 @@ static irqreturn_t wavelan_interrupt(int irq, void *dev_id)
  */
 static void wavelan_watchdog(struct net_device *	dev)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *	lp = (net_local *)dev->priv;
 	u_long		ioaddr = dev->base_addr;
 	unsigned long	flags;
 	unsigned int	nreaped;
@@ -3958,7 +3974,7 @@ static void wavelan_watchdog(struct net_device *	dev)
  */
 static int wavelan_open(struct net_device * dev)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *	lp = (net_local *)dev->priv;
 	unsigned long	flags;
 
 #ifdef DEBUG_CALLBACK_TRACE
@@ -4013,7 +4029,7 @@ static int wavelan_open(struct net_device * dev)
  */
 static int wavelan_close(struct net_device * dev)
 {
-	net_local *lp = netdev_priv(dev);
+	net_local *lp = (net_local *) dev->priv;
 	unsigned long flags;
 
 #ifdef DEBUG_CALLBACK_TRACE
@@ -4112,8 +4128,8 @@ static int __init wavelan_config(struct net_device *dev, unsigned short ioaddr)
 	dev->if_port = 0;
 
 	/* Initialize device structures */
-	memset(netdev_priv(dev), 0, sizeof(net_local));
-	lp = netdev_priv(dev);
+	memset(dev->priv, 0, sizeof(net_local));
+	lp = (net_local *) dev->priv;
 
 	/* Back link to the device structure. */
 	lp->dev = dev;

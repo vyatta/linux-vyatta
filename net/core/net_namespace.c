@@ -47,6 +47,7 @@ static __net_init int setup_net(struct net *net)
 		goto out;
 
 	ng->len = INITIAL_NET_GEN_PTRS;
+	INIT_RCU_HEAD(&ng->rcu);
 	rcu_assign_pointer(net->gen, ng);
 
 	error = 0;
@@ -477,6 +478,7 @@ int net_assign_generic(struct net *net, int id, void *data)
 	 */
 
 	ng->len = id;
+	INIT_RCU_HEAD(&ng->rcu);
 	memcpy(&ng->ptr, &old_ng->ptr, old_ng->len);
 
 	rcu_assign_pointer(net->gen, ng);

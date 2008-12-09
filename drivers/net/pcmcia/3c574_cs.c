@@ -345,6 +345,7 @@ static int tc574_config(struct pcmcia_device *link)
 	__be16 *phys_addr;
 	char *cardname;
 	__u32 config;
+	DECLARE_MAC_BUF(mac);
 
 	phys_addr = (__be16 *)dev->dev_addr;
 
@@ -462,9 +463,9 @@ static int tc574_config(struct pcmcia_device *link)
 	strcpy(lp->node.dev_name, dev->name);
 
 	printk(KERN_INFO "%s: %s at io %#3lx, irq %d, "
-	       "hw_addr %pM.\n",
+	       "hw_addr %s.\n",
 	       dev->name, cardname, dev->base_addr, dev->irq,
-	       dev->dev_addr);
+	       print_mac(mac, dev->dev_addr));
 	printk(" %dK FIFO split %s Rx:Tx, %sMII interface.\n",
 		   8 << config & Ram_size,
 		   ram_split[(config & Ram_split) >> Ram_split_shift],
@@ -1061,6 +1062,7 @@ static int el3_rx(struct net_device *dev, int worklimit)
 						((pkt_len+3)>>2));
 				skb->protocol = eth_type_trans(skb, dev);
 				netif_rx(skb);
+				dev->last_rx = jiffies;
 				dev->stats.rx_packets++;
 				dev->stats.rx_bytes += pkt_len;
 			} else {

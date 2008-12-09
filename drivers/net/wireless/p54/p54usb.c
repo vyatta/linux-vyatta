@@ -28,8 +28,6 @@ MODULE_AUTHOR("Michael Wu <flamingice@sourmilk.net>");
 MODULE_DESCRIPTION("Prism54 USB wireless driver");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("prism54usb");
-MODULE_FIRMWARE("isl3886usb");
-MODULE_FIRMWARE("isl3887usb");
 
 static struct usb_device_id p54u_table[] __devinitdata = {
 	/* Version 1 devices (pci chip + net2280) */
@@ -137,16 +135,6 @@ static void p54u_rx_cb(struct urb *urb)
 	usb_submit_urb(urb, GFP_ATOMIC);
 }
 
-static void p54u_tx_reuse_skb_cb(struct urb *urb)
-{
-	struct sk_buff *skb = urb->context;
-	struct p54u_priv *priv = (struct p54u_priv *)((struct ieee80211_hw *)
-		usb_get_intfdata(usb_ifnum_to_if(urb->dev, 0)))->priv;
-
-	skb_pull(skb, priv->common.tx_hdr_len);
-	usb_free_urb(urb);
-}
-
 static void p54u_tx_cb(struct urb *urb)
 {
 	usb_free_urb(urb);
@@ -155,16 +143,6 @@ static void p54u_tx_cb(struct urb *urb)
 static void p54u_tx_free_cb(struct urb *urb)
 {
 	kfree(urb->transfer_buffer);
-	usb_free_urb(urb);
-}
-
-static void p54u_tx_free_skb_cb(struct urb *urb)
-{
-	struct sk_buff *skb = urb->context;
-	struct ieee80211_hw *dev = (struct ieee80211_hw *)
-		usb_get_intfdata(usb_ifnum_to_if(urb->dev, 0));
-
-	p54_free_skb(dev, skb);
 	usb_free_urb(urb);
 }
 
@@ -214,8 +192,8 @@ static void p54u_free_urbs(struct ieee80211_hw *dev)
 	}
 }
 
-static void p54u_tx_3887(struct ieee80211_hw *dev, struct sk_buff *skb,
-			 int free_on_tx)
+static void p54u_tx_3887(struct ieee80211_hw *dev, struct p54_control_hdr *data,
+			 size_t len, int free_on_tx)
 {
 	struct p54u_priv *priv = dev->priv;
 	struct urb *addr_urb, *data_urb;
@@ -231,14 +209,11 @@ static void p54u_tx_3887(struct ieee80211_hw *dev, struct sk_buff *skb,
 	}
 
 	usb_fill_bulk_urb(addr_urb, priv->udev,
-			  usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA),
-			  &((struct p54_hdr *)skb->data)->req_id, 4,
-			  p54u_tx_cb, dev);
+		usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA), &data->req_id,
+		sizeof(data->req_id), p54u_tx_cb, dev);
 	usb_fill_bulk_urb(data_urb, priv->udev,
-			  usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA),
-			  skb->data, skb->len,
-			  free_on_tx ? p54u_tx_free_skb_cb :
-				       p54u_tx_reuse_skb_cb, skb);
+		usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA), data, len,
+		free_on_tx ? p54u_tx_free_cb : p54u_tx_cb, dev);
 
 	usb_submit_urb(addr_urb, GFP_ATOMIC);
 	usb_submit_urb(data_urb, GFP_ATOMIC);
@@ -257,35 +232,31 @@ static __le32 p54u_lm87_chksum(const u32 *data, size_t length)
 	return cpu_to_le32(chk);
 }
 
-static void p54u_tx_lm87(struct ieee80211_hw *dev, struct sk_buff *skb,
-			 int free_on_tx)
+static void p54u_tx_lm87(struct ieee80211_hw *dev,
+			 struct p54_control_hdr *data,
+			 size_t len, int free_on_tx)
 {
 	struct p54u_priv *priv = dev->priv;
 	struct urb *data_urb;
-	struct lm87_tx_hdr *hdr;
-	__le32 checksum;
-	__le32 addr = ((struct p54_hdr *)skb->data)->req_id;
+	struct lm87_tx_hdr *hdr = (void *)data - sizeof(*hdr);
 
 	data_urb = usb_alloc_urb(0, GFP_ATOMIC);
 	if (!data_urb)
 		return;
 
-	checksum = p54u_lm87_chksum((u32 *)skb->data, skb->len);
-	hdr = (struct lm87_tx_hdr *)skb_push(skb, sizeof(*hdr));
-	hdr->chksum = checksum;
-	hdr->device_addr = addr;
+	hdr->chksum = p54u_lm87_chksum((u32 *)data, len);
+	hdr->device_addr = data->req_id;
 
 	usb_fill_bulk_urb(data_urb, priv->udev,
-			  usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA),
-			  skb->data, skb->len,
-			  free_on_tx ? p54u_tx_free_skb_cb :
-				       p54u_tx_reuse_skb_cb, skb);
+		usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA), hdr,
+		len + sizeof(*hdr), free_on_tx ? p54u_tx_free_cb : p54u_tx_cb,
+		dev);
 
 	usb_submit_urb(data_urb, GFP_ATOMIC);
 }
 
-static void p54u_tx_net2280(struct ieee80211_hw *dev, struct sk_buff *skb,
-			    int free_on_tx)
+static void p54u_tx_net2280(struct ieee80211_hw *dev, struct p54_control_hdr *data,
+			    size_t len, int free_on_tx)
 {
 	struct p54u_priv *priv = dev->priv;
 	struct urb *int_urb, *data_urb;
@@ -313,10 +284,11 @@ static void p54u_tx_net2280(struct ieee80211_hw *dev, struct sk_buff *skb,
 	reg->addr = cpu_to_le32(P54U_DEV_BASE);
 	reg->val = cpu_to_le32(ISL38XX_DEV_INT_DATA);
 
-	hdr = (void *)skb_push(skb, sizeof(*hdr));
+	len += sizeof(*data);
+	hdr = (void *)data - sizeof(*hdr);
 	memset(hdr, 0, sizeof(*hdr));
-	hdr->device_addr = ((struct p54_hdr *)skb->data)->req_id;
-	hdr->len = cpu_to_le16(skb->len + sizeof(struct p54_hdr));
+	hdr->device_addr = data->req_id;
+	hdr->len = cpu_to_le16(len);
 
 	usb_fill_bulk_urb(int_urb, priv->udev,
 		usb_sndbulkpipe(priv->udev, P54U_PIPE_DEV), reg, sizeof(*reg),
@@ -324,10 +296,8 @@ static void p54u_tx_net2280(struct ieee80211_hw *dev, struct sk_buff *skb,
 	usb_submit_urb(int_urb, GFP_ATOMIC);
 
 	usb_fill_bulk_urb(data_urb, priv->udev,
-			  usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA),
-			  skb->data, skb->len,
-			  free_on_tx ? p54u_tx_free_skb_cb :
-				       p54u_tx_reuse_skb_cb, skb);
+		usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA), hdr, len + sizeof(*hdr),
+		free_on_tx ? p54u_tx_free_cb : p54u_tx_cb, dev);
 	usb_submit_urb(data_urb, GFP_ATOMIC);
 }
 
@@ -417,13 +387,10 @@ static int p54u_upload_firmware_3887(struct ieee80211_hw *dev)
 		goto err_reset;
 	}
 
-	err = request_firmware(&fw_entry, "isl3887usb", &priv->udev->dev);
+	err = request_firmware(&fw_entry, "isl3887usb_bare", &priv->udev->dev);
 	if (err) {
-		printk(KERN_ERR "p54usb: cannot find firmware (isl3887usb)\n");
-		err = request_firmware(&fw_entry, "isl3887usb_bare",
-			&priv->udev->dev);
-		if (err)
-			goto err_req_fw_failed;
+		printk(KERN_ERR "p54usb: cannot find firmware (isl3887usb_bare)!\n");
+		goto err_req_fw_failed;
 	}
 
 	err = p54_parse_firmware(dev, fw_entry);
@@ -558,15 +525,11 @@ static int p54u_upload_firmware_net2280(struct ieee80211_hw *dev)
 		return -ENOMEM;
 	}
 
-	err = request_firmware(&fw_entry, "isl3886usb", &priv->udev->dev);
+	err = request_firmware(&fw_entry, "isl3890usb", &priv->udev->dev);
 	if (err) {
-		printk(KERN_ERR "p54usb: cannot find firmware (isl3886usb)\n");
-		err = request_firmware(&fw_entry, "isl3890usb",
-			&priv->udev->dev);
-		if (err) {
-			kfree(buf);
-			return err;
-			}
+		printk(KERN_ERR "p54usb: cannot find firmware (isl3890usb)!\n");
+		kfree(buf);
+		return err;
 	}
 
 	err = p54_parse_firmware(dev, fw_entry);
@@ -823,6 +786,7 @@ static int __devinit p54u_probe(struct usb_interface *intf,
 	struct p54u_priv *priv;
 	int err;
 	unsigned int i, recognized_pipes;
+	DECLARE_MAC_BUF(mac);
 
 	dev = p54_init_common(sizeof(*priv));
 	if (!dev) {

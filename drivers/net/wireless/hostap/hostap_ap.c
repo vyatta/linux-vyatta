@@ -94,6 +94,7 @@ static void ap_sta_hash_add(struct ap_data *ap, struct sta_info *sta)
 static void ap_sta_hash_del(struct ap_data *ap, struct sta_info *sta)
 {
 	struct sta_info *s;
+	DECLARE_MAC_BUF(mac);
 
 	s = ap->sta_hash[STA_HASH(sta->addr)];
 	if (s == NULL) return;
@@ -108,18 +109,20 @@ static void ap_sta_hash_del(struct ap_data *ap, struct sta_info *sta)
 	if (s->hnext != NULL)
 		s->hnext = s->hnext->hnext;
 	else
-		printk("AP: could not remove STA %pM from hash table\n",
-		       sta->addr);
+		printk("AP: could not remove STA %s"
+		       " from hash table\n",
+		       print_mac(mac, sta->addr));
 }
 
 static void ap_free_sta(struct ap_data *ap, struct sta_info *sta)
 {
+	DECLARE_MAC_BUF(mac);
 	if (sta->ap && sta->local)
 		hostap_event_expired_sta(sta->local->dev, sta);
 
 	if (ap->proc != NULL) {
 		char name[20];
-		sprintf(name, "%pM", sta->addr);
+		sprintf(name, "%s", print_mac(mac, sta->addr));
 		remove_proc_entry(name, ap->proc);
 	}
 
@@ -182,6 +185,7 @@ static void ap_handle_timer(unsigned long data)
 	struct ap_data *ap;
 	unsigned long next_time = 0;
 	int was_assoc;
+	DECLARE_MAC_BUF(mac);
 
 	if (sta == NULL || sta->local == NULL || sta->local->ap == NULL) {
 		PDEBUG(DEBUG_AP, "ap_handle_timer() called with NULL data\n");
@@ -238,8 +242,8 @@ static void ap_handle_timer(unsigned long data)
 	if (sta->ap) {
 		if (ap->autom_ap_wds) {
 			PDEBUG(DEBUG_AP, "%s: removing automatic WDS "
-			       "connection to AP %pM\n",
-			       local->dev->name, sta->addr);
+			       "connection to AP %s\n",
+			       local->dev->name, print_mac(mac, sta->addr));
 			hostap_wds_link_oper(local, sta->addr, WDS_DEL);
 		}
 	} else if (sta->timeout_next == STA_NULLFUNC) {
@@ -255,11 +259,11 @@ static void ap_handle_timer(unsigned long data)
 	} else {
 		int deauth = sta->timeout_next == STA_DEAUTH;
 		__le16 resp;
-		PDEBUG(DEBUG_AP, "%s: sending %s info to STA %pM"
+		PDEBUG(DEBUG_AP, "%s: sending %s info to STA %s"
 		       "(last=%lu, jiffies=%lu)\n",
 		       local->dev->name,
 		       deauth ? "deauthentication" : "disassociation",
-		       sta->addr, sta->last_rx, jiffies);
+		       print_mac(mac, sta->addr), sta->last_rx, jiffies);
 
 		resp = cpu_to_le16(deauth ? WLAN_REASON_PREV_AUTH_NOT_VALID :
 				   WLAN_REASON_DISASSOC_DUE_TO_INACTIVITY);
@@ -271,10 +275,10 @@ static void ap_handle_timer(unsigned long data)
 
 	if (sta->timeout_next == STA_DEAUTH) {
 		if (sta->flags & WLAN_STA_PERM) {
-			PDEBUG(DEBUG_AP, "%s: STA %pM"
+			PDEBUG(DEBUG_AP, "%s: STA %s"
 			       " would have been removed, "
 			       "but it has 'perm' flag\n",
-			       local->dev->name, sta->addr);
+			       local->dev->name, print_mac(mac, sta->addr));
 		} else
 			ap_free_sta(ap, sta);
 		return;
@@ -328,6 +332,7 @@ static int ap_control_proc_read(char *page, char **start, off_t off,
 	struct ap_data *ap = (struct ap_data *) data;
 	char *policy_txt;
 	struct mac_entry *entry;
+	DECLARE_MAC_BUF(mac);
 
 	if (off != 0) {
 		*eof = 1;
@@ -358,7 +363,7 @@ static int ap_control_proc_read(char *page, char **start, off_t off,
 			break;
 		}
 
-		p += sprintf(p, "%pM\n", entry->addr);
+		p += sprintf(p, "%s\n", print_mac(mac, entry->addr));
 	}
 	spin_unlock_bh(&ap->mac_restrictions.lock);
 
@@ -515,6 +520,7 @@ static int prism2_ap_proc_read(char *page, char **start, off_t off,
 	struct ap_data *ap = (struct ap_data *) data;
 	struct sta_info *sta;
 	int i;
+	DECLARE_MAC_BUF(mac);
 
 	if (off > PROC_LIMIT) {
 		*eof = 1;
@@ -527,8 +533,8 @@ static int prism2_ap_proc_read(char *page, char **start, off_t off,
 		if (!sta->ap)
 			continue;
 
-		p += sprintf(p, "%pM %d %d %d %d '",
-			     sta->addr,
+		p += sprintf(p, "%s %d %d %d %d '",
+			     print_mac(mac, sta->addr),
 			     sta->u.ap.channel, sta->last_rx_signal,
 			     sta->last_rx_silence, sta->last_rx_rate);
 		for (i = 0; i < sta->u.ap.ssid_len; i++)
@@ -677,9 +683,11 @@ static void hostap_ap_tx_cb_auth(struct sk_buff *skb, int ok, void *data)
 	if (sta)
 		atomic_dec(&sta->users);
 	if (txt) {
-		PDEBUG(DEBUG_AP, "%s: %pM auth_cb - alg=%d "
+		PDEBUG(DEBUG_AP, "%s: " MAC_FMT " auth_cb - alg=%d "
 		       "trans#=%d status=%d - %s\n",
-		       dev->name, hdr->addr1,
+		       dev->name,
+		       hdr->addr1[0], hdr->addr1[1], hdr->addr1[2],
+		       hdr->addr1[3], hdr->addr1[4], hdr->addr1[5],
 		       auth_alg, auth_transaction, status, txt);
 	}
 	dev_kfree_skb(skb);
@@ -746,8 +754,11 @@ static void hostap_ap_tx_cb_assoc(struct sk_buff *skb, int ok, void *data)
 	if (sta)
 		atomic_dec(&sta->users);
 	if (txt) {
-		PDEBUG(DEBUG_AP, "%s: %pM assoc_cb - %s\n",
-		       dev->name, hdr->addr1, txt);
+		PDEBUG(DEBUG_AP, "%s: " MAC_FMT " assoc_cb - %s\n",
+		       dev->name,
+		       hdr->addr1[0], hdr->addr1[1], hdr->addr1[2],
+		       hdr->addr1[3], hdr->addr1[4], hdr->addr1[5],
+		       txt);
 	}
 	dev_kfree_skb(skb);
 }
@@ -770,9 +781,11 @@ static void hostap_ap_tx_cb_poll(struct sk_buff *skb, int ok, void *data)
 			sta->flags &= ~WLAN_STA_PENDING_POLL;
 		spin_unlock(&ap->sta_table_lock);
 	} else {
-		PDEBUG(DEBUG_AP,
-		       "%s: STA %pM did not ACK activity poll frame\n",
-		       ap->local->dev->name, hdr->addr1);
+		PDEBUG(DEBUG_AP, "%s: STA " MAC_FMT
+		       " did not ACK activity poll frame\n",
+		       ap->local->dev->name,
+		       hdr->addr1[0], hdr->addr1[1], hdr->addr1[2],
+		       hdr->addr1[3], hdr->addr1[4], hdr->addr1[5]);
 	}
 
  fail:
@@ -989,6 +1002,7 @@ static int prism2_sta_proc_read(char *page, char **start, off_t off,
 	char *p = page;
 	struct sta_info *sta = (struct sta_info *) data;
 	int i;
+	DECLARE_MAC_BUF(mac);
 
 	/* FIX: possible race condition.. the STA data could have just expired,
 	 * but proc entry was still here so that the read could have started;
@@ -999,11 +1013,11 @@ static int prism2_sta_proc_read(char *page, char **start, off_t off,
 		return 0;
 	}
 
-	p += sprintf(p, "%s=%pM\nusers=%d\naid=%d\n"
+	p += sprintf(p, "%s=%s\nusers=%d\naid=%d\n"
 		     "flags=0x%04x%s%s%s%s%s%s%s\n"
 		     "capability=0x%02x\nlisten_interval=%d\nsupported_rates=",
 		     sta->ap ? "AP" : "STA",
-		     sta->addr, atomic_read(&sta->users), sta->aid,
+		     print_mac(mac, sta->addr), atomic_read(&sta->users), sta->aid,
 		     sta->flags,
 		     sta->flags & WLAN_STA_AUTH ? " AUTH" : "",
 		     sta->flags & WLAN_STA_ASSOC ? " ASSOC" : "",
@@ -1064,6 +1078,7 @@ static void handle_add_proc_queue(struct work_struct *work)
 	struct sta_info *sta;
 	char name[20];
 	struct add_sta_proc_data *entry, *prev;
+	DECLARE_MAC_BUF(mac);
 
 	entry = ap->add_sta_proc_entries;
 	ap->add_sta_proc_entries = NULL;
@@ -1076,7 +1091,7 @@ static void handle_add_proc_queue(struct work_struct *work)
 		spin_unlock_bh(&ap->sta_table_lock);
 
 		if (sta) {
-			sprintf(name, "%pM", sta->addr);
+			sprintf(name, "%s", print_mac(mac, sta->addr));
 			sta->proc = create_proc_read_entry(
 				name, 0, ap->proc,
 				prism2_sta_proc_read, sta);
@@ -1206,7 +1221,7 @@ static void prism2_check_tx_rates(struct sta_info *sta)
 
 static void ap_crypt_init(struct ap_data *ap)
 {
-	ap->crypt = lib80211_get_crypto_ops("WEP");
+	ap->crypt = ieee80211_get_crypto_ops("WEP");
 
 	if (ap->crypt) {
 		if (ap->crypt->init) {
@@ -1224,7 +1239,7 @@ static void ap_crypt_init(struct ap_data *ap)
 
 	if (ap->crypt == NULL) {
 		printk(KERN_WARNING "AP could not initialize WEP: load module "
-		       "lib80211_crypt_wep.ko\n");
+		       "ieee80211_crypt_wep.ko\n");
 	}
 }
 
@@ -1293,7 +1308,7 @@ static void handle_authen(local_info_t *local, struct sk_buff *skb,
 	__le16 *pos;
 	u16 resp = WLAN_STATUS_SUCCESS, fc;
 	struct sta_info *sta = NULL;
-	struct lib80211_crypt_data *crypt;
+	struct ieee80211_crypt_data *crypt;
 	char *txt = "";
 
 	len = skb->len - IEEE80211_MGMT_HDR_LEN;
@@ -1303,7 +1318,9 @@ static void handle_authen(local_info_t *local, struct sk_buff *skb,
 
 	if (len < 6) {
 		PDEBUG(DEBUG_AP, "%s: handle_authen - too short payload "
-		       "(len=%d) from %pM\n", dev->name, len, hdr->addr2);
+		       "(len=%d) from " MAC_FMT "\n", dev->name, len,
+		       hdr->addr2[0], hdr->addr2[1], hdr->addr2[2],
+		       hdr->addr2[3], hdr->addr2[4], hdr->addr2[5]);
 		return;
 	}
 
@@ -1319,7 +1336,7 @@ static void handle_authen(local_info_t *local, struct sk_buff *skb,
 		int idx = 0;
 		if (skb->len >= hdrlen + 3)
 			idx = skb->data[hdrlen + 3] >> 6;
-		crypt = local->crypt_info.crypt[idx];
+		crypt = local->crypt[idx];
 	}
 
 	pos = (__le16 *) (skb->data + IEEE80211_MGMT_HDR_LEN);
@@ -1368,8 +1385,10 @@ static void handle_authen(local_info_t *local, struct sk_buff *skb,
 		if (time_after(jiffies, sta->u.ap.last_beacon +
 			       (10 * sta->listen_interval * HZ) / 1024)) {
 			PDEBUG(DEBUG_AP, "%s: no beacons received for a while,"
-			       " assuming AP %pM is now STA\n",
-			       dev->name, sta->addr);
+			       " assuming AP " MAC_FMT " is now STA\n",
+			       dev->name,
+			       sta->addr[0], sta->addr[1], sta->addr[2],
+			       sta->addr[3], sta->addr[4], sta->addr[5]);
 			sta->ap = 0;
 			sta->flags = 0;
 			sta->u.sta.challenge = NULL;
@@ -1484,9 +1503,11 @@ static void handle_authen(local_info_t *local, struct sk_buff *skb,
 	}
 
 	if (resp) {
-		PDEBUG(DEBUG_AP, "%s: %pM auth (alg=%d "
+		PDEBUG(DEBUG_AP, "%s: " MAC_FMT " auth (alg=%d "
 		       "trans#=%d stat=%d len=%d fc=%04x) ==> %d (%s)\n",
-		       dev->name, hdr->addr2,
+		       dev->name,
+		       hdr->addr2[0], hdr->addr2[1], hdr->addr2[2],
+		       hdr->addr2[3], hdr->addr2[4], hdr->addr2[5],
 		       auth_alg, auth_transaction, status_code, len,
 		       fc, resp, txt);
 	}
@@ -1512,8 +1533,10 @@ static void handle_assoc(local_info_t *local, struct sk_buff *skb,
 
 	if (len < (reassoc ? 10 : 4)) {
 		PDEBUG(DEBUG_AP, "%s: handle_assoc - too short payload "
-		       "(len=%d, reassoc=%d) from %pM\n",
-		       dev->name, len, reassoc, hdr->addr2);
+		       "(len=%d, reassoc=%d) from " MAC_FMT "\n",
+		       dev->name, len, reassoc,
+		       hdr->addr2[0], hdr->addr2[1], hdr->addr2[2],
+		       hdr->addr2[3], hdr->addr2[4], hdr->addr2[5]);
 		return;
 	}
 
@@ -1590,9 +1613,12 @@ static void handle_assoc(local_info_t *local, struct sk_buff *skb,
 		}
 
 		if (left > 0) {
-			PDEBUG(DEBUG_AP, "%s: assoc from %pM"
+			PDEBUG(DEBUG_AP, "%s: assoc from " MAC_FMT
 			       " with extra data (%d bytes) [",
-			       dev->name, hdr->addr2, left);
+			       dev->name,
+			       hdr->addr2[0], hdr->addr2[1], hdr->addr2[2],
+			       hdr->addr2[3], hdr->addr2[4], hdr->addr2[5],
+			       left);
 			while (left > 0) {
 				PDEBUG2(DEBUG_AP, "<%02x>", *u);
 				u++; left--;
@@ -1691,12 +1717,14 @@ static void handle_assoc(local_info_t *local, struct sk_buff *skb,
 	}
 
 #if 0
-	PDEBUG(DEBUG_AP, "%s: %pM %sassoc (len=%d "
-	       "prev_ap=%pM) => %d(%d) (%s)\n",
+	PDEBUG(DEBUG_AP, "%s: " MAC_FMT" %sassoc (len=%d "
+	       "prev_ap=" MAC_FMT") => %d(%d) (%s)\n",
 	       dev->name,
-	       hdr->addr2,
+	       hdr->addr2[0], hdr->addr2[1], hdr->addr2[2],
+	       hdr->addr2[3], hdr->addr2[4], hdr->addr2[5],
 	       reassoc ? "re" : "", len,
-	       prev_ap,
+	       prev_ap[0], prev_ap[1], prev_ap[2],
+	       prev_ap[3], prev_ap[4], prev_ap[5],
 	       resp, send_deauth, txt);
 #endif
 }
@@ -1713,6 +1741,7 @@ static void handle_deauth(local_info_t *local, struct sk_buff *skb,
 	u16 reason_code;
 	__le16 *pos;
 	struct sta_info *sta = NULL;
+	DECLARE_MAC_BUF(mac);
 
 	len = skb->len - IEEE80211_MGMT_HDR_LEN;
 
@@ -1724,8 +1753,10 @@ static void handle_deauth(local_info_t *local, struct sk_buff *skb,
 	pos = (__le16 *) body;
 	reason_code = le16_to_cpu(*pos);
 
-	PDEBUG(DEBUG_AP, "%s: deauthentication: %pM len=%d, "
-	       "reason_code=%d\n", dev->name, hdr->addr2,
+	PDEBUG(DEBUG_AP, "%s: deauthentication: " MAC_FMT " len=%d, "
+	       "reason_code=%d\n", dev->name,
+	       hdr->addr2[0], hdr->addr2[1], hdr->addr2[2],
+	       hdr->addr2[3], hdr->addr2[4], hdr->addr2[5],
 	       len, reason_code);
 
 	spin_lock_bh(&local->ap->sta_table_lock);
@@ -1737,9 +1768,11 @@ static void handle_deauth(local_info_t *local, struct sk_buff *skb,
 	}
 	spin_unlock_bh(&local->ap->sta_table_lock);
 	if (sta == NULL) {
-		printk("%s: deauthentication from %pM, "
+		printk("%s: deauthentication from " MAC_FMT ", "
 	       "reason_code=%d, but STA not authenticated\n", dev->name,
-		       hdr->addr2, reason_code);
+		       hdr->addr2[0], hdr->addr2[1], hdr->addr2[2],
+		       hdr->addr2[3], hdr->addr2[4], hdr->addr2[5],
+		       reason_code);
 	}
 }
 
@@ -1766,8 +1799,10 @@ static void handle_disassoc(local_info_t *local, struct sk_buff *skb,
 	pos = (__le16 *) body;
 	reason_code = le16_to_cpu(*pos);
 
-	PDEBUG(DEBUG_AP, "%s: disassociation: %pM len=%d, "
-	       "reason_code=%d\n", dev->name, hdr->addr2,
+	PDEBUG(DEBUG_AP, "%s: disassociation: " MAC_FMT " len=%d, "
+	       "reason_code=%d\n", dev->name,
+	       hdr->addr2[0], hdr->addr2[1], hdr->addr2[2],
+	       hdr->addr2[3], hdr->addr2[4], hdr->addr2[5],
 	       len, reason_code);
 
 	spin_lock_bh(&local->ap->sta_table_lock);
@@ -1779,9 +1814,12 @@ static void handle_disassoc(local_info_t *local, struct sk_buff *skb,
 	}
 	spin_unlock_bh(&local->ap->sta_table_lock);
 	if (sta == NULL) {
-		printk("%s: disassociation from %pM, "
+		printk("%s: disassociation from " MAC_FMT ", "
 		       "reason_code=%d, but STA not authenticated\n",
-		       dev->name, hdr->addr2, reason_code);
+		       dev->name,
+		       hdr->addr2[0], hdr->addr2[1], hdr->addr2[2],
+		       hdr->addr2[3], hdr->addr2[4], hdr->addr2[5],
+		       reason_code);
 	}
 }
 
@@ -1871,14 +1909,19 @@ static void handle_pspoll(local_info_t *local,
 	u16 aid;
 	struct sk_buff *skb;
 
-	PDEBUG(DEBUG_PS2, "handle_pspoll: BSSID=%pM, TA=%pM PWRMGT=%d\n",
-	       hdr->addr1, hdr->addr2,
+	PDEBUG(DEBUG_PS2, "handle_pspoll: BSSID=" MAC_FMT
+	       ", TA=" MAC_FMT " PWRMGT=%d\n",
+	       hdr->addr1[0], hdr->addr1[1], hdr->addr1[2],
+	       hdr->addr1[3], hdr->addr1[4], hdr->addr1[5],
+	       hdr->addr2[0], hdr->addr2[1], hdr->addr2[2],
+	       hdr->addr2[3], hdr->addr2[4], hdr->addr2[5],
 	       !!(le16_to_cpu(hdr->frame_ctl) & IEEE80211_FCTL_PM));
 
 	if (memcmp(hdr->addr1, dev->dev_addr, ETH_ALEN)) {
-		PDEBUG(DEBUG_AP,
-		       "handle_pspoll - addr1(BSSID)=%pM not own MAC\n",
-		       hdr->addr1);
+		PDEBUG(DEBUG_AP, "handle_pspoll - addr1(BSSID)=" MAC_FMT
+		       " not own MAC\n",
+		       hdr->addr1[0], hdr->addr1[1], hdr->addr1[2],
+		       hdr->addr1[3], hdr->addr1[4], hdr->addr1[5]);
 		return;
 	}
 
@@ -1964,10 +2007,11 @@ static void handle_wds_oper_queue(struct work_struct *work)
 
 	while (entry) {
 		PDEBUG(DEBUG_AP, "%s: %s automatic WDS connection "
-		       "to AP %pM\n",
+		       "to AP " MAC_FMT "\n",
 		       local->dev->name,
 		       entry->type == WDS_ADD ? "adding" : "removing",
-		       entry->addr);
+		       entry->addr[0], entry->addr[1], entry->addr[2],
+		       entry->addr[3], entry->addr[4], entry->addr[5]);
 		if (entry->type == WDS_ADD)
 			prism2_wds_add(local, entry->addr, 0);
 		else if (entry->type == WDS_DEL)
@@ -2171,8 +2215,10 @@ static void handle_ap_item(local_info_t *local, struct sk_buff *skb,
 		}
 
 		if (memcmp(hdr->addr1, dev->dev_addr, ETH_ALEN)) {
-			PDEBUG(DEBUG_AP, "handle_ap_item - addr1(BSSID)=%pM"
-			       " not own MAC\n", hdr->addr1);
+			PDEBUG(DEBUG_AP, "handle_ap_item - addr1(BSSID)="
+			       MAC_FMT " not own MAC\n",
+			       hdr->addr1[0], hdr->addr1[1], hdr->addr1[2],
+			       hdr->addr1[3], hdr->addr1[4], hdr->addr1[5]);
 			goto done;
 		}
 
@@ -2208,14 +2254,18 @@ static void handle_ap_item(local_info_t *local, struct sk_buff *skb,
 	}
 
 	if (memcmp(hdr->addr1, dev->dev_addr, ETH_ALEN)) {
-		PDEBUG(DEBUG_AP, "handle_ap_item - addr1(DA)=%pM"
-		       " not own MAC\n", hdr->addr1);
+		PDEBUG(DEBUG_AP, "handle_ap_item - addr1(DA)=" MAC_FMT
+		       " not own MAC\n",
+		       hdr->addr1[0], hdr->addr1[1], hdr->addr1[2],
+		       hdr->addr1[3], hdr->addr1[4], hdr->addr1[5]);
 		goto done;
 	}
 
 	if (memcmp(hdr->addr3, dev->dev_addr, ETH_ALEN)) {
-		PDEBUG(DEBUG_AP, "handle_ap_item - addr3(BSSID)=%pM"
-		       " not own MAC\n", hdr->addr3);
+		PDEBUG(DEBUG_AP, "handle_ap_item - addr3(BSSID)=" MAC_FMT
+		       " not own MAC\n",
+		       hdr->addr3[0], hdr->addr3[1], hdr->addr3[2],
+		       hdr->addr3[3], hdr->addr3[4], hdr->addr3[5]);
 		goto done;
 	}
 
@@ -2316,9 +2366,10 @@ static void schedule_packet_send(local_info_t *local, struct sta_info *sta)
 	memcpy(hdr->addr2, sta->addr, ETH_ALEN);
 	hdr->duration_id = cpu_to_le16(sta->aid | BIT(15) | BIT(14));
 
-	PDEBUG(DEBUG_PS2,
-	       "%s: Scheduling buffered packet delivery for STA %pM\n",
-	       local->dev->name, sta->addr);
+	PDEBUG(DEBUG_PS2, "%s: Scheduling buffered packet delivery for STA "
+	       MAC_FMT "\n", local->dev->name,
+	       sta->addr[0], sta->addr[1], sta->addr[2],
+	       sta->addr[3], sta->addr[4], sta->addr[5]);
 
 	skb->dev = local->dev;
 
@@ -2672,8 +2723,12 @@ static int ap_update_sta_tx_rate(struct sta_info *sta, struct net_device *dev)
 			case 3: sta->tx_rate = 110; break;
 			default: sta->tx_rate = 0; break;
 			}
-			PDEBUG(DEBUG_AP, "%s: STA %pM TX rate raised to %d\n",
-			       dev->name, sta->addr, sta->tx_rate);
+			PDEBUG(DEBUG_AP, "%s: STA " MAC_FMT
+			       " TX rate raised to %d\n",
+			       dev->name,
+			       sta->addr[0], sta->addr[1], sta->addr[2],
+			       sta->addr[3], sta->addr[4], sta->addr[5],
+			       sta->tx_rate);
 		}
 		sta->tx_since_last_failure = 0;
 	}
@@ -2726,7 +2781,9 @@ ap_tx_ret hostap_handle_sta_tx(local_info_t *local, struct hostap_tx_data *tx)
 		 * print out any errors here. */
 		if (net_ratelimit()) {
 			printk(KERN_DEBUG "AP: drop packet to non-associated "
-			       "STA %pM\n", hdr->addr1);
+			       "STA " MAC_FMT "\n",
+			       hdr->addr1[0], hdr->addr1[1], hdr->addr1[2],
+			       hdr->addr1[3], hdr->addr1[4], hdr->addr1[5]);
 		}
 #endif
 		local->ap->tx_drop_nonassoc++;
@@ -2764,9 +2821,11 @@ ap_tx_ret hostap_handle_sta_tx(local_info_t *local, struct hostap_tx_data *tx)
 	}
 
 	if (skb_queue_len(&sta->tx_buf) >= STA_MAX_TX_BUFFER) {
-		PDEBUG(DEBUG_PS, "%s: No more space in STA (%pM)'s"
-		       "PS mode buffer\n",
-		       local->dev->name, sta->addr);
+		PDEBUG(DEBUG_PS, "%s: No more space in STA (" MAC_FMT
+		       ")'s PS mode buffer\n",
+		       local->dev->name,
+		       sta->addr[0], sta->addr[1], sta->addr[2],
+		       sta->addr[3], sta->addr[4], sta->addr[5]);
 		/* Make sure that TIM is set for the station (it might not be
 		 * after AP wlan hw reset). */
 		/* FIX: should fix hw reset to restore bits based on STA
@@ -2838,9 +2897,12 @@ void hostap_handle_sta_tx_exc(local_info_t *local, struct sk_buff *skb)
 	sta = ap_get_sta(local->ap, hdr->addr1);
 	if (!sta) {
 		spin_unlock(&local->ap->sta_table_lock);
-		PDEBUG(DEBUG_AP, "%s: Could not find STA %pM"
+		PDEBUG(DEBUG_AP, "%s: Could not find STA " MAC_FMT
 		       " for this TX error (@%lu)\n",
-		       local->dev->name, hdr->addr1, jiffies);
+		       local->dev->name,
+		       hdr->addr1[0], hdr->addr1[1], hdr->addr1[2],
+		       hdr->addr1[3], hdr->addr1[4], hdr->addr1[5],
+		       jiffies);
 		return;
 	}
 
@@ -2867,9 +2929,12 @@ void hostap_handle_sta_tx_exc(local_info_t *local, struct sk_buff *skb)
 			case 3: sta->tx_rate = 110; break;
 			default: sta->tx_rate = 0; break;
 			}
-			PDEBUG(DEBUG_AP,
-			       "%s: STA %pM TX rate lowered to %d\n",
-			       local->dev->name, sta->addr, sta->tx_rate);
+			PDEBUG(DEBUG_AP, "%s: STA " MAC_FMT
+			       " TX rate lowered to %d\n",
+			       local->dev->name,
+			       sta->addr[0], sta->addr[1], sta->addr[2],
+			       sta->addr[3], sta->addr[4], sta->addr[5],
+			       sta->tx_rate);
 		}
 		sta->tx_consecutive_exc = 0;
 	}
@@ -2880,16 +2945,17 @@ void hostap_handle_sta_tx_exc(local_info_t *local, struct sk_buff *skb)
 static void hostap_update_sta_ps2(local_info_t *local, struct sta_info *sta,
 				  int pwrmgt, int type, int stype)
 {
+	DECLARE_MAC_BUF(mac);
 	if (pwrmgt && !(sta->flags & WLAN_STA_PS)) {
 		sta->flags |= WLAN_STA_PS;
-		PDEBUG(DEBUG_PS2, "STA %pM changed to use PS "
+		PDEBUG(DEBUG_PS2, "STA %s changed to use PS "
 		       "mode (type=0x%02X, stype=0x%02X)\n",
-		       sta->addr, type >> 2, stype >> 4);
+		       print_mac(mac, sta->addr), type >> 2, stype >> 4);
 	} else if (!pwrmgt && (sta->flags & WLAN_STA_PS)) {
 		sta->flags &= ~WLAN_STA_PS;
-		PDEBUG(DEBUG_PS2, "STA %pM changed to not use "
+		PDEBUG(DEBUG_PS2, "STA %s changed to not use "
 		       "PS mode (type=0x%02X, stype=0x%02X)\n",
-		       sta->addr, type >> 2, stype >> 4);
+		       print_mac(mac, sta->addr), type >> 2, stype >> 4);
 		if (type != IEEE80211_FTYPE_CTL ||
 		    stype != IEEE80211_STYPE_PSPOLL)
 			schedule_packet_send(local, sta);
@@ -2963,9 +3029,13 @@ ap_rx_ret hostap_handle_sta_rx(local_info_t *local, struct net_device *dev,
 #ifndef PRISM2_NO_KERNEL_IEEE80211_MGMT
 			} else {
 				printk(KERN_DEBUG "%s: dropped received packet"
-				       " from non-associated STA %pM"
+				       " from non-associated STA "
+				       MAC_FMT
 				       " (type=0x%02x, subtype=0x%02x)\n",
-				       dev->name, hdr->addr2,
+				       dev->name,
+				       hdr->addr2[0], hdr->addr2[1],
+				       hdr->addr2[2], hdr->addr2[3],
+				       hdr->addr2[4], hdr->addr2[5],
 				       type >> 2, stype >> 4);
 				hostap_rx(dev, skb, rx_stats);
 #endif /* PRISM2_NO_KERNEL_IEEE80211_MGMT */
@@ -2998,9 +3068,13 @@ ap_rx_ret hostap_handle_sta_rx(local_info_t *local, struct net_device *dev,
 			 * after being unavailable for some time. Speed up
 			 * re-association by informing the station about it not
 			 * being associated. */
-			printk(KERN_DEBUG "%s: rejected received nullfunc frame"
-			       " without ToDS from not associated STA %pM\n",
-			       dev->name, hdr->addr2);
+			printk(KERN_DEBUG "%s: rejected received nullfunc "
+			       "frame without ToDS from not associated STA "
+			       MAC_FMT "\n",
+			       dev->name,
+			       hdr->addr2[0], hdr->addr2[1],
+			       hdr->addr2[2], hdr->addr2[3],
+			       hdr->addr2[4], hdr->addr2[5]);
 			hostap_rx(dev, skb, rx_stats);
 #endif /* PRISM2_NO_KERNEL_IEEE80211_MGMT */
 		}
@@ -3016,10 +3090,13 @@ ap_rx_ret hostap_handle_sta_rx(local_info_t *local, struct net_device *dev,
 		 * broadcast frame from an IBSS network. Drop it silently.
 		 * If BSSID is own, report the dropping of this frame. */
 		if (memcmp(hdr->addr3, dev->dev_addr, ETH_ALEN) == 0) {
-			printk(KERN_DEBUG "%s: dropped received packet from %pM"
-			       " with no ToDS flag "
+			printk(KERN_DEBUG "%s: dropped received packet from "
+			       MAC_FMT " with no ToDS flag "
 			       "(type=0x%02x, subtype=0x%02x)\n", dev->name,
-			       hdr->addr2, type >> 2, stype >> 4);
+			       hdr->addr2[0], hdr->addr2[1],
+			       hdr->addr2[2], hdr->addr2[3],
+			       hdr->addr2[4], hdr->addr2[5],
+			       type >> 2, stype >> 4);
 			hostap_dump_rx_80211(dev->name, skb, rx_stats);
 		}
 		ret = AP_RX_DROP;
@@ -3065,7 +3142,7 @@ ap_rx_ret hostap_handle_sta_rx(local_info_t *local, struct net_device *dev,
 /* Called only as a tasklet (software IRQ) */
 int hostap_handle_sta_crypto(local_info_t *local,
 			     struct ieee80211_hdr_4addr *hdr,
-			     struct lib80211_crypt_data **crypt,
+			     struct ieee80211_crypt_data **crypt,
 			     void **sta_ptr)
 {
 	struct sta_info *sta;
@@ -3213,7 +3290,7 @@ void hostap_update_rates(local_info_t *local)
 
 
 void * ap_crypt_get_ptrs(struct ap_data *ap, u8 *addr, int permanent,
-			 struct lib80211_crypt_data ***crypt)
+			 struct ieee80211_crypt_data ***crypt)
 {
 	struct sta_info *sta;
 

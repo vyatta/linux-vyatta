@@ -47,6 +47,7 @@ void dccp_minisock_init(struct dccp_minisock *dmsk)
 	dmsk->dccpms_sequence_window = sysctl_dccp_feat_sequence_window;
 	dmsk->dccpms_rx_ccid	     = sysctl_dccp_feat_rx_ccid;
 	dmsk->dccpms_tx_ccid	     = sysctl_dccp_feat_tx_ccid;
+	dmsk->dccpms_ack_ratio	     = sysctl_dccp_feat_ack_ratio;
 	dmsk->dccpms_send_ack_vector = sysctl_dccp_feat_send_ack_vector;
 	dmsk->dccpms_send_ndp_count  = sysctl_dccp_feat_send_ndp_count;
 }
@@ -124,7 +125,6 @@ struct sock *dccp_create_openreq_child(struct sock *sk,
 		newdp->dccps_timestamp_time = dreq->dreq_timestamp_time;
 		newicsk->icsk_rto	    = DCCP_TIMEOUT_INIT;
 
-		INIT_LIST_HEAD(&newdp->dccps_featneg);
 		if (dccp_feat_clone(sk, newsk))
 			goto out_free;
 
@@ -304,8 +304,7 @@ void dccp_reqsk_send_ack(struct sock *sk, struct sk_buff *skb,
 
 EXPORT_SYMBOL_GPL(dccp_reqsk_send_ack);
 
-int dccp_reqsk_init(struct request_sock *req,
-		    struct dccp_sock const *dp, struct sk_buff const *skb)
+void dccp_reqsk_init(struct request_sock *req, struct sk_buff *skb)
 {
 	struct dccp_request_sock *dreq = dccp_rsk(req);
 
@@ -314,9 +313,6 @@ int dccp_reqsk_init(struct request_sock *req,
 	inet_rsk(req)->acked	  = 0;
 	req->rcv_wnd		  = sysctl_dccp_feat_sequence_window;
 	dreq->dreq_timestamp_echo = 0;
-
-	/* inherit feature negotiation options from listening socket */
-	return dccp_feat_clone_list(&dp->dccps_featneg, &dreq->dreq_featneg);
 }
 
 EXPORT_SYMBOL_GPL(dccp_reqsk_init);

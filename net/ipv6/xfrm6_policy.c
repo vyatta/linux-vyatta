@@ -144,7 +144,6 @@ static int xfrm6_fill_dst(struct xfrm_dst *xdst, struct net_device *dev)
 static inline void
 _decode_session6(struct sk_buff *skb, struct flowi *fl, int reverse)
 {
-	int onlyproto = 0;
 	u16 offset = skb_network_header_len(skb);
 	struct ipv6hdr *hdr = ipv6_hdr(skb);
 	struct ipv6_opt_hdr *exthdr;
@@ -160,8 +159,6 @@ _decode_session6(struct sk_buff *skb, struct flowi *fl, int reverse)
 		exthdr = (struct ipv6_opt_hdr *)(nh + offset);
 
 		switch (nexthdr) {
-		case NEXTHDR_FRAGMENT:
-			onlyproto = 1;
 		case NEXTHDR_ROUTING:
 		case NEXTHDR_HOP:
 		case NEXTHDR_DEST:
@@ -175,7 +172,7 @@ _decode_session6(struct sk_buff *skb, struct flowi *fl, int reverse)
 		case IPPROTO_TCP:
 		case IPPROTO_SCTP:
 		case IPPROTO_DCCP:
-			if (!onlyproto && pskb_may_pull(skb, nh + offset + 4 - skb->data)) {
+			if (pskb_may_pull(skb, nh + offset + 4 - skb->data)) {
 				__be16 *ports = (__be16 *)exthdr;
 
 				fl->fl_ip_sport = ports[!!reverse];
@@ -185,7 +182,7 @@ _decode_session6(struct sk_buff *skb, struct flowi *fl, int reverse)
 			return;
 
 		case IPPROTO_ICMPV6:
-			if (!onlyproto && pskb_may_pull(skb, nh + offset + 2 - skb->data)) {
+			if (pskb_may_pull(skb, nh + offset + 2 - skb->data)) {
 				u8 *icmp = (u8 *)exthdr;
 
 				fl->fl_icmp_type = icmp[0];
@@ -196,7 +193,7 @@ _decode_session6(struct sk_buff *skb, struct flowi *fl, int reverse)
 
 #if defined(CONFIG_IPV6_MIP6) || defined(CONFIG_IPV6_MIP6_MODULE)
 		case IPPROTO_MH:
-			if (!onlyproto && pskb_may_pull(skb, nh + offset + 3 - skb->data)) {
+			if (pskb_may_pull(skb, nh + offset + 3 - skb->data)) {
 				struct ip6_mh *mh;
 				mh = (struct ip6_mh *)exthdr;
 
@@ -277,6 +274,7 @@ static struct dst_ops xfrm6_dst_ops = {
 	.ifdown =		xfrm6_dst_ifdown,
 	.local_out =		__ip6_local_out,
 	.gc_thresh =		1024,
+	.entry_size =		sizeof(struct xfrm_dst),
 	.entries =		ATOMIC_INIT(0),
 };
 

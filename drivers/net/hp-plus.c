@@ -166,6 +166,7 @@ static int __init hpp_probe1(struct net_device *dev, int ioaddr)
 	const char name[] = "HP-PC-LAN+";
 	int mem_start;
 	static unsigned version_printed;
+	DECLARE_MAC_BUF(mac);
 
 	if (!request_region(ioaddr, HP_IO_EXTENT, DRV_NAME))
 		return -EBUSY;
@@ -192,7 +193,7 @@ static int __init hpp_probe1(struct net_device *dev, int ioaddr)
 	}
 	checksum += inb(ioaddr + 14);
 
-	printk("%pM", dev->dev_addr);
+	printk("%s", print_mac(mac, dev->dev_addr));
 
 	if (checksum != 0xff) {
 		printk(" bad checksum %2.2x.\n", checksum);
@@ -229,7 +230,7 @@ static int __init hpp_probe1(struct net_device *dev, int ioaddr)
 	dev->open = &hpp_open;
 	dev->stop = &hpp_close;
 #ifdef CONFIG_NET_POLL_CONTROLLER
-	dev->poll_controller = ei_poll;
+	dev->poll_controller = eip_poll;
 #endif
 
 	ei_status.name = name;

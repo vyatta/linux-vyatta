@@ -1213,7 +1213,7 @@ static void pegasus_set_multicast(struct net_device *net)
 		pegasus->eth_regs[EthCtrl0] |= RX_MULTICAST;
 		pegasus->eth_regs[EthCtrl2] &= ~RX_PROMISCUOUS;
 		if (netif_msg_link(pegasus))
-			pr_debug("%s: set allmulti\n", net->name);
+			pr_info("%s: set allmulti\n", net->name);
 	} else {
 		pegasus->eth_regs[EthCtrl0] &= ~RX_MULTICAST;
 		pegasus->eth_regs[EthCtrl2] &= ~RX_PROMISCUOUS;
@@ -1273,7 +1273,6 @@ static inline void setup_pegasus_II(pegasus_t * pegasus)
 }
 
 
-static int pegasus_count;
 static struct workqueue_struct *pegasus_workqueue = NULL;
 #define CARRIER_CHECK_DELAY (2 * HZ)
 
@@ -1302,18 +1301,6 @@ static int pegasus_blacklisted(struct usb_device *udev)
 	return 0;
 }
 
-/* we rely on probe() and remove() being serialized so we
- * don't need extra locking on pegasus_count.
- */
-static void pegasus_dec_workqueue(void)
-{
-	pegasus_count--;
-	if (pegasus_count == 0) {
-		destroy_workqueue(pegasus_workqueue);
-		pegasus_workqueue = NULL;
-	}
-}
-
 static int pegasus_probe(struct usb_interface *intf,
 			 const struct usb_device_id *id)
 {
@@ -1322,18 +1309,14 @@ static int pegasus_probe(struct usb_interface *intf,
 	pegasus_t *pegasus;
 	int dev_index = id - pegasus_ids;
 	int res = -ENOMEM;
-
-	if (pegasus_blacklisted(dev))
-		return -ENODEV;
-
-	if (pegasus_count == 0) {
-		pegasus_workqueue = create_singlethread_workqueue("pegasus");
-		if (!pegasus_workqueue)
-			return -ENOMEM;
-	}
-	pegasus_count++;
+	DECLARE_MAC_BUF(mac);
 
 	usb_get_dev(dev);
+
+	if (pegasus_blacklisted(dev)) {
+		res = -ENODEV;
+		goto out;
+	}
 
 	net = alloc_etherdev(sizeof(struct pegasus));
 	if (!net) {
@@ -1403,10 +1386,10 @@ static int pegasus_probe(struct usb_interface *intf,
 	queue_delayed_work(pegasus_workqueue, &pegasus->carrier_check,
 				CARRIER_CHECK_DELAY);
 
-	dev_info(&intf->dev, "%s, %s, %pM\n",
+	dev_info(&intf->dev, "%s, %s, %s\n",
 		 net->name,
 		 usb_dev_id[dev_index].name,
-		 net->dev_addr);
+		 print_mac(mac, net->dev_addr));
 	return 0;
 
 out3:
@@ -1418,7 +1401,6 @@ out1:
 	free_netdev(net);
 out:
 	usb_put_dev(dev);
-	pegasus_dec_workqueue();
 	return res;
 }
 
@@ -1444,7 +1426,6 @@ static void pegasus_disconnect(struct usb_interface *intf)
 		pegasus->rx_skb = NULL;
 	}
 	free_netdev(pegasus->net);
-	pegasus_dec_workqueue();
 }
 
 static int pegasus_suspend (struct usb_interface *intf, pm_message_t message)
@@ -1488,7 +1469,7 @@ static struct usb_driver pegasus_driver = {
 	.resume = pegasus_resume,
 };
 
-static void __init parse_id(char *id)
+static void parse_id(char *id)
 {
 	unsigned int vendor_id=0, device_id=0, flags=0, i=0;
 	char *token, *name=NULL;
@@ -1524,11 +1505,15 @@ static int __init pegasus_init(void)
 	pr_info("%s: %s, " DRIVER_DESC "\n", driver_name, DRIVER_VERSION);
 	if (devid)
 		parse_id(devid);
+	pegasus_workqueue = create_singlethread_workqueue("pegasus");
+	if (!pegasus_workqueue)
+		return -ENOMEM;
 	return usb_register(&pegasus_driver);
 }
 
 static void __exit pegasus_exit(void)
 {
+	destroy_workqueue(pegasus_workqueue);
 	usb_deregister(&pegasus_driver);
 }
 

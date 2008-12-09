@@ -477,15 +477,6 @@ static void dfx_get_bars(struct device *bdev,
 	}
 }
 
-static const struct net_device_ops dfx_netdev_ops = {
-	.ndo_open		= dfx_open,
-	.ndo_stop		= dfx_close,
-	.ndo_start_xmit		= dfx_xmt_queue_pkt,
-	.ndo_get_stats		= dfx_ctl_get_stats,
-	.ndo_set_multicast_list	= dfx_ctl_set_multicast_list,
-	.ndo_set_mac_address	= dfx_ctl_set_mac_address,
-};
-
 /*
  * ================
  * = dfx_register =
@@ -520,7 +511,7 @@ static int __devinit dfx_register(struct device *bdev)
 	int dfx_bus_pci = DFX_BUS_PCI(bdev);
 	int dfx_bus_tc = DFX_BUS_TC(bdev);
 	int dfx_use_mmio = DFX_MMIO || dfx_bus_tc;
-	const char *print_name = dev_name(bdev);
+	char *print_name = bdev->bus_id;
 	struct net_device *dev;
 	DFX_board_t	  *bp;			/* board pointer */
 	resource_size_t bar_start = 0;		/* pointer to port */
@@ -582,7 +573,13 @@ static int __devinit dfx_register(struct device *bdev)
 	}
 
 	/* Initialize new device structure */
-	dev->netdev_ops			= &dfx_netdev_ops;
+
+	dev->get_stats			= dfx_ctl_get_stats;
+	dev->open			= dfx_open;
+	dev->stop			= dfx_close;
+	dev->hard_start_xmit		= dfx_xmt_queue_pkt;
+	dev->set_multicast_list		= dfx_ctl_set_multicast_list;
+	dev->set_mac_address		= dfx_ctl_set_mac_address;
 
 	if (dfx_bus_pci)
 		pci_set_master(to_pci_dev(bdev));
@@ -3106,6 +3103,7 @@ static void dfx_rcv_queue_process(
 					netif_rx(skb);
 
 					/* Update the rcv counters */
+					bp->dev->last_rx = jiffies;
 					bp->rcv_total_frames++;
 					if (*(p_buff + RCV_BUFF_K_DA) & 0x01)
 						bp->rcv_multicast_frames++;

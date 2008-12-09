@@ -51,8 +51,8 @@
 #include <linux/workqueue.h>
 #include <linux/phy.h>
 #include <linux/mv643xx_eth.h>
-#include <linux/io.h>
-#include <linux/types.h>
+#include <asm/io.h>
+#include <asm/types.h>
 #include <asm/system.h>
 
 static char mv643xx_eth_driver_name[] = "mv643xx_eth";
@@ -78,17 +78,16 @@ static char mv643xx_eth_driver_version[] = "1.4";
 #define WINDOW_PROTECT(w)		(0x0294 + ((w) << 4))
 
 /*
- * Main per-port registers.  These live at offset 0x0400 for
- * port #0, 0x0800 for port #1, and 0x0c00 for port #2.
+ * Per-port registers.
  */
-#define PORT_CONFIG			0x0000
+#define PORT_CONFIG(p)			(0x0400 + ((p) << 10))
 #define  UNICAST_PROMISCUOUS_MODE	0x00000001
-#define PORT_CONFIG_EXT			0x0004
-#define MAC_ADDR_LOW			0x0014
-#define MAC_ADDR_HIGH			0x0018
-#define SDMA_CONFIG			0x001c
-#define PORT_SERIAL_CONTROL		0x003c
-#define PORT_STATUS			0x0044
+#define PORT_CONFIG_EXT(p)		(0x0404 + ((p) << 10))
+#define MAC_ADDR_LOW(p)			(0x0414 + ((p) << 10))
+#define MAC_ADDR_HIGH(p)		(0x0418 + ((p) << 10))
+#define SDMA_CONFIG(p)			(0x041c + ((p) << 10))
+#define PORT_SERIAL_CONTROL(p)		(0x043c + ((p) << 10))
+#define PORT_STATUS(p)			(0x0444 + ((p) << 10))
 #define  TX_FIFO_EMPTY			0x00000400
 #define  TX_IN_PROGRESS			0x00000080
 #define  PORT_SPEED_MASK		0x00000030
@@ -98,35 +97,31 @@ static char mv643xx_eth_driver_version[] = "1.4";
 #define  FLOW_CONTROL_ENABLED		0x00000008
 #define  FULL_DUPLEX			0x00000004
 #define  LINK_UP			0x00000002
-#define TXQ_COMMAND			0x0048
-#define TXQ_FIX_PRIO_CONF		0x004c
-#define TX_BW_RATE			0x0050
-#define TX_BW_MTU			0x0058
-#define TX_BW_BURST			0x005c
-#define INT_CAUSE			0x0060
+#define TXQ_COMMAND(p)			(0x0448 + ((p) << 10))
+#define TXQ_FIX_PRIO_CONF(p)		(0x044c + ((p) << 10))
+#define TX_BW_RATE(p)			(0x0450 + ((p) << 10))
+#define TX_BW_MTU(p)			(0x0458 + ((p) << 10))
+#define TX_BW_BURST(p)			(0x045c + ((p) << 10))
+#define INT_CAUSE(p)			(0x0460 + ((p) << 10))
 #define  INT_TX_END			0x07f80000
 #define  INT_RX				0x000003fc
 #define  INT_EXT			0x00000002
-#define INT_CAUSE_EXT			0x0064
+#define INT_CAUSE_EXT(p)		(0x0464 + ((p) << 10))
 #define  INT_EXT_LINK_PHY		0x00110000
 #define  INT_EXT_TX			0x000000ff
-#define INT_MASK			0x0068
-#define INT_MASK_EXT			0x006c
-#define TX_FIFO_URGENT_THRESHOLD	0x0074
-#define TXQ_FIX_PRIO_CONF_MOVED		0x00dc
-#define TX_BW_RATE_MOVED		0x00e0
-#define TX_BW_MTU_MOVED			0x00e8
-#define TX_BW_BURST_MOVED		0x00ec
-#define RXQ_CURRENT_DESC_PTR(q)		(0x020c + ((q) << 4))
-#define RXQ_COMMAND			0x0280
-#define TXQ_CURRENT_DESC_PTR(q)		(0x02c0 + ((q) << 2))
-#define TXQ_BW_TOKENS(q)		(0x0300 + ((q) << 4))
-#define TXQ_BW_CONF(q)			(0x0304 + ((q) << 4))
-#define TXQ_BW_WRR_CONF(q)		(0x0308 + ((q) << 4))
-
-/*
- * Misc per-port registers.
- */
+#define INT_MASK(p)			(0x0468 + ((p) << 10))
+#define INT_MASK_EXT(p)			(0x046c + ((p) << 10))
+#define TX_FIFO_URGENT_THRESHOLD(p)	(0x0474 + ((p) << 10))
+#define TXQ_FIX_PRIO_CONF_MOVED(p)	(0x04dc + ((p) << 10))
+#define TX_BW_RATE_MOVED(p)		(0x04e0 + ((p) << 10))
+#define TX_BW_MTU_MOVED(p)		(0x04e8 + ((p) << 10))
+#define TX_BW_BURST_MOVED(p)		(0x04ec + ((p) << 10))
+#define RXQ_CURRENT_DESC_PTR(p, q)	(0x060c + ((p) << 10) + ((q) << 4))
+#define RXQ_COMMAND(p)			(0x0680 + ((p) << 10))
+#define TXQ_CURRENT_DESC_PTR(p, q)	(0x06c0 + ((p) << 10) + ((q) << 2))
+#define TXQ_BW_TOKENS(p, q)		(0x0700 + ((p) << 10) + ((q) << 4))
+#define TXQ_BW_CONF(p, q)		(0x0704 + ((p) << 10) + ((q) << 4))
+#define TXQ_BW_WRR_CONF(p, q)		(0x0708 + ((p) << 10) + ((q) << 4))
 #define MIB_COUNTERS(p)			(0x1000 + ((p) << 7))
 #define SPECIAL_MCAST_TABLE(p)		(0x1400 + ((p) << 10))
 #define OTHER_MCAST_TABLE(p)		(0x1500 + ((p) << 10))
@@ -143,14 +138,14 @@ static char mv643xx_eth_driver_version[] = "1.4";
 
 #if defined(__BIG_ENDIAN)
 #define PORT_SDMA_CONFIG_DEFAULT_VALUE		\
-		(RX_BURST_SIZE_16_64BIT	|	\
-		TX_BURST_SIZE_16_64BIT)
+		RX_BURST_SIZE_16_64BIT	|	\
+		TX_BURST_SIZE_16_64BIT
 #elif defined(__LITTLE_ENDIAN)
 #define PORT_SDMA_CONFIG_DEFAULT_VALUE		\
-		(RX_BURST_SIZE_16_64BIT	|	\
+		RX_BURST_SIZE_16_64BIT	|	\
 		BLM_RX_NO_SWAP		|	\
 		BLM_TX_NO_SWAP		|	\
-		TX_BURST_SIZE_16_64BIT)
+		TX_BURST_SIZE_16_64BIT
 #else
 #error One of __BIG_ENDIAN or __LITTLE_ENDIAN must be defined
 #endif
@@ -356,7 +351,6 @@ struct tx_queue {
 
 struct mv643xx_eth_private {
 	struct mv643xx_eth_shared_private *shared;
-	void __iomem *base;
 	int port_num;
 
 	struct net_device *dev;
@@ -407,19 +401,9 @@ static inline u32 rdl(struct mv643xx_eth_private *mp, int offset)
 	return readl(mp->shared->base + offset);
 }
 
-static inline u32 rdlp(struct mv643xx_eth_private *mp, int offset)
-{
-	return readl(mp->base + offset);
-}
-
 static inline void wrl(struct mv643xx_eth_private *mp, int offset, u32 data)
 {
 	writel(data, mp->shared->base + offset);
-}
-
-static inline void wrlp(struct mv643xx_eth_private *mp, int offset, u32 data)
-{
-	writel(data, mp->base + offset);
 }
 
 
@@ -437,7 +421,7 @@ static struct mv643xx_eth_private *txq_to_mp(struct tx_queue *txq)
 static void rxq_enable(struct rx_queue *rxq)
 {
 	struct mv643xx_eth_private *mp = rxq_to_mp(rxq);
-	wrlp(mp, RXQ_COMMAND, 1 << rxq->index);
+	wrl(mp, RXQ_COMMAND(mp->port_num), 1 << rxq->index);
 }
 
 static void rxq_disable(struct rx_queue *rxq)
@@ -445,25 +429,26 @@ static void rxq_disable(struct rx_queue *rxq)
 	struct mv643xx_eth_private *mp = rxq_to_mp(rxq);
 	u8 mask = 1 << rxq->index;
 
-	wrlp(mp, RXQ_COMMAND, mask << 8);
-	while (rdlp(mp, RXQ_COMMAND) & mask)
+	wrl(mp, RXQ_COMMAND(mp->port_num), mask << 8);
+	while (rdl(mp, RXQ_COMMAND(mp->port_num)) & mask)
 		udelay(10);
 }
 
 static void txq_reset_hw_ptr(struct tx_queue *txq)
 {
 	struct mv643xx_eth_private *mp = txq_to_mp(txq);
+	int off = TXQ_CURRENT_DESC_PTR(mp->port_num, txq->index);
 	u32 addr;
 
 	addr = (u32)txq->tx_desc_dma;
 	addr += txq->tx_curr_desc * sizeof(struct tx_desc);
-	wrlp(mp, TXQ_CURRENT_DESC_PTR(txq->index), addr);
+	wrl(mp, off, addr);
 }
 
 static void txq_enable(struct tx_queue *txq)
 {
 	struct mv643xx_eth_private *mp = txq_to_mp(txq);
-	wrlp(mp, TXQ_COMMAND, 1 << txq->index);
+	wrl(mp, TXQ_COMMAND(mp->port_num), 1 << txq->index);
 }
 
 static void txq_disable(struct tx_queue *txq)
@@ -471,8 +456,8 @@ static void txq_disable(struct tx_queue *txq)
 	struct mv643xx_eth_private *mp = txq_to_mp(txq);
 	u8 mask = 1 << txq->index;
 
-	wrlp(mp, TXQ_COMMAND, mask << 8);
-	while (rdlp(mp, TXQ_COMMAND) & mask)
+	wrl(mp, TXQ_COMMAND(mp->port_num), mask << 8);
+	while (rdl(mp, TXQ_COMMAND(mp->port_num)) & mask)
 		udelay(10);
 }
 
@@ -543,38 +528,37 @@ static int rxq_process(struct rx_queue *rxq, int budget)
 		 * on, or the error summary bit is set, the packet needs
 		 * to be dropped.
 		 */
-		if ((cmd_sts & (RX_FIRST_DESC | RX_LAST_DESC | ERROR_SUMMARY))
-			!= (RX_FIRST_DESC | RX_LAST_DESC))
-			goto err;
+		if (((cmd_sts & (RX_FIRST_DESC | RX_LAST_DESC)) !=
+					(RX_FIRST_DESC | RX_LAST_DESC))
+				|| (cmd_sts & ERROR_SUMMARY)) {
+			stats->rx_dropped++;
 
-		/*
-		 * The -4 is for the CRC in the trailer of the
-		 * received packet
-		 */
-		skb_put(skb, byte_cnt - 2 - 4);
+			if ((cmd_sts & (RX_FIRST_DESC | RX_LAST_DESC)) !=
+				(RX_FIRST_DESC | RX_LAST_DESC)) {
+				if (net_ratelimit())
+					dev_printk(KERN_ERR, &mp->dev->dev,
+						   "received packet spanning "
+						   "multiple descriptors\n");
+			}
 
-		if (cmd_sts & LAYER_4_CHECKSUM_OK)
-			skb->ip_summed = CHECKSUM_UNNECESSARY;
-		skb->protocol = eth_type_trans(skb, mp->dev);
-		netif_receive_skb(skb);
+			if (cmd_sts & ERROR_SUMMARY)
+				stats->rx_errors++;
 
-		continue;
+			dev_kfree_skb(skb);
+		} else {
+			/*
+			 * The -4 is for the CRC in the trailer of the
+			 * received packet
+			 */
+			skb_put(skb, byte_cnt - 2 - 4);
 
-err:
-		stats->rx_dropped++;
-
-		if ((cmd_sts & (RX_FIRST_DESC | RX_LAST_DESC)) !=
-			(RX_FIRST_DESC | RX_LAST_DESC)) {
-			if (net_ratelimit())
-				dev_printk(KERN_ERR, &mp->dev->dev,
-					   "received packet spanning "
-					   "multiple descriptors\n");
+			if (cmd_sts & LAYER_4_CHECKSUM_OK)
+				skb->ip_summed = CHECKSUM_UNNECESSARY;
+			skb->protocol = eth_type_trans(skb, mp->dev);
+			netif_receive_skb(skb);
 		}
 
-		if (cmd_sts & ERROR_SUMMARY)
-			stats->rx_errors++;
-
-		dev_kfree_skb(skb);
+		mp->dev->last_rx = jiffies;
 	}
 
 	if (rx < budget)
@@ -593,7 +577,6 @@ static int rxq_refill(struct rx_queue *rxq, int budget)
 		struct sk_buff *skb;
 		int unaligned;
 		int rx;
-		struct rx_desc *rx_desc;
 
 		skb = __skb_dequeue(&mp->rx_recycle);
 		if (skb == NULL)
@@ -616,14 +599,13 @@ static int rxq_refill(struct rx_queue *rxq, int budget)
 		if (rxq->rx_used_desc == rxq->rx_ring_size)
 			rxq->rx_used_desc = 0;
 
-		rx_desc = rxq->rx_desc_area + rx;
-
-		rx_desc->buf_ptr = dma_map_single(NULL, skb->data,
-					mp->skb_size, DMA_FROM_DEVICE);
-		rx_desc->buf_size = mp->skb_size;
+		rxq->rx_desc_area[rx].buf_ptr = dma_map_single(NULL, skb->data,
+						mp->skb_size, DMA_FROM_DEVICE);
+		rxq->rx_desc_area[rx].buf_size = mp->skb_size;
 		rxq->rx_skb[rx] = skb;
 		wmb();
-		rx_desc->cmd_sts = BUFFER_OWNED_BY_DMA | RX_ENABLE_INTERRUPT;
+		rxq->rx_desc_area[rx].cmd_sts = BUFFER_OWNED_BY_DMA |
+						RX_ENABLE_INTERRUPT;
 		wmb();
 
 		/*
@@ -656,6 +638,21 @@ static inline unsigned int has_tiny_unaligned_frags(struct sk_buff *skb)
 	return 0;
 }
 
+static int txq_alloc_desc_index(struct tx_queue *txq)
+{
+	int tx_desc_curr;
+
+	BUG_ON(txq->tx_desc_count >= txq->tx_ring_size);
+
+	tx_desc_curr = txq->tx_curr_desc++;
+	if (txq->tx_curr_desc == txq->tx_ring_size)
+		txq->tx_curr_desc = 0;
+
+	BUG_ON(txq->tx_curr_desc == txq->tx_used_desc);
+
+	return tx_desc_curr;
+}
+
 static void txq_submit_frag_skb(struct tx_queue *txq, struct sk_buff *skb)
 {
 	int nr_frags = skb_shinfo(skb)->nr_frags;
@@ -667,9 +664,7 @@ static void txq_submit_frag_skb(struct tx_queue *txq, struct sk_buff *skb)
 		struct tx_desc *desc;
 
 		this_frag = &skb_shinfo(skb)->frags[frag];
-		tx_index = txq->tx_curr_desc++;
-		if (txq->tx_curr_desc == txq->tx_ring_size)
-			txq->tx_curr_desc = 0;
+		tx_index = txq_alloc_desc_index(txq);
 		desc = &txq->tx_desc_area[tx_index];
 
 		/*
@@ -751,9 +746,7 @@ no_csum:
 		cmd_sts |= 5 << TX_IHL_SHIFT;
 	}
 
-	tx_index = txq->tx_curr_desc++;
-	if (txq->tx_curr_desc == txq->tx_ring_size)
-		txq->tx_curr_desc = 0;
+	tx_index = txq_alloc_desc_index(txq);
 	desc = &txq->tx_desc_area[tx_index];
 
 	if (nr_frags) {
@@ -838,10 +831,10 @@ static void txq_kick(struct tx_queue *txq)
 
 	__netif_tx_lock(nq, smp_processor_id());
 
-	if (rdlp(mp, TXQ_COMMAND) & (1 << txq->index))
+	if (rdl(mp, TXQ_COMMAND(mp->port_num)) & (1 << txq->index))
 		goto out;
 
-	hw_desc_ptr = rdlp(mp, TXQ_CURRENT_DESC_PTR(txq->index));
+	hw_desc_ptr = rdl(mp, TXQ_CURRENT_DESC_PTR(mp->port_num, txq->index));
 	expected_ptr = (u32)txq->tx_desc_dma +
 				txq->tx_curr_desc * sizeof(struct tx_desc);
 
@@ -948,14 +941,14 @@ static void tx_set_rate(struct mv643xx_eth_private *mp, int rate, int burst)
 
 	switch (mp->shared->tx_bw_control) {
 	case TX_BW_CONTROL_OLD_LAYOUT:
-		wrlp(mp, TX_BW_RATE, token_rate);
-		wrlp(mp, TX_BW_MTU, mtu);
-		wrlp(mp, TX_BW_BURST, bucket_size);
+		wrl(mp, TX_BW_RATE(mp->port_num), token_rate);
+		wrl(mp, TX_BW_MTU(mp->port_num), mtu);
+		wrl(mp, TX_BW_BURST(mp->port_num), bucket_size);
 		break;
 	case TX_BW_CONTROL_NEW_LAYOUT:
-		wrlp(mp, TX_BW_RATE_MOVED, token_rate);
-		wrlp(mp, TX_BW_MTU_MOVED, mtu);
-		wrlp(mp, TX_BW_BURST_MOVED, bucket_size);
+		wrl(mp, TX_BW_RATE_MOVED(mp->port_num), token_rate);
+		wrl(mp, TX_BW_MTU_MOVED(mp->port_num), mtu);
+		wrl(mp, TX_BW_BURST_MOVED(mp->port_num), bucket_size);
 		break;
 	}
 }
@@ -974,8 +967,9 @@ static void txq_set_rate(struct tx_queue *txq, int rate, int burst)
 	if (bucket_size > 65535)
 		bucket_size = 65535;
 
-	wrlp(mp, TXQ_BW_TOKENS(txq->index), token_rate << 14);
-	wrlp(mp, TXQ_BW_CONF(txq->index), (bucket_size << 10) | token_rate);
+	wrl(mp, TXQ_BW_TOKENS(mp->port_num, txq->index), token_rate << 14);
+	wrl(mp, TXQ_BW_CONF(mp->port_num, txq->index),
+			(bucket_size << 10) | token_rate);
 }
 
 static void txq_set_fixed_prio_mode(struct tx_queue *txq)
@@ -990,17 +984,17 @@ static void txq_set_fixed_prio_mode(struct tx_queue *txq)
 	off = 0;
 	switch (mp->shared->tx_bw_control) {
 	case TX_BW_CONTROL_OLD_LAYOUT:
-		off = TXQ_FIX_PRIO_CONF;
+		off = TXQ_FIX_PRIO_CONF(mp->port_num);
 		break;
 	case TX_BW_CONTROL_NEW_LAYOUT:
-		off = TXQ_FIX_PRIO_CONF_MOVED;
+		off = TXQ_FIX_PRIO_CONF_MOVED(mp->port_num);
 		break;
 	}
 
 	if (off) {
-		val = rdlp(mp, off);
+		val = rdl(mp, off);
 		val |= 1 << txq->index;
-		wrlp(mp, off, val);
+		wrl(mp, off, val);
 	}
 }
 
@@ -1016,25 +1010,26 @@ static void txq_set_wrr(struct tx_queue *txq, int weight)
 	off = 0;
 	switch (mp->shared->tx_bw_control) {
 	case TX_BW_CONTROL_OLD_LAYOUT:
-		off = TXQ_FIX_PRIO_CONF;
+		off = TXQ_FIX_PRIO_CONF(mp->port_num);
 		break;
 	case TX_BW_CONTROL_NEW_LAYOUT:
-		off = TXQ_FIX_PRIO_CONF_MOVED;
+		off = TXQ_FIX_PRIO_CONF_MOVED(mp->port_num);
 		break;
 	}
 
 	if (off) {
-		val = rdlp(mp, off);
+		val = rdl(mp, off);
 		val &= ~(1 << txq->index);
-		wrlp(mp, off, val);
+		wrl(mp, off, val);
 
 		/*
 		 * Configure WRR weight for this queue.
 		 */
+		off = TXQ_BW_WRR_CONF(mp->port_num, txq->index);
 
-		val = rdlp(mp, off);
+		val = rdl(mp, off);
 		val = (val & ~0xff) | (weight & 0xff);
-		wrlp(mp, TXQ_BW_WRR_CONF(txq->index), val);
+		wrl(mp, off, val);
 	}
 }
 
@@ -1089,20 +1084,20 @@ static int smi_bus_read(struct mii_bus *bus, int addr, int reg)
 	int ret;
 
 	if (smi_wait_ready(msp)) {
-		printk(KERN_WARNING "mv643xx_eth: SMI bus busy timeout\n");
+		printk("mv643xx_eth: SMI bus busy timeout\n");
 		return -ETIMEDOUT;
 	}
 
 	writel(SMI_OPCODE_READ | (reg << 21) | (addr << 16), smi_reg);
 
 	if (smi_wait_ready(msp)) {
-		printk(KERN_WARNING "mv643xx_eth: SMI bus busy timeout\n");
+		printk("mv643xx_eth: SMI bus busy timeout\n");
 		return -ETIMEDOUT;
 	}
 
 	ret = readl(smi_reg);
 	if (!(ret & SMI_READ_VALID)) {
-		printk(KERN_WARNING "mv643xx_eth: SMI bus read not valid\n");
+		printk("mv643xx_eth: SMI bus read not valid\n");
 		return -ENODEV;
 	}
 
@@ -1115,7 +1110,7 @@ static int smi_bus_write(struct mii_bus *bus, int addr, int reg, u16 val)
 	void __iomem *smi_reg = msp->base + SMI_REG;
 
 	if (smi_wait_ready(msp)) {
-		printk(KERN_WARNING "mv643xx_eth: SMI bus busy timeout\n");
+		printk("mv643xx_eth: SMI bus busy timeout\n");
 		return -ETIMEDOUT;
 	}
 
@@ -1123,7 +1118,7 @@ static int smi_bus_write(struct mii_bus *bus, int addr, int reg, u16 val)
 		(addr << 16) | (val & 0xffff), smi_reg);
 
 	if (smi_wait_ready(msp)) {
-		printk(KERN_WARNING "mv643xx_eth: SMI bus busy timeout\n");
+		printk("mv643xx_eth: SMI bus busy timeout\n");
 		return -ETIMEDOUT;
 	}
 
@@ -1276,8 +1271,7 @@ static const struct mv643xx_eth_stats mv643xx_eth_stats[] = {
 	MIBSTAT(late_collision),
 };
 
-static int
-mv643xx_eth_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+static int mv643xx_eth_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	struct mv643xx_eth_private *mp = netdev_priv(dev);
 	int err;
@@ -1295,14 +1289,12 @@ mv643xx_eth_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 	return err;
 }
 
-static int
-mv643xx_eth_get_settings_phyless(struct net_device *dev,
-				 struct ethtool_cmd *cmd)
+static int mv643xx_eth_get_settings_phyless(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	struct mv643xx_eth_private *mp = netdev_priv(dev);
 	u32 port_status;
 
-	port_status = rdlp(mp, PORT_STATUS);
+	port_status = rdl(mp, PORT_STATUS(mp->port_num));
 
 	cmd->supported = SUPPORTED_MII;
 	cmd->advertising = ADVERTISED_MII;
@@ -1331,8 +1323,7 @@ mv643xx_eth_get_settings_phyless(struct net_device *dev,
 	return 0;
 }
 
-static int
-mv643xx_eth_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+static int mv643xx_eth_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	struct mv643xx_eth_private *mp = netdev_priv(dev);
 
@@ -1344,9 +1335,7 @@ mv643xx_eth_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 	return phy_ethtool_sset(mp->phy, cmd);
 }
 
-static int
-mv643xx_eth_set_settings_phyless(struct net_device *dev,
-				 struct ethtool_cmd *cmd)
+static int mv643xx_eth_set_settings_phyless(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	return -EINVAL;
 }
@@ -1454,8 +1443,11 @@ static const struct ethtool_ops mv643xx_eth_ethtool_ops_phyless = {
 /* address handling *********************************************************/
 static void uc_addr_get(struct mv643xx_eth_private *mp, unsigned char *addr)
 {
-	unsigned int mac_h = rdlp(mp, MAC_ADDR_HIGH);
-	unsigned int mac_l = rdlp(mp, MAC_ADDR_LOW);
+	unsigned int mac_h;
+	unsigned int mac_l;
+
+	mac_h = rdl(mp, MAC_ADDR_HIGH(mp->port_num));
+	mac_l = rdl(mp, MAC_ADDR_LOW(mp->port_num));
 
 	addr[0] = (mac_h >> 24) & 0xff;
 	addr[1] = (mac_h >> 16) & 0xff;
@@ -1465,71 +1457,57 @@ static void uc_addr_get(struct mv643xx_eth_private *mp, unsigned char *addr)
 	addr[5] = mac_l & 0xff;
 }
 
-static void uc_addr_set(struct mv643xx_eth_private *mp, unsigned char *addr)
+static void init_mac_tables(struct mv643xx_eth_private *mp)
 {
-	wrlp(mp, MAC_ADDR_HIGH,
-		(addr[0] << 24) | (addr[1] << 16) | (addr[2] << 8) | addr[3]);
-	wrlp(mp, MAC_ADDR_LOW, (addr[4] << 8) | addr[5]);
-}
-
-static u32 uc_addr_filter_mask(struct net_device *dev)
-{
-	struct dev_addr_list *uc_ptr;
-	u32 nibbles;
-
-	if (dev->flags & IFF_PROMISC)
-		return 0;
-
-	nibbles = 1 << (dev->dev_addr[5] & 0x0f);
-	for (uc_ptr = dev->uc_list; uc_ptr != NULL; uc_ptr = uc_ptr->next) {
-		if (memcmp(dev->dev_addr, uc_ptr->da_addr, 5))
-			return 0;
-		if ((dev->dev_addr[5] ^ uc_ptr->da_addr[5]) & 0xf0)
-			return 0;
-
-		nibbles |= 1 << (uc_ptr->da_addr[5] & 0x0f);
-	}
-
-	return nibbles;
-}
-
-static void mv643xx_eth_program_unicast_filter(struct net_device *dev)
-{
-	struct mv643xx_eth_private *mp = netdev_priv(dev);
-	u32 port_config;
-	u32 nibbles;
 	int i;
 
+	for (i = 0; i < 0x100; i += 4) {
+		wrl(mp, SPECIAL_MCAST_TABLE(mp->port_num) + i, 0);
+		wrl(mp, OTHER_MCAST_TABLE(mp->port_num) + i, 0);
+	}
+
+	for (i = 0; i < 0x10; i += 4)
+		wrl(mp, UNICAST_TABLE(mp->port_num) + i, 0);
+}
+
+static void set_filter_table_entry(struct mv643xx_eth_private *mp,
+				   int table, unsigned char entry)
+{
+	unsigned int table_reg;
+
+	/* Set "accepts frame bit" at specified table entry */
+	table_reg = rdl(mp, table + (entry & 0xfc));
+	table_reg |= 0x01 << (8 * (entry & 3));
+	wrl(mp, table + (entry & 0xfc), table_reg);
+}
+
+static void uc_addr_set(struct mv643xx_eth_private *mp, unsigned char *addr)
+{
+	unsigned int mac_h;
+	unsigned int mac_l;
+	int table;
+
+	mac_l = (addr[4] << 8) | addr[5];
+	mac_h = (addr[0] << 24) | (addr[1] << 16) | (addr[2] << 8) | addr[3];
+
+	wrl(mp, MAC_ADDR_LOW(mp->port_num), mac_l);
+	wrl(mp, MAC_ADDR_HIGH(mp->port_num), mac_h);
+
+	table = UNICAST_TABLE(mp->port_num);
+	set_filter_table_entry(mp, table, addr[5] & 0x0f);
+}
+
+static int mv643xx_eth_set_mac_address(struct net_device *dev, void *addr)
+{
+	struct mv643xx_eth_private *mp = netdev_priv(dev);
+
+	/* +2 is for the offset of the HW addr type */
+	memcpy(dev->dev_addr, addr + 2, 6);
+
+	init_mac_tables(mp);
 	uc_addr_set(mp, dev->dev_addr);
 
-	port_config = rdlp(mp, PORT_CONFIG);
-	nibbles = uc_addr_filter_mask(dev);
-	if (!nibbles) {
-		port_config |= UNICAST_PROMISCUOUS_MODE;
-		wrlp(mp, PORT_CONFIG, port_config);
-		return;
-	}
-
-	for (i = 0; i < 16; i += 4) {
-		int off = UNICAST_TABLE(mp->port_num) + i;
-		u32 v;
-
-		v = 0;
-		if (nibbles & 1)
-			v |= 0x00000001;
-		if (nibbles & 2)
-			v |= 0x00000100;
-		if (nibbles & 4)
-			v |= 0x00010000;
-		if (nibbles & 8)
-			v |= 0x01000000;
-		nibbles >>= 4;
-
-		wrl(mp, off, v);
-	}
-
-	port_config &= ~UNICAST_PROMISCUOUS_MODE;
-	wrlp(mp, PORT_CONFIG, port_config);
+	return 0;
 }
 
 static int addr_crc(unsigned char *addr)
@@ -1550,22 +1528,24 @@ static int addr_crc(unsigned char *addr)
 	return crc;
 }
 
-static void mv643xx_eth_program_multicast_filter(struct net_device *dev)
+static void mv643xx_eth_set_rx_mode(struct net_device *dev)
 {
 	struct mv643xx_eth_private *mp = netdev_priv(dev);
-	u32 *mc_spec;
-	u32 *mc_other;
+	u32 port_config;
 	struct dev_addr_list *addr;
 	int i;
 
-	if (dev->flags & (IFF_PROMISC | IFF_ALLMULTI)) {
-		int port_num;
-		u32 accept;
-		int i;
+	port_config = rdl(mp, PORT_CONFIG(mp->port_num));
+	if (dev->flags & IFF_PROMISC)
+		port_config |= UNICAST_PROMISCUOUS_MODE;
+	else
+		port_config &= ~UNICAST_PROMISCUOUS_MODE;
+	wrl(mp, PORT_CONFIG(mp->port_num), port_config);
 
-oom:
-		port_num = mp->port_num;
-		accept = 0x01010101;
+	if (dev->flags & (IFF_PROMISC | IFF_ALLMULTI)) {
+		int port_num = mp->port_num;
+		u32 accept = 0x01010101;
+
 		for (i = 0; i < 0x100; i += 4) {
 			wrl(mp, SPECIAL_MCAST_TABLE(port_num) + i, accept);
 			wrl(mp, OTHER_MCAST_TABLE(port_num) + i, accept);
@@ -1573,55 +1553,28 @@ oom:
 		return;
 	}
 
-	mc_spec = kmalloc(0x200, GFP_KERNEL);
-	if (mc_spec == NULL)
-		goto oom;
-	mc_other = mc_spec + (0x100 >> 2);
-
-	memset(mc_spec, 0, 0x100);
-	memset(mc_other, 0, 0x100);
+	for (i = 0; i < 0x100; i += 4) {
+		wrl(mp, SPECIAL_MCAST_TABLE(mp->port_num) + i, 0);
+		wrl(mp, OTHER_MCAST_TABLE(mp->port_num) + i, 0);
+	}
 
 	for (addr = dev->mc_list; addr != NULL; addr = addr->next) {
 		u8 *a = addr->da_addr;
-		u32 *table;
-		int entry;
+		int table;
+
+		if (addr->da_addrlen != 6)
+			continue;
 
 		if (memcmp(a, "\x01\x00\x5e\x00\x00", 5) == 0) {
-			table = mc_spec;
-			entry = a[5];
+			table = SPECIAL_MCAST_TABLE(mp->port_num);
+			set_filter_table_entry(mp, table, a[5]);
 		} else {
-			table = mc_other;
-			entry = addr_crc(a);
+			int crc = addr_crc(a);
+
+			table = OTHER_MCAST_TABLE(mp->port_num);
+			set_filter_table_entry(mp, table, crc);
 		}
-
-		table[entry >> 2] |= 1 << (entry & 3);
 	}
-
-	for (i = 0; i < 0x100; i += 4) {
-		wrl(mp, SPECIAL_MCAST_TABLE(mp->port_num) + i, mc_spec[i >> 2]);
-		wrl(mp, OTHER_MCAST_TABLE(mp->port_num) + i, mc_other[i >> 2]);
-	}
-
-	kfree(mc_spec);
-}
-
-static void mv643xx_eth_set_rx_mode(struct net_device *dev)
-{
-	mv643xx_eth_program_unicast_filter(dev);
-	mv643xx_eth_program_multicast_filter(dev);
-}
-
-static int mv643xx_eth_set_mac_address(struct net_device *dev, void *addr)
-{
-	struct sockaddr *sa = addr;
-
-	memcpy(dev->dev_addr, sa->sa_data, ETH_ALEN);
-
-	netif_addr_lock_bh(dev);
-	mv643xx_eth_program_unicast_filter(dev);
-	netif_addr_unlock_bh(dev);
-
-	return 0;
 }
 
 
@@ -1805,25 +1758,26 @@ static int mv643xx_eth_collect_events(struct mv643xx_eth_private *mp)
 	u32 int_cause;
 	u32 int_cause_ext;
 
-	int_cause = rdlp(mp, INT_CAUSE) & (INT_TX_END | INT_RX | INT_EXT);
+	int_cause = rdl(mp, INT_CAUSE(mp->port_num)) &
+			(INT_TX_END | INT_RX | INT_EXT);
 	if (int_cause == 0)
 		return 0;
 
 	int_cause_ext = 0;
 	if (int_cause & INT_EXT)
-		int_cause_ext = rdlp(mp, INT_CAUSE_EXT);
+		int_cause_ext = rdl(mp, INT_CAUSE_EXT(mp->port_num));
 
 	int_cause &= INT_TX_END | INT_RX;
 	if (int_cause) {
-		wrlp(mp, INT_CAUSE, ~int_cause);
+		wrl(mp, INT_CAUSE(mp->port_num), ~int_cause);
 		mp->work_tx_end |= ((int_cause & INT_TX_END) >> 19) &
-				~(rdlp(mp, TXQ_COMMAND) & 0xff);
+				~(rdl(mp, TXQ_COMMAND(mp->port_num)) & 0xff);
 		mp->work_rx |= (int_cause & INT_RX) >> 2;
 	}
 
 	int_cause_ext &= INT_EXT_LINK_PHY | INT_EXT_TX;
 	if (int_cause_ext) {
-		wrlp(mp, INT_CAUSE_EXT, ~int_cause_ext);
+		wrl(mp, INT_CAUSE_EXT(mp->port_num), ~int_cause_ext);
 		if (int_cause_ext & INT_EXT_LINK_PHY)
 			mp->work_link = 1;
 		mp->work_tx |= int_cause_ext & INT_EXT_TX;
@@ -1840,7 +1794,7 @@ static irqreturn_t mv643xx_eth_irq(int irq, void *dev_id)
 	if (unlikely(!mv643xx_eth_collect_events(mp)))
 		return IRQ_NONE;
 
-	wrlp(mp, INT_MASK, 0);
+	wrl(mp, INT_MASK(mp->port_num), 0);
 	napi_schedule(&mp->napi);
 
 	return IRQ_HANDLED;
@@ -1854,7 +1808,7 @@ static void handle_link_event(struct mv643xx_eth_private *mp)
 	int duplex;
 	int fc;
 
-	port_status = rdlp(mp, PORT_STATUS);
+	port_status = rdl(mp, PORT_STATUS(mp->port_num));
 	if (!(port_status & LINK_UP)) {
 		if (netif_carrier_ok(dev)) {
 			int i;
@@ -1954,7 +1908,7 @@ static int mv643xx_eth_poll(struct napi_struct *napi, int budget)
 		if (mp->work_rx_oom)
 			mod_timer(&mp->rx_oom, jiffies + (HZ / 10));
 		napi_complete(napi);
-		wrlp(mp, INT_MASK, INT_TX_END | INT_RX | INT_EXT);
+		wrl(mp, INT_MASK(mp->port_num), INT_TX_END | INT_RX | INT_EXT);
 	}
 
 	return work_done;
@@ -2003,17 +1957,17 @@ static void port_start(struct mv643xx_eth_private *mp)
 	/*
 	 * Configure basic link parameters.
 	 */
-	pscr = rdlp(mp, PORT_SERIAL_CONTROL);
+	pscr = rdl(mp, PORT_SERIAL_CONTROL(mp->port_num));
 
 	pscr |= SERIAL_PORT_ENABLE;
-	wrlp(mp, PORT_SERIAL_CONTROL, pscr);
+	wrl(mp, PORT_SERIAL_CONTROL(mp->port_num), pscr);
 
 	pscr |= DO_NOT_FORCE_LINK_FAIL;
 	if (mp->phy == NULL)
 		pscr |= FORCE_LINK_PASS;
-	wrlp(mp, PORT_SERIAL_CONTROL, pscr);
+	wrl(mp, PORT_SERIAL_CONTROL(mp->port_num), pscr);
 
-	wrlp(mp, SDMA_CONFIG, PORT_SDMA_CONFIG_DEFAULT_VALUE);
+	wrl(mp, SDMA_CONFIG(mp->port_num), PORT_SDMA_CONFIG_DEFAULT_VALUE);
 
 	/*
 	 * Configure TX path and queues.
@@ -2030,30 +1984,31 @@ static void port_start(struct mv643xx_eth_private *mp)
 	/*
 	 * Add configured unicast address to address filter table.
 	 */
-	mv643xx_eth_program_unicast_filter(mp->dev);
+	uc_addr_set(mp, mp->dev->dev_addr);
 
 	/*
 	 * Receive all unmatched unicast, TCP, UDP, BPDU and broadcast
 	 * frames to RX queue #0, and include the pseudo-header when
 	 * calculating receive checksums.
 	 */
-	wrlp(mp, PORT_CONFIG, 0x02000000);
+	wrl(mp, PORT_CONFIG(mp->port_num), 0x02000000);
 
 	/*
 	 * Treat BPDUs as normal multicasts, and disable partition mode.
 	 */
-	wrlp(mp, PORT_CONFIG_EXT, 0x00000000);
+	wrl(mp, PORT_CONFIG_EXT(mp->port_num), 0x00000000);
 
 	/*
 	 * Enable the receive queues.
 	 */
 	for (i = 0; i < mp->rxq_count; i++) {
 		struct rx_queue *rxq = mp->rxq + i;
+		int off = RXQ_CURRENT_DESC_PTR(mp->port_num, i);
 		u32 addr;
 
 		addr = (u32)rxq->rx_desc_dma;
 		addr += rxq->rx_curr_desc * sizeof(struct rx_desc);
-		wrlp(mp, RXQ_CURRENT_DESC_PTR(i), addr);
+		wrl(mp, off, addr);
 
 		rxq_enable(rxq);
 	}
@@ -2064,7 +2019,7 @@ static void set_rx_coal(struct mv643xx_eth_private *mp, unsigned int delay)
 	unsigned int coal = ((mp->shared->t_clk / 1000000) * delay) / 64;
 	u32 val;
 
-	val = rdlp(mp, SDMA_CONFIG);
+	val = rdl(mp, SDMA_CONFIG(mp->port_num));
 	if (mp->shared->extended_rx_coal_limit) {
 		if (coal > 0xffff)
 			coal = 0xffff;
@@ -2077,7 +2032,7 @@ static void set_rx_coal(struct mv643xx_eth_private *mp, unsigned int delay)
 		val &= ~0x003fff00;
 		val |= (coal & 0x3fff) << 8;
 	}
-	wrlp(mp, SDMA_CONFIG, val);
+	wrl(mp, SDMA_CONFIG(mp->port_num), val);
 }
 
 static void set_tx_coal(struct mv643xx_eth_private *mp, unsigned int delay)
@@ -2086,7 +2041,7 @@ static void set_tx_coal(struct mv643xx_eth_private *mp, unsigned int delay)
 
 	if (coal > 0x3fff)
 		coal = 0x3fff;
-	wrlp(mp, TX_FIFO_URGENT_THRESHOLD, (coal & 0x3fff) << 4);
+	wrl(mp, TX_FIFO_URGENT_THRESHOLD(mp->port_num), (coal & 0x3fff) << 4);
 }
 
 static void mv643xx_eth_recalc_skb_size(struct mv643xx_eth_private *mp)
@@ -2115,9 +2070,9 @@ static int mv643xx_eth_open(struct net_device *dev)
 	int err;
 	int i;
 
-	wrlp(mp, INT_CAUSE, 0);
-	wrlp(mp, INT_CAUSE_EXT, 0);
-	rdlp(mp, INT_CAUSE_EXT);
+	wrl(mp, INT_CAUSE(mp->port_num), 0);
+	wrl(mp, INT_CAUSE_EXT(mp->port_num), 0);
+	rdl(mp, INT_CAUSE_EXT(mp->port_num));
 
 	err = request_irq(dev->irq, mv643xx_eth_irq,
 			  IRQF_SHARED, dev->name, dev);
@@ -2125,6 +2080,8 @@ static int mv643xx_eth_open(struct net_device *dev)
 		dev_printk(KERN_ERR, &dev->dev, "can't assign irq\n");
 		return -EAGAIN;
 	}
+
+	init_mac_tables(mp);
 
 	mv643xx_eth_recalc_skb_size(mp);
 
@@ -2164,8 +2121,8 @@ static int mv643xx_eth_open(struct net_device *dev)
 	set_rx_coal(mp, 0);
 	set_tx_coal(mp, 0);
 
-	wrlp(mp, INT_MASK_EXT, INT_EXT_LINK_PHY | INT_EXT_TX);
-	wrlp(mp, INT_MASK, INT_TX_END | INT_RX | INT_EXT);
+	wrl(mp, INT_MASK_EXT(mp->port_num), INT_EXT_LINK_PHY | INT_EXT_TX);
+	wrl(mp, INT_MASK(mp->port_num), INT_TX_END | INT_RX | INT_EXT);
 
 	return 0;
 
@@ -2190,7 +2147,7 @@ static void port_reset(struct mv643xx_eth_private *mp)
 		txq_disable(mp->txq + i);
 
 	while (1) {
-		u32 ps = rdlp(mp, PORT_STATUS);
+		u32 ps = rdl(mp, PORT_STATUS(mp->port_num));
 
 		if ((ps & (TX_IN_PROGRESS | TX_FIFO_EMPTY)) == TX_FIFO_EMPTY)
 			break;
@@ -2198,11 +2155,11 @@ static void port_reset(struct mv643xx_eth_private *mp)
 	}
 
 	/* Reset the Enable bit in the Configuration Register */
-	data = rdlp(mp, PORT_SERIAL_CONTROL);
+	data = rdl(mp, PORT_SERIAL_CONTROL(mp->port_num));
 	data &= ~(SERIAL_PORT_ENABLE		|
 		  DO_NOT_FORCE_LINK_FAIL	|
 		  FORCE_LINK_PASS);
-	wrlp(mp, PORT_SERIAL_CONTROL, data);
+	wrl(mp, PORT_SERIAL_CONTROL(mp->port_num), data);
 }
 
 static int mv643xx_eth_stop(struct net_device *dev)
@@ -2210,8 +2167,8 @@ static int mv643xx_eth_stop(struct net_device *dev)
 	struct mv643xx_eth_private *mp = netdev_priv(dev);
 	int i;
 
-	wrlp(mp, INT_MASK, 0x00000000);
-	rdlp(mp, INT_MASK);
+	wrl(mp, INT_MASK(mp->port_num), 0x00000000);
+	rdl(mp, INT_MASK(mp->port_num));
 
 	del_timer_sync(&mp->mib_counters_timer);
 
@@ -2304,12 +2261,12 @@ static void mv643xx_eth_netpoll(struct net_device *dev)
 {
 	struct mv643xx_eth_private *mp = netdev_priv(dev);
 
-	wrlp(mp, INT_MASK, 0x00000000);
-	rdlp(mp, INT_MASK);
+	wrl(mp, INT_MASK(mp->port_num), 0x00000000);
+	rdl(mp, INT_MASK(mp->port_num));
 
 	mv643xx_eth_irq(dev->irq, dev);
 
-	wrlp(mp, INT_MASK, INT_TX_END | INT_RX | INT_EXT);
+	wrl(mp, INT_MASK(mp->port_num), INT_TX_END | INT_RX | INT_EXT);
 }
 #endif
 
@@ -2357,8 +2314,8 @@ static void infer_hw_params(struct mv643xx_eth_shared_private *msp)
 	 * [21:8], or a 16-bit coal limit in bits [25,21:7] of the
 	 * SDMA config register.
 	 */
-	writel(0x02000000, msp->base + 0x0400 + SDMA_CONFIG);
-	if (readl(msp->base + 0x0400 + SDMA_CONFIG) & 0x02000000)
+	writel(0x02000000, msp->base + SDMA_CONFIG(0));
+	if (readl(msp->base + SDMA_CONFIG(0)) & 0x02000000)
 		msp->extended_rx_coal_limit = 1;
 	else
 		msp->extended_rx_coal_limit = 0;
@@ -2368,12 +2325,12 @@ static void infer_hw_params(struct mv643xx_eth_shared_private *msp)
 	 * yes, whether its associated registers are in the old or
 	 * the new place.
 	 */
-	writel(1, msp->base + 0x0400 + TX_BW_MTU_MOVED);
-	if (readl(msp->base + 0x0400 + TX_BW_MTU_MOVED) & 1) {
+	writel(1, msp->base + TX_BW_MTU_MOVED(0));
+	if (readl(msp->base + TX_BW_MTU_MOVED(0)) & 1) {
 		msp->tx_bw_control = TX_BW_CONTROL_NEW_LAYOUT;
 	} else {
-		writel(7, msp->base + 0x0400 + TX_BW_RATE);
-		if (readl(msp->base + 0x0400 + TX_BW_RATE) & 7)
+		writel(7, msp->base + TX_BW_RATE(0));
+		if (readl(msp->base + TX_BW_RATE(0)) & 7)
 			msp->tx_bw_control = TX_BW_CONTROL_OLD_LAYOUT;
 		else
 			msp->tx_bw_control = TX_BW_CONTROL_ABSENT;
@@ -2382,7 +2339,7 @@ static void infer_hw_params(struct mv643xx_eth_shared_private *msp)
 
 static int mv643xx_eth_shared_probe(struct platform_device *pdev)
 {
-	static int mv643xx_eth_version_printed;
+	static int mv643xx_eth_version_printed = 0;
 	struct mv643xx_eth_shared_platform_data *pd = pdev->dev.platform_data;
 	struct mv643xx_eth_shared_private *msp;
 	struct resource *res;
@@ -2606,10 +2563,10 @@ static void init_pscr(struct mv643xx_eth_private *mp, int speed, int duplex)
 {
 	u32 pscr;
 
-	pscr = rdlp(mp, PORT_SERIAL_CONTROL);
+	pscr = rdl(mp, PORT_SERIAL_CONTROL(mp->port_num));
 	if (pscr & SERIAL_PORT_ENABLE) {
 		pscr &= ~SERIAL_PORT_ENABLE;
-		wrlp(mp, PORT_SERIAL_CONTROL, pscr);
+		wrl(mp, PORT_SERIAL_CONTROL(mp->port_num), pscr);
 	}
 
 	pscr = MAX_RX_PACKET_9700BYTE | SERIAL_PORT_CONTROL_RESERVED;
@@ -2627,7 +2584,7 @@ static void init_pscr(struct mv643xx_eth_private *mp, int speed, int duplex)
 			pscr |= SET_FULL_DUPLEX_MODE;
 	}
 
-	wrlp(mp, PORT_SERIAL_CONTROL, pscr);
+	wrl(mp, PORT_SERIAL_CONTROL(mp->port_num), pscr);
 }
 
 static int mv643xx_eth_probe(struct platform_device *pdev)
@@ -2636,6 +2593,7 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
 	struct mv643xx_eth_private *mp;
 	struct net_device *dev;
 	struct resource *res;
+	DECLARE_MAC_BUF(mac);
 	int err;
 
 	pd = pdev->dev.platform_data;
@@ -2659,7 +2617,6 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, mp);
 
 	mp->shared = platform_get_drvdata(pd->shared);
-	mp->base = mp->shared->base + 0x0400 + (pd->port_number << 10);
 	mp->port_num = pd->port_number;
 
 	mp->dev = dev;
@@ -2707,7 +2664,7 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
 	dev->hard_start_xmit = mv643xx_eth_xmit;
 	dev->open = mv643xx_eth_open;
 	dev->stop = mv643xx_eth_stop;
-	dev->set_rx_mode = mv643xx_eth_set_rx_mode;
+	dev->set_multicast_list = mv643xx_eth_set_rx_mode;
 	dev->set_mac_address = mv643xx_eth_set_mac_address;
 	dev->do_ioctl = mv643xx_eth_ioctl;
 	dev->change_mtu = mv643xx_eth_change_mtu;
@@ -2730,8 +2687,8 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
 	if (err)
 		goto out;
 
-	dev_printk(KERN_NOTICE, &dev->dev, "port %d with MAC address %pM\n",
-		   mp->port_num, dev->dev_addr);
+	dev_printk(KERN_NOTICE, &dev->dev, "port %d with MAC address %s\n",
+		   mp->port_num, print_mac(mac, dev->dev_addr));
 
 	if (mp->tx_desc_sram_size > 0)
 		dev_printk(KERN_NOTICE, &dev->dev, "configured with sram\n");
@@ -2764,8 +2721,8 @@ static void mv643xx_eth_shutdown(struct platform_device *pdev)
 	struct mv643xx_eth_private *mp = platform_get_drvdata(pdev);
 
 	/* Mask all interrupts on ethernet port */
-	wrlp(mp, INT_MASK, 0);
-	rdlp(mp, INT_MASK);
+	wrl(mp, INT_MASK(mp->port_num), 0);
+	rdl(mp, INT_MASK(mp->port_num));
 
 	if (netif_running(mp->dev))
 		port_reset(mp);

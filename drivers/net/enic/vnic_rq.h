@@ -132,15 +132,8 @@ static inline void vnic_rq_post(struct vnic_rq *rq,
 #define VNIC_RQ_RETURN_RATE		0xf	/* keep 2^n - 1 */
 #endif
 
-	if ((buf->index & VNIC_RQ_RETURN_RATE) == 0) {
-		/* Adding write memory barrier prevents compiler and/or CPU
-		 * reordering, thus avoiding descriptor posting before
-		 * descriptor is initialized. Otherwise, hardware can read
-		 * stale descriptor fields.
-		 */
-		wmb();
+	if ((buf->index & VNIC_RQ_RETURN_RATE) == 0)
 		iowrite32(buf->index, &rq->ctrl->posted_index);
-	}
 }
 
 static inline void vnic_rq_return_descs(struct vnic_rq *rq, unsigned int count)

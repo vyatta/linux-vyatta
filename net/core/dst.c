@@ -263,11 +263,9 @@ again:
 void dst_release(struct dst_entry *dst)
 {
 	if (dst) {
-               int newrefcnt;
-
+		WARN_ON(atomic_read(&dst->__refcnt) < 1);
 		smp_mb__before_atomic_dec();
-               newrefcnt = atomic_dec_return(&dst->__refcnt);
-               WARN_ON(newrefcnt < 0);
+		atomic_dec(&dst->__refcnt);
 	}
 }
 EXPORT_SYMBOL(dst_release);

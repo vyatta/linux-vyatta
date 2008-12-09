@@ -457,6 +457,7 @@ static inline void cp_rx_skb (struct cp_private *cp, struct sk_buff *skb,
 
 	cp->dev->stats.rx_packets++;
 	cp->dev->stats.rx_bytes += skb->len;
+	cp->dev->last_rx = jiffies;
 
 #if CP_VLAN_TAG_USED
 	if (cp->vlgrp && (desc->opts2 & cpu_to_le32(RxVlanTagged))) {
@@ -1817,26 +1818,6 @@ static void cp_set_d3_state (struct cp_private *cp)
 	pci_set_power_state (cp->pdev, PCI_D3hot);
 }
 
-static const struct net_device_ops cp_netdev_ops = {
-	.ndo_open		= cp_open,
-	.ndo_stop		= cp_close,
-	.ndo_validate_addr	= eth_validate_addr,
-	.ndo_set_multicast_list	= cp_set_rx_mode,
-	.ndo_get_stats		= cp_get_stats,
-	.ndo_do_ioctl		= cp_ioctl,
-	.ndo_start_xmit		= cp_start_xmit,
-	.ndo_tx_timeout		= cp_tx_timeout,
-#if CP_VLAN_TAG_USED
-	.ndo_vlan_rx_register	= cp_vlan_rx_register,
-#endif
-#ifdef BROKEN
-	.ndo_change_mtu		= cp_change_mtu,
-#endif
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	.ndo_poll_controller	= cp_poll_controller,
-#endif
-};
-
 static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct net_device *dev;
@@ -1845,6 +1826,7 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	void __iomem *regs;
 	resource_size_t pciaddr;
 	unsigned int addr_len, i, pci_using_dac;
+	DECLARE_MAC_BUF(mac);
 
 #ifndef MODULE
 	static int version_printed;
@@ -1949,13 +1931,26 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		    cpu_to_le16(read_eeprom (regs, i + 7, addr_len));
 	memcpy(dev->perm_addr, dev->dev_addr, dev->addr_len);
 
-	dev->netdev_ops = &cp_netdev_ops;
+	dev->open = cp_open;
+	dev->stop = cp_close;
+	dev->set_multicast_list = cp_set_rx_mode;
+	dev->hard_start_xmit = cp_start_xmit;
+	dev->get_stats = cp_get_stats;
+	dev->do_ioctl = cp_ioctl;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = cp_poll_controller;
+#endif
 	netif_napi_add(dev, &cp->napi, cp_rx_poll, 16);
+#ifdef BROKEN
+	dev->change_mtu = cp_change_mtu;
+#endif
 	dev->ethtool_ops = &cp_ethtool_ops;
+	dev->tx_timeout = cp_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 
 #if CP_VLAN_TAG_USED
 	dev->features |= NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
+	dev->vlan_rx_register = cp_vlan_rx_register;
 #endif
 
 	if (pci_using_dac)
@@ -1972,10 +1967,10 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto err_out_iomap;
 
 	printk (KERN_INFO "%s: RTL-8139C+ at 0x%lx, "
-		"%pM, IRQ %d\n",
+		"%s, IRQ %d\n",
 		dev->name,
 		dev->base_addr,
-		dev->dev_addr,
+		print_mac(mac, dev->dev_addr),
 		dev->irq);
 
 	pci_set_drvdata(pdev, dev);

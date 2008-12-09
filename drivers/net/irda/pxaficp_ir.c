@@ -225,6 +225,7 @@ static irqreturn_t pxa_irda_sir_irq(int irq, void *dev_id)
 			}
 			lsr = STLSR;
 		}
+		dev->last_rx = jiffies;
 		si->last_oscr = OSCR;
 		break;
 
@@ -236,6 +237,7 @@ static irqreturn_t pxa_irda_sir_irq(int irq, void *dev_id)
 		    si->stats.rx_bytes++;
 	            async_unwrap_char(dev, &si->stats, &si->rx_buff, STRBR);
 	  	} while (STLSR & LSR_DR);
+	  	dev->last_rx = jiffies;
 		si->last_oscr = OSCR;
 	  	break;
 
@@ -395,6 +397,8 @@ static void pxa_irda_fir_irq_eif(struct pxa_irda *si, struct net_device *dev, in
 
 		si->stats.rx_packets++;
 		si->stats.rx_bytes += len;
+
+		dev->last_rx = jiffies;
 	}
 }
 

@@ -285,15 +285,15 @@ extern int sctp_debug_flag;
 	if (sctp_debug_flag) { \
 		if (saddr->sa.sa_family == AF_INET6) { \
 			printk(KERN_DEBUG \
-			       lead "%pI6" trail, \
+			       lead NIP6_FMT trail, \
 			       leadparm, \
-			       &saddr->v6.sin6_addr, \
+			       NIP6(saddr->v6.sin6_addr), \
 			       otherparms); \
 		} else { \
 			printk(KERN_DEBUG \
-			       lead "%pI4" trail, \
+			       lead NIPQUAD_FMT trail, \
 			       leadparm, \
-			       &saddr->v4.sin_addr.s_addr, \
+			       NIPQUAD(saddr->v4.sin_addr.s_addr), \
 			       otherparms); \
 		} \
 	}

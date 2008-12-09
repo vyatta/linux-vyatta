@@ -390,8 +390,11 @@ static int nic_init(struct ioc3 *ioc3)
 	}
 
 	printk("Found %s NIC", type);
-	if (type != unknown)
-		printk (" registration number %pM, CRC %02x", serial, crc);
+	if (type != unknown) {
+		printk (" registration number %02x:%02x:%02x:%02x:%02x:%02x,"
+			" CRC %02x", serial[0], serial[1], serial[2],
+			serial[3], serial[4], serial[5], crc);
+	}
 	printk(".\n");
 
 	return 0;
@@ -440,9 +443,12 @@ static void ioc3_get_eaddr_nic(struct ioc3_private *ip)
  */
 static void ioc3_get_eaddr(struct ioc3_private *ip)
 {
+	DECLARE_MAC_BUF(mac);
+
 	ioc3_get_eaddr_nic(ip);
 
-	printk("Ethernet address is %pM.\n", priv_netdev(ip)->dev_addr);
+	printk("Ethernet address is %s.\n",
+	       print_mac(mac, priv_netdev(ip)->dev_addr));
 }
 
 static void __ioc3_set_mac_address(struct net_device *dev)
@@ -621,6 +627,7 @@ static inline void ioc3_rx(struct ioc3_private *ip)
 			rxb = (struct ioc3_erxbuf *) new_skb->data;
 			skb_reserve(new_skb, RX_OFFSET);
 
+			priv_netdev(ip)->last_rx = jiffies;
 			ip->stats.rx_packets++;		/* Statistics */
 			ip->stats.rx_bytes += len;
 		} else {

@@ -354,11 +354,9 @@ static void lbtf_op_remove_interface(struct ieee80211_hw *hw,
 	priv->vif = NULL;
 }
 
-static int lbtf_op_config(struct ieee80211_hw *hw, u32 changed)
+static int lbtf_op_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 {
 	struct lbtf_private *priv = hw->priv;
-	struct ieee80211_conf *conf = &hw->conf;
-
 	if (conf->channel->center_freq != priv->cur_freq) {
 		priv->cur_freq = conf->channel->center_freq;
 		lbtf_set_channel(priv, conf->channel->hw_value);
@@ -592,14 +590,14 @@ EXPORT_SYMBOL_GPL(lbtf_remove_card);
 void lbtf_send_tx_feedback(struct lbtf_private *priv, u8 retrycnt, u8 fail)
 {
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(priv->tx_skb);
-
-	ieee80211_tx_info_clear_status(info);
+	memset(&info->status, 0, sizeof(info->status));
 	/*
 	 * Commented out, otherwise we never go beyond 1Mbit/s using mac80211
 	 * default pid rc algorithm.
 	 *
 	 * info->status.retry_count = MRVL_DEFAULT_RETRIES - retrycnt;
 	 */
+	info->status.excessive_retries = fail ? 1 : 0;
 	if (!(info->flags & IEEE80211_TX_CTL_NO_ACK) && !fail)
 		info->flags |= IEEE80211_TX_STAT_ACK;
 	skb_pull(priv->tx_skb, sizeof(struct txpd));

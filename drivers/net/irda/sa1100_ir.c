@@ -298,7 +298,7 @@ static int sa1100_irda_suspend(struct platform_device *pdev, pm_message_t state)
 	if (!dev)
 		return 0;
 
-	si = netdev_priv(dev);
+	si = dev->priv;
 	if (si->open) {
 		/*
 		 * Stop the transmit queue
@@ -323,7 +323,7 @@ static int sa1100_irda_resume(struct platform_device *pdev)
 	if (!dev)
 		return 0;
 
-	si = netdev_priv(dev);
+	si = dev->priv;
 	if (si->open) {
 		/*
 		 * If we missed a speed change, initialise at the new speed
@@ -359,7 +359,7 @@ static int sa1100_irda_resume(struct platform_device *pdev)
  */
 static void sa1100_irda_hpsir_irq(struct net_device *dev)
 {
-	struct sa1100_irda *si = netdev_priv(dev);
+	struct sa1100_irda *si = dev->priv;
 	int status;
 
 	status = Ser2UTSR0;
@@ -410,6 +410,7 @@ static void sa1100_irda_hpsir_irq(struct net_device *dev)
 					  Ser2UTDR);
 		} while (Ser2UTSR1 & UTSR1_RNE);
 
+		dev->last_rx = jiffies;
 	}
 
 	if (status & UTSR0_TFS && si->tx_buff.len) {
@@ -514,6 +515,7 @@ static void sa1100_irda_fir_error(struct sa1100_irda *si, struct net_device *dev
 		sa1100_irda_rx_alloc(si);
 
 		netif_rx(skb);
+		dev->last_rx = jiffies;
 	} else {
 		/*
 		 * Remap the buffer.
@@ -532,7 +534,7 @@ static void sa1100_irda_fir_error(struct sa1100_irda *si, struct net_device *dev
  */
 static void sa1100_irda_fir_irq(struct net_device *dev)
 {
-	struct sa1100_irda *si = netdev_priv(dev);
+	struct sa1100_irda *si = dev->priv;
 
 	/*
 	 * Stop RX DMA
@@ -580,7 +582,7 @@ static void sa1100_irda_fir_irq(struct net_device *dev)
 static irqreturn_t sa1100_irda_irq(int irq, void *dev_id)
 {
 	struct net_device *dev = dev_id;
-	if (IS_FIR(((struct sa1100_irda *)netdev_priv(dev))))
+	if (IS_FIR(((struct sa1100_irda *)dev->priv)))
 		sa1100_irda_fir_irq(dev);
 	else
 		sa1100_irda_hpsir_irq(dev);
@@ -593,7 +595,7 @@ static irqreturn_t sa1100_irda_irq(int irq, void *dev_id)
 static void sa1100_irda_txdma_irq(void *id)
 {
 	struct net_device *dev = id;
-	struct sa1100_irda *si = netdev_priv(dev);
+	struct sa1100_irda *si = dev->priv;
 	struct sk_buff *skb = si->txskb;
 
 	si->txskb = NULL;
@@ -647,7 +649,7 @@ static void sa1100_irda_txdma_irq(void *id)
 
 static int sa1100_irda_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct sa1100_irda *si = netdev_priv(dev);
+	struct sa1100_irda *si = dev->priv;
 	int speed = irda_get_next_speed(skb);
 
 	/*
@@ -722,7 +724,7 @@ static int
 sa1100_irda_ioctl(struct net_device *dev, struct ifreq *ifreq, int cmd)
 {
 	struct if_irda_req *rq = (struct if_irda_req *)ifreq;
-	struct sa1100_irda *si = netdev_priv(dev);
+	struct sa1100_irda *si = dev->priv;
 	int ret = -EOPNOTSUPP;
 
 	switch (cmd) {
@@ -764,13 +766,13 @@ sa1100_irda_ioctl(struct net_device *dev, struct ifreq *ifreq, int cmd)
 
 static struct net_device_stats *sa1100_irda_stats(struct net_device *dev)
 {
-	struct sa1100_irda *si = netdev_priv(dev);
+	struct sa1100_irda *si = dev->priv;
 	return &si->stats;
 }
 
 static int sa1100_irda_start(struct net_device *dev)
 {
-	struct sa1100_irda *si = netdev_priv(dev);
+	struct sa1100_irda *si = dev->priv;
 	int err;
 
 	si->speed = 9600;
@@ -833,7 +835,7 @@ err_irq:
 
 static int sa1100_irda_stop(struct net_device *dev)
 {
-	struct sa1100_irda *si = netdev_priv(dev);
+	struct sa1100_irda *si = dev->priv;
 
 	disable_irq(dev->irq);
 	sa1100_irda_shutdown(si);
@@ -906,7 +908,7 @@ static int sa1100_irda_probe(struct platform_device *pdev)
 	if (!dev)
 		goto err_mem_4;
 
-	si = netdev_priv(dev);
+	si = dev->priv;
 	si->dev = &pdev->dev;
 	si->pdata = pdev->dev.platform_data;
 
@@ -985,7 +987,7 @@ static int sa1100_irda_remove(struct platform_device *pdev)
 	struct net_device *dev = platform_get_drvdata(pdev);
 
 	if (dev) {
-		struct sa1100_irda *si = netdev_priv(dev);
+		struct sa1100_irda *si = dev->priv;
 		unregister_netdev(dev);
 		kfree(si->tx_buff.head);
 		kfree(si->rx_buff.head);

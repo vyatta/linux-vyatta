@@ -180,6 +180,9 @@ struct neigh_table
 	__u32			hash_rnd;
 	unsigned int		hash_chain_gc;
 	struct pneigh_entry	**phash_buckets;
+#ifdef CONFIG_PROC_FS
+	struct proc_dir_entry	*pde;
+#endif
 };
 
 /* flags for neigh_update() */
@@ -220,7 +223,11 @@ extern void			neigh_parms_release(struct neigh_table *tbl, struct neigh_parms *p
 static inline
 struct net			*neigh_parms_net(const struct neigh_parms *parms)
 {
-	return read_pnet(&parms->net);
+#ifdef CONFIG_NET_NS
+	return parms->net;
+#else
+	return &init_net;
+#endif
 }
 
 extern unsigned long		neigh_rand_reach_time(unsigned long base);
@@ -237,7 +244,11 @@ extern int			pneigh_delete(struct neigh_table *tbl, struct net *net, const void 
 static inline
 struct net			*pneigh_net(const struct pneigh_entry *pneigh)
 {
-	return read_pnet(&pneigh->net);
+#ifdef CONFIG_NET_NS
+	return pneigh->net;
+#else
+	return &init_net;
+#endif
 }
 
 extern void neigh_app_ns(struct neighbour *n);

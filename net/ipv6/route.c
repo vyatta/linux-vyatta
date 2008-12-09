@@ -108,6 +108,7 @@ static struct dst_ops ip6_dst_ops_template = {
 	.link_failure		=	ip6_link_failure,
 	.update_pmtu		=	ip6_rt_update_pmtu,
 	.local_out		=	__ip6_local_out,
+	.entry_size		=	sizeof(struct rt6_info),
 	.entries		=	ATOMIC_INIT(0),
 };
 
@@ -121,6 +122,7 @@ static struct dst_ops ip6_dst_blackhole_ops = {
 	.destroy		=	ip6_dst_destroy,
 	.check			=	ip6_dst_check,
 	.update_pmtu		=	ip6_rt_blackhole_update_pmtu,
+	.entry_size		=	sizeof(struct rt6_info),
 	.entries		=	ATOMIC_INIT(0),
 };
 
@@ -2406,16 +2408,19 @@ static int rt6_info_route(struct rt6_info *rt, void *p_arg)
 {
 	struct seq_file *m = p_arg;
 
-	seq_printf(m, "%pi6 %02x ", &rt->rt6i_dst.addr, rt->rt6i_dst.plen);
+	seq_printf(m, NIP6_SEQFMT " %02x ", NIP6(rt->rt6i_dst.addr),
+		   rt->rt6i_dst.plen);
 
 #ifdef CONFIG_IPV6_SUBTREES
-	seq_printf(m, "%pi6 %02x ", &rt->rt6i_src.addr, rt->rt6i_src.plen);
+	seq_printf(m, NIP6_SEQFMT " %02x ", NIP6(rt->rt6i_src.addr),
+		   rt->rt6i_src.plen);
 #else
 	seq_puts(m, "00000000000000000000000000000000 00 ");
 #endif
 
 	if (rt->rt6i_nexthop) {
-		seq_printf(m, "%pi6", rt->rt6i_nexthop->primary_key);
+		seq_printf(m, NIP6_SEQFMT,
+			   NIP6(*((struct in6_addr *)rt->rt6i_nexthop->primary_key)));
 	} else {
 		seq_puts(m, "00000000000000000000000000000000");
 	}
@@ -2497,7 +2502,7 @@ ctl_table ipv6_route_table_template[] = {
 		.data		=	&init_net.ipv6.sysctl.flush_delay,
 		.maxlen		=	sizeof(int),
 		.mode		=	0200,
-		.proc_handler	=	ipv6_sysctl_rtcache_flush
+		.proc_handler	=	&ipv6_sysctl_rtcache_flush
 	},
 	{
 		.ctl_name	=	NET_IPV6_ROUTE_GC_THRESH,
@@ -2505,7 +2510,7 @@ ctl_table ipv6_route_table_template[] = {
 		.data		=	&ip6_dst_ops_template.gc_thresh,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
-		.proc_handler	=	proc_dointvec,
+		.proc_handler	=	&proc_dointvec,
 	},
 	{
 		.ctl_name	=	NET_IPV6_ROUTE_MAX_SIZE,
@@ -2513,7 +2518,7 @@ ctl_table ipv6_route_table_template[] = {
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_max_size,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
-		.proc_handler	=	proc_dointvec,
+		.proc_handler	=	&proc_dointvec,
 	},
 	{
 		.ctl_name	=	NET_IPV6_ROUTE_GC_MIN_INTERVAL,
@@ -2521,8 +2526,8 @@ ctl_table ipv6_route_table_template[] = {
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_gc_min_interval,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
-		.proc_handler	=	proc_dointvec_jiffies,
-		.strategy	=	sysctl_jiffies,
+		.proc_handler	=	&proc_dointvec_jiffies,
+		.strategy	=	&sysctl_jiffies,
 	},
 	{
 		.ctl_name	=	NET_IPV6_ROUTE_GC_TIMEOUT,
@@ -2530,8 +2535,8 @@ ctl_table ipv6_route_table_template[] = {
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_gc_timeout,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
-		.proc_handler	=	proc_dointvec_jiffies,
-		.strategy	=	sysctl_jiffies,
+		.proc_handler	=	&proc_dointvec_jiffies,
+		.strategy	=	&sysctl_jiffies,
 	},
 	{
 		.ctl_name	=	NET_IPV6_ROUTE_GC_INTERVAL,
@@ -2539,8 +2544,8 @@ ctl_table ipv6_route_table_template[] = {
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_gc_interval,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
-		.proc_handler	=	proc_dointvec_jiffies,
-		.strategy	=	sysctl_jiffies,
+		.proc_handler	=	&proc_dointvec_jiffies,
+		.strategy	=	&sysctl_jiffies,
 	},
 	{
 		.ctl_name	=	NET_IPV6_ROUTE_GC_ELASTICITY,
@@ -2548,8 +2553,8 @@ ctl_table ipv6_route_table_template[] = {
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_gc_elasticity,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
-		.proc_handler	=	proc_dointvec_jiffies,
-		.strategy	=	sysctl_jiffies,
+		.proc_handler	=	&proc_dointvec_jiffies,
+		.strategy	=	&sysctl_jiffies,
 	},
 	{
 		.ctl_name	=	NET_IPV6_ROUTE_MTU_EXPIRES,
@@ -2557,8 +2562,8 @@ ctl_table ipv6_route_table_template[] = {
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_mtu_expires,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
-		.proc_handler	=	proc_dointvec_jiffies,
-		.strategy	=	sysctl_jiffies,
+		.proc_handler	=	&proc_dointvec_jiffies,
+		.strategy	=	&sysctl_jiffies,
 	},
 	{
 		.ctl_name	=	NET_IPV6_ROUTE_MIN_ADVMSS,
@@ -2566,8 +2571,8 @@ ctl_table ipv6_route_table_template[] = {
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_min_advmss,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
-		.proc_handler	=	proc_dointvec_jiffies,
-		.strategy	=	sysctl_jiffies,
+		.proc_handler	=	&proc_dointvec_jiffies,
+		.strategy	=	&sysctl_jiffies,
 	},
 	{
 		.ctl_name	=	NET_IPV6_ROUTE_GC_MIN_INTERVAL_MS,
@@ -2575,8 +2580,8 @@ ctl_table ipv6_route_table_template[] = {
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_gc_min_interval,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
-		.proc_handler	=	proc_dointvec_ms_jiffies,
-		.strategy	=	sysctl_ms_jiffies,
+		.proc_handler	=	&proc_dointvec_ms_jiffies,
+		.strategy	=	&sysctl_ms_jiffies,
 	},
 	{ .ctl_name = 0 }
 };

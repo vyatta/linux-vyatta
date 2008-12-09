@@ -1125,6 +1125,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	struct usb_device		*xdev;
 	int				status;
 	const char			*name;
+	DECLARE_MAC_BUF(mac);
 
 	name = udev->dev.driver->name;
 	info = (struct driver_info *) prod->driver_info;
@@ -1235,11 +1236,11 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	if (status)
 		goto out3;
 	if (netif_msg_probe (dev))
-		devinfo (dev, "register '%s' at usb-%s-%s, %s, %pM",
+		devinfo (dev, "register '%s' at usb-%s-%s, %s, %s",
 			udev->dev.driver->name,
 			xdev->bus->bus_name, xdev->devpath,
 			dev->driver_info->description,
-			net->dev_addr);
+			print_mac(mac, net->dev_addr));
 
 	// ok, it's ready to go.
 	usb_set_intfdata (udev, dev);

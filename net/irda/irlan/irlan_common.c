@@ -207,7 +207,7 @@ static struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr)
 	if (!dev)
 		return NULL;
 
-	self = netdev_priv(dev);
+	self = dev->priv;
 	self->dev = dev;
 
 	/*

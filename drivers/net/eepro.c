@@ -605,7 +605,7 @@ out:
 
 static void __init printEEPROMInfo(struct net_device *dev)
 {
-	struct eepro_local *lp = netdev_priv(dev);
+	struct eepro_local *lp = (struct eepro_local *)dev->priv;
 	int ioaddr = dev->base_addr;
 	unsigned short Word;
 	int i,j;
@@ -690,6 +690,7 @@ static void __init eepro_print_info (struct net_device *dev)
 	struct eepro_local *	lp = netdev_priv(dev);
 	int			i;
 	const char *		ifmap[] = {"AUI", "10Base2", "10BaseT"};
+	DECLARE_MAC_BUF(mac);
 
 	i = inb(dev->base_addr + ID_REG);
 	printk(KERN_DEBUG " id: %#x ",i);
@@ -714,7 +715,7 @@ static void __init eepro_print_info (struct net_device *dev)
 			break;
 	}
 
-	printk(" %pM", dev->dev_addr);
+	printk(" %s", print_mac(mac, dev->dev_addr));
 
 	if (net_debug > 3)
 		printk(KERN_DEBUG ", %dK RCV buffer",
@@ -1580,6 +1581,7 @@ eepro_rx(struct net_device *dev)
 
 			skb->protocol = eth_type_trans(skb,dev);
 			netif_rx(skb);
+			dev->last_rx = jiffies;
 			dev->stats.rx_packets++;
 		}
 
@@ -1674,7 +1676,7 @@ eepro_transmit_interrupt(struct net_device *dev)
 static int eepro_ethtool_get_settings(struct net_device *dev,
 					struct ethtool_cmd *cmd)
 {
-	struct eepro_local	*lp = netdev_priv(dev);
+	struct eepro_local	*lp = (struct eepro_local *)dev->priv;
 
 	cmd->supported = 	SUPPORTED_10baseT_Half |
 				SUPPORTED_10baseT_Full |

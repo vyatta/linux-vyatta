@@ -285,7 +285,10 @@ void tr_source_route(struct sk_buff *skb,struct trh_hdr *trh,
 		if(entry)
 		{
 #if TR_SR_DEBUG
-printk("source routing for %pM\n", trh->daddr);
+{
+DECLARE_MAC_BUF(mac);
+printk("source routing for %s\n",print_mac(mac, trh->daddr));
+}
 #endif
 			if(!entry->local_ring && (ntohs(entry->rcf) & TR_RCF_LEN_MASK) >> 8)
 			{
@@ -367,8 +370,9 @@ static void tr_add_rif_info(struct trh_hdr *trh, struct net_device *dev)
 	if(entry==NULL)
 	{
 #if TR_SR_DEBUG
-		printk("adding rif_entry: addr:%pM rcf:%04X\n",
-		       trh->saddr, ntohs(trh->rcf));
+		DECLARE_MAC_BUF(mac);
+		printk("adding rif_entry: addr:%s rcf:%04X\n",
+		       print_mac(mac, trh->saddr), ntohs(trh->rcf));
 #endif
 		/*
 		 *	Allocate our new entry. A failure to allocate loses
@@ -413,8 +417,11 @@ static void tr_add_rif_info(struct trh_hdr *trh, struct net_device *dev)
 			 !(trh->rcf & htons(TR_RCF_BROADCAST_MASK)))
 		    {
 #if TR_SR_DEBUG
-printk("updating rif_entry: addr:%pM rcf:%04X\n",
-		trh->saddr, ntohs(trh->rcf));
+{
+DECLARE_MAC_BUF(mac);
+printk("updating rif_entry: addr:%s rcf:%04X\n",
+		print_mac(mac, trh->saddr), ntohs(trh->rcf));
+}
 #endif
 			    entry->rcf = trh->rcf & htons((unsigned short)~TR_RCF_BROADCAST_MASK);
 			    memcpy(&(entry->rseg[0]),&(trh->rseg[0]),8*sizeof(unsigned short));
@@ -525,6 +532,7 @@ static int rif_seq_show(struct seq_file *seq, void *v)
 {
 	int j, rcf_len, segment, brdgnmb;
 	struct rif_cache *entry = v;
+	DECLARE_MAC_BUF(mac);
 
 	if (v == SEQ_START_TOKEN)
 		seq_puts(seq,
@@ -534,9 +542,9 @@ static int rif_seq_show(struct seq_file *seq, void *v)
 		long ttl = (long) (entry->last_used + sysctl_tr_rif_timeout)
 				- (long) jiffies;
 
-		seq_printf(seq, "%s %pM %7li ",
+		seq_printf(seq, "%s %s %7li ",
 			   dev?dev->name:"?",
-			   entry->addr,
+			   print_mac(mac, entry->addr),
 			   ttl/HZ);
 
 			if (entry->local_ring)
@@ -635,7 +643,7 @@ static struct ctl_table tr_table[] = {
 		.data		= &sysctl_tr_rif_timeout,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec
+		.proc_handler	= &proc_dointvec
 	},
 	{ 0 },
 };

@@ -541,6 +541,7 @@ static int __devinit el3_common_init(struct net_device *dev)
 {
 	struct el3_private *lp = netdev_priv(dev);
 	int err;
+	DECLARE_MAC_BUF(mac);
 	const char *if_names[] = {"10baseT", "AUI", "undefined", "BNC"};
 
 	spin_lock_init(&lp->lock);
@@ -574,9 +575,9 @@ static int __devinit el3_common_init(struct net_device *dev)
 	}
 
 	printk(KERN_INFO "%s: 3c5x9 found at %#3.3lx, %s port, "
-	       "address %pM, IRQ %d.\n",
+	       "address %s, IRQ %d.\n",
 	       dev->name, dev->base_addr, if_names[(dev->if_port & 0x03)],
-	       dev->dev_addr, dev->irq);
+	       print_mac(mac, dev->dev_addr), dev->irq);
 
 	if (el3_debug > 0)
 		printk(KERN_INFO "%s", version);
@@ -1074,6 +1075,7 @@ el3_rx(struct net_device *dev)
 				outw(RxDiscard, ioaddr + EL3_CMD); /* Pop top Rx packet. */
 				skb->protocol = eth_type_trans(skb,dev);
 				netif_rx(skb);
+				dev->last_rx = jiffies;
 				dev->stats.rx_bytes += pkt_len;
 				dev->stats.rx_packets++;
 				continue;

@@ -622,6 +622,7 @@ static int lance_rx(struct net_device *dev)
 
 			skb->protocol = eth_type_trans(skb, dev);
 			netif_rx(skb);
+			dev->last_rx = jiffies;
 			dev->stats.rx_packets++;
 		}
 
@@ -1022,6 +1023,7 @@ static int __init dec_lance_probe(struct device *bdev, const int type)
 	int i, ret;
 	unsigned long esar_base;
 	unsigned char *esar;
+	DECLARE_MAC_BUF(mac);
 
 	if (dec_lance_debug && version_printed++ == 0)
 		printk(version);
@@ -1033,7 +1035,7 @@ static int __init dec_lance_probe(struct device *bdev, const int type)
 		dev = root_lance_dev;
 		while (dev) {
 			i++;
-			lp = netdev_priv(dev);
+			lp = (struct lance_private *)dev->priv;
 			dev = lp->next;
 		}
 		snprintf(name, sizeof(name), fmt, i);
@@ -1221,7 +1223,8 @@ static int __init dec_lance_probe(struct device *bdev, const int type)
 	for (i = 0; i < 6; i++)
 		dev->dev_addr[i] = esar[i * 4];
 
-	printk(", addr = %pM, irq = %d\n", dev->dev_addr, dev->irq);
+	printk(", addr = %s, irq = %d\n",
+	       print_mac(mac, dev->dev_addr), dev->irq);
 
 	dev->open = &lance_open;
 	dev->stop = &lance_close;

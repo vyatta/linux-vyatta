@@ -147,7 +147,7 @@ static int ieee80211_ioctl_giwname(struct net_device *dev,
 	sband = local->hw.wiphy->bands[IEEE80211_BAND_5GHZ];
 	if (sband) {
 		is_a = 1;
-		is_ht |= sband->ht_cap.ht_supported;
+		is_ht |= sband->ht_info.ht_supported;
 	}
 
 	sband = local->hw.wiphy->bands[IEEE80211_BAND_2GHZ];
@@ -160,7 +160,7 @@ static int ieee80211_ioctl_giwname(struct net_device *dev,
 			if (sband->bitrates[i].bitrate == 60)
 				is_g = 1;
 		}
-		is_ht |= sband->ht_cap.ht_supported;
+		is_ht |= sband->ht_info.ht_supported;
 	}
 
 	strcpy(name, "IEEE 802.11");
@@ -271,6 +271,7 @@ static int ieee80211_ioctl_siwmode(struct net_device *dev,
 				   __u32 *mode, char *extra)
 {
 	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
+	struct ieee80211_local *local = sdata->local;
 	int type;
 
 	if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
@@ -281,6 +282,13 @@ static int ieee80211_ioctl_siwmode(struct net_device *dev,
 		type = NL80211_IFTYPE_STATION;
 		break;
 	case IW_MODE_ADHOC:
+		/* Setting ad-hoc mode on non ibss channel is not
+		 * supported.
+		 */
+		if (local->oper_channel &&
+		    (local->oper_channel->flags & IEEE80211_CHAN_NO_IBSS))
+			return -EOPNOTSUPP;
+
 		type = NL80211_IFTYPE_ADHOC;
 		break;
 	case IW_MODE_REPEAT:
@@ -407,6 +415,13 @@ static int ieee80211_ioctl_siwessid(struct net_device *dev,
 		return 0;
 	}
 
+	if (sdata->vif.type == NL80211_IFTYPE_AP) {
+		memcpy(sdata->u.ap.ssid, ssid, len);
+		memset(sdata->u.ap.ssid + len, 0,
+		       IEEE80211_MAX_SSID_LEN - len);
+		sdata->u.ap.ssid_len = len;
+		return ieee80211_if_config(sdata, IEEE80211_IFCC_SSID);
+	}
 	return -EOPNOTSUPP;
 }
 
@@ -430,6 +445,15 @@ static int ieee80211_ioctl_giwessid(struct net_device *dev,
 		return res;
 	}
 
+	if (sdata->vif.type == NL80211_IFTYPE_AP) {
+		len = sdata->u.ap.ssid_len;
+		if (len > IW_ESSID_MAX_SIZE)
+			len = IW_ESSID_MAX_SIZE;
+		memcpy(ssid, sdata->u.ap.ssid, len);
+		data->length = len;
+		data->flags = 1;
+		return 0;
+	}
 	return -EOPNOTSUPP;
 }
 
@@ -620,8 +644,8 @@ static int ieee80211_ioctl_giwrate(struct net_device *dev,
 
 	sta = sta_info_get(local, sdata->u.sta.bssid);
 
-	if (sta && !(sta->last_tx_rate.flags & IEEE80211_TX_RC_MCS))
-		rate->value = sband->bitrates[sta->last_tx_rate.idx].bitrate;
+	if (sta && sta->last_txrate_idx < sband->n_bitrates)
+		rate->value = sband->bitrates[sta->last_txrate_idx].bitrate;
 	else
 		rate->value = 0;
 
@@ -640,35 +664,45 @@ static int ieee80211_ioctl_siwtxpower(struct net_device *dev,
 				      union iwreq_data *data, char *extra)
 {
 	struct ieee80211_local *local = wdev_priv(dev->ieee80211_ptr);
-	struct ieee80211_channel* chan = local->hw.conf.channel;
-	u32 reconf_flags = 0;
+	bool need_reconfig = 0;
 	int new_power_level;
 
 	if ((data->txpower.flags & IW_TXPOW_TYPE) != IW_TXPOW_DBM)
 		return -EINVAL;
 	if (data->txpower.flags & IW_TXPOW_RANGE)
 		return -EINVAL;
-	if (!chan)
-		return -EINVAL;
 
-	if (data->txpower.fixed)
-		new_power_level = min(data->txpower.value, chan->max_power);
-	else /* Automatic power level setting */
+	if (data->txpower.fixed) {
+		new_power_level = data->txpower.value;
+	} else {
+		/*
+		 * Automatic power level. Use maximum power for the current
+		 * channel. Should be part of rate control.
+		 */
+		struct ieee80211_channel* chan = local->hw.conf.channel;
+		if (!chan)
+			return -EINVAL;
+
 		new_power_level = chan->max_power;
+	}
 
 	if (local->hw.conf.power_level != new_power_level) {
 		local->hw.conf.power_level = new_power_level;
-		reconf_flags |= IEEE80211_CONF_CHANGE_POWER;
+		need_reconfig = 1;
 	}
 
 	if (local->hw.conf.radio_enabled != !(data->txpower.disabled)) {
 		local->hw.conf.radio_enabled = !(data->txpower.disabled);
-		reconf_flags |= IEEE80211_CONF_CHANGE_RADIO_ENABLED;
+		need_reconfig = 1;
 		ieee80211_led_radio(local, local->hw.conf.radio_enabled);
 	}
 
-	if (reconf_flags)
-		ieee80211_hw_config(local, reconf_flags);
+	if (need_reconfig) {
+		ieee80211_hw_config(local);
+		/* The return value of hw_config is not of big interest here,
+		 * as it doesn't say that it failed because of _this_ config
+		 * change or something else. Ignore it. */
+	}
 
 	return 0;
 }
@@ -780,16 +814,21 @@ static int ieee80211_ioctl_siwretry(struct net_device *dev,
 	    (retry->flags & IW_RETRY_TYPE) != IW_RETRY_LIMIT)
 		return -EINVAL;
 
-	if (retry->flags & IW_RETRY_MAX) {
-		local->hw.conf.long_frame_max_tx_count = retry->value;
-	} else if (retry->flags & IW_RETRY_MIN) {
-		local->hw.conf.short_frame_max_tx_count = retry->value;
-	} else {
-		local->hw.conf.long_frame_max_tx_count = retry->value;
-		local->hw.conf.short_frame_max_tx_count = retry->value;
+	if (retry->flags & IW_RETRY_MAX)
+		local->long_retry_limit = retry->value;
+	else if (retry->flags & IW_RETRY_MIN)
+		local->short_retry_limit = retry->value;
+	else {
+		local->long_retry_limit = retry->value;
+		local->short_retry_limit = retry->value;
 	}
 
-	ieee80211_hw_config(local, IEEE80211_CONF_CHANGE_RETRY_LIMITS);
+	if (local->ops->set_retry_limit) {
+		return local->ops->set_retry_limit(
+			local_to_hw(local),
+			local->short_retry_limit,
+			local->long_retry_limit);
+	}
 
 	return 0;
 }
@@ -806,15 +845,14 @@ static int ieee80211_ioctl_giwretry(struct net_device *dev,
 		/* first return min value, iwconfig will ask max value
 		 * later if needed */
 		retry->flags |= IW_RETRY_LIMIT;
-		retry->value = local->hw.conf.short_frame_max_tx_count;
-		if (local->hw.conf.long_frame_max_tx_count !=
-		    local->hw.conf.short_frame_max_tx_count)
+		retry->value = local->short_retry_limit;
+		if (local->long_retry_limit != local->short_retry_limit)
 			retry->flags |= IW_RETRY_MIN;
 		return 0;
 	}
 	if (retry->flags & IW_RETRY_MAX) {
 		retry->flags = IW_RETRY_LIMIT | IW_RETRY_MAX;
-		retry->value = local->hw.conf.long_frame_max_tx_count;
+		retry->value = local->long_retry_limit;
 	}
 
 	return 0;
@@ -950,7 +988,7 @@ static int ieee80211_ioctl_siwpower(struct net_device *dev,
 
 	if (wrq->disabled) {
 		conf->flags &= ~IEEE80211_CONF_PS;
-		return ieee80211_hw_config(local, IEEE80211_CONF_CHANGE_PS);
+		return ieee80211_hw_config(local);
 	}
 
 	switch (wrq->flags & IW_POWER_MODE) {
@@ -963,7 +1001,7 @@ static int ieee80211_ioctl_siwpower(struct net_device *dev,
 		return -EINVAL;
 	}
 
-	return ieee80211_hw_config(local, IEEE80211_CONF_CHANGE_PS);
+	return ieee80211_hw_config(local);
 }
 
 static int ieee80211_ioctl_giwpower(struct net_device *dev,

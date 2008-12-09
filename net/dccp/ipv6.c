@@ -304,7 +304,6 @@ done:
 
 static void dccp_v6_reqsk_destructor(struct request_sock *req)
 {
-	dccp_feat_list_purge(&dccp_rsk(req)->dreq_featneg);
 	if (inet6_rsk(req)->pktopts != NULL)
 		kfree_skb(inet6_rsk(req)->pktopts);
 }
@@ -427,8 +426,7 @@ static int dccp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 	if (req == NULL)
 		goto drop;
 
-	if (dccp_reqsk_init(req, dccp_sk(sk), skb))
-		goto drop_and_free;
+	dccp_reqsk_init(req, skb);
 
 	dreq = dccp_rsk(req);
 	if (dccp_parse_options(sk, dreq, skb))
@@ -1140,7 +1138,6 @@ static struct proto dccp_v6_prot = {
 	.orphan_count	   = &dccp_orphan_count,
 	.max_header	   = MAX_DCCP_HEADER,
 	.obj_size	   = sizeof(struct dccp6_sock),
-	.slab_flags	   = SLAB_DESTROY_BY_RCU,
 	.rsk_prot	   = &dccp6_request_sock_ops,
 	.twsk_prot	   = &dccp6_timewait_sock_ops,
 	.h.hashinfo	   = &dccp_hashinfo,

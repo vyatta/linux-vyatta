@@ -43,7 +43,6 @@ struct vnic_dev {
 	struct vnic_devcmd_notify *notify;
 	struct vnic_devcmd_notify notify_copy;
 	dma_addr_t notify_pa;
-	u32 notify_sz;
 	u32 *linkstatus;
 	dma_addr_t linkstatus_pa;
 	struct vnic_stats *stats;
@@ -236,6 +235,14 @@ int vnic_dev_cmd(struct vnic_dev *vdev, enum vnic_devcmd_cmd cmd,
 	struct vnic_devcmd __iomem *devcmd = vdev->devcmd;
 	int delay;
 	u32 status;
+	int dev_cmd_err[] = {
+		/* convert from fw's version of error.h to host's version */
+		0,	/* ERR_SUCCESS */
+		EINVAL,	/* ERR_EINVAL */
+		EFAULT,	/* ERR_EFAULT */
+		EPERM,	/* ERR_EPERM */
+		EBUSY,  /* ERR_EBUSY */
+	};
 	int err;
 
 	status = ioread32(&devcmd->status);
@@ -263,12 +270,10 @@ int vnic_dev_cmd(struct vnic_dev *vdev, enum vnic_devcmd_cmd cmd,
 		if (!(status & STAT_BUSY)) {
 
 			if (status & STAT_ERROR) {
-				err = (int)readq(&devcmd->args[0]);
-				if (err != ERR_ECMDUNKNOWN ||
-				    cmd != CMD_CAPABILITY)
-					printk(KERN_ERR "Error %d devcmd %d\n",
-						err, _CMD_N(cmd));
-				return err;
+				err = dev_cmd_err[(int)readq(&devcmd->args[0])];
+				printk(KERN_ERR "Error %d devcmd %d\n",
+					err, _CMD_N(cmd));
+				return -err;
 			}
 
 			if (_CMD_DIR(cmd) & _CMD_DIR_READ) {
@@ -283,17 +288,6 @@ int vnic_dev_cmd(struct vnic_dev *vdev, enum vnic_devcmd_cmd cmd,
 
 	printk(KERN_ERR "Timedout devcmd %d\n", _CMD_N(cmd));
 	return -ETIMEDOUT;
-}
-
-int vnic_dev_capable(struct vnic_dev *vdev, enum vnic_devcmd_cmd cmd)
-{
-	u64 a0 = (u32)cmd, a1 = 0;
-	int wait = 1000;
-	int err;
-
-	err = vnic_dev_cmd(vdev, CMD_CAPABILITY, &a0, &a1, wait);
-
-	return !(err || a0);
 }
 
 int vnic_dev_fw_info(struct vnic_dev *vdev,
@@ -495,7 +489,10 @@ void vnic_dev_add_addr(struct vnic_dev *vdev, u8 *addr)
 
 	err = vnic_dev_cmd(vdev, CMD_ADDR_ADD, &a0, &a1, wait);
 	if (err)
-		printk(KERN_ERR "Can't add addr [%pM], %d\n", addr, err);
+		printk(KERN_ERR
+			"Can't add addr [%02x:%02x:%02x:%02x:%02x:%02x], %d\n",
+			addr[0], addr[1], addr[2], addr[3], addr[4], addr[5],
+			err);
 }
 
 void vnic_dev_del_addr(struct vnic_dev *vdev, u8 *addr)
@@ -510,14 +507,16 @@ void vnic_dev_del_addr(struct vnic_dev *vdev, u8 *addr)
 
 	err = vnic_dev_cmd(vdev, CMD_ADDR_DEL, &a0, &a1, wait);
 	if (err)
-		printk(KERN_ERR "Can't del addr [%pM], %d\n", addr, err);
+		printk(KERN_ERR
+			"Can't del addr [%02x:%02x:%02x:%02x:%02x:%02x], %d\n",
+			addr[0], addr[1], addr[2], addr[3], addr[4], addr[5],
+			err);
 }
 
 int vnic_dev_notify_set(struct vnic_dev *vdev, u16 intr)
 {
 	u64 a0, a1;
 	int wait = 1000;
-	int r;
 
 	if (!vdev->notify) {
 		vdev->notify = pci_alloc_consistent(vdev->pdev,
@@ -525,16 +524,13 @@ int vnic_dev_notify_set(struct vnic_dev *vdev, u16 intr)
 			&vdev->notify_pa);
 		if (!vdev->notify)
 			return -ENOMEM;
-		memset(vdev->notify, 0, sizeof(struct vnic_devcmd_notify));
 	}
 
 	a0 = vdev->notify_pa;
 	a1 = ((u64)intr << 32) & 0x0000ffff00000000ULL;
 	a1 += sizeof(struct vnic_devcmd_notify);
 
-	r = vnic_dev_cmd(vdev, CMD_NOTIFY, &a0, &a1, wait);
-	vdev->notify_sz = (r == 0) ? (u32)a1 : 0;
-	return r;
+	return vnic_dev_cmd(vdev, CMD_NOTIFY, &a0, &a1, wait);
 }
 
 void vnic_dev_notify_unset(struct vnic_dev *vdev)
@@ -547,22 +543,22 @@ void vnic_dev_notify_unset(struct vnic_dev *vdev)
 	a1 += sizeof(struct vnic_devcmd_notify);
 
 	vnic_dev_cmd(vdev, CMD_NOTIFY, &a0, &a1, wait);
-	vdev->notify_sz = 0;
 }
 
 static int vnic_dev_notify_ready(struct vnic_dev *vdev)
 {
 	u32 *words;
-	unsigned int nwords = vdev->notify_sz / 4;
+	unsigned int nwords = sizeof(struct vnic_devcmd_notify) / 4;
 	unsigned int i;
 	u32 csum;
 
-	if (!vdev->notify || !vdev->notify_sz)
+	if (!vdev->notify)
 		return 0;
 
 	do {
 		csum = 0;
-		memcpy(&vdev->notify_copy, vdev->notify, vdev->notify_sz);
+		memcpy(&vdev->notify_copy, vdev->notify,
+			sizeof(struct vnic_devcmd_notify));
 		words = (u32 *)&vdev->notify_copy;
 		for (i = 1; i < nwords; i++)
 			csum += words[i];
@@ -575,20 +571,7 @@ int vnic_dev_init(struct vnic_dev *vdev, int arg)
 {
 	u64 a0 = (u32)arg, a1 = 0;
 	int wait = 1000;
-        int r = 0;
-
-	if (vnic_dev_capable(vdev, CMD_INIT))
-		r = vnic_dev_cmd(vdev, CMD_INIT, &a0, &a1, wait);
-	else {
-		vnic_dev_cmd(vdev, CMD_INIT_v1, &a0, &a1, wait);
-		if (a0 & CMD_INITF_DEFAULT_MAC) {
-			// Emulate these for old CMD_INIT_v1 which
-			// didn't pass a0 so no CMD_INITF_*.
-			vnic_dev_cmd(vdev, CMD_MAC_ADDR, &a0, &a1, wait);
-			vnic_dev_cmd(vdev, CMD_ADDR_ADD, &a0, &a1, wait);
-		}
-        }
-        return r;
+	return vnic_dev_cmd(vdev, CMD_INIT, &a0, &a1, wait);
 }
 
 int vnic_dev_link_status(struct vnic_dev *vdev)
@@ -688,5 +671,4 @@ err_out:
 	vnic_dev_unregister(vdev);
 	return NULL;
 }
-
 

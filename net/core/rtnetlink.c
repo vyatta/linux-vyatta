@@ -551,7 +551,7 @@ static void set_operstate(struct net_device *dev, unsigned char transition)
 }
 
 static void copy_rtnl_link_stats(struct rtnl_link_stats *a,
-				 const struct net_device_stats *b)
+				 struct net_device_stats *b)
 {
 	a->rx_packets = b->rx_packets;
 	a->tx_packets = b->tx_packets;
@@ -609,7 +609,7 @@ static int rtnl_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
 	struct netdev_queue *txq;
 	struct ifinfomsg *ifm;
 	struct nlmsghdr *nlh;
-	const struct net_device_stats *stats;
+	struct net_device_stats *stats;
 	struct nlattr *attr;
 
 	nlh = nlmsg_put(skb, pid, seq, type, sizeof(*ifm), flags);
@@ -666,7 +666,7 @@ static int rtnl_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
 	if (attr == NULL)
 		goto nla_put_failure;
 
-	stats = dev_get_stats(dev);
+	stats = dev->get_stats(dev);
 	copy_rtnl_link_stats(nla_data(attr), stats);
 
 	if (dev->rtnl_link_ops) {
@@ -762,7 +762,6 @@ static int validate_linkmsg(struct net_device *dev, struct nlattr *tb[])
 static int do_setlink(struct net_device *dev, struct ifinfomsg *ifm,
 		      struct nlattr **tb, char *ifname, int modified)
 {
-	const struct net_device_ops *ops = dev->netdev_ops;
 	int send_addr_notify = 0;
 	int err;
 
@@ -784,7 +783,7 @@ static int do_setlink(struct net_device *dev, struct ifinfomsg *ifm,
 		struct rtnl_link_ifmap *u_map;
 		struct ifmap k_map;
 
-		if (!ops->ndo_set_config) {
+		if (!dev->set_config) {
 			err = -EOPNOTSUPP;
 			goto errout;
 		}
@@ -802,7 +801,7 @@ static int do_setlink(struct net_device *dev, struct ifinfomsg *ifm,
 		k_map.dma = (unsigned char) u_map->dma;
 		k_map.port = (unsigned char) u_map->port;
 
-		err = ops->ndo_set_config(dev, &k_map);
+		err = dev->set_config(dev, &k_map);
 		if (err < 0)
 			goto errout;
 
@@ -813,7 +812,7 @@ static int do_setlink(struct net_device *dev, struct ifinfomsg *ifm,
 		struct sockaddr *sa;
 		int len;
 
-		if (!ops->ndo_set_mac_address) {
+		if (!dev->set_mac_address) {
 			err = -EOPNOTSUPP;
 			goto errout;
 		}
@@ -832,7 +831,7 @@ static int do_setlink(struct net_device *dev, struct ifinfomsg *ifm,
 		sa->sa_family = dev->type;
 		memcpy(sa->sa_data, nla_data(tb[IFLA_ADDRESS]),
 		       dev->addr_len);
-		err = ops->ndo_set_mac_address(dev, sa);
+		err = dev->set_mac_address(dev, sa);
 		kfree(sa);
 		if (err)
 			goto errout;

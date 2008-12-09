@@ -108,15 +108,8 @@ static inline void vnic_wq_post(struct vnic_wq *wq,
 	buf->len = len;
 
 	buf = buf->next;
-	if (eop) {
-		/* Adding write memory barrier prevents compiler and/or CPU
-		 * reordering, thus avoiding descriptor posting before
-		 * descriptor is initialized. Otherwise, hardware can read
-		 * stale descriptor fields.
-		 */
-		wmb();
+	if (eop)
 		iowrite32(buf->index, &wq->ctrl->posted_index);
-	}
 	wq->to_use = buf;
 
 	wq->ring.desc_avail--;

@@ -125,7 +125,6 @@ typedef struct local_info_t {
     u_short tx_queue_len;
     cardtype_t cardtype;
     u_short sent;
-    u_char __iomem *base;
 } local_info_t;
 
 #define MC_FILTERBREAK 64
@@ -243,7 +242,6 @@ static int fmvj18x_probe(struct pcmcia_device *link)
     lp = netdev_priv(dev);
     link->priv = dev;
     lp->p_dev = link;
-    lp->base = NULL;
 
     /* The io structure describes IO port mapping */
     link->io.NumPorts1 = 32;
@@ -350,6 +348,7 @@ static int fmvj18x_config(struct pcmcia_device *link)
     cardtype_t cardtype;
     char *card_name = "unknown";
     u_char *node_id;
+    DECLARE_MAC_BUF(mac);
 
     DEBUG(0, "fmvj18x_config(0x%p)\n", link);
 
@@ -444,10 +443,8 @@ static int fmvj18x_config(struct pcmcia_device *link)
     dev->irq = link->irq.AssignedIRQ;
     dev->base_addr = link->io.BasePort1;
 
-    if (link->io.BasePort2 != 0) {
-	ret = fmvj18x_setup_mfc(link);
-	if (ret != 0) goto failed;
-    }
+    if (link->io.BasePort2 != 0)
+	fmvj18x_setup_mfc(link);
 
     ioaddr = dev->base_addr;
 
@@ -542,9 +539,9 @@ static int fmvj18x_config(struct pcmcia_device *link)
 
     /* print current configuration */
     printk(KERN_INFO "%s: %s, sram %s, port %#3lx, irq %d, "
-	   "hw_addr %pM\n",
+	   "hw_addr %s\n",
 	   dev->name, card_name, sram_config == 0 ? "4K TX*2" : "8K TX*2", 
-	   dev->base_addr, dev->irq, dev->dev_addr);
+	   dev->base_addr, dev->irq, print_mac(mac, dev->dev_addr));
 
     return 0;
     
@@ -614,10 +611,10 @@ static int fmvj18x_setup_mfc(struct pcmcia_device *link)
 {
     win_req_t req;
     memreq_t mem;
-    int i;
+    u_char __iomem *base;
+    int i, j;
     struct net_device *dev = link->priv;
     unsigned int ioaddr;
-    local_info_t *lp = netdev_priv(dev);
 
     /* Allocate a small memory window */
     req.Attributes = WIN_DATA_WIDTH_8|WIN_MEMORY_TYPE_AM|WIN_ENABLE;
@@ -629,32 +626,25 @@ static int fmvj18x_setup_mfc(struct pcmcia_device *link)
 	return -1;
     }
 
-    lp->base = ioremap(req.Base, req.Size);
-    if (lp->base == NULL) {
-	printk(KERN_NOTICE "fmvj18x_cs: ioremap failed\n");
-	return -1;
-    }
-
+    base = ioremap(req.Base, req.Size);
     mem.Page = 0;
     mem.CardOffset = 0;
-    i = pcmcia_map_mem_page(link->win, &mem);
-    if (i != 0) {
-	iounmap(lp->base);
-	lp->base = NULL;
-	cs_error(link, MapMemPage, i);
-	return -1;
-    }
-    
+    pcmcia_map_mem_page(link->win, &mem);
+
     ioaddr = dev->base_addr;
-    writeb(0x47, lp->base+0x800);	/* Config Option Register of LAN */
-    writeb(0x0,  lp->base+0x802);	/* Config and Status Register */
+    writeb(0x47, base+0x800);	/* Config Option Register of LAN */
+    writeb(0x0, base+0x802);	/* Config and Status Register */
 
-    writeb(ioaddr & 0xff, lp->base+0x80a);	  /* I/O Base(Low) of LAN */
-    writeb((ioaddr >> 8) & 0xff, lp->base+0x80c); /* I/O Base(High) of LAN */
+    writeb(ioaddr & 0xff, base+0x80a);		/* I/O Base(Low) of LAN */
+    writeb((ioaddr >> 8) & 0xff, base+0x80c);	/* I/O Base(High) of LAN */
    
-    writeb(0x45, lp->base+0x820);	/* Config Option Register of Modem */
-    writeb(0x8,  lp->base+0x822);	/* Config and Status Register */
+    writeb(0x45, base+0x820);	/* Config Option Register of Modem */
+    writeb(0x8, base+0x822);	/* Config and Status Register */
 
+    iounmap(base);
+    j = pcmcia_release_window(link->win);
+    if (j != 0)
+	cs_error(link, ReleaseWindow, j);
     return 0;
 
 }
@@ -662,25 +652,8 @@ static int fmvj18x_setup_mfc(struct pcmcia_device *link)
 
 static void fmvj18x_release(struct pcmcia_device *link)
 {
-
-    struct net_device *dev = link->priv;
-    local_info_t *lp = netdev_priv(dev);
-    u_char __iomem *tmp;
-    int j;
-
-    DEBUG(0, "fmvj18x_release(0x%p)\n", link);
-
-    if (lp->base != NULL) {
-	tmp = lp->base;
-	lp->base = NULL;    /* set NULL before iounmap */
-	iounmap(tmp);
-	j = pcmcia_release_window(link->win);
-	if (j != 0)
-	    cs_error(link, ReleaseWindow, j);
-    }
-
-    pcmcia_disable_device(link);
-
+	DEBUG(0, "fmvj18x_release(0x%p)\n", link);
+	pcmcia_disable_device(link);
 }
 
 static int fmvj18x_suspend(struct pcmcia_device *link)
@@ -811,13 +784,6 @@ static irqreturn_t fjn_interrupt(int dummy, void *dev_id)
 
     outb(D_TX_INTR, ioaddr + TX_INTR);
     outb(D_RX_INTR, ioaddr + RX_INTR);
-
-    if (lp->base != NULL) {
-	/* Ack interrupt for multifunction card */
-	writeb(0x01, lp->base+0x802);
-	writeb(0x09, lp->base+0x822);
-    }
-
     return IRQ_HANDLED;
 
 } /* fjn_interrupt */
@@ -1070,6 +1036,7 @@ static void fjn_rx(struct net_device *dev)
 #endif
 
 	    netif_rx(skb);
+	    dev->last_rx = jiffies;
 	    lp->stats.rx_packets++;
 	    lp->stats.rx_bytes += pkt_len;
 	}

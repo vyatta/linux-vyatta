@@ -59,11 +59,8 @@ struct dst_entry
 
 	struct neighbour	*neighbour;
 	struct hh_cache		*hh;
-#ifdef CONFIG_XFRM
 	struct xfrm_state	*xfrm;
-#else
-	void			*__pad1;
-#endif
+
 	int			(*input)(struct sk_buff*);
 	int			(*output)(struct sk_buff*);
 
@@ -73,20 +70,8 @@ struct dst_entry
 
 #ifdef CONFIG_NET_CLS_ROUTE
 	__u32			tclassid;
-#else
-	__u32			__pad2;
 #endif
 
-
-	/*
-	 * Align __refcnt to a 64 bytes alignment
-	 * (L1_CACHE_SIZE would be too much)
-	 */
-#ifdef CONFIG_64BIT
-	long			__pad_to_align_refcnt[2];
-#else
-	long			__pad_to_align_refcnt[1];
-#endif
 	/*
 	 * __refcnt wants to be on a different cache line from
 	 * input/output/ops or performance tanks badly
@@ -118,6 +103,7 @@ struct dst_ops
 	void			(*link_failure)(struct sk_buff *);
 	void			(*update_pmtu)(struct dst_entry *dst, u32 mtu);
 	int			(*local_out)(struct sk_buff *skb);
+	int			entry_size;
 
 	atomic_t		entries;
 	struct kmem_cache 		*kmem_cachep;
@@ -171,11 +157,6 @@ dst_metric_locked(struct dst_entry *dst, int metric)
 
 static inline void dst_hold(struct dst_entry * dst)
 {
-	/*
-	 * If your kernel compilation stops here, please check
-	 * __pad_to_align_refcnt declaration in struct dst_entry
-	 */
-	BUILD_BUG_ON(offsetof(struct dst_entry, __refcnt) & 63);
 	atomic_inc(&dst->__refcnt);
 }
 

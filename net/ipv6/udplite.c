@@ -15,14 +15,14 @@
 
 static int udplitev6_rcv(struct sk_buff *skb)
 {
-	return __udp6_lib_rcv(skb, &udplite_table, IPPROTO_UDPLITE);
+	return __udp6_lib_rcv(skb, udplite_hash, IPPROTO_UDPLITE);
 }
 
 static void udplitev6_err(struct sk_buff *skb,
 			  struct inet6_skb_parm *opt,
 			  int type, int code, int offset, __be32 info)
 {
-	__udp6_lib_err(skb, opt, type, code, offset, info, &udplite_table);
+	__udp6_lib_err(skb, opt, type, code, offset, info, udplite_hash);
 }
 
 static struct inet6_protocol udplitev6_protocol = {
@@ -49,8 +49,7 @@ struct proto udplitev6_prot = {
 	.unhash		   = udp_lib_unhash,
 	.get_port	   = udp_v6_get_port,
 	.obj_size	   = sizeof(struct udp6_sock),
-	.slab_flags	   = SLAB_DESTROY_BY_RCU,
-	.h.udp_table	   = &udplite_table,
+	.h.udp_hash	   = udplite_hash,
 #ifdef CONFIG_COMPAT
 	.compat_setsockopt = compat_udpv6_setsockopt,
 	.compat_getsockopt = compat_udpv6_getsockopt,
@@ -96,7 +95,7 @@ void udplitev6_exit(void)
 static struct udp_seq_afinfo udplite6_seq_afinfo = {
 	.name		= "udplite6",
 	.family		= AF_INET6,
-	.udp_table	= &udplite_table,
+	.hashtable	= udplite_hash,
 	.seq_fops	= {
 		.owner	=	THIS_MODULE,
 	},

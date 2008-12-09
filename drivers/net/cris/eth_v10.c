@@ -419,6 +419,7 @@ e100_set_mac_address(struct net_device *dev, void *p)
 {
 	struct net_local *np = netdev_priv(dev);
 	struct sockaddr *addr = p;
+	DECLARE_MAC_BUF(mac);
 
 	spin_lock(&np->lock); /* preemption protection */
 
@@ -439,7 +440,8 @@ e100_set_mac_address(struct net_device *dev, void *p)
 
 	/* show it in the log as well */
 
-	printk(KERN_INFO "%s: changed MAC to %pM\n", dev->name, dev->dev_addr);
+	printk(KERN_INFO "%s: changed MAC to %s\n",
+	       dev->name, print_mac(mac, dev->dev_addr));
 
 	spin_unlock(&np->lock);
 

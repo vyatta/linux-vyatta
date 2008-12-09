@@ -726,8 +726,7 @@ static int sendup_buffer (struct net_device *dev)
 	int dnode, snode, llaptype, len; 
 	int sklen;
 	struct sk_buff *skb;
-	struct ltpc_private *ltpc_priv = netdev_priv(dev);
-	struct net_device_stats *stats = &ltpc_priv->stats;
+	struct net_device_stats *stats = &((struct ltpc_private *)dev->priv)->stats;
 	struct lt_rcvlap *ltc = (struct lt_rcvlap *) ltdmacbuf;
 
 	if (ltc->command != LT_RCVLAP) {
@@ -784,6 +783,7 @@ static int sendup_buffer (struct net_device *dev)
 
 	/* toss it onwards */
 	netif_rx(skb);
+	dev->last_rx = jiffies;
 	return 0;
 }
 
@@ -823,8 +823,7 @@ static int ltpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct sockaddr_at *sa = (struct sockaddr_at *) &ifr->ifr_addr;
 	/* we'll keep the localtalk node address in dev->pa_addr */
-	struct ltpc_private *ltpc_priv = netdev_priv(dev);
-	struct atalk_addr *aa = &ltpc_priv->my_addr;
+	struct atalk_addr *aa = &((struct ltpc_private *)dev->priv)->my_addr;
 	struct lt_init c;
 	int ltflags;
 
@@ -905,8 +904,7 @@ static int ltpc_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * and skb->len is the length of the ddp data + ddp header
 	 */
 
-	struct ltpc_private *ltpc_priv = netdev_priv(dev);
-	struct net_device_stats *stats = &ltpc_priv->stats;
+	struct net_device_stats *stats = &((struct ltpc_private *)dev->priv)->stats;
 
 	int i;
 	struct lt_sendlap cbuf;
@@ -945,8 +943,7 @@ static int ltpc_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static struct net_device_stats *ltpc_get_stats(struct net_device *dev)
 {
-	struct ltpc_private *ltpc_priv = netdev_priv(dev);
-	struct net_device_stats *stats = &ltpc_priv->stats;
+	struct net_device_stats *stats = &((struct ltpc_private *) dev->priv)->stats;
 	return stats;
 }
 

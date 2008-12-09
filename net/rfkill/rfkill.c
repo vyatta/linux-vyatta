@@ -51,7 +51,6 @@ struct rfkill_gsw_state {
 
 static struct rfkill_gsw_state rfkill_global_states[RFKILL_TYPE_MAX];
 static unsigned long rfkill_states_lockdflt[BITS_TO_LONGS(RFKILL_TYPE_MAX)];
-static bool rfkill_epo_lock_active;
 
 static BLOCKING_NOTIFIER_HEAD(rfkill_notifier_list);
 
@@ -265,14 +264,11 @@ static void __rfkill_switch_all(const enum rfkill_type type,
  *
  * Acquires rfkill_global_mutex and calls __rfkill_switch_all(@type, @state).
  * Please refer to __rfkill_switch_all() for details.
- *
- * Does nothing if the EPO lock is active.
  */
 void rfkill_switch_all(enum rfkill_type type, enum rfkill_state state)
 {
 	mutex_lock(&rfkill_global_mutex);
-	if (!rfkill_epo_lock_active)
-		__rfkill_switch_all(type, state);
+	__rfkill_switch_all(type, state);
 	mutex_unlock(&rfkill_global_mutex);
 }
 EXPORT_SYMBOL(rfkill_switch_all);
@@ -293,7 +289,6 @@ void rfkill_epo(void)
 
 	mutex_lock(&rfkill_global_mutex);
 
-	rfkill_epo_lock_active = true;
 	list_for_each_entry(rfkill, &rfkill_list, node) {
 		mutex_lock(&rfkill->mutex);
 		rfkill_toggle_radio(rfkill, RFKILL_STATE_SOFT_BLOCKED, 1);
@@ -322,54 +317,11 @@ void rfkill_restore_states(void)
 
 	mutex_lock(&rfkill_global_mutex);
 
-	rfkill_epo_lock_active = false;
 	for (i = 0; i < RFKILL_TYPE_MAX; i++)
 		__rfkill_switch_all(i, rfkill_global_states[i].default_state);
 	mutex_unlock(&rfkill_global_mutex);
 }
 EXPORT_SYMBOL_GPL(rfkill_restore_states);
-
-/**
- * rfkill_remove_epo_lock - unlock state changes
- *
- * Used by rfkill-input manually unlock state changes, when
- * the EPO switch is deactivated.
- */
-void rfkill_remove_epo_lock(void)
-{
-	mutex_lock(&rfkill_global_mutex);
-	rfkill_epo_lock_active = false;
-	mutex_unlock(&rfkill_global_mutex);
-}
-EXPORT_SYMBOL_GPL(rfkill_remove_epo_lock);
-
-/**
- * rfkill_is_epo_lock_active - returns true EPO is active
- *
- * Returns 0 (false) if there is NOT an active EPO contidion,
- * and 1 (true) if there is an active EPO contition, which
- * locks all radios in one of the BLOCKED states.
- *
- * Can be called in atomic context.
- */
-bool rfkill_is_epo_lock_active(void)
-{
-	return rfkill_epo_lock_active;
-}
-EXPORT_SYMBOL_GPL(rfkill_is_epo_lock_active);
-
-/**
- * rfkill_get_global_state - returns global state for a type
- * @type: the type to get the global state of
- *
- * Returns the current global state for a given wireless
- * device type.
- */
-enum rfkill_state rfkill_get_global_state(const enum rfkill_type type)
-{
-	return rfkill_global_states[type].current_state;
-}
-EXPORT_SYMBOL_GPL(rfkill_get_global_state);
 
 /**
  * rfkill_force_state - Force the internal rfkill radio state
@@ -479,15 +431,9 @@ static ssize_t rfkill_state_store(struct device *dev,
 	    state != RFKILL_STATE_SOFT_BLOCKED)
 		return -EINVAL;
 
-	error = mutex_lock_killable(&rfkill->mutex);
-	if (error)
-		return error;
-
-	if (!rfkill_epo_lock_active)
-		error = rfkill_toggle_radio(rfkill, state, 0);
-	else
-		error = -EPERM;
-
+	if (mutex_lock_interruptible(&rfkill->mutex))
+		return -ERESTARTSYS;
+	error = rfkill_toggle_radio(rfkill, state, 0);
 	mutex_unlock(&rfkill->mutex);
 
 	return error ? error : count;
@@ -526,12 +472,12 @@ static ssize_t rfkill_claim_store(struct device *dev,
 	 * Take the global lock to make sure the kernel is not in
 	 * the middle of rfkill_switch_all
 	 */
-	error = mutex_lock_killable(&rfkill_global_mutex);
+	error = mutex_lock_interruptible(&rfkill_global_mutex);
 	if (error)
 		return error;
 
 	if (rfkill->user_claim != claim) {
-		if (!claim && !rfkill_epo_lock_active) {
+		if (!claim) {
 			mutex_lock(&rfkill->mutex);
 			rfkill_toggle_radio(rfkill,
 					rfkill_global_states[rfkill->type].current_state,
@@ -581,17 +527,8 @@ static int rfkill_resume(struct device *dev)
 
 		dev->power.power_state.event = PM_EVENT_ON;
 
-		/*
-		 * If we are under EPO, kick transmitter offline,
-		 * otherwise restore to pre-suspend state.
-		 *
-		 * Issue a notification in any case
-		 */
-		rfkill_toggle_radio(rfkill,
-				rfkill_epo_lock_active ?
-					RFKILL_STATE_SOFT_BLOCKED :
-					rfkill->state,
-				1);
+		/* restore radio state AND notify everybody */
+		rfkill_toggle_radio(rfkill, rfkill->state, 1);
 
 		mutex_unlock(&rfkill->mutex);
 	}
@@ -774,7 +711,7 @@ static void rfkill_led_trigger_register(struct rfkill *rfkill)
 	int error;
 
 	if (!rfkill->led_trigger.name)
-		rfkill->led_trigger.name = dev_name(&rfkill->dev);
+		rfkill->led_trigger.name = rfkill->dev.bus_id;
 	if (!rfkill->led_trigger.activate)
 		rfkill->led_trigger.activate = rfkill_led_trigger_activate;
 	error = led_trigger_register(&rfkill->led_trigger);
@@ -815,7 +752,8 @@ int __must_check rfkill_register(struct rfkill *rfkill)
 			"badly initialized rfkill struct\n"))
 		return -EINVAL;
 
-	dev_set_name(dev, "rfkill%ld", (long)atomic_inc_return(&rfkill_no) - 1);
+	snprintf(dev->bus_id, sizeof(dev->bus_id),
+		 "rfkill%ld", (long)atomic_inc_return(&rfkill_no) - 1);
 
 	rfkill_led_trigger_register(rfkill);
 
@@ -895,7 +833,6 @@ int rfkill_set_default(enum rfkill_type type, enum rfkill_state state)
 
 	if (!test_and_set_bit(type, rfkill_states_lockdflt)) {
 		rfkill_global_states[type].default_state = state;
-		rfkill_global_states[type].current_state = state;
 		error = 0;
 	} else
 		error = -EPERM;

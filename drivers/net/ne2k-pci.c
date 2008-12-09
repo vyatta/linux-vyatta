@@ -200,19 +200,6 @@ struct ne2k_pci_card {
   in the 'dev' and 'ei_status' structures.
 */
 
-static const struct net_device_ops ne2k_netdev_ops = {
-	.ndo_open		= ne2k_pci_open,
-	.ndo_stop		= ne2k_pci_close,
-	.ndo_start_xmit		= ei_start_xmit,
-	.ndo_tx_timeout		= ei_tx_timeout,
-	.ndo_get_stats		= ei_get_stats,
-	.ndo_set_multicast_list = ei_set_multicast_list,
-	.ndo_validate_addr	= eth_validate_addr,
-	.ndo_change_mtu		= eth_change_mtu,
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	.ndo_poll_controller = ei_poll,
-#endif
-};
 
 static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 				     const struct pci_device_id *ent)
@@ -225,6 +212,7 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 	static unsigned int fnd_cnt;
 	long ioaddr;
 	int flags = pci_clone_list[chip_idx].flags;
+	DECLARE_MAC_BUF(mac);
 
 /* when built into the kernel, we only print version if device is found */
 #ifndef MODULE
@@ -278,8 +266,6 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 		dev_err(&pdev->dev, "cannot allocate ethernet device\n");
 		goto err_out_free_res;
 	}
-	dev->netdev_ops = &ne2k_netdev_ops;
-
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	/* Reset card. Who knows what dain-bramaged state it was left in. */
@@ -368,8 +354,12 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 	ei_status.block_output = &ne2k_pci_block_output;
 	ei_status.get_8390_hdr = &ne2k_pci_get_8390_hdr;
 	ei_status.priv = (unsigned long) pdev;
-
+	dev->open = &ne2k_pci_open;
+	dev->stop = &ne2k_pci_close;
 	dev->ethtool_ops = &ne2k_pci_ethtool_ops;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = ei_poll;
+#endif
 	NS8390_init(dev, 0);
 
 	i = register_netdev(dev);
@@ -378,9 +368,9 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 
 	for(i = 0; i < 6; i++)
 		dev->dev_addr[i] = SA_prom[i];
-	printk("%s: %s found at %#lx, IRQ %d, %pM.\n",
+	printk("%s: %s found at %#lx, IRQ %d, %s.\n",
 	       dev->name, pci_clone_list[chip_idx].name, ioaddr, dev->irq,
-	       dev->dev_addr);
+	       print_mac(mac, dev->dev_addr));
 
 	memcpy(dev->perm_addr, dev->dev_addr, dev->addr_len);
 
@@ -636,7 +626,7 @@ static void ne2k_pci_block_output(struct net_device *dev, int count,
 static void ne2k_pci_get_drvinfo(struct net_device *dev,
 				 struct ethtool_drvinfo *info)
 {
-	struct ei_device *ei = netdev_priv(dev);
+	struct ei_device *ei = dev->priv;
 	struct pci_dev *pci_dev = (struct pci_dev *) ei->priv;
 
 	strcpy(info->driver, DRV_NAME);

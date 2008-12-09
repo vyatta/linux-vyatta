@@ -43,6 +43,7 @@ struct rt2x00_rate {
 #define DEV_RATE_CCK			0x0001
 #define DEV_RATE_OFDM			0x0002
 #define DEV_RATE_SHORT_PREAMBLE		0x0004
+#define DEV_RATE_BASIC			0x0008
 
 	unsigned short bitrate; /* In 100kbit/s */
 	unsigned short ratemask;
@@ -93,10 +94,9 @@ void rt2x00lib_config_erp(struct rt2x00_dev *rt2x00dev,
 			  struct rt2x00_intf *intf,
 			  struct ieee80211_bss_conf *conf);
 void rt2x00lib_config_antenna(struct rt2x00_dev *rt2x00dev,
-			      struct antenna_setup *ant);
+			      enum antenna rx, enum antenna tx);
 void rt2x00lib_config(struct rt2x00_dev *rt2x00dev,
-		      struct ieee80211_conf *conf,
-		      const unsigned int changed_flags);
+		      struct ieee80211_conf *conf, const int force_config);
 
 /**
  * DOC: Queue handlers
@@ -150,16 +150,8 @@ int rt2x00queue_update_beacon(struct rt2x00_dev *rt2x00dev,
  */
 void rt2x00queue_index_inc(struct data_queue *queue, enum queue_index index);
 
-/**
- * rt2x00queue_init_queues - Initialize all data queues
- * @rt2x00dev: Pointer to &struct rt2x00_dev.
- *
- * This function will loop through all available queues to clear all
- * index numbers and set the queue entry to the correct initialization
- * state.
- */
-void rt2x00queue_init_queues(struct rt2x00_dev *rt2x00dev);
-
+void rt2x00queue_init_rx(struct rt2x00_dev *rt2x00dev);
+void rt2x00queue_init_tx(struct rt2x00_dev *rt2x00dev);
 int rt2x00queue_initialize(struct rt2x00_dev *rt2x00dev);
 void rt2x00queue_uninitialize(struct rt2x00_dev *rt2x00dev);
 int rt2x00queue_allocate(struct rt2x00_dev *rt2x00dev);

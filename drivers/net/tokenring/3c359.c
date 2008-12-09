@@ -974,6 +974,7 @@ static void xl_rx(struct net_device *dev)
 
 			netif_rx(skb2) ; 		
 		 } /* if multiple buffers */
+		dev->last_rx = jiffies ; 	
 	} /* while packet to do */
 
 	/* Clear the updComplete interrupt */
@@ -1570,6 +1571,7 @@ static void xl_arb_cmd(struct net_device *dev)
 		 * anyway.
 		 */
 
+		dev->last_rx = jiffies ; 
 		/* Acknowledge interrupt, this tells nic we are done with the arb */
 		writel(ACK_INTERRUPT | ARBCACK | LATCH_ACK, xl_mmio + MMIO_COMMAND) ; 
 

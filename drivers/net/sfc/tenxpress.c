@@ -376,7 +376,6 @@ static int tenxpress_phy_check_hw(struct efx_nic *efx)
 {
 	struct tenxpress_phy_data *phy_data = efx->phy_data;
 	bool link_ok;
-	int rc = 0;
 
 	link_ok = tenxpress_link_ok(efx, true);
 
@@ -392,22 +391,7 @@ static int tenxpress_phy_check_hw(struct efx_nic *efx)
 		atomic_set(&phy_data->bad_crc_count, 0);
 	}
 
-	rc = efx->board_info.monitor(efx);
-	if (rc) {
-		EFX_ERR(efx, "Board sensor %s; shutting down PHY\n",
-			(rc == -ERANGE) ? "reported fault" : "failed");
-		if (efx->phy_mode & PHY_MODE_OFF) {
-			/* Assume that board has shut PHY off */
-			phy_data->phy_mode = PHY_MODE_OFF;
-		} else {
-			efx->phy_mode |= PHY_MODE_LOW_POWER;
-			mdio_clause45_set_mmds_lpower(efx, true,
-						      efx->phy_op->mmds);
-			phy_data->phy_mode |= PHY_MODE_LOW_POWER;
-		}
-	}
-
-	return rc;
+	return 0;
 }
 
 static void tenxpress_phy_fini(struct efx_nic *efx)

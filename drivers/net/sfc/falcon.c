@@ -1628,9 +1628,9 @@ static int falcon_spi_wait(struct efx_nic *efx)
 	}
 }
 
-int falcon_spi_cmd(const struct efx_spi_device *spi,
-		   unsigned int command, int address,
-		   const void *in, void *out, unsigned int len)
+static int falcon_spi_cmd(const struct efx_spi_device *spi,
+			  unsigned int command, int address,
+			  const void *in, void *out, unsigned int len)
 {
 	struct efx_nic *efx = spi->efx;
 	bool addressed = (address >= 0);
@@ -1641,7 +1641,6 @@ int falcon_spi_cmd(const struct efx_spi_device *spi,
 	/* Input validation */
 	if (len > FALCON_SPI_MAX_LEN)
 		return -EINVAL;
-	BUG_ON(!mutex_is_locked(&efx->spi_lock));
 
 	/* Check SPI not currently being accessed */
 	rc = falcon_spi_wait(efx);
@@ -1700,7 +1699,8 @@ efx_spi_munge_command(const struct efx_spi_device *spi,
 	return command | (((address >> 8) & spi->munge_address) << 3);
 }
 
-int falcon_spi_fast_wait(const struct efx_spi_device *spi)
+
+static int falcon_spi_fast_wait(const struct efx_spi_device *spi)
 {
 	u8 status;
 	int i, rc;
@@ -2253,15 +2253,13 @@ int falcon_read_nvram(struct efx_nic *efx, struct falcon_nvconfig *nvconfig_out)
 	__le16 *word, *limit;
 	u32 csum;
 
-	region = kmalloc(FALCON_NVCONFIG_END, GFP_KERNEL);
+	region = kmalloc(NVCONFIG_END, GFP_KERNEL);
 	if (!region)
 		return -ENOMEM;
 	nvconfig = region + NVCONFIG_OFFSET;
 
 	spi = efx->spi_flash ? efx->spi_flash : efx->spi_eeprom;
-	mutex_lock(&efx->spi_lock);
-	rc = falcon_spi_read(spi, 0, FALCON_NVCONFIG_END, NULL, region);
-	mutex_unlock(&efx->spi_lock);
+	rc = falcon_spi_read(spi, 0, NVCONFIG_END, NULL, region);
 	if (rc) {
 		EFX_ERR(efx, "Failed to read %s\n",
 			efx->spi_flash ? "flash" : "EEPROM");
@@ -2285,7 +2283,7 @@ int falcon_read_nvram(struct efx_nic *efx, struct falcon_nvconfig *nvconfig_out)
 		limit = (__le16 *) (nvconfig + 1);
 	} else {
 		word = region;
-		limit = region + FALCON_NVCONFIG_END;
+		limit = region + NVCONFIG_END;
 	}
 	for (csum = 0; word < limit; ++word)
 		csum += le16_to_cpu(*word);
@@ -2557,11 +2555,6 @@ static int falcon_spi_device_init(struct efx_nic *efx,
 			SPI_DEV_TYPE_FIELD(device_type, SPI_DEV_TYPE_ADDR_LEN);
 		spi_device->munge_address = (spi_device->size == 1 << 9 &&
 					     spi_device->addr_len == 1);
-		spi_device->erase_command =
-			SPI_DEV_TYPE_FIELD(device_type, SPI_DEV_TYPE_ERASE_CMD);
-		spi_device->erase_size =
-			1 << SPI_DEV_TYPE_FIELD(device_type,
-						SPI_DEV_TYPE_ERASE_SIZE);
 		spi_device->block_size =
 			1 << SPI_DEV_TYPE_FIELD(device_type,
 						SPI_DEV_TYPE_BLOCK_SIZE);

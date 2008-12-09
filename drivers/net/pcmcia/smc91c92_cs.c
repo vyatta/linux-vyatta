@@ -949,6 +949,7 @@ static int smc91c92_config(struct pcmcia_device *link)
     int i, j, rev;
     unsigned int ioaddr;
     u_long mir;
+    DECLARE_MAC_BUF(mac);
 
     DEBUG(0, "smc91c92_config(0x%p)\n", link);
 
@@ -1061,9 +1062,9 @@ static int smc91c92_config(struct pcmcia_device *link)
     strcpy(smc->node.dev_name, dev->name);
 
     printk(KERN_INFO "%s: smc91c%s rev %d: io %#3lx, irq %d, "
-	   "hw_addr %pM\n",
+	   "hw_addr %s\n",
 	   dev->name, name, (rev & 0x0f), dev->base_addr, dev->irq,
-	   dev->dev_addr);
+	   print_mac(mac, dev->dev_addr));
 
     if (rev > 0) {
 	if (mir & 0x3ff)

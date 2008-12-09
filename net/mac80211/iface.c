@@ -65,7 +65,7 @@ static int ieee80211_open(struct net_device *dev)
 	struct ieee80211_if_init_conf conf;
 	u32 changed = 0;
 	int res;
-	u32 hw_reconf_flags = 0;
+	bool need_hw_reconfig = 0;
 	u8 null_addr[ETH_ALEN] = {0};
 
 	/* fail early if user set an invalid address */
@@ -152,8 +152,7 @@ static int ieee80211_open(struct net_device *dev)
 			res = local->ops->start(local_to_hw(local));
 		if (res)
 			goto err_del_bss;
-		/* we're brought up, everything changes */
-		hw_reconf_flags = ~0;
+		need_hw_reconfig = 1;
 		ieee80211_led_radio(local, local->hw.conf.radio_enabled);
 	}
 
@@ -199,10 +198,8 @@ static int ieee80211_open(struct net_device *dev)
 
 		/* must be before the call to ieee80211_configure_filter */
 		local->monitors++;
-		if (local->monitors == 1) {
+		if (local->monitors == 1)
 			local->hw.conf.flags |= IEEE80211_CONF_RADIOTAP;
-			hw_reconf_flags |= IEEE80211_CONF_CHANGE_RADIOTAP;
-		}
 
 		if (sdata->u.mntr_flags & MONITOR_FLAG_FCSFAIL)
 			local->fif_fcsfail++;
@@ -229,14 +226,8 @@ static int ieee80211_open(struct net_device *dev)
 		if (res)
 			goto err_stop;
 
-		if (ieee80211_vif_is_mesh(&sdata->vif)) {
-			local->fif_other_bss++;
-			netif_addr_lock_bh(local->mdev);
-			ieee80211_configure_filter(local);
-			netif_addr_unlock_bh(local->mdev);
-
+		if (ieee80211_vif_is_mesh(&sdata->vif))
 			ieee80211_start_mesh(sdata);
-		}
 		changed |= ieee80211_reset_erp_info(sdata);
 		ieee80211_bss_info_change_notify(sdata, changed);
 		ieee80211_enable_keys(sdata);
@@ -288,8 +279,8 @@ static int ieee80211_open(struct net_device *dev)
 		atomic_inc(&local->iff_promiscs);
 
 	local->open_count++;
-	if (hw_reconf_flags) {
-		ieee80211_hw_config(local, hw_reconf_flags);
+	if (need_hw_reconfig) {
+		ieee80211_hw_config(local);
 		/*
 		 * set default queue parameters so drivers don't
 		 * need to initialise the hardware if the hardware
@@ -331,7 +322,6 @@ static int ieee80211_stop(struct net_device *dev)
 	struct ieee80211_local *local = sdata->local;
 	struct ieee80211_if_init_conf conf;
 	struct sta_info *sta;
-	u32 hw_reconf_flags = 0;
 
 	/*
 	 * Stop TX on this interface first.
@@ -415,10 +405,8 @@ static int ieee80211_stop(struct net_device *dev)
 		}
 
 		local->monitors--;
-		if (local->monitors == 0) {
+		if (local->monitors == 0)
 			local->hw.conf.flags &= ~IEEE80211_CONF_RADIOTAP;
-			hw_reconf_flags |= IEEE80211_CONF_CHANGE_RADIOTAP;
-		}
 
 		if (sdata->u.mntr_flags & MONITOR_FLAG_FCSFAIL)
 			local->fif_fcsfail--;
@@ -462,15 +450,8 @@ static int ieee80211_stop(struct net_device *dev)
 		/* fall through */
 	case NL80211_IFTYPE_MESH_POINT:
 		if (ieee80211_vif_is_mesh(&sdata->vif)) {
-			/* other_bss and allmulti are always set on mesh
-			 * ifaces */
-			local->fif_other_bss--;
+			/* allmulti is always set on mesh ifaces */
 			atomic_dec(&local->iff_allmultis);
-
-			netif_addr_lock_bh(local->mdev);
-			ieee80211_configure_filter(local);
-			netif_addr_unlock_bh(local->mdev);
-
 			ieee80211_stop_mesh(sdata);
 		}
 		/* fall through */
@@ -523,14 +504,7 @@ static int ieee80211_stop(struct net_device *dev)
 
 		tasklet_disable(&local->tx_pending_tasklet);
 		tasklet_disable(&local->tasklet);
-
-		/* no reconfiguring after stop! */
-		hw_reconf_flags = 0;
 	}
-
-	/* do after stop to avoid reconfiguring when we stop anyway */
-	if (hw_reconf_flags)
-		ieee80211_hw_config(local, hw_reconf_flags);
 
 	return 0;
 }
@@ -708,7 +682,7 @@ int ieee80211_if_change_type(struct ieee80211_sub_if_data *sdata,
 	ieee80211_setup_sdata(sdata, type);
 
 	/* reset some values that shouldn't be kept across type changes */
-	sdata->vif.bss_conf.basic_rates =
+	sdata->bss_conf.basic_rates =
 		ieee80211_mandatory_rates(sdata->local,
 			sdata->local->hw.conf.channel->band);
 	sdata->drop_unencrypted = 0;

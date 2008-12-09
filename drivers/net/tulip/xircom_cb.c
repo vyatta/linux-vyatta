@@ -1072,6 +1072,7 @@ static void read_mac_address(struct xircom_private *card)
 	unsigned char j, tuple, link, data_id, data_count;
 	unsigned long flags;
 	int i;
+	DECLARE_MAC_BUF(mac);
 
 	enter("read_mac_address");
 
@@ -1101,7 +1102,7 @@ static void read_mac_address(struct xircom_private *card)
 		}
 	}
 	spin_unlock_irqrestore(&card->lock, flags);
-	pr_debug(" %pM\n", card->dev->dev_addr);
+	pr_debug(" %s\n", print_mac(mac, card->dev->dev_addr));
 	leave("read_mac_address");
 }
 
@@ -1201,6 +1202,7 @@ static void investigate_read_descriptor(struct net_device *dev,struct xircom_pri
 			skb_put(skb, pkt_len);
 			skb->protocol = eth_type_trans(skb, dev);
 			netif_rx(skb);
+			dev->last_rx = jiffies;
 			card->stats.rx_packets++;
 			card->stats.rx_bytes += pkt_len;
 

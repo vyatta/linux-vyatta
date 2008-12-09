@@ -71,7 +71,7 @@
  *
  *      static void __exit exit_my_ematch(void)
  *      {
- *      	tcf_em_unregister(&my_ops);
+ *      	return tcf_em_unregister(&my_ops);
  *      }
  *
  *      module_init(init_my_ematch);
@@ -154,11 +154,23 @@ EXPORT_SYMBOL(tcf_em_register);
  *
  * Returns -ENOENT if no matching ematch was found.
  */
-void tcf_em_unregister(struct tcf_ematch_ops *ops)
+int tcf_em_unregister(struct tcf_ematch_ops *ops)
 {
+	int err = 0;
+	struct tcf_ematch_ops *e;
+
 	write_lock(&ematch_mod_lock);
-	list_del(&ops->link);
+	list_for_each_entry(e, &ematch_ops, link) {
+		if (e == ops) {
+			list_del(&e->link);
+			goto out;
+		}
+	}
+
+	err = -ENOENT;
+out:
 	write_unlock(&ematch_mod_lock);
+	return err;
 }
 EXPORT_SYMBOL(tcf_em_unregister);
 

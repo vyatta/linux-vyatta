@@ -792,6 +792,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	const int pcibar = 1; /* PCI base address register */
 	int prev_eedata;
 	u32 tmp;
+	DECLARE_MAC_BUF(mac);
 
 /* when built into the kernel, we only print version if device is found */
 #ifndef MODULE
@@ -947,10 +948,10 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 
 	if (netif_msg_drv(np)) {
 		printk(KERN_INFO "natsemi %s: %s at %#08llx "
-		       "(%s), %pM, IRQ %d",
+		       "(%s), %s, IRQ %d",
 		       dev->name, natsemi_pci_info[chip_idx].name,
 		       (unsigned long long)iostart, pci_name(np->pci_dev),
-		       dev->dev_addr, irq);
+		       print_mac(mac, dev->dev_addr), irq);
 		if (dev->if_port == PORT_TP)
 			printk(", port TP.\n");
 		else if (np->ignore_phy)
@@ -2361,6 +2362,7 @@ static void netdev_rx(struct net_device *dev, int *work_done, int work_to_do)
 			}
 			skb->protocol = eth_type_trans(skb, dev);
 			netif_receive_skb(skb);
+			dev->last_rx = jiffies;
 			np->stats.rx_packets++;
 			np->stats.rx_bytes += pkt_len;
 		}

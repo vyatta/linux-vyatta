@@ -308,7 +308,7 @@ static int elmc_open(struct net_device *dev)
 
 static int __init check586(struct net_device *dev, unsigned long where, unsigned size)
 {
-	struct priv *p = netdev_priv(dev);
+	struct priv *p = (struct priv *) dev->priv;
 	char *iscp_addrs[2];
 	int i = 0;
 
@@ -349,7 +349,7 @@ static int __init check586(struct net_device *dev, unsigned long where, unsigned
 
 void alloc586(struct net_device *dev)
 {
-	struct priv *p = netdev_priv(dev);
+	struct priv *p = (struct priv *) dev->priv;
 
 	elmc_id_reset586();
 	DELAY(2);
@@ -383,6 +383,7 @@ static int elmc_getinfo(char *buf, int slot, void *d)
 {
 	int len = 0;
 	struct net_device *dev = d;
+	DECLARE_MAC_BUF(mac);
 
 	if (dev == NULL)
 		return len;
@@ -397,8 +398,8 @@ static int elmc_getinfo(char *buf, int slot, void *d)
 	len += sprintf(buf + len, "Transceiver: %s\n", dev->if_port ?
 		       "External" : "Internal");
 	len += sprintf(buf + len, "Device: %s\n", dev->name);
-	len += sprintf(buf + len, "Hardware Address: %pM\n",
-		       dev->dev_addr);
+	len += sprintf(buf + len, "Hardware Address: %s\n",
+		       print_mac(mac, dev->dev_addr));
 
 	return len;
 }				/* elmc_getinfo() */
@@ -415,7 +416,8 @@ static int __init do_elmc_probe(struct net_device *dev)
 	int i = 0;
 	unsigned int size = 0;
 	int retval;
-	struct priv *pr = netdev_priv(dev);
+	struct priv *pr = dev->priv;
+	DECLARE_MAC_BUF(mac);
 
 	if (MCA_bus == 0) {
 		return -ENODEV;
@@ -541,8 +543,8 @@ static int __init do_elmc_probe(struct net_device *dev)
 	for (i = 0; i < 6; i++)
 		dev->dev_addr[i] = inb(dev->base_addr + i);
 
-	printk(KERN_INFO "%s: hardware address %pM\n",
-	       dev->name, dev->dev_addr);
+	printk(KERN_INFO "%s: hardware address %s\n",
+	       dev->name, print_mac(mac, dev->dev_addr));
 
 	dev->open = &elmc_open;
 	dev->stop = &elmc_close;
@@ -578,8 +580,7 @@ err_out:
 
 static void cleanup_card(struct net_device *dev)
 {
-	mca_set_adapter_procfn(((struct priv *)netdev_priv(dev))->slot,
-				NULL, NULL);
+	mca_set_adapter_procfn(((struct priv *) (dev->priv))->slot, NULL, NULL);
 	release_region(dev->base_addr, ELMC_IO_EXTENT);
 }
 
@@ -615,7 +616,7 @@ static int init586(struct net_device *dev)
 	void *ptr;
 	unsigned long s;
 	int i, result = 0;
-	struct priv *p = netdev_priv(dev);
+	struct priv *p = (struct priv *) dev->priv;
 	volatile struct configure_cmd_struct *cfg_cmd;
 	volatile struct iasetup_cmd_struct *ias_cmd;
 	volatile struct tdr_cmd_struct *tdr_cmd;
@@ -851,7 +852,7 @@ static void *alloc_rfa(struct net_device *dev, void *ptr)
 	volatile struct rfd_struct *rfd = (struct rfd_struct *) ptr;
 	volatile struct rbd_struct *rbd;
 	int i;
-	struct priv *p = netdev_priv(dev);
+	struct priv *p = (struct priv *) dev->priv;
 
 	memset((char *) rfd, 0, sizeof(struct rfd_struct) * p->num_recv_buffs);
 	p->rfd_first = rfd;
@@ -912,7 +913,7 @@ elmc_interrupt(int irq, void *dev_id)
 	}
 	/* reading ELMC_CTRL also clears the INT bit. */
 
-	p = netdev_priv(dev);
+	p = (struct priv *) dev->priv;
 
 	while ((stat = p->scb->status & STAT_MASK))
 	{
@@ -968,7 +969,7 @@ static void elmc_rcv_int(struct net_device *dev)
 	unsigned short totlen;
 	struct sk_buff *skb;
 	struct rbd_struct *rbd;
-	struct priv *p = netdev_priv(dev);
+	struct priv *p = (struct priv *) dev->priv;
 
 	for (; (status = p->rfd_top->status) & STAT_COMPL;) {
 		rbd = (struct rbd_struct *) make32(p->rfd_top->rbd_offset);
@@ -984,6 +985,7 @@ static void elmc_rcv_int(struct net_device *dev)
 					skb_copy_to_linear_data(skb, (char *) p->base+(unsigned long) rbd->buffer,totlen);
 					skb->protocol = eth_type_trans(skb, dev);
 					netif_rx(skb);
+					dev->last_rx = jiffies;
 					dev->stats.rx_packets++;
 					dev->stats.rx_bytes += totlen;
 				} else {
@@ -1011,7 +1013,7 @@ static void elmc_rcv_int(struct net_device *dev)
 
 static void elmc_rnr_int(struct net_device *dev)
 {
-	struct priv *p = netdev_priv(dev);
+	struct priv *p = (struct priv *) dev->priv;
 
 	dev->stats.rx_errors++;
 
@@ -1034,7 +1036,7 @@ static void elmc_rnr_int(struct net_device *dev)
 static void elmc_xmt_int(struct net_device *dev)
 {
 	int status;
-	struct priv *p = netdev_priv(dev);
+	struct priv *p = (struct priv *) dev->priv;
 
 	status = p->xmit_cmds[p->xmit_last]->cmd_status;
 	if (!(status & STAT_COMPL)) {
@@ -1077,7 +1079,7 @@ static void elmc_xmt_int(struct net_device *dev)
 
 static void startrecv586(struct net_device *dev)
 {
-	struct priv *p = netdev_priv(dev);
+	struct priv *p = (struct priv *) dev->priv;
 
 	p->scb->rfa_offset = make16(p->rfd_first);
 	p->scb->cmd = RUC_START;
@@ -1091,7 +1093,7 @@ static void startrecv586(struct net_device *dev)
 
 static void elmc_timeout(struct net_device *dev)
 {
-	struct priv *p = netdev_priv(dev);
+	struct priv *p = (struct priv *) dev->priv;
 	/* COMMAND-UNIT active? */
 	if (p->scb->status & CU_ACTIVE) {
 #ifdef DEBUG
@@ -1127,7 +1129,7 @@ static int elmc_send_packet(struct sk_buff *skb, struct net_device *dev)
 #ifndef NO_NOPCOMMANDS
 	int next_nop;
 #endif
-	struct priv *p = netdev_priv(dev);
+	struct priv *p = (struct priv *) dev->priv;
 
 	netif_stop_queue(dev);
 
@@ -1198,7 +1200,7 @@ static int elmc_send_packet(struct sk_buff *skb, struct net_device *dev)
 
 static struct net_device_stats *elmc_get_stats(struct net_device *dev)
 {
-	struct priv *p = netdev_priv(dev);
+	struct priv *p = (struct priv *) dev->priv;
 	unsigned short crc, aln, rsc, ovrn;
 
 	crc = p->scb->crc_errs;	/* get error-statistic from the ni82586 */

@@ -842,7 +842,9 @@ int ath5k_hw_reset(struct ath5k_hw *ah, enum nl80211_iftype op_mode,
 	 *
 	 * XXX: Find an interval that's OK for all cards...
 	 */
-	ath5k_hw_noise_floor_calibration(ah, channel->center_freq);
+	ret = ath5k_hw_noise_floor_calibration(ah, channel->center_freq);
+	if (ret)
+		return ret;
 
 	/*
 	 * Reset queues and start beacon timers at the end of the reset routine
@@ -862,7 +864,8 @@ int ath5k_hw_reset(struct ath5k_hw *ah, enum nl80211_iftype op_mode,
 
 	/* Pre-enable interrupts on 5211/5212*/
 	if (ah->ah_version != AR5K_AR5210)
-		ath5k_hw_set_imr(ah, ah->ah_imr);
+		ath5k_hw_set_imr(ah, AR5K_INT_RX | AR5K_INT_TX |
+				AR5K_INT_FATAL);
 
 	/*
 	 * Set RF kill flags if supported by the device (read from the EEPROM)

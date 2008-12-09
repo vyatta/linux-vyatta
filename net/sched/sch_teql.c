@@ -93,6 +93,16 @@ teql_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 	return NET_XMIT_DROP;
 }
 
+static int
+teql_requeue(struct sk_buff *skb, struct Qdisc* sch)
+{
+	struct teql_sched_data *q = qdisc_priv(sch);
+
+	__skb_queue_head(&q->q, skb);
+	sch->qstats.requeues++;
+	return 0;
+}
+
 static struct sk_buff *
 teql_dequeue(struct Qdisc* sch)
 {
@@ -111,13 +121,6 @@ teql_dequeue(struct Qdisc* sch)
 	}
 	sch->q.qlen = dat->q.qlen + dat_queue->qdisc->q.qlen;
 	return skb;
-}
-
-static struct sk_buff *
-teql_peek(struct Qdisc* sch)
-{
-	/* teql is meant to be used as root qdisc */
-	return NULL;
 }
 
 static __inline__ void
@@ -430,7 +433,7 @@ static __init void teql_master_setup(struct net_device *dev)
 
 	ops->enqueue	=	teql_enqueue;
 	ops->dequeue	=	teql_dequeue;
-	ops->peek	=	teql_peek;
+	ops->requeue	=	teql_requeue;
 	ops->init	=	teql_qdisc_init;
 	ops->reset	=	teql_reset;
 	ops->destroy	=	teql_destroy;

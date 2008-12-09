@@ -605,6 +605,7 @@ static void irqrx_handler(struct net_device *dev)
 				skb->ip_summed = CHECKSUM_NONE;
 
 				/* bookkeeping */
+				dev->last_rx = jiffies;
 				dev->stats.rx_packets++;
 				dev->stats.rx_bytes += rda.length;
 
@@ -913,6 +914,7 @@ static int __devinit ibmlana_init_one(struct device *kdev)
 	int base = 0, irq = 0, iobase = 0, memlen = 0;
 	ibmlana_priv *priv;
 	ibmlana_medium medium;
+	DECLARE_MAC_BUF(mac);
 
 	dev = alloc_etherdev(sizeof(ibmlana_priv));
 	if (!dev)
@@ -988,10 +990,10 @@ static int __devinit ibmlana_init_one(struct device *kdev)
 	/* print config */
 
 	printk(KERN_INFO "%s: IRQ %d, I/O %#lx, memory %#lx-%#lx, "
-	       "MAC address %pM.\n",
+	       "MAC address %s.\n",
 	       dev->name, priv->realirq, dev->base_addr,
 	       dev->mem_start, dev->mem_end - 1,
-	       dev->dev_addr);
+	       print_mac(mac, dev->dev_addr));
 	printk(KERN_INFO "%s: %s medium\n", dev->name, MediaNames[priv->medium]);
 
 	/* reset board */
