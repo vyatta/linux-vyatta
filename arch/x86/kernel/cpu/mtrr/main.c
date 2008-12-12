@@ -1496,8 +1496,14 @@ int __init mtrr_trim_uncached_memory(unsigned long end_pfn)
 
 	/* kvm/qemu doesn't have mtrr set right, don't trim them all */
 	if (!highest_pfn) {
+#if 0
 		WARN(!kvm_para_available(), KERN_WARNING
-				"WARNING: strange, CPU MTRRs all blank?\n");
+		     "WARNING: strange, CPU MTRRs all blank?\n");
+#else
+		/* old version of vmware give bogus MTRR so only warning */
+		if (!kvm_para_available())
+			printk(KERN_WARNING "CPU MTRRs all blank\n");
+#endif
 		return 0;
 	}
 
