@@ -66,6 +66,7 @@ ifeq ($(MODULES),True)
 endif
 
 binary-indep: install-source
+	rm -f debian/files
 	@echo "binary-indep skipped"; true
 
 build: $(STAMPS_DIR)/build-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-$(TYPE)
