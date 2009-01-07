@@ -1,3 +1,9 @@
+linux-2.6 (2.6.27-1+vyatta+2) unstable; urgency=low
+
+   * Release 2.6.27-1+vyatta+2
+
+ -- An-Cheng Huang <ancheng@vyatta.com>  Wed, 07 Jan 2009 15:04:51 -0800
+
 linux-2.6 (2.6.27-1+vyatta+1) unstable; urgency=low
 
    * Update kernel to 2.6.27
