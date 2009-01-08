@@ -1542,9 +1542,6 @@ static void ad_agg_selection_logic(struct aggregator *agg)
 	do {
 		agg->is_active = 0;
 
-		/* Any other link is better than a link that is down */
-		if (!netif_carrier_ok(agg->slave->dev))
-			continue;
 		if (agg->num_of_ports)
 			best = ad_agg_selection_test(best, agg);
 
