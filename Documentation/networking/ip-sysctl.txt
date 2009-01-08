@@ -937,6 +937,14 @@ dad_transmits - INTEGER
 	The amount of Duplicate Address Detection probes to send.
 	Default: 1
 	
+delete_address_ifdown - BOOLEAN
+	Delete all addresses on device down
+	Default: TRUE
+
+	When network device is disabled: 
+	  FALSE - only delete temporary addresses (similar to IPV4)
+	  TRUE  - delete all addresses
+
 forwarding - BOOLEAN
 	Configure interface-specific Host/Router behaviour.  
 

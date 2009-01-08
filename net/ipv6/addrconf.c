@@ -186,6 +186,7 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.accept_source_route	= 0,	/* we do not accept RH0 by default. */
 	.disable_ipv6		= 0,
 	.accept_dad		= 1,
+	.delete_address_ifdown  = 1,
 };
 
 static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
@@ -220,6 +221,7 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.accept_source_route	= 0,	/* we do not accept RH0 by default. */
 	.disable_ipv6		= 0,
 	.accept_dad		= 1,
+	.delete_address_ifdown  = 1,
 };
 
 /* IPv6 Wildcard Address and Loopback Address defined by RFC2553 */
@@ -2673,19 +2675,20 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 		write_lock_bh(&idev->lock);
 	}
 #endif
-	while ((ifa = idev->addr_list) != NULL) {
-		idev->addr_list = ifa->if_next;
-		ifa->if_next = NULL;
-		ifa->dead = 1;
-		addrconf_del_timer(ifa);
-		write_unlock_bh(&idev->lock);
+	if (how || idev->cnf.delete_address_ifdown)
+		while ((ifa = idev->addr_list) != NULL) {
+			idev->addr_list = ifa->if_next;
+			ifa->if_next = NULL;
+			ifa->dead = 1;
+			addrconf_del_timer(ifa);
+			write_unlock_bh(&idev->lock);
 
-		__ipv6_ifa_notify(RTM_DELADDR, ifa);
-		atomic_notifier_call_chain(&inet6addr_chain, NETDEV_DOWN, ifa);
-		in6_ifa_put(ifa);
-
-		write_lock_bh(&idev->lock);
-	}
+			__ipv6_ifa_notify(RTM_DELADDR, ifa);
+			atomic_notifier_call_chain(&inet6addr_chain,
+						   NETDEV_DOWN, ifa);
+			in6_ifa_put(ifa);
+			write_lock_bh(&idev->lock);
+		}
 	write_unlock_bh(&idev->lock);
 
 	/* Step 5: Discard multicast list */
@@ -3693,6 +3696,7 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 #endif
 	array[DEVCONF_DISABLE_IPV6] = cnf->disable_ipv6;
 	array[DEVCONF_ACCEPT_DAD] = cnf->accept_dad;
+	array[DEVCONF_DELETE_ADDRESS_IFDOWN] = cnf->delete_address_ifdown;
 }
 
 static inline size_t inet6_if_nlmsg_size(void)
@@ -4263,6 +4267,14 @@ static struct addrconf_sysctl_table
 			.ctl_name	=	CTL_UNNUMBERED,
 			.procname	=	"accept_dad",
 			.data		=	&ipv6_devconf.accept_dad,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+			.proc_handler	=	&proc_dointvec,
+		},
+		{
+			.ctl_name	=	CTL_UNNUMBERED,
+			.procname	=	"delete_address_ifdown",
+			.data		=	&ipv6_devconf.delete_address_ifdown,
 			.maxlen		=	sizeof(int),
 			.mode		=	0644,
 			.proc_handler	=	&proc_dointvec,

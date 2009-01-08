@@ -166,6 +166,7 @@ struct ipv6_devconf {
 #endif
 	__s32		disable_ipv6;
 	__s32		accept_dad;
+	__s32		delete_address_ifdown;
 	void		*sysctl;
 };
 #endif
@@ -200,6 +201,7 @@ enum {
 	DEVCONF_MC_FORWARDING,
 	DEVCONF_DISABLE_IPV6,
 	DEVCONF_ACCEPT_DAD,
+	DEVCONF_DELETE_ADDRESS_IFDOWN,
 	DEVCONF_MAX
 };
 
