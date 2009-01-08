@@ -1462,6 +1462,9 @@ static struct aggregator *ad_agg_selection_test(struct aggregator *best,
 	 *
 	 * BOND_AD_STABLE, BOND_AD_BANDWIDTH: Select by bandwidth.
 	 */
+	if (curr->is_individual && !netif_carrier_ok(curr->slave->dev))
+		return best;
+
 	if (!best)
 		return curr;
 
