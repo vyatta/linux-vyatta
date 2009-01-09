@@ -1,4 +1,4 @@
-linux-2.6 (2.6.27-1+vyatta+2.1ubuntu1) intrepid; urgency=low
+linux-2.6 (2.6.27-1+vyatta+3) intrepid; urgency=low
 
   * IPV6 address preservation
   * Bonding: don't choose aggregator that is down
