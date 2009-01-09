@@ -2673,18 +2673,23 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 		write_lock_bh(&idev->lock);
 	}
 #endif
-	while ((ifa = idev->addr_list) != NULL) {
-		idev->addr_list = ifa->if_next;
-		ifa->if_next = NULL;
-		ifa->dead = 1;
-		addrconf_del_timer(ifa);
-		write_unlock_bh(&idev->lock);
+	bifa = &idev->addr_list;
+	while ((ifa = *bifa) != NULL) {
+		if (how || !(ifa->flags & IFA_F_PERMANENT)) {
+			*bifa = ifa->if_next;
+			ifa->if_next = NULL;
+			ifa->dead = 1;
+			addrconf_del_timer(ifa);
+			write_unlock_bh(&idev->lock);
 
-		__ipv6_ifa_notify(RTM_DELADDR, ifa);
-		atomic_notifier_call_chain(&inet6addr_chain, NETDEV_DOWN, ifa);
-		in6_ifa_put(ifa);
+			__ipv6_ifa_notify(RTM_DELADDR, ifa);
+			atomic_notifier_call_chain(&inet6addr_chain, NETDEV_DOWN, ifa);
+			in6_ifa_put(ifa);
 
-		write_lock_bh(&idev->lock);
+			write_lock_bh(&idev->lock);
+			continue;
+		}
+		bifa = &ifa->if_next;
 	}
 	write_unlock_bh(&idev->lock);
 
