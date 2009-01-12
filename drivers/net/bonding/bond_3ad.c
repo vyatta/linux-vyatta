@@ -1459,7 +1459,11 @@ static void ad_agg_selection_logic(struct aggregator *aggregator)
 				aggregator->is_active = 0; // mark this aggregator as not active anymore
 			}
 		}
-		if (aggregator->num_of_ports) {	// if any ports attached
+		if (aggregator->num_of_ports 	// if any ports attached
+		    && (!aggregator->is_individual || 
+			(netif_running(aggregator->slave->dev) &&  
+			 netif_carrier_ok(aggregator->slave->dev)))) {
+
 			if (best_aggregator) {	// if there is a candidte aggregator
 				//The reasons for choosing new best aggregator:
 				// 1. if current agg is NOT individual and the best agg chosen so far is individual OR
