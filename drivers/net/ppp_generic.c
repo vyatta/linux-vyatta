@@ -46,6 +46,7 @@
 #include <linux/mutex.h>
 #include <net/slhc_vj.h>
 #include <asm/atomic.h>
+#include <linux/sysctl.h>
 
 #define PPP_VERSION	"2.4.2"
 
@@ -191,6 +192,9 @@ static void *cardmap_get(struct cardmap *map, unsigned int nr);
 static int cardmap_set(struct cardmap **map, unsigned int nr, void *ptr);
 static unsigned int cardmap_find_first_free(struct cardmap *map);
 static void cardmap_destroy(struct cardmap **map);
+
+static int ppp_generic_init_sysctl(void);
+static void ppp_generic_fini_sysctl(void);
 
 /*
  * all_ppp_mutex protects the all_ppp_units mapping.
@@ -847,6 +851,7 @@ static const struct file_operations ppp_device_fops = {
 static int __init ppp_init(void)
 {
 	int err;
+	int ret;
 
 	printk(KERN_INFO "PPP generic driver version " PPP_VERSION "\n");
 	err = register_chrdev(PPP_MAJOR, "ppp", &ppp_device_fops);
@@ -859,6 +864,9 @@ static int __init ppp_init(void)
 		device_create(ppp_class, NULL, MKDEV(PPP_MAJOR, 0), "ppp");
 	}
 
+	ret = ppp_generic_init_sysctl();
+	if (ret < 0)
+		ppp_generic_fini_sysctl();
 out:
 	if (err)
 		printk(KERN_ERR "failed to register PPP device (%d)\n", err);
@@ -1217,6 +1225,7 @@ ppp_push(struct ppp *ppp)
 }
 
 #ifdef CONFIG_PPP_MULTILINK
+int ppp_multilink_do_pcomp = 1;
 /*
  * Divide a packet to be transmitted into fragments and
  * send them out the individual links.
@@ -1259,11 +1268,12 @@ static int ppp_mp_explode(struct ppp *ppp, struct sk_buff *skb)
 	 */
 	if (nfree == 0 || nfree < navail / 2)
 		return 0;	/* can't take now, leave it in xmit_pending */
-
-	/* Do protocol field compression (XXX this should be optional) */
+	
 	p = skb->data;
 	len = skb->len;
-	if (*p == 0) {
+
+	/* compress the protocol field if the option is enabled */
+        if (*p == 0 && ppp_multilink_do_pcomp) {
 		++p;
 		--len;
 	}
@@ -2676,6 +2686,7 @@ static void __exit ppp_cleanup(void)
 	unregister_chrdev(PPP_MAJOR, "ppp");
 	device_destroy(ppp_class, MKDEV(PPP_MAJOR, 0));
 	class_destroy(ppp_class);
+	ppp_generic_fini_sysctl();
 }
 
 /*
@@ -2790,6 +2801,56 @@ static void cardmap_destroy(struct cardmap **pmap)
 	}
 	*pmap = NULL;
 }
+
+#if defined(CONFIG_SYSCTL) && defined(CONFIG_PPP_MULTILINK)
+static struct ctl_table_header *ppp_generic_cth;
+
+static ctl_table ppp_generic_sysctl_table[] = {
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "mlppp_do_pcomp",
+		.data		= &ppp_multilink_do_pcomp,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= 0,
+	}
+};
+
+static struct ctl_path pg_path[] = {
+	{ .procname = "net", .ctl_name = CTL_NET, },
+	{ }
+};
+
+static int ppp_generic_init_sysctl()
+{
+	ppp_generic_cth =
+		register_sysctl_paths(pg_path, ppp_generic_sysctl_table);
+	if (!ppp_generic_cth) {
+		printk(KERN_ERR "ppp_generic: can't register to sysctl.\n");
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+static void ppp_generic_fini_sysctl()
+{
+	unregister_sysctl_table(ppp_generic_cth);
+}
+
+#else
+
+static int ppp_generic_init_sysctl()
+{
+	return 0;
+}
+
+static void ppp_generic_fini_sysctl()
+{
+}
+#endif	/* CONFIG_SYSCTL && CONFIG_PPP_MULTILINK */
 
 /* Module/initialization stuff */
 
