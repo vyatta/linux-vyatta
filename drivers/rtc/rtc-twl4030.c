@@ -19,6 +19,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/types.h>
@@ -337,7 +338,7 @@ static int twl4030_rtc_ioctl(struct device *dev, unsigned int cmd,
 }
 
 #else
-#define	omap_rtc_ioctl	NULL
+#define	twl4030_rtc_ioctl	NULL
 #endif
 
 static irqreturn_t twl4030_rtc_interrupt(int irq, void *rtc)
@@ -415,8 +416,8 @@ static int __devinit twl4030_rtc_probe(struct platform_device *pdev)
 	int irq = platform_get_irq(pdev, 0);
 	u8 rd_reg;
 
-	if (irq < 0)
-		return irq;
+	if (irq <= 0)
+		return -EINVAL;
 
 	rtc = rtc_device_register(pdev->name,
 				  &pdev->dev, &twl4030_rtc_ops, THIS_MODULE);
