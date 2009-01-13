@@ -1,10 +1,10 @@
-linux-2.6 (2.6.27-1+vyatta+4) intrepid; urgency=low
+linux-2.6 (2.6.27-1+vyatta+4) unstable; urgency=low
 
   * pcnet32: round off carrier watch timer
 
  -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 12 Jan 2009 16:54:06 -0800
 
-linux-2.6 (2.6.27-1+vyatta+3) intrepid; urgency=low
+linux-2.6 (2.6.27-1+vyatta+3) unstable; urgency=low
 
   * IPV6 address preservation
   * Bonding: don't choose aggregator that is down
