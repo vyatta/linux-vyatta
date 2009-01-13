@@ -1,3 +1,43 @@
+linux-2.6 (2.6.26-1+vyatta+2+islavista1) unstable; urgency=low
+
+  [ Bob Gilligan ]
+  * Bugfix: 1292: Enable the Vyatta logo again.
+
+  [ Stephen Hemminger ]
+  * 8139x: reduce message severity on driver overlap
+
+  [ Johannes Berg ]
+  * libertas: fix buffer overrun
+
+  [ Herbert Xu ]
+  * net: Fix netdev_run_todo dead-lock
+
+  [ Ilpo Järvinen ]
+  * tcpv6: fix option space offsets with md5
+
+  [ Alexey Dobriyan ]
+  * netfilter: xt_iprange: fix range inversion match
+
+  [ Ilpo Järvinen ]
+  * netfilter: snmp nat leaks memory in case of failure
+
+  [ Patrick McHardy ]
+  * netfilter: restore lost ifdef guarding defrag exception
+
+  [ Mark O'Brien ]
+  * 3.2.0
+
+  [ Bob Gilligan ]
+  * Bugfix 3979: Provide a configurable parameter to disable protocol
+    compression.
+
+  [ Stephen Hemminger ]
+  * bonding: don't choose down ports as aggregator
+
+  [ An-Cheng Huang ]
+
+ -- An-Cheng Huang <ancheng@vyatta.com>  Mon, 12 Jan 2009 16:14:34 -0800
+
 linux-2.6 (2.6.26-1+vyatta+2) unstable; urgency=low
 
 	  3.2.0
