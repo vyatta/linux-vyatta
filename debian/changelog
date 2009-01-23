@@ -1,3 +1,9 @@
+linux-2.6 (2.6.27-1+vyatta+5) unstable; urgency=low
+
+  * tweak vyatta-virt kernel config so that it actually works on xen.
+
+ -- An-Cheng Huang <ancheng@vyatta.com>  Thu, 22 Jan 2009 18:51:46 -0800
+
 linux-2.6 (2.6.27-1+vyatta+4) unstable; urgency=low
 
   * pcnet32: round off carrier watch timer
