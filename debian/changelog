@@ -1,3 +1,15 @@
+linux-2.6 (2.6.27-1+vyatta+7) unstable; urgency=low
+
+  * Revert "fastboot: sync the async execution before late_initcall and
+    move level 6s (sync) first"
+  * Revert "fastboot: convert a few non-critical ACPI drivers to async
+    initcalls"
+  * revert usbnet change
+  * Remove bootgraph
+  * Revert "Add a script to visualize the kernel boot process / time"
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 30 Jan 2009 15:19:22 -0800
+
 linux-2.6 (2.6.27-1+vyatta+6) unstable; urgency=low
 
   [ David Brownell ]
