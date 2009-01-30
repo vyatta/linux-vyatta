@@ -1,3 +1,338 @@
+linux-2.6 (2.6.27-1+vyatta+6) unstable; urgency=low
+
+  [ David Brownell ]
+  * USB: gadget: fix rndis working at high speed
+
+  [ Alan Stern ]
+  * usb-storage: update unusual_devs entry for Nokia 5310
+
+  [ CSÉCSY László ]
+  * USB: storage: unusual_devs.h: Nokia 3109c addition
+
+  [ Ozan Sener ]
+  * USB: Unusual devs patch for Nokia 3500c
+
+  [ Guillaume Knispel ]
+  * powerpc: Fix corruption error in rh_alloc_fixed()
+
+  [ Johannes Berg ]
+  * iwlagn: downgrade BUG_ON in interrupt
+
+  [ Dan Williams ]
+  * async_xor: dma_map destination DMA_BIDIRECTIONAL
+  * dmaengine: protect 'id' from concurrent registrations
+  * ioat: wait for self-test completion
+
+  [ NeilBrown ]
+  * md: Don't read past end of bitmap when reading bitmap.
+
+  [ Stanley Miao ]
+  * ALSA: Fix a Oops bug in omap soc driver.
+
+  [ Brian King ]
+  * SCSI: ibmvstgt: move crq_queue_create to the end of initialization
+
+  [ Hillier, Gernot ]
+  * SCSI: aacraid: disable Dell Percraid quirk on Adaptec 2200S and
+    2120S
+
+  [ Stephen M. Cameron ]
+  * cciss: fix problem that deleting multiple logical drives could cause
+    a panic
+
+  [ Herton Ronaldo Krzesinski ]
+  * ALSA: hda - Add missing terminators in patch_sigmatel.c
+
+  [ Kyle McMartin ]
+  * parisc: disable UP-optimized flush_tlb_mm
+
+  [ Jarek Poplawski ]
+  * drivers/net: starfire: Fix napi ->poll() weight handling
+
+  [ Joerg Roedel ]
+  * AMD IOMMU: reset command buffer pointers manually
+  * AMD IOMMU: allocate rlookup_table with __GFP_ZERO
+  * AMD IOMMU: initialize phys_addr correctly in iommu_page_map
+  * AMD IOMMU: fix wrong loop counter in free_pagetables
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.27.11
+
+  [ Takashi Iwai ]
+  * ALSA: caiaq - Fix Oops with MIDI
+  * ALSA: hda - Add quirk for HP6730B laptop
+
+  [ Li Zefan ]
+  * cgroups: fix a race between cgroup_clone and umount
+
+  [ Serge E. Hallyn ]
+  * devices cgroup: allow mkfifo
+
+  [ Takahiro Yasui ]
+  * dm log: fix dm_io_client leak on error paths
+
+  [ Jonathan Brassow ]
+  * dm raid1: fix error count
+
+  [ Dan Williams ]
+  * ioat: fix self test for multi-channel case
+
+  [ Zhu Yi ]
+  * iwlwifi: use GFP_KERNEL to allocate Rx SKB memory
+
+  [ NeilBrown ]
+  * md: fix bitmap-on-external-file bug.
+
+  [ Evgeniy Dushistov ]
+  * minix: fix add link's wrong position calculation
+
+  [ Thomas Gleixner ]
+  * sched_clock: prevent scd->clock from moving backwards, take #2
+
+  [ Larry Finger ]
+  * SCSI: aha152x_cs: Fix regression that keeps driver from using shared
+    interrupts
+
+  [ FUJITA Tomonori ]
+  * SCSI: eata: fix the data buffer accessors conversion regression
+
+  [ Marcin Slusarz ]
+  * USB: emi26: fix oops on load
+
+  [ Sebastian Andrzej Siewior ]
+  * USB: isp1760: use a specific PLX bridge instead of any bdridge
+
+  [ Daniel Drake ]
+  * USB: unusual_devs.h additions for Pentax K10D
+
+  [ Joerg Roedel ]
+  * x86: default to SWIOTLB=y on x86_64
+
+  [ Ravikiran G Thirumalai ]
+  * x86: fix incorrect __read_mostly on _boot_cpu_pda
+
+  [ Cliff Wickman ]
+  * x86, UV: remove erroneous BAU initialization
+
+  [ Michael Kerrisk ]
+  * inotify: fix type errors in interfaces
+
+  [ Heiko Carstens ]
+  * Move compat system call declarations to compat header file
+  * Convert all system calls to return a long
+  * Rename old_readdir to sys_old_readdir
+  * Remove __attribute__((weak)) from sys_pipe/sys_pipe2
+  * Make sys_pselect7 static
+  * Make sys_syslog a conditional system call
+  * System call wrapper infrastructure
+
+  [ Benjamin Herrenschmidt ]
+  * powerpc: Enable syscall wrappers for 64-bit
+
+  [ Heiko Carstens ]
+  * s390: enable system call wrappers
+  * System call wrapper special cases
+  * System call wrappers part 01
+  * System call wrappers part 02
+  * System call wrappers part 03
+  * System call wrappers part 04
+  * System call wrappers part 05
+  * System call wrappers part 06
+  * System call wrappers part 07
+  * System call wrappers part 08
+  * System call wrappers part 09
+  * System call wrappers part 10
+  * System call wrappers part 11
+  * System call wrappers part 12
+  * System call wrappers part 13
+  * System call wrappers part 14
+  * System call wrappers part 15
+  * System call wrappers part 16
+  * System call wrappers part 17
+  * System call wrappers part 18
+  * System call wrappers part 19
+  * System call wrappers part 20
+  * System call wrappers part 21
+  * System call wrappers part 22
+  * System call wrappers part 23
+  * System call wrappers part 24
+  * System call wrappers part 25
+  * System call wrappers part 26
+  * System call wrappers part 27
+  * System call wrappers part 28
+  * System call wrappers part 29
+  * System call wrappers part 30
+  * System call wrappers part 31
+  * System call wrappers part 32
+  * System call wrappers part 33
+  * s390 specific system call wrappers
+
+  [ Jeff Kirsher ]
+  * e1000e: fix IPMI traffic
+
+  [ Duane Griffin ]
+  * eCryptfs: check readlink result was not an error before using it
+
+  [ Al Viro ]
+  * fix switch_names() breakage in short-to-short case
+
+  [ Nick Piggin ]
+  * fs: symlink write_begin allocation context fix
+
+  [ Brian King ]
+  * ibmvfc: Delay NPIV login retry and add retries
+  * ibmvfc: Improve async event handling
+
+  [ Nick Piggin ]
+  * mm: fix assertion
+  * mm lockless pagecache barrier fix
+
+  [ Reinhard Nissl ]
+  * mvsas: increase port type detection delay to suit Seagate's 10k6
+    drive ST3450856SS 0003
+
+  [ Wu Fengguang ]
+  * nfs: remove redundant tests on reading new pages
+
+  [ Brian King ]
+  * powerpc: Disable Collaborative Memory Manager for kdump
+
+  [ Nguyen Anh Quynh ]
+  * USB: another unusual_devs entry for another bad Argosy storage
+    device
+
+  [ Oliver Neukum ]
+  * USB: storage: extend unusual range for 067b:3507
+
+  [ Paulo Afonso Graner Fessel ]
+  * USB: storage: recognizing and enabling Nokia 5200 cell phoes
+
+  [ Andi Kleen ]
+  * x86: avoid theoretical vmalloc fault loop
+
+  [ Suresh Siddha ]
+  * x86, cpa: dont use large pages for kernel identity mapping with
+    DEBUG_PAGEALLOC
+
+  [ Jiri Slaby ]
+  * x86: fix RIP printout in early_idt_handler
+
+  [ Rafael J. Wysocki ]
+  * PCI: Rework default handling of suspend and resume
+  * PCI: Suspend and resume PCI Express ports with interrupts disabled
+  * PCI: handle PCI state saving with interrupts disabled
+  * PCI PM: Split PCI Express port suspend-resume
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.27.12
+
+  [ Jarek Poplawski ]
+  * pkt_sched: sch_htb: Fix deadlock in hrtimers triggered by HTB
+
+  [ Herbert Xu ]
+  * ipv6: Fix fib6_dump_table walker leak
+
+  [ Wei Yongjun ]
+  * sctp: Avoid memory overflow while FWD-TSN chunk is received with bad
+    stream ID
+
+  [ Jarek Poplawski ]
+  * pkt_sched: cls_u32: Fix locking in u32_change()
+
+  [ Joe Chou ]
+  * r6040: fix wrong logic in mdio code
+  * r6040: save and restore MIER correctly in the interrupt routine
+
+  [ Florian Fainelli ]
+  * r6040: bump release number to 0.19
+
+  [ Lennert Buytenhek ]
+  * tcp: don't mask EOF and socket errors on nonblocking splice receive
+
+  [ Alan Stern ]
+  * usb-storage: add last-sector hacks
+  * usb-storage: set CAPACITY_HEURISTICS flag for bad vendors
+
+  [ Luke Yelavich ]
+  * ALSA: hda - Add automatic model setting for Samsung Q45
+
+  [ Takashi Iwai ]
+  * ALSA: hda - make laptop-eapd model back for AD1986A
+
+  [ Jos-Vicente Gilabert ]
+  * drivers/net/irda/irda-usb.c: fix buffer overflow
+
+  [ Tony Luck ]
+  * IA64: Turn on CONFIG_HAVE_UNSTABLE_CLOCK
+
+  [ Sukadev Bhattiprolu ]
+  * 'kill sig -1' must only apply to caller's namespace
+
+  [ Andrew Morton ]
+  * lib/idr.c: use kmem_cache_zalloc() for the idr_layer cache
+
+  [ Michiel ]
+  * p54usb: Add USB ID for Thomson Speedtouch 121g
+
+  [ Shaohua Li ]
+  * PCI: keep ASPM link state consistent throughout PCIe hierarchy
+
+  [ Stefan Lippers-Hollmann ]
+  * rt2x00: add USB ID for the Linksys WUSB200.
+
+  [ Vegard Nossum ]
+  * security: introduce missing kfree
+
+  [ Dean Nelson ]
+  * sgi-xp: eliminate false detection of no heartbeat
+
+  [ Roman Zippel ]
+  * clocksource: introduce clocksource_forward_now()
+
+  [ Jean Delvare ]
+  * hwmon-vid: Add support for AMD family 10h CPUs
+
+  [ Luis R. Rodriguez ]
+  * ath9k: quiet harmless ForceXPAon messages
+
+  [ Pavel Roskin ]
+  * dell_rbu: use scnprintf() instead of less secure sprintf()
+
+  [ Alistair John Strachan ]
+  * hwmon: (abituguru3) Fix CONFIG_DMI=n fallback to probe
+
+  [ Dave Kleikamp ]
+  * powerpc: is_hugepage_only_range() must account for both 4kB and 64kB
+    slices
+
+  [ Nick Piggin ]
+  * mm: write_cache_pages cyclic fix
+  * mm: write_cache_pages early loop termination
+  * mm: write_cache_pages writepage error fix
+  * mm: write_cache_pages integrity fix
+  * mm: write_cache_pages cleanups
+  * mm: write_cache_pages optimise page cleaning
+  * mm: write_cache_pages terminate quickly
+
+  [ Andrew Morton ]
+  * mm: write_cache_pages more terminate quickly
+
+  [ Nick Piggin ]
+  * mm: do_sync_mapping_range integrity fix
+  * mm: direct IO starvation improvement
+  * fs: remove WB_SYNC_HOLD
+  * fs: sync_sb_inodes fix
+  * fs: sys_sync fix
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.27.13
+
+  [ Stephen Hemminger ]
+  * Update to unionfs 2.5.1
+  * Update aufs to current version
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Thu, 29 Jan 2009 18:11:56 -0800
+
 linux-2.6 (2.6.27-1+vyatta+5) unstable; urgency=low
 
   * tweak vyatta-virt kernel config so that it actually works on xen.
