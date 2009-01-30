@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * sub-routines for VFS
  *
- * $Id: vfsub.h,v 1.11 2008/08/25 01:51:04 sfjro Exp $
+ * $Id: vfsub.h,v 1.14 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #ifndef __AUFS_VFSUB_H__
@@ -157,6 +157,17 @@ static inline void vfsub_unlock_rename_mutex(struct super_block *sb)
 	lockdep_on();
 }
 
+static inline int vfsub_is_rename_mutex_locked(struct super_block *sb)
+{
+	int res;
+
+	lockdep_off();
+	res = mutex_is_locked(&sb->s_vfs_rename_mutex);
+	lockdep_on();
+
+	return res;
+}
+
 static inline
 struct dentry *vfsub_lock_rename(struct dentry *d1, struct dentry *d2)
 {
@@ -178,7 +189,7 @@ static inline void vfsub_unlock_rename(struct dentry *d1, struct dentry *d2)
 static inline int au_verify_parent(struct dentry *dentry, struct inode *dir)
 {
 	IMustLock(dir);
-	return (/* !dir->i_nlink || */ dentry->d_parent->d_inode != dir);
+	return /* !dir->i_nlink || */ dentry->d_parent->d_inode != dir;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -225,6 +236,7 @@ int vfsub_security_inode_permission(struct inode *inode, int mask,
 				    struct nameidata *nd)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
+	mask &= MAY_READ | MAY_WRITE | MAY_EXEC | MAY_APPEND;
 	return security_inode_permission(inode, mask);
 #else
 	return security_inode_permission(inode, mask, nd);

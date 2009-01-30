@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * debug print functions
  *
- * $Id: debug.c,v 1.16 2008/10/06 00:30:02 sfjro Exp $
+ * $Id: debug.c,v 1.19 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -284,7 +284,9 @@ void au_dpri_sb(struct super_block *sb)
 	sbinfo = au_sbi(sb);
 	if (!sbinfo)
 		return;
-	dpri("gen %u\n", sbinfo->si_generation);
+	dpri("nw %d, gen %u, kobj %d\n",
+	     atomic_read(&sbinfo->si_nowait.nw_len), sbinfo->si_generation,
+	     atomic_read(&sbinfo->si_kobj.kref.refcount));
 	for (bindex = 0; bindex <= sbinfo->si_bend; bindex++)
 		do_pri_br(bindex, sbinfo->si_branch[0 + bindex]);
 }
@@ -305,7 +307,8 @@ void au_dbg_sleep_jiffy(int jiffy)
 
 void au_dbg_iattr(struct iattr *ia)
 {
-#define AuBit(name)	if (ia->ia_valid & ATTR_ ## name) dpri(#name "\n")
+#define AuBit(name)	if (ia->ia_valid & ATTR_ ## name) \
+				dpri(#name "\n")
 	AuBit(MODE);
 	AuBit(UID);
 	AuBit(GID);

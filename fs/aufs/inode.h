@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * inode operations
  *
- * $Id: inode.h,v 1.16 2008/10/13 03:09:48 sfjro Exp $
+ * $Id: inode.h,v 1.20 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #ifndef __AUFS_INODE_H__
@@ -46,7 +46,6 @@ struct au_iinfo {
 	__u32			ii_higen;
 	struct au_hinode	*ii_hinode;
 	struct au_vdir		*ii_vdir;
-	struct au_splhead	*ii_nfsd_readdir;
 };
 
 struct aufs_icntnr {
@@ -58,8 +57,9 @@ struct aufs_icntnr {
 #define AuPin_DI_LOCKED		1
 #define AuPin_DO_GPARENT	(1 << 1)
 #define AuPin_MNT_WRITE		(1 << 2)
-/* be set automatically */
-#define AuPin_VERIFY		(1 << 3)
+#define AuPin_VFS_RENAME	(1 << 3)
+/* will be set automatically */
+#define AuPin_VERIFY		(1 << 4)
 #define au_ftest_pin(flags, name)	((flags) & AuPin_##name)
 #define au_fset_pin(flags, name)	{ (flags) |= AuPin_##name; }
 #define au_fclr_pin(flags, name)	{ (flags) &= ~AuPin_##name; }
@@ -246,15 +246,19 @@ enum {
 #define AuReadLockFunc(name, lsc) \
 static inline void ii_read_lock_##name(struct inode *i) \
 { \
+	au_dbg_locking_ii_reg(i, 0, AuLsc_II_##lsc); \
 	au_rw_read_lock_nested(&au_ii(i)->ii_rwsem, AuLsc_II_##lsc); \
-	au_dbg_lock_ii_reg(i, AuLsc_II_##lsc); \
+	au_dbg_locking_ii_unreg(i, 0); \
+	au_dbg_locked_ii_reg(i, 0, AuLsc_II_##lsc); \
 }
 
 #define AuWriteLockFunc(name, lsc) \
 static inline void ii_write_lock_##name(struct inode *i) \
 { \
+	au_dbg_locking_ii_reg(i, 1, AuLsc_II_##lsc); \
 	au_rw_write_lock_nested(&au_ii(i)->ii_rwsem, AuLsc_II_##lsc); \
-	au_dbg_lock_ii_reg(i, AuLsc_II_##lsc); \
+	au_dbg_locking_ii_unreg(i, 1); \
+	au_dbg_locked_ii_reg(i, 1, AuLsc_II_##lsc); \
 }
 
 #define AuRWLockFuncs(name, lsc) \
@@ -281,13 +285,13 @@ AuSimpleUnlockRwsemFuncs(ii_do, struct inode *i, au_ii(i)->ii_rwsem);
 static inline void ii_read_unlock(struct inode *i)
 {
 	ii_do_read_unlock(i);
-	au_dbg_lock_ii_unreg(i);
+	au_dbg_locked_ii_unreg(i, 0);
 }
 
 static inline void ii_write_unlock(struct inode *i)
 {
 	ii_do_write_unlock(i);
-	au_dbg_lock_ii_unreg(i);
+	au_dbg_locked_ii_unreg(i, 0);
 }
 
 static inline void ii_downgrade_lock(struct inode *i)

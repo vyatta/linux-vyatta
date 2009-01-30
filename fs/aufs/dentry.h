@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * lookup and dentry operations
  *
- * $Id: dentry.h,v 1.9 2008/10/06 00:31:01 sfjro Exp $
+ * $Id: dentry.h,v 1.12 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #ifndef __AUFS_DENTRY_H__
@@ -110,7 +110,7 @@ struct file *au_h_intent(struct dentry *dentry, aufs_bindex_t bindex,
 int au_br_nfs_h_intent(struct file *nd_file, struct dentry *dentry,
 		       aufs_bindex_t bindex, struct nameidata *nd);
 void au_hintent_put(struct au_hdentry *hd, int do_free);
-int au_fake_intent(struct nameidata *nd, int perm);
+int au_fake_intent(struct nameidata *nd, struct au_branch *br);
 int au_hin_after_reval(struct nameidata *nd, struct dentry *dentry,
 		       aufs_bindex_t bindex, struct file *file);
 struct dentry *au_lkup_hash(const char *name, struct dentry *parent, int len,
@@ -147,7 +147,7 @@ static inline void au_hintent_put(struct au_hdentry *hd, int do_free)
 	/* empty */
 }
 
-static inline int au_fake_intent(struct nameidata *nd, int perm)
+static inline int au_fake_intent(struct nameidata *nd, struct au_branch *br)
 {
 	return 0;
 }
@@ -324,16 +324,6 @@ AuRWLockFuncs(parent4, PARENT4);
 } while (0)
 
 #define DiMustNoWaiters(d)	AuRwMustNoWaiters(&au_di(d)->di_rwsem)
-
-#ifndef CONFIG_AUFS_EXPORT
-/* cf. dir.h */
-static inline
-int di_nfsd_read_lock_parent(struct dentry *dentry, unsigned int flags)
-{
-	di_read_lock_parent(dentry, flags);
-	return 0;
-}
-#endif
 
 /* ---------------------------------------------------------------------- */
 

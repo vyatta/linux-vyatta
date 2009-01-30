@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * workqueue for asynchronous/super-io/delegated operations
  *
- * $Id: wkq.c,v 1.14 2008/09/29 03:45:13 sfjro Exp $
+ * $Id: wkq.c,v 1.17 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include <linux/module.h>
@@ -88,7 +88,7 @@ static void cred_switch(struct au_cred *old, struct au_cred *new)
 
 static void dlgt_cred_store(unsigned int flags, struct au_wkinfo *wkinfo)
 {
-	if (unlikely(au_ftest_wkq(flags, DLGT)))
+	if (au_ftest_wkq(flags, DLGT))
 		cred_store(&wkinfo->cred);
 }
 
@@ -217,6 +217,7 @@ static void au_wkq_comp_free(struct completion *comp)
 
 #else
 
+/* no braces */
 #define AuWkqCompDeclare(name) \
 	DECLARE_COMPLETION_ONSTACK(_ ## name); \
 	struct completion *comp = &_ ## name
@@ -260,7 +261,7 @@ int au_wkq_wait(au_wkq_func_t func, void *args, int dlgt)
 
 	err = au_wkq_comp_alloc(&wkinfo, &comp);
 	if (!err) {
-		if (unlikely(dlgt))
+		if (dlgt)
 			au_fset_wkq(wkinfo.flags, DLGT);
 		au_wkq_run(&wkinfo);
 		/* no timeout, no interrupt */
@@ -296,7 +297,7 @@ int au_wkq_nowait(au_wkq_func_t func, void *args, struct super_block *sb,
 		wkinfo->func = func;
 		wkinfo->args = args;
 		wkinfo->comp = NULL;
-		if (unlikely(dlgt))
+		if (dlgt)
 			au_fset_wkq(wkinfo->flags, DLGT);
 		kobject_get(&au_sbi(sb)->si_kobj);
 		__module_get(THIS_MODULE);

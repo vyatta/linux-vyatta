@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,160 +19,13 @@
 /*
  * export via nfs
  *
- * $Id: export.c,v 1.17 2008/10/06 00:30:12 sfjro Exp $
+ * $Id: export.c,v 1.23 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include <linux/exportfs.h>
 #include <linux/mnt_namespace.h>
 #include <linux/random.h>
 #include "aufs.h"
-
-/*
- * cf. struct au_nfsd_readdir_pid in dir.h.
- */
-int au_nfsd_readdir_alloc(struct inode *inode)
-{
-	int err;
-	struct au_splhead *spl;
-
-	LKTRTrace("i%lu\n", inode->i_ino);
-	IiMustWriteLock(inode);
-	AuDebugOn(!S_ISDIR(inode->i_mode));
-	AuDebugOn(au_ii(inode)->ii_nfsd_readdir);
-
-	err = -ENOMEM;
-	spl = kmalloc(sizeof(*spl), GFP_NOFS);
-	au_ii(inode)->ii_nfsd_readdir = spl;
-	if (spl) {
-		au_spl_init(spl);
-		err = 0;
-	}
-
-	AuTraceErr(err);
-	return err;
-}
-
-void au_nfsd_readdir_free(struct inode *inode)
-{
-	struct au_splhead *spl;
-
-	LKTRTrace("i%lu\n", inode->i_ino);
-	AuDebugOn(!S_ISDIR(inode->i_mode));
-
-	spl = au_ii(inode)->ii_nfsd_readdir;
-	if (spl) {
-		AuDebugOn(!list_empty(&spl->head));
-		kfree(spl);
-	}
-}
-
-void au_nfsd_readdir_reg(struct inode *inode, struct au_nfsd_readdir_pid *pid)
-{
-	struct au_splhead *spl;
-
-	LKTRTrace("i%lu\n", inode->i_ino);
-	AuDebugOn(!S_ISDIR(inode->i_mode));
-	AuDebugOn(!au_test_nfsd(current));
-	spl = au_ii(inode)->ii_nfsd_readdir;
-	AuDebugOn(!spl);
-
-	pid->pid = current->pid;
-	au_spl_add(&pid->list, spl);
-}
-
-void au_nfsd_readdir_unreg(struct inode *inode, struct au_nfsd_readdir_pid *pid)
-{
-	struct au_splhead *spl;
-
-	LKTRTrace("i%lu\n", inode->i_ino);
-	AuDebugOn(!S_ISDIR(inode->i_mode));
-	AuDebugOn(!au_test_nfsd(current));
-	spl = au_ii(inode)->ii_nfsd_readdir;
-	AuDebugOn(!spl);
-
-	au_spl_del(&pid->list, spl);
-}
-
-static int au_nfsd_readdir_test(struct inode *inode)
-{
-	int found;
-	const pid_t pid = current->pid;
-	struct au_splhead *spl;
-	struct au_nfsd_readdir_pid *e;
-	struct list_head *head;
-
-	LKTRTrace("i%lu\n", inode->i_ino);
-	AuDebugOn(!S_ISDIR(inode->i_mode));
-	AuDebugOn(!au_test_nfsd(current));
-
-	found = 0;
-	spl = au_ii(inode)->ii_nfsd_readdir;
-	if (!spl)
-		goto out;
-
-	head = &spl->head;
-	spin_lock(&spl->spin);
-	list_for_each_entry(e, head, list)
-		if (e->pid == pid) {
-			found = 1;
-			break;
-		}
-	spin_unlock(&spl->spin);
-
-	if (found)
-		IMustLock(inode);
- out:
-	return found;
-}
-
-int au_nfsd_do_read_lock(int sw, struct dentry *dentry, unsigned int flags)
-{
-	int no_lock;
-	unsigned char tmp_unlock;
-	struct dentry *parent;
-	struct inode *inode;
-
-	LKTRTrace("%.*s, 0x%x\n", AuDLNPair(dentry), flags);
-
-	no_lock = 0;
-	tmp_unlock = 0;
-	inode = dentry->d_inode;
-	parent = NULL;
-	if (au_test_nfsd(current)) {
-		parent = dget_parent(dentry);
-		tmp_unlock = au_nfsd_readdir_test(parent->d_inode);
-		if (tmp_unlock)
-			di_read_unlock(parent, AuLock_IR);
-		else {
-			dput(parent);
-			if (inode && S_ISDIR(inode->i_mode))
-				no_lock = au_nfsd_readdir_test(inode);
-		}
-	}
-	if (!no_lock) {
-		switch(sw) {
-		case AuNfsdRLock_AU:
-			aufs_read_lock(dentry, flags);
-			break;
-		case AuNfsdRLock_DI_PARENT:
-			di_read_lock_parent(dentry, flags);
-			break;
-		default:
-			BUG();
-		}
-	} else {
-		DiMustReadLock(dentry);
-		IiMustReadLock(inode);
-	}
-	if (tmp_unlock) {
-		di_read_lock_parent(parent, AuLock_IR);
-		dput(parent);
-	}
-
-	return no_lock;
-}
-
-/* ---------------------------------------------------------------------- */
 
 union conv {
 #ifdef CONFIG_AUFS_INO_T_64
@@ -264,7 +117,7 @@ int au_xigen_inc(struct inode *inode)
 	err = sz;
 	if (unlikely(sz >= 0)) {
 		err = -EIO;
-		AuIOErr("xigen error (%ld)\n", (long)sz);
+		AuIOErr("xigen error (%zd)\n", sz);
 	}
 
  out:
@@ -281,7 +134,7 @@ int au_xigen_new(struct inode *inode)
 	struct au_sbinfo *sbinfo;
 	struct file *file;
 
-	LKTRTrace("i%lu\n", (unsigned long)inode->i_ino);
+	LKTRTrace("i%lu\n", inode->i_ino);
 
 	err = 0;
 	/* todo: dirty, at mount time */
@@ -318,7 +171,7 @@ int au_xigen_new(struct inode *inode)
 	err = sz;
 	if (unlikely(sz >= 0)) {
 		err = -EIO;
-		AuIOErr("xigen error (%ld)\n", (long)sz);
+		AuIOErr("xigen error (%zd)\n", sz);
 	}
 
  out:
@@ -375,7 +228,7 @@ static struct dentry *decode_by_ino(struct super_block *sb, ino_t ino,
 
 	dentry = NULL;
 	inode = ilookup(sb, ino);
-	if (unlikely(!inode))
+	if (!inode)
 		goto out;
 
 	dentry = ERR_PTR(-ESTALE);
@@ -387,7 +240,7 @@ static struct dentry *decode_by_ino(struct super_block *sb, ino_t ino,
 
 	dentry = NULL;
 	if (!dir_ino || S_ISDIR(inode->i_mode))
- 		dentry = d_find_alias(inode);
+		dentry = d_find_alias(inode);
 	else {
 		spin_lock(&dcache_lock);
 		list_for_each_entry(d, &inode->i_dentry, d_alias)
@@ -466,6 +319,33 @@ static struct vfsmount *au_mnt_get(struct super_block *sb)
 }
 #endif
 
+struct au_nfsd_si_lock {
+	const au_gen_t sigen;
+	const aufs_bindex_t br_id;
+	unsigned char force_lock;
+};
+
+static aufs_bindex_t si_nfsd_read_lock(struct super_block *sb,
+				       struct au_nfsd_si_lock *nsi_lock)
+{
+	aufs_bindex_t bindex;
+
+	si_read_lock(sb, AuLock_FLUSH);
+
+	/* branch id may be wrapped around */
+	bindex = au_br_index(sb, nsi_lock->br_id);
+	LKTRTrace("b%d\n", bindex);
+	if (bindex >= 0 && nsi_lock->sigen + AUFS_BRANCH_MAX > au_sigen(sb))
+		goto out; /* success */
+
+	if (!nsi_lock->force_lock)
+		si_read_unlock(sb);
+	bindex = -1;
+
+ out:
+	return bindex;
+}
+
 struct find_name_by_ino {
 	int called, found;
 	ino_t ino;
@@ -489,17 +369,20 @@ find_name_by_ino(void *arg, const char *name, int namelen, loff_t offset,
 	return 1;
 }
 
-static struct dentry *au_lkup_by_ino(struct path *path, ino_t ino)
+static struct dentry *au_lkup_by_ino(struct path *path, ino_t ino,
+				     struct au_nfsd_si_lock *nsi_lock)
 {
 	struct dentry *dentry, *parent;
 	struct file *file;
-	struct inode *dir, *inode;
+	struct inode *dir;
 	struct find_name_by_ino arg;
 	int err;
 
 	parent = path->dentry;
-	LKTRTrace("%.*s, i%lu\n", AuDLNPair(parent), (unsigned long )ino);
+	LKTRTrace("%.*s, i%lu\n", AuDLNPair(parent), (unsigned long)ino);
 
+	if (nsi_lock)
+		si_read_unlock(parent->d_sb);
 	path_get(path);
 	file = dentry_open(parent, path->mnt, au_dir_roflags);
 	dentry = (void *)file;
@@ -533,8 +416,7 @@ static struct dentry *au_lkup_by_ino(struct path *path, ino_t ino)
 	if (IS_ERR(dentry))
 		goto out_name;
 	AuDebugOn(au_test_anon(dentry));
-	inode = dentry->d_inode;
-	if (unlikely(!inode)) {
+	if (unlikely(!dentry->d_inode)) {
 		dput(dentry);
 		dentry = ERR_PTR(-ENOENT);
 	}
@@ -544,13 +426,19 @@ static struct dentry *au_lkup_by_ino(struct path *path, ino_t ino)
  out_file:
 	fput(file);
  out:
+	if (unlikely(nsi_lock
+		     && si_nfsd_read_lock(parent->d_sb, nsi_lock) < 0))
+		if (!IS_ERR(dentry)) {
+			dput(dentry);
+			dentry = ERR_PTR(-ESTALE);
+		}
 	AuTraceErrPtr(dentry);
 	return dentry;
 }
 
 static /* noinline_for_stack */
 struct dentry *decode_by_dir_ino(struct super_block *sb, ino_t ino,
-				 ino_t dir_ino)
+				 ino_t dir_ino, struct au_nfsd_si_lock *nsi_lock)
 {
 	struct dentry *dentry, *parent;
 	struct path path;
@@ -562,7 +450,7 @@ struct dentry *decode_by_dir_ino(struct super_block *sb, ino_t ino,
 	if (dir_ino != AUFS_ROOT_INO) {
 		parent = decode_by_ino(sb, dir_ino, 0);
 		dentry = parent;
-		if (unlikely(!parent))
+		if (!parent)
 			goto out;
 		if (IS_ERR(parent))
 			goto out;
@@ -572,7 +460,7 @@ struct dentry *decode_by_dir_ino(struct super_block *sb, ino_t ino,
 
 	path.dentry = parent;
 	path.mnt = au_mnt_get(sb);
-	dentry = au_lkup_by_ino(&path, ino);
+	dentry = au_lkup_by_ino(&path, ino, nsi_lock);
 	path_put(&path);
 
  out:
@@ -629,7 +517,8 @@ static char *au_build_path(struct dentry *h_parent, struct path *h_rootpath,
 
 static noinline_for_stack
 struct dentry *decode_by_path(struct super_block *sb, aufs_bindex_t bindex,
-			      ino_t ino, __u32 *fh, int fh_len)
+			      ino_t ino, __u32 *fh, int fh_len,
+			      struct au_nfsd_si_lock *nsi_lock)
 {
 	struct dentry *dentry, *h_parent, *root;
 	struct super_block *h_sb;
@@ -681,10 +570,11 @@ struct dentry *decode_by_path(struct super_block *sb, aufs_bindex_t bindex,
 		goto out_pathname;
 
 	LKTRTrace("%s\n", p);
+	si_read_unlock(sb);
 	err = vfsub_path_lookup(p, LOOKUP_FOLLOW | LOOKUP_DIRECTORY, &nd);
 	dentry = ERR_PTR(err);
 	if (unlikely(err))
-		goto out_pathname;
+		goto out_relock;
 
 	dentry = ERR_PTR(-ENOENT);
 	AuDebugOn(au_test_anon(nd.path.dentry));
@@ -692,12 +582,18 @@ struct dentry *decode_by_path(struct super_block *sb, aufs_bindex_t bindex,
 		goto out_nd;
 
 	if (ino != nd.path.dentry->d_inode->i_ino)
-		dentry = au_lkup_by_ino(&nd.path, ino);
+		dentry = au_lkup_by_ino(&nd.path, ino, /*nsi_lock*/NULL);
 	else
 		dentry = dget(nd.path.dentry);
 
  out_nd:
 	path_put(&nd.path);
+ out_relock:
+	if (unlikely(si_nfsd_read_lock(sb, nsi_lock) < 0))
+		if (!IS_ERR(dentry)) {
+			dput(dentry);
+			dentry = ERR_PTR(-ESTALE);
+		}
  out_pathname:
 	free_page((unsigned long)pathname);
  out_h_parent:
@@ -717,25 +613,24 @@ aufs_fh_to_dentry(struct super_block *sb, struct fid *fid, int fh_len,
 	struct dentry *dentry;
 	__u32 *fh = fid->raw;
 	ino_t ino, dir_ino;
-	aufs_bindex_t bindex, br_id;
-	au_gen_t sigen;
+	aufs_bindex_t bindex;
+	struct au_nfsd_si_lock nsi_lock = {
+		.sigen		= fh[Fh_sigen],
+		.br_id		= fh[Fh_br_id],
+		.force_lock	= 0
+	};
 
 	LKTRTrace("%d, fh{br_id %u, sigen %u, i%u, diri%u, g%u}\n",
 		  fh_type, fh[Fh_br_id], fh[Fh_sigen], fh[Fh_ino],
 		  fh[Fh_dir_ino], fh[Fh_igen]);
 	AuDebugOn(fh_len < Fh_tail);
 
-	si_read_lock(sb, AuLock_FLUSH);
-	//lockdep_off();
-
-	/* branch id may be wrapped around */
 	dentry = ERR_PTR(-ESTALE);
-	br_id = fh[Fh_br_id];
-	sigen = fh[Fh_sigen];
-	bindex = au_br_index(sb, br_id);
-	LKTRTrace("b%d\n", bindex);
-	if (unlikely(bindex < 0 || sigen + AUFS_BRANCH_MAX <= au_sigen(sb)))
+	/* branch id may be wrapped around */
+	bindex = si_nfsd_read_lock(sb, &nsi_lock);
+	if (unlikely(bindex < 0))
 		goto out;
+	nsi_lock.force_lock = 1;
 
 	/* is this inode still cached? */
 	ino = decode_ino(fh + Fh_ino);
@@ -743,36 +638,40 @@ aufs_fh_to_dentry(struct super_block *sb, struct fid *fid, int fh_len,
 	dir_ino = decode_ino(fh + Fh_dir_ino);
 	dentry = decode_by_ino(sb, ino, dir_ino);
 	if (IS_ERR(dentry))
-		goto out;
+		goto out_unlock;
 	if (dentry)
 		goto accept;
 
 	/* is the parent dir cached? */
-	dentry = decode_by_dir_ino(sb, ino, dir_ino);
+	dentry = decode_by_dir_ino(sb, ino, dir_ino, &nsi_lock);
 	if (IS_ERR(dentry))
-		goto out;
+		goto out_unlock;
 	if (dentry)
 		goto accept;
 
 	/* lookup path */
-	dentry = decode_by_path(sb, bindex, ino, fh, fh_len);
+	dentry = decode_by_path(sb, bindex, ino, fh, fh_len, &nsi_lock);
 	if (IS_ERR(dentry))
-		goto out;
+		goto out_unlock;
 	if (unlikely(!dentry))
-		goto out;
+		/* todo?: make it ESTALE */
+		goto out_unlock;
 
  accept:
 	LKTRLabel(accept);
 	if (dentry->d_inode->i_generation == fh[Fh_igen])
-		goto out; /* success */
+		goto out_unlock; /* success */
 
 	LKTRLabel(stale);
 	dput(dentry);
 	dentry = ERR_PTR(-ESTALE);
+ out_unlock:
+	LKTRLabel(out_unlock);
+	si_read_unlock(sb);
  out:
 	LKTRLabel(out);
-	//lockdep_on();
-	si_read_unlock(sb);
+	if (0 && IS_ERR(dentry))
+		dentry = ERR_PTR(-ESTALE);
 	AuTraceErrPtr(dentry);
 	return dentry;
 }
@@ -805,7 +704,7 @@ static struct dentry *aufs_fh_to_parent(struct super_block *sb, struct fid *fid,
 static int aufs_encode_fh(struct dentry *dentry, __u32 *fh, int *max_len,
 			  int connectable)
 {
-	int err, no_lock;
+	int err;
 	aufs_bindex_t bindex, bend;
 	struct super_block *sb, *h_sb;
 	struct inode *inode;
@@ -832,8 +731,9 @@ static int aufs_encode_fh(struct dentry *dentry, __u32 *fh, int *max_len,
 	err = -EIO;
 	h_parent = NULL;
 	sb = dentry->d_sb;
+	aufs_read_lock(dentry, AuLock_FLUSH | AuLock_IR);
 	parent = dget_parent(dentry);
-	no_lock = au_nfsd_read_lock(parent, AuLock_FLUSH | AuLock_IR);
+	di_read_lock_parent(parent, !AuLock_IR);
 	inode = dentry->d_inode;
 	AuDebugOn(!inode);
 #ifdef CONFIG_AUFS_DEBUG
@@ -890,9 +790,9 @@ static int aufs_encode_fh(struct dentry *dentry, __u32 *fh, int *max_len,
  out_dput:
 	dput(h_parent);
  out_unlock:
-	if (!no_lock)
-		aufs_read_unlock(parent, AuLock_IR);
+	di_read_unlock(parent, !AuLock_IR);
 	dput(parent);
+	aufs_read_unlock(dentry, AuLock_IR);
  out:
 	AuTraceErr(err);
 	if (unlikely(err < 0))

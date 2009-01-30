@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * directory operations
  *
- * $Id: dir.h,v 1.4 2008/09/29 03:43:43 sfjro Exp $
+ * $Id: dir.h,v 1.7 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #ifndef __AUFS_DIR_H__
@@ -93,21 +93,6 @@ struct au_vdir {
 	unsigned long	vd_jiffy;
 };
 
-/*
- * very drity approach.
- * nfsd issues some operations during readdir which breaks aufs dinfo locking
- * order, child first.
- * Fortunately the parent dir i_mutex is held during readdir, so aufs tries
- * unlocking the dinfo lock temporary.
- * todo: change the lock order, parent first?
- */
-struct au_nfsd_readdir_pid {
-#ifdef CONFIG_AUFS_EXPORT
-	struct list_head	list;
-	pid_t			pid;
-#endif
-};
-
 /* ---------------------------------------------------------------------- */
 
 /* dir.c */
@@ -131,53 +116,6 @@ void au_vdir_free(struct au_vdir *vdir);
 int au_vdir_init(struct file *file);
 int au_vdir_fill_de(struct file *file, void *dirent, filldir_t filldir);
 
-#ifdef CONFIG_AUFS_EXPORT
-/* export.c */
-int au_nfsd_readdir_alloc(struct inode *inode);
-void au_nfsd_readdir_free(struct inode *inode);
-void au_nfsd_readdir_reg(struct inode *inode, struct au_nfsd_readdir_pid *pid);
-void au_nfsd_readdir_unreg(struct inode *inode,
-			   struct au_nfsd_readdir_pid *pid);
-
-enum { AuNfsdRLock_AU, AuNfsdRLock_DI_PARENT };
-int au_nfsd_do_read_lock(int sw, struct dentry *dentry, unsigned int flags);
-
-static inline
-int au_nfsd_read_lock(struct dentry *dentry, unsigned int flags)
-{
-	return au_nfsd_do_read_lock(AuNfsdRLock_AU, dentry, flags);
-}
-
-static inline
-int di_nfsd_read_lock_parent(struct dentry *dentry, unsigned int flags)
-{
-	return au_nfsd_do_read_lock(AuNfsdRLock_DI_PARENT, dentry, flags);
-}
-#else
-static inline int au_nfsd_readdir_alloc(struct inode *inode)
-{
-	return 0;
-}
-
-static inline void au_nfsd_readdir_free(struct inode *inode)
-{
-	/* empty */
-}
-
-static inline
-void au_nfsd_readdir_reg(struct inode *inode, struct au_nfsd_readdir_pid *pid)
-{
-	/* empty */
-}
-
-static inline
-void au_nfsd_readdir_unreg(struct inode *inode,
-			   struct au_nfsd_readdir_pid *pid)
-{
-	/* empty */
-}
-#endif
-
 /* ---------------------------------------------------------------------- */
 
 static inline
@@ -193,7 +131,7 @@ static inline void au_add_nlink(struct inode *dir, struct inode *h_dir)
 {
 	AuDebugOn(!S_ISDIR(dir->i_mode) || !S_ISDIR(h_dir->i_mode));
 	dir->i_nlink += h_dir->i_nlink - 2;
-	if (unlikely(h_dir->i_nlink < 2))
+	if (h_dir->i_nlink < 2)
 		dir->i_nlink += 2;
 }
 
@@ -201,7 +139,7 @@ static inline void au_sub_nlink(struct inode *dir, struct inode *h_dir)
 {
 	AuDebugOn(!S_ISDIR(dir->i_mode) || !S_ISDIR(h_dir->i_mode));
 	dir->i_nlink -= h_dir->i_nlink - 2;
-	if (unlikely(h_dir->i_nlink < 2))
+	if (h_dir->i_nlink < 2)
 		dir->i_nlink -= 2;
 }
 

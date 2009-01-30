@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * file operations
  *
- * $Id: file.h,v 1.5 2008/06/30 03:53:43 sfjro Exp $
+ * $Id: file.h,v 1.8 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #ifndef __AUFS_FILE_H__
@@ -110,6 +110,12 @@ void au_robr_reset_file(struct vm_area_struct *vma, struct file *file)
 	/* smp_mb(); */ /* flush vm_file */
 }
 #endif /* CONFIG_AUFS_ROBR */
+
+#if 0 /* reserved for future use */
+/* ioctl.c */
+long aufs_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
+long aufs_ioctl_dir(struct file *file, unsigned int cmd, unsigned long arg);
+#endif
 
 /* ---------------------------------------------------------------------- */
 
@@ -209,7 +215,11 @@ static inline aufs_bindex_t au_fbend(struct file *file)
 
 static inline struct au_vdir *au_fvdir_cache(struct file *file)
 {
+#ifdef CONFIG_AUFS_EXPORT
+	AuRwMustAnyLock(&au_fi(file)->fi_rwsem);
+#else
 	FiMustAnyLock(file);
+#endif
 	return au_fi(file)->fi_vdir_cache;
 }
 

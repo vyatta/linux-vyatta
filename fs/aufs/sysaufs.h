@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * sysfs interface and lifetime management
  *
- * $Id: sysaufs.h,v 1.11 2008/09/15 03:14:55 sfjro Exp $
+ * $Id: sysaufs.h,v 1.12 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #ifndef __SYSAUFS_H__

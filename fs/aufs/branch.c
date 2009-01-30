@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * branch management
  *
- * $Id: branch.c,v 1.19 2008/10/13 03:09:27 sfjro Exp $
+ * $Id: branch.c,v 1.23 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include <linux/iso_fs.h>
@@ -257,7 +257,7 @@ static struct au_branch *alloc_addbr(struct super_block *sb, int new_nbranch,
 	if (unlikely(!add_branch))
 		goto out;
 	add_branch->br_wbr = NULL;
-	if (unlikely(au_br_writable(perm))) {
+	if (au_br_writable(perm)) {
 		add_branch->br_wbr = kmalloc(sizeof(*add_branch->br_wbr),
 					     GFP_NOFS);
 		if (unlikely(!add_branch->br_wbr))
@@ -322,11 +322,11 @@ static int test_br(struct super_block *sb, struct inode *inode, int brperm,
 
 static int au_unsupported_fs(struct super_block *sb)
 {
-	return (sb->s_magic == PROC_SUPER_MAGIC
+	return sb->s_magic == PROC_SUPER_MAGIC
 #ifdef SYSFS_MAGIC
 		|| sb->s_magic == SYSFS_MAGIC
 #endif
-		|| !strcmp(au_sbtype(sb), "unionfs"));
+		|| !strcmp(au_sbtype(sb), "unionfs");
 }
 
 /*
@@ -395,6 +395,11 @@ static int test_add(struct super_block *sb, struct au_opt_add *add, int remount)
 
 	if (unlikely(au_test_unsupported_nfs(inode->i_sb))) {
 		AuErr(AuNoNfsBranchMsg " %s\n", add->path);
+		goto out;
+	}
+
+	if (unlikely(au_test_unsupported_nfs4(inode->i_sb))) {
+		AuErr(AuNoNfsv4BranchMsg " %s\n", add->path);
 		goto out;
 	}
 
@@ -468,7 +473,7 @@ static int au_br_init(struct au_branch *br, struct super_block *sb,
 	atomic_set(&br->br_xino_running, 0);
 	atomic_set(&br->br_count, 0);
 
-	if (unlikely(au_br_writable(add->perm))) {
+	if (au_br_writable(add->perm)) {
 		err = au_wbr_init(br, sb, add->perm, &add->nd.path);
 		if (unlikely(err))
 			goto out;
@@ -583,7 +588,7 @@ int au_br_add(struct super_block *sb, struct au_opt_add *add, int remount)
 		sysaufs_brs_add(sb, add_bindex);
 
 	if (!add_bindex)
-		au_cpup_attr_all(root_inode);
+		au_cpup_attr_all(root_inode, /*force*/1);
 	else
 		au_add_nlink(root_inode, dentry->d_inode);
 	maxb = dentry->d_sb->s_maxbytes;
@@ -812,7 +817,7 @@ int au_br_del(struct super_block *sb, struct au_opt_del *del, int remount)
 
 	err = test_children_busy(sb->s_root, bindex);
 	if (unlikely(err)) {
-		if (unlikely(do_wh))
+		if (do_wh)
 			goto out_wh;
 		goto out;
 	}
@@ -852,7 +857,7 @@ int au_br_del(struct super_block *sb, struct au_opt_del *del, int remount)
 		sysaufs_brs_add(sb, bindex);
 
 	if (!bindex)
-		au_cpup_attr_all(sb->s_root->d_inode);
+		au_cpup_attr_all(sb->s_root->d_inode, /*force*/1);
 	else
 		au_sub_nlink(sb->s_root->d_inode, del->h_root->d_inode);
 	if (au_opt_test(au_mntflags(sb), PLINK))
@@ -887,13 +892,13 @@ int au_br_del(struct super_block *sb, struct au_opt_del *del, int remount)
 
 static int do_need_sigen_inc(int a, int b)
 {
-	return (au_br_whable(a) && !au_br_whable(b));
+	return au_br_whable(a) && !au_br_whable(b);
 }
 
 static int need_sigen_inc(int old, int new)
 {
-	return (do_need_sigen_inc(old, new)
-		|| do_need_sigen_inc(new, old));
+	return do_need_sigen_inc(old, new)
+		|| do_need_sigen_inc(new, old);
 }
 
 static int au_br_mod_files_ro(struct super_block *sb, aufs_bindex_t bindex)

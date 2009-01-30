@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * virtual or vertical directory
  *
- * $Id: vdir.c,v 1.11 2008/09/22 03:52:19 sfjro Exp $
+ * $Id: vdir.c,v 1.14 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -150,7 +150,7 @@ int au_nhash_test_longer_wh(struct au_nhash *whlist, aufs_bindex_t btgt,
 
 static unsigned int au_name_hash(const unsigned char *name, unsigned int len)
 {
-	return (full_name_hash(name, len) % AuSize_NHASH);
+	return full_name_hash(name, len) % AuSize_NHASH;
 }
 
 /* returns found(true) or not */
@@ -189,7 +189,7 @@ int au_nhash_append_wh(struct au_nhash *whlist, char *name, int namelen,
 		goto out;
 	err = 0;
 	wh->wh_bindex = bindex;
-	if (unlikely(shwh))
+	if (shwh)
 		au_shwh_init_wh(wh, ino, d_type);
 	str = &wh->wh_str;
 	str->len = namelen;
@@ -519,7 +519,7 @@ static int fillvdir(void *__arg, const char *__name, int namelen, loff_t offset,
 				goto out; /* already whiteouted */
 
 		ino = 1; /* dummy */
-		if (unlikely(au_ftest_fillvdir(arg->flags, SHWH)))
+		if (au_ftest_fillvdir(arg->flags, SHWH))
 			arg->err = au_wh_ino(sb, bend, h_ino, d_type, &ino);
 		if (!arg->err)
 			arg->err = au_nhash_append_wh
@@ -620,7 +620,7 @@ static int au_do_read_vdir(struct fillvdir_arg *arg)
 	dlgt = !!au_test_dlgt(mnt_flags);
 	arg->flags = 0;
 	shwh = 0;
-	if (unlikely(au_opt_test(mnt_flags, SHWH))) {
+	if (au_opt_test(mnt_flags, SHWH)) {
 		shwh = 1;
 		au_fset_fillvdir(arg->flags, SHWH);
 	}
@@ -645,7 +645,7 @@ static int au_do_read_vdir(struct fillvdir_arg *arg)
 		} while (!err && au_ftest_fillvdir(arg->flags, CALLED));
 	}
 
-	if (unlikely(!err && shwh))
+	if (!err && shwh)
 		err = au_handle_shwh(sb, arg->vdir, bstart, bend, arg->whlist,
 				     arg->delist);
 

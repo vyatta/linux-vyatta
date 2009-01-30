@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * sub-routines for dentry cache
  *
- * $Id: dcsub.h,v 1.4 2008/07/21 02:54:22 sfjro Exp $
+ * $Id: dcsub.h,v 1.5 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #ifndef __AUFS_DCSUB_H__

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * module initialization and module-global
  *
- * $Id: module.h,v 1.8 2008/08/25 01:50:37 sfjro Exp $
+ * $Id: module.h,v 1.9 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #ifndef __AUFS_MODULE_H__

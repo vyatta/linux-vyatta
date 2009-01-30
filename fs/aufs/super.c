@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * mount and super_block operations
  *
- * $Id: super.c,v 1.19 2008/10/13 03:09:56 sfjro Exp $
+ * $Id: super.c,v 1.23 2009/01/26 06:24:10 sfjro Exp $
  */
 
 #include <linux/module.h>
@@ -56,20 +56,16 @@ static void aufs_destroy_inode(struct inode *inode)
 	LKTRTrace("i%lu\n", inode->i_ino);
 
 	if (!inode->i_nlink || IS_DEADDIR(inode)) {
+		/* todo: move this lock into xigen_inc() */
+		/* in nowait task or remount, sbi is write-locked */
 		struct super_block *sb = inode->i_sb;
-		const int do_lock = !au_test_nowait_wkq(current);
+		const int locked = si_noflush_read_trylock(sb);
 
-		/* in nowait task, sbi is write-locked */
-		if (do_lock) {
-			si_noflush_read_lock(sb);
-			err = au_xigen_inc(inode);
-			si_read_unlock(sb);
-		} else {
-			SiMustWriteLock(sb);
-			err = au_xigen_inc(inode);
-		}
+		err = au_xigen_inc(inode);
 		if (unlikely(err))
 			AuWarn1("failed resetting i_generation, %d\n", err);
+		if (locked)
+			si_read_unlock(sb);
 	}
 
 	au_iinfo_fin(inode);
@@ -90,7 +86,7 @@ struct inode *au_iget_locked(struct super_block *sb, ino_t ino)
 		goto out;
 	}
 	AuDebugOn(IS_ERR(inode));
-	if (unlikely(!(inode->i_state & I_NEW)))
+	if (!(inode->i_state & I_NEW))
 		goto out;
 
 	err = au_xigen_new(inode);
@@ -122,7 +118,6 @@ static int au_show_brs(struct seq_file *seq, struct super_block *sb)
 
 	err = 0;
 	bend = au_sbend(sb);
-	/* todo: via h_sb */
 	hd = au_di(sb->s_root)->di_hdentry;
 	for (bindex = 0; !err && bindex <= bend; bindex++) {
 		path.mnt = au_sbr_mnt(sb, bindex);
@@ -256,6 +251,8 @@ static int aufs_show_options(struct seq_file *m, struct vfsmount *mnt)
 	AuBool(DLGT, dlgt);
 	AuBool(WARN_PERM, warn_perm);
 	AuBool(VERBOSE, verbose);
+	AuBool(SUM, sum);
+	/* AuBool(SUM_W, wsum); */
 
 	n = sbinfo->si_dirwh;
 	if (n != AUFS_DIRWH_DEF)
@@ -279,10 +276,71 @@ static int aufs_show_options(struct seq_file *m, struct vfsmount *mnt)
 #undef AuStr_BrOpt
 }
 
+static u64 au_add_till_max(u64 a, u64 b)
+{
+	u64 old;
+
+	old = a;
+	a += b;
+	if (old < a)
+		return a;
+	return ULLONG_MAX;
+}
+
+static int au_statfs_sum(struct super_block *sb, struct kstatfs *buf, int dlgt)
+{
+	int err;
+	aufs_bindex_t bend, bindex, i;
+	unsigned char shared;
+	u64 blocks, bfree, bavail, files, ffree;
+	struct super_block *h_sb;
+
+	AuTraceEnter();
+
+	blocks = 0;
+	bfree = 0;
+	bavail = 0;
+	files = 0;
+	ffree = 0;
+
+	err = 0;
+	bend = au_sbend(sb);
+	for (bindex = bend; bindex >= 0; bindex--) {
+		h_sb = au_sbr_sb(sb, bindex);
+		shared = 0;
+		for (i = bindex + 1; !shared && i <= bend; i++)
+			shared = au_sbr_sb(sb, i) == h_sb;
+		if (shared)
+			continue;
+
+		err = vfsub_statfs(h_sb->s_root, buf, dlgt);
+		if (unlikely(err))
+			goto out;
+
+		blocks = au_add_till_max(blocks, buf->f_blocks);
+		bfree = au_add_till_max(bfree, buf->f_bfree);
+		bavail = au_add_till_max(bavail, buf->f_bavail);
+		files = au_add_till_max(files, buf->f_files);
+		ffree = au_add_till_max(ffree, buf->f_ffree);
+	}
+
+	buf->f_blocks = blocks;
+	buf->f_bfree = bfree;
+	buf->f_bavail = bavail;
+	buf->f_files = files;
+	buf->f_ffree = ffree;
+
+ out:
+	AuTraceErr(err);
+	return err;
+}
+
 /* todo: in case of round-robin policy, return the sum of all rw branches? */
 static int aufs_statfs(struct dentry *dentry, struct kstatfs *buf)
 {
 	int err;
+	unsigned int mnt_flags;
+	unsigned char dlgt;
 	struct super_block *sb;
 
 	AuTraceEnter();
@@ -290,8 +348,12 @@ static int aufs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	/* lock free root dinfo */
 	sb = dentry->d_sb;
 	si_noflush_read_lock(sb);
-	err = vfsub_statfs(au_sbr_sb(sb, 0)->s_root, buf,
-			   !!au_test_dlgt(au_mntflags(sb)));
+	mnt_flags = au_mntflags(sb);
+	dlgt = !!au_test_dlgt(mnt_flags);
+	if (!au_opt_test(mnt_flags, SUM))
+		err = vfsub_statfs(au_sbr_sb(sb, 0)->s_root, buf, dlgt);
+	else
+		err = au_statfs_sum(sb, buf, dlgt);
 	si_read_unlock(sb);
 	if (!err) {
 		buf->f_type = AUFS_SUPER_MAGIC;
@@ -309,6 +371,7 @@ static void au_fsync_br(struct super_block *sb)
 #ifdef CONFIG_AUFS_FSYNC_SUPER_PATCH
 	aufs_bindex_t bend, bindex;
 	int brperm;
+	struct au_branch *br;
 	struct super_block *h_sb;
 
 	AuTraceEnter();
@@ -316,10 +379,11 @@ static void au_fsync_br(struct super_block *sb)
 	si_write_lock(sb);
 	bend = au_sbend(sb);
 	for (bindex = 0; bindex < bend; bindex++) {
-		brperm = au_sbr_perm(sb, bindex);
+		br = au_sbr(sb, bindex);
+		brperm = br->br_perm;
 		if (brperm == AuBrPerm_RR || brperm == AuBrPerm_RRWH)
 			continue;
-		h_sb = au_sbr_sb(sb, bindex);
+		h_sb = br->br_mnt->mnt_sb;
 		if (bdev_read_only(h_sb->s_bdev))
 			continue;
 
@@ -341,7 +405,7 @@ static void aufs_umount_begin(struct super_block *arg)
 #else
 /* this IS for super_operations */
 static void aufs_umount_begin(struct vfsmount *arg, int flags)
-#define AuUmountBeginSb(arg)	(arg)->mnt_sb
+#define AuUmountBeginSb(arg)	((arg)->mnt_sb)
 #endif
 {
 	struct super_block *sb = AuUmountBeginSb(arg);
@@ -352,7 +416,7 @@ static void aufs_umount_begin(struct vfsmount *arg, int flags)
 	AuDebugOn(!kernel_locked());
 
 	sbinfo = au_sbi(sb);
-	if (unlikely(!sbinfo))
+	if (!sbinfo)
 		return;
 
 	au_fsync_br(sb);
@@ -376,7 +440,7 @@ static void aufs_put_super(struct super_block *sb)
 	AuTraceEnter();
 
 	sbinfo = au_sbi(sb);
-	if (unlikely(!sbinfo))
+	if (!sbinfo)
 		return;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 26)
 	aufs_umount_begin(sb);
@@ -614,8 +678,13 @@ static int aufs_remount_fs(struct super_block *sb, int *flags, char *data)
 	au_fsync_br(sb);
 
 	err = 0;
-	if (!data || !*data)
+	root = sb->s_root;
+	if (!data || !*data) {
+		aufs_write_lock(root);
+		err = verify_opts(sb, *flags, /*pending*/0, /*remount*/1);
+		aufs_write_unlock(root);
 		goto out; /* success */
+	}
 
 	err = -ENOMEM;
 	memset(&opts, 0, sizeof(opts));
@@ -624,14 +693,14 @@ static int aufs_remount_fs(struct super_block *sb, int *flags, char *data)
 		goto out;
 	opts.max_opt = PAGE_SIZE / sizeof(*opts.opt);
 	opts.flags = AuOpts_REMOUNT;
+	opts.sb_flags = *flags;
 
 	/* parse it before aufs lock */
-	err = au_opts_parse(sb, *flags, data, &opts);
+	err = au_opts_parse(sb, data, &opts);
 	if (unlikely(err))
 		goto out_opts;
 
 	sbinfo = au_sbi(sb);
-	root = sb->s_root;
 	inode = root->d_inode;
 	mutex_lock(&inode->i_mutex);
 	aufs_write_lock(root);
@@ -660,7 +729,7 @@ static int aufs_remount_fs(struct super_block *sb, int *flags, char *data)
 			       rerr);
 		}
 
-		if (unlikely(au_ftest_opts(opts.flags, REFRESH_NONDIR))) {
+		if (au_ftest_opts(opts.flags, REFRESH_NONDIR)) {
 			rerr = refresh_nondir(root, sigen, !rerr);
 			if (unlikely(rerr))
 				AuWarn("Refreshing non-directories failed,"
@@ -670,8 +739,8 @@ static int aufs_remount_fs(struct super_block *sb, int *flags, char *data)
 		/* aufs_write_lock() calls ..._child() */
 		di_write_lock_child(root);
 
-		au_cpup_attr_all(inode);
-		if (unlikely(dlgt))
+		au_cpup_attr_all(inode, /*force*/1);
+		if (dlgt)
 			au_opt_set(sbinfo->si_mntflags, DLGT);
 	}
 
@@ -765,6 +834,7 @@ static int aufs_fill_super(struct super_block *sb, void *raw_data, int silent)
 	if (unlikely(!opts.opt))
 		goto out;
 	opts.max_opt = PAGE_SIZE / sizeof(*opts.opt);
+	opts.sb_flags = sb->s_flags;
 
 	err = au_si_alloc(sb);
 	if (unlikely(err))
@@ -794,8 +864,9 @@ static int aufs_fill_super(struct super_block *sb, void *raw_data, int silent)
 	 * so we follow the same rule.
 	 */
 	ii_write_lock_parent(inode);
+	au_dbg_locked_si_reg(sb, 1);
 	aufs_write_unlock(root);
-	err = au_opts_parse(sb, sb->s_flags, arg, &opts);
+	err = au_opts_parse(sb, arg, &opts);
 	if (unlikely(err))
 		goto out_root;
 
@@ -860,7 +931,7 @@ struct file_system_type aufs_fs_type = {
 	.name		= AUFS_FSTYPE,
 	.fs_flags	=
 		FS_RENAME_DOES_D_MOVE	/* a race between rename and others*/
-		| FS_REVAL_DOT,		/* for NFS branch */
+		| FS_REVAL_DOT,		/* for NFS branch and udba */
 	.get_sb		= aufs_get_sb,
 	.kill_sb	= generic_shutdown_super,
 	/* no need to __module_get() and module_put(). */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * main header files
  *
- * $Id: aufs.h,v 1.4 2008/06/30 03:58:55 sfjro Exp $
+ * $Id: aufs.h,v 1.6 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #ifndef __AUFS_H__
@@ -31,6 +31,14 @@
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 25)
 #error you got wrong version
 #endif
+
+/* introduced in linux-2.6.27 */
+#include <linux/bug.h>
+#ifndef WARN_ONCE
+#define WARN_ONCE(cond, fmt ...) WARN_ON(cond)
+#endif
+
+/* ---------------------------------------------------------------------- */
 
 #include "debug.h"
 

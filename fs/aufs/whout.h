@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * whiteout for logical deletion and opaque directory
  *
- * $Id: whout.h,v 1.3 2008/06/30 03:57:35 sfjro Exp $
+ * $Id: whout.h,v 1.5 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #ifndef __AUFS_WHOUT_H__
@@ -94,7 +94,7 @@ struct dentry *au_diropq_create(struct dentry *dentry, aufs_bindex_t bindex,
 				int dlgt)
 {
 	unsigned int flags = AuDiropq_CREATE;
-	if (unlikely(dlgt))
+	if (dlgt)
 		au_fset_diropq(flags, DLGT);
 	return au_diropq_sio(dentry, bindex, flags);
 }
@@ -103,7 +103,7 @@ static inline
 int au_diropq_remove(struct dentry *dentry, aufs_bindex_t bindex, int dlgt)
 {
 	unsigned int flags = !AuDiropq_CREATE;
-	if (unlikely(dlgt))
+	if (dlgt)
 		au_fset_diropq(flags, DLGT);
 	return PTR_ERR(au_diropq_sio(dentry, bindex, flags));
 }

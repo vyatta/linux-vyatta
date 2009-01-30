@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * policies for selecting one among multiple writable branches
  *
- * $Id: wbr_policy.c,v 1.12 2008/09/01 02:55:35 sfjro Exp $
+ * $Id: wbr_policy.c,v 1.15 2009/01/26 06:23:51 sfjro Exp $
  */
 
 #include <linux/statfs.h>
@@ -43,7 +43,7 @@ static int au_cpdown_attr(struct au_hinode *hdir, struct dentry *h_dst,
 	ia.ia_uid = h_isrc->i_uid;
 	ia.ia_gid = h_isrc->i_gid;
 	sbits = !!(ia.ia_mode & (S_ISUID | S_ISGID));
-
+	au_cpup_attr_flags(h_idst, h_isrc);
 	err = vfsub_sio_notify_change(hdir, h_dst, &ia);
 
 	/* is this nfs only? */
@@ -52,10 +52,6 @@ static int au_cpdown_attr(struct au_hinode *hdir, struct dentry *h_dst,
 		ia.ia_mode = h_isrc->i_mode;
 		err = vfsub_sio_notify_change(hdir, h_dst, &ia);
 	}
-
-	/* todo: necessary? */
-	if (!err)
-		h_idst->i_flags = h_isrc->i_flags;
 
 	AuTraceErr(err);
 	return err;
@@ -96,8 +92,8 @@ static int au_cpdown_dir(struct dentry *dentry, aufs_bindex_t bdst,
 		goto out;
 	h_dentry = au_h_dptr(dentry, bdst);
 	dlgt = !!au_test_dlgt(au_mntflags(dentry->d_sb));
-	err = vfsub_sio_mkdir(au_hi(dir, bdst), h_dentry, S_IRWXU | S_IRUGO | S_IXUGO,
-			      dlgt);
+	err = vfsub_sio_mkdir(au_hi(dir, bdst), h_dentry,
+			      S_IRWXU | S_IRUGO | S_IXUGO, dlgt);
 	if (unlikely(err))
 		goto out_put;
 
@@ -123,7 +119,8 @@ static int au_cpdown_dir(struct dentry *dentry, aufs_bindex_t bdst,
 		diropq = 1;
 	}
 
-	err = au_cpdown_attr(au_hi(dir, bdst), h_dentry, au_h_dptr(dentry, bstart));
+	err = au_cpdown_attr(au_hi(dir, bdst), h_dentry,
+			     au_h_dptr(dentry, bstart));
 	mutex_unlock(&h_inode->i_mutex);
 	if (unlikely(err))
 		goto out_opq;
@@ -480,7 +477,7 @@ static int au_wbr_create_mfsrr(struct dentry *dentry, int isdir)
 		mfs = &au_sbi(dentry->d_sb)->si_wbr_mfs;
 		LKTRTrace("%llu bytes, %llu wmark\n",
 			  mfs->mfsrr_bytes, mfs->mfsrr_watermark);
-		if (unlikely(mfs->mfsrr_bytes < mfs->mfsrr_watermark))
+		if (mfs->mfsrr_bytes < mfs->mfsrr_watermark)
 			err = au_wbr_create_rr(dentry, isdir);
 	}
 
@@ -536,7 +533,7 @@ static int au_wbr_create_pmfs(struct dentry *dentry, int isdir)
 	b = br->br_wbr->wbr_bytes;
 	LKTRTrace("b%d, %llu\n", err, b);
 
-	if (unlikely(dirperm1)) {
+	if (dirperm1) {
 		for (bindex = bstart; bindex <= bend; bindex++) {
 			h_parent = au_h_dptr(parent, bindex);
 			if (!h_parent)

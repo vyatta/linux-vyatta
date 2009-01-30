@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * copy-up/down functions
  *
- * $Id: cpup.h,v 1.5 2008/09/01 02:54:48 sfjro Exp $
+ * $Id: cpup.h,v 1.7 2009/01/26 06:23:51 sfjro Exp $
  */
 
 #ifndef __AUFS_CPUP_H__
@@ -31,10 +31,10 @@
 #include <linux/aufs_type.h>
 
 void au_cpup_attr_timesizes(struct inode *inode);
-void au_cpup_attr_nlink(struct inode *inode);
+void au_cpup_attr_nlink(struct inode *inode, int force);
 void au_cpup_attr_changeable(struct inode *inode);
 void au_cpup_igen(struct inode *inode, struct inode *h_inode);
-void au_cpup_attr_all(struct inode *inode);
+void au_cpup_attr_all(struct inode *inode, int force);
 
 /* ---------------------------------------------------------------------- */
 
@@ -73,6 +73,14 @@ void au_dtime_store(struct au_dtime *dt, struct dentry *dentry,
 		    struct dentry *h_dentry, struct au_hinode *hinode,
 		    struct au_hinode *hdir);
 void au_dtime_revert(struct au_dtime *dt);
+
+/* ---------------------------------------------------------------------- */
+
+static inline void au_cpup_attr_flags(struct inode *inode,
+				      struct inode *h_inode)
+{
+	inode->i_flags |= h_inode->i_flags & ~(S_DEAD | S_PRIVATE);
+}
 
 #endif /* __KERNEL__ */
 #endif /* __AUFS_CPUP_H__ */

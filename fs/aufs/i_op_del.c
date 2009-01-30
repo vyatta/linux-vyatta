@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * inode operations (del entry)
  *
- * $Id: i_op_del.c,v 1.14 2008/10/06 00:29:57 sfjro Exp $
+ * $Id: i_op_del.c,v 1.17 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -147,7 +147,7 @@ int au_may_del(struct dentry *dentry, aufs_bindex_t bindex,
 	 * some filesystem may unlink a dir and corrupt its consistency.
 	 * so let's try heavy test.
 	 */
-	if (1 /*unlikely(au_opt_test(au_mntflags(sb), UDBA_INOTIFY))*/) {
+	if (1 /*au_opt_test(au_mntflags(sb), UDBA_INOTIFY)*/) {
 		struct dentry *h_latest;
 		struct qstr *qstr = &dentry->d_name;
 
@@ -196,7 +196,7 @@ lock_hdir_create_wh(struct dentry *dentry, int isdir, aufs_bindex_t *rbcpup,
 	mnt_flags = au_mntflags(sb);
 	bcpup = *rbcpup;
 	pin_flags = AuPin_DI_LOCKED | AuPin_MNT_WRITE;
-	if (unlikely(au_opt_test(mnt_flags, UDBA_INOTIFY)))
+	if (au_opt_test(mnt_flags, UDBA_INOTIFY))
 		au_fset_pin(pin_flags, DO_GPARENT);
 	err = au_pin(pin, dentry, bcpup, pin_flags);
 	wh_dentry = ERR_PTR(err);
@@ -206,7 +206,7 @@ lock_hdir_create_wh(struct dentry *dentry, int isdir, aufs_bindex_t *rbcpup,
 	if (!au_opt_test(mnt_flags, UDBA_NONE) && au_dbstart(dentry) == bcpup) {
 		ndx.nfsmnt = au_nfsmnt(sb, bcpup);
 		ndx.flags = 0;
-		if (unlikely(au_test_dlgt(mnt_flags)))
+		if (au_test_dlgt(mnt_flags))
 			au_fset_ndx(ndx.flags, DLGT);
 		ndx.nd = NULL;
 		/* ndx.br = au_sbr(sb, bcpup); */
@@ -225,7 +225,7 @@ lock_hdir_create_wh(struct dentry *dentry, int isdir, aufs_bindex_t *rbcpup,
 
 	ndx.nfsmnt = au_nfsmnt(sb, bcpup);
 	ndx.flags = 0;
-	if (unlikely(au_test_dlgt(mnt_flags)))
+	if (au_test_dlgt(mnt_flags))
 		au_fset_ndx(ndx.flags, DLGT);
 	ndx.nd = NULL;
 	/* ndx.br = NULL; */
@@ -254,14 +254,14 @@ static int renwh_and_rmdir(struct dentry *dentry, aufs_bindex_t bindex,
 	inode = NULL;
 	h_inode = NULL;
 	sb = dentry->d_sb;
-	if (unlikely(au_opt_test(au_mntflags(sb), UDBA_INOTIFY))) {
+	if (au_opt_test(au_mntflags(sb), UDBA_INOTIFY)) {
 		inode = dentry->d_inode;
 		h_inode = au_h_iptr(inode, bindex);
 		mutex_lock_nested(&h_inode->i_mutex, AuLsc_I_CHILD);
 	}
 	h_dentry = au_h_dptr(dentry, bindex);
 	err = au_whtmp_ren(dir, bindex, h_dentry);
-	if (unlikely(inode)) {
+	if (inode) {
 		/* todo: bad approach? */
 		if (!err)
 			au_hin_suspend(au_hi(inode, bindex));
@@ -395,10 +395,10 @@ int aufs_unlink(struct inode *dir, struct dentry *dentry)
 	if (!err) {
 		drop_nlink(inode);
 #if 0 /* todo: update plink? */
-		if (unlikely(!inode->i_nlink
-			     && au_opt_test(p->a.mnt_flags, PLINK)
-			     && au_plink_test(sb, inode)
-			     /* && atomic_read(&inode->i_count) == 2) */)) {
+		if (!inode->i_nlink
+		    && au_opt_test(p->a.mnt_flags, PLINK)
+		    && au_plink_test(sb, inode)
+		    /* && atomic_read(&inode->i_count) == 2) */) {
 			au_debug_on();
 			DbgInode(inode);
 			au_debug_off();
@@ -428,7 +428,7 @@ int aufs_unlink(struct inode *dir, struct dentry *dentry)
 		unsigned int rev_flags;
 
 		rev_flags = 0;
-		if (unlikely(dlgt))
+		if (dlgt)
 			au_fset_rev(rev_flags, DLGT);
 		rerr = do_revert(err, dir, bwh, wh_dentry, dentry, &dt,
 				 rev_flags);
@@ -444,6 +444,8 @@ int aufs_unlink(struct inode *dir, struct dentry *dentry)
 	di_write_unlock(parent);
 	aufs_read_unlock(dentry, AuLock_DW);
 	AuTraceErr(err);
+	if (unlikely(err == -EBUSY && au_test_nfsd(current)))
+		err = -ESTALE;
 	return err;
 }
 
@@ -515,8 +517,7 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 	sb = dentry->d_sb;
 	mnt_flags = au_mntflags(sb);
 	if (!err) {
-		if (unlikely(au_opt_test(mnt_flags, UDBA_INOTIFY)
-			     && rmdir_later))
+		if (au_opt_test(mnt_flags, UDBA_INOTIFY) && rmdir_later)
 			au_reset_hinotify(inode, /*flags*/0);
 		clear_nlink(inode);
 		inode->i_flags |= S_DEAD;
@@ -539,7 +540,7 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 		unsigned int rev_flags;
 
 		rev_flags = 0;
-		if (unlikely(au_test_dlgt(mnt_flags)))
+		if (au_test_dlgt(mnt_flags))
 			au_fset_rev(rev_flags, DLGT);
 		rerr = do_revert(err, dir, bwh, wh_dentry, dentry, &dt,
 				 rev_flags);
@@ -559,5 +560,7 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 	au_nhash_del(whlist);
  out:
 	AuTraceErr(err);
+	if (unlikely(err == -EBUSY && au_test_nfsd(current)))
+		err = -ESTALE;
 	return err;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * lookup functions for NFS branch in linux-2.6.19 and later
  *
- * $Id: br_nfs.c,v 1.7 2008/07/21 02:54:22 sfjro Exp $
+ * $Id: br_nfs.c,v 1.10 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -160,13 +160,13 @@ void au_hintent_put(struct au_hdentry *hd, int do_free)
 	struct au_hdintent *hdi, *tmp;
 	struct file *hf;
 
-	if (unlikely(hd->hd_intent_list)) {
+	if (hd->hd_intent_list) {
 		/* no spin lock */
 		list_for_each_entry_safe(hdi, tmp, hd->hd_intent_list,
 					 hdi_list) {
 			LKTRTrace("hdi %p\n", hdi);
 			hf = hdi->hdi_file[AuIntent_BRANCH];
-			if (unlikely(hf))
+			if (hf)
 				fput(hf);
 			/* list_del(&hdi->hdi_list); */
 			kfree(hdi);
@@ -179,22 +179,23 @@ void au_hintent_put(struct au_hdentry *hd, int do_free)
 /* ---------------------------------------------------------------------- */
 
 int au_fake_intent(/* struct au_ndsub *save,  */struct nameidata *nd,
-		   int perm)
+		   struct au_branch *br)
 {
 	int err;
 
-	LKTRTrace("perm %d\n", perm);
+	LKTRTrace("perm %d\n", br->br_perm);
 
 	err = 0;
 	nd->intent.open.file = NULL;
 	if (nd->flags & LOOKUP_OPEN) {
-		err = -ENFILE;
-		nd->intent.open.file = get_empty_filp();
-		if (unlikely(!nd->intent.open.file))
-			goto out;
-
-		err = 0;
-		if (!au_br_writable(perm)) {
+		if (au_test_fs_intent(br->br_mnt->mnt_sb)) {
+			err = -ENFILE;
+			nd->intent.open.file = get_empty_filp();
+			if (unlikely(!nd->intent.open.file))
+				goto out;
+			err = 0;
+		}
+		if (!au_br_writable(br->br_perm)) {
 			nd->intent.open.flags = FMODE_READ
 				| au_file_roflags(nd->intent.open.flags);
 			nd->flags &= ~LOOKUP_CREATE;
@@ -204,6 +205,16 @@ int au_fake_intent(/* struct au_ndsub *save,  */struct nameidata *nd,
  out:
 	AuTraceErr(err);
 	return err;
+}
+
+static void au_put_filp(struct file *file)
+{
+#if !defined(CONFIG_AUFS_MODULE) || defined(CONFIG_AUFS_PUT_FILP_PATCH)
+	if (unlikely(file))
+		put_filp(file);
+#else
+	WARN_ONCE(file, "unexpected put_fillp() call");
+#endif
 }
 
 int au_hin_after_reval(struct nameidata *nd, struct dentry *dentry,
@@ -224,8 +235,7 @@ int au_hin_after_reval(struct nameidata *nd, struct dentry *dentry,
 			if (!err)
 				nd->intent.open.file = NULL;
 		}
-		if (unlikely(nd->intent.open.file))
-			put_filp(nd->intent.open.file);
+		au_put_filp(nd->intent.open.file);
 	}
 
 	return err;
@@ -314,7 +324,7 @@ struct dentry *au_lkup_hash(const char *name, struct dentry *parent,
 	ndo = ndx->nd;
 	if (ndo) {
 		tmp_nd = *ndo;
-		err = au_fake_intent(&tmp_nd, ndx->br->br_perm);
+		err = au_fake_intent(&tmp_nd, ndx->br);
 		dentry = ERR_PTR(err);
 		if (unlikely(err))
 			goto out_intent;
@@ -339,8 +349,7 @@ struct dentry *au_lkup_hash(const char *name, struct dentry *parent,
 	path_put(&tmp_nd.path);
 
  out_intent:
-	if (tmp_nd.intent.open.file)
-		put_filp(tmp_nd.intent.open.file);
+	au_put_filp(tmp_nd.intent.open.file);
  out:
 	AuTraceErrPtr(dentry);
 	return dentry;

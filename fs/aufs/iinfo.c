@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * inode private data
  *
- * $Id: iinfo.c,v 1.10 2008/10/13 03:09:48 sfjro Exp $
+ * $Id: iinfo.c,v 1.13 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -86,7 +86,7 @@ unsigned int au_hi_flags(struct inode *inode, int isdir)
 	flags = 0;
 	if (au_opt_test_xino(mnt_flags))
 		au_fset_hi(flags, XINO);
-	if (unlikely(isdir && au_opt_test(mnt_flags, UDBA_INOTIFY)))
+	if (isdir && au_opt_test(mnt_flags, UDBA_INOTIFY))
 		au_fset_hi(flags, NOTIFY);
 	return flags;
 }
@@ -127,8 +127,8 @@ void au_set_h_iptr(struct inode *inode, aufs_bindex_t bindex,
 				AuIOErr1("failed au_xino_write() %d\n", err);
 		}
 
-		if (unlikely(au_ftest_hi(flags, NOTIFY)
-			     && au_br_hinotifyable(au_sbr_perm(sb, bindex)))) {
+		if (au_ftest_hi(flags, NOTIFY)
+		    && au_br_hinotifyable(au_sbr_perm(sb, bindex))) {
 			err = au_hin_alloc(hinode, inode, h_inode);
 			if (unlikely(err))
 				AuIOErr1("au_hin_alloc() %d\n", err);
@@ -163,7 +163,7 @@ void au_update_brange(struct inode *inode, int do_put_zero)
 	IiMustWriteLock(inode);
 
 	iinfo = au_ii(inode);
-	if (unlikely(!iinfo) || iinfo->ii_bstart < 0)
+	if (!iinfo || iinfo->ii_bstart < 0)
 		return;
 
 	if (do_put_zero) {
@@ -207,7 +207,7 @@ int au_iinfo_init(struct inode *inode)
 	iinfo = &(container_of(inode, struct aufs_icntnr, vfs_inode)->iinfo);
 	AuDebugOn(iinfo->ii_hinode);
 	nbr = au_sbend(sb) + 1;
-	if (unlikely(nbr <= 0))
+	if (nbr <= 0)
 		nbr = 1;
 	iinfo->ii_hinode = kcalloc(nbr, sizeof(*iinfo->ii_hinode), GFP_NOFS);
 	if (iinfo->ii_hinode) {
@@ -219,7 +219,6 @@ int au_iinfo_init(struct inode *inode)
 		iinfo->ii_bstart = -1;
 		iinfo->ii_bend = -1;
 		iinfo->ii_vdir = NULL;
-		iinfo->ii_nfsd_readdir = NULL;
 		return 0;
 	}
 	return -ENOMEM;
@@ -253,13 +252,11 @@ void au_iinfo_fin(struct inode *inode)
 
 	iinfo = au_ii(inode);
 	/* bad_inode case */
-	if (unlikely(!iinfo))
+	if (!iinfo)
 		return;
 
-	if (unlikely(iinfo->ii_vdir))
+	if (iinfo->ii_vdir)
 		au_vdir_free(iinfo->ii_vdir);
-	if (unlikely(iinfo->ii_nfsd_readdir))
-		au_nfsd_readdir_free(inode);
 
 	if (iinfo->ii_bstart >= 0) {
 		sb = inode->i_sb;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * inode attributes on NFS/FUSE branch or HINOTIFY
  *
- * $Id: getattr.c,v 1.2 2008/10/13 03:09:35 sfjro Exp $
+ * $Id: getattr.c,v 1.5 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -75,7 +75,7 @@ int aufs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *st)
 	int err;
 	unsigned int mnt_flags;
 	aufs_bindex_t bindex;
-	unsigned char no_lock;
+	unsigned char did_lock;
 	struct inode *inode;
 	struct dentry *h_dentry;
 	struct super_block *sb, *h_sb;
@@ -87,8 +87,9 @@ int aufs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *st)
 	si_read_lock(sb, AuLock_FLUSH);
 	mnt_flags = au_mntflags(sb);
 	if (dentry != sb->s_root) {
-		no_lock = !!di_nfsd_read_lock_parent(dentry, AuLock_IR);
+		di_read_lock_parent(dentry, AuLock_IR);
 		inode = dentry->d_inode;
+		did_lock = 1;
 
 		/* todo: test bit inotify option too? */
 		bindex = au_ibstart(inode);
@@ -105,10 +106,9 @@ int aufs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *st)
 			goto out;
 	} else {
 		/* lock free root dinfo */
-		no_lock = 1;
+		did_lock = 0;
 		bindex = 0;
 		inode = dentry->d_inode;
-		/* todo: via h_sb */
 		h_dentry = dget(au_di(dentry)->di_hdentry->hd_dentry);
 	}
 
@@ -119,13 +119,13 @@ int aufs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *st)
 	dput(h_dentry);
 	if (!err) {
 		/* todo: I don't like this approach */
-		au_cpup_attr_all(inode);
+		au_cpup_attr_all(inode, /*force*/0);
 	fill:
 		generic_fillattr(inode, st);
 	}
 
  out:
-	if (!no_lock)
+	if (did_lock)
 		di_read_unlock(dentry, AuLock_IR);
 	si_read_unlock(sb);
 	AuTraceErr(err);

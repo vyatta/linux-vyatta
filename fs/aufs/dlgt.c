@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * lookup functions in 'delegate' mode
  *
- * $Id: dlgt.c,v 1.5 2008/08/11 02:50:34 sfjro Exp $
+ * $Id: dlgt.c,v 1.6 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"

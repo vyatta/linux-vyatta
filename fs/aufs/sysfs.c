@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * sysfs interface
  *
- * $Id: sysfs.c,v 1.15 2008/10/06 00:31:01 sfjro Exp $
+ * $Id: sysfs.c,v 1.19 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include <linux/fs.h>
@@ -49,23 +49,29 @@ static ssize_t config_show(struct kobject *kobj, struct kobj_attribute *attr,
 #elif defined(CONFIG_AUFS_BRANCH_MAX_32767)
 		conf_bool(BRANCH_MAX_32767)
 #endif
+#ifdef CONFIG_AUFS_STAT
+		conf_bool(STAT)
+#endif
 #ifdef CONFIG_AUFS_HINOTIFY
 		conf_bool(HINOTIFY)
 #endif
 #ifdef CONFIG_AUFS_EXPORT
 		conf_bool(EXPORT)
 #endif
+#ifdef CONFIG_AUFS_INO_T_64
+		conf_bool(INO_T_64)
+#endif
 #ifdef CONFIG_AUFS_ROBR
 		conf_bool(ROBR)
-#endif
-#ifdef CONFIG_AUFS_SHWH
-		conf_bool(SHWH)
 #endif
 #ifdef CONFIG_AUFS_DLGT
 		conf_bool(DLGT)
 #endif
 #ifdef CONFIG_AUFS_HIN_OR_DLGT
 		conf_bool(HIN_OR_DLGT)
+#endif
+#ifdef CONFIG_AUFS_SHWH
+		conf_bool(SHWH)
 #endif
 #ifdef CONFIG_AUFS_RR_SQUASHFS
 		conf_bool(RR_SQUASHFS)
@@ -76,14 +82,17 @@ static ssize_t config_show(struct kobject *kobj, struct kobj_attribute *attr,
 #ifdef CONFIG_AUFS_SPLICE_PATCH
 		conf_bool(SPLICE_PATCH)
 #endif
-#ifdef CONFIG_AUFS_PUT_FILP_PATCH
-		conf_bool(PUT_FILP_PATCH)
-#endif
 #ifdef CONFIG_AUFS_LHASH_PATCH
 		conf_bool(LHASH_PATCH)
 #endif
+#ifdef CONFIG_AUFS_PUT_FILP_PATCH
+		conf_bool(PUT_FILP_PATCH)
+#endif
 #ifdef CONFIG_AUFS_BR_NFS
 		conf_bool(BR_NFS)
+#endif
+#ifdef CONFIG_AUFS_BR_NFS_V4
+		conf_bool(BR_NFS_V4)
 #endif
 #ifdef CONFIG_AUFS_BR_XFS
 		conf_bool(BR_XFS)
@@ -103,17 +112,14 @@ static ssize_t config_show(struct kobject *kobj, struct kobj_attribute *attr,
 #ifdef CONFIG_AUFS_GETATTR
 		conf_bool(GETATTR)
 #endif
-#ifdef CONFIG_AUFS_STAT
-		conf_bool(STAT)
-#endif
 #ifdef CONFIG_AUFS_DEBUG
 		conf_bool(DEBUG)
 #endif
-#ifdef CONFIG_AUFS_DEBUG_LOCK
-		conf_bool(DEBUG_LOCK)
-#endif
 #ifdef CONFIG_AUFS_MAGIC_SYSRQ
 		conf_bool(MAGIC_SYSRQ)
+#endif
+#ifdef CONFIG_AUFS_DEBUG_LOCK
+		conf_bool(DEBUG_LOCK)
 #endif
 #ifdef CONFIG_AUFS_COMPAT
 		conf_bool(COMPAT)
@@ -271,7 +277,7 @@ int sysaufs_sbi_xi(struct seq_file *seq, struct file *xf, int dlgt,
 	if (!err) {
 		seq_printf(seq, "%llux%lu %lld",
 			   st.blocks, st.blksize, (long long)st.size);
-		if (unlikely(print_path)) {
+		if (print_path) {
 			path.dentry = xf->f_dentry;
 			path.mnt = xf->f_vfsmnt;
 			seq_putc(seq, ' ');
@@ -301,7 +307,7 @@ int sysaufs_sbi_xino(struct seq_file *seq, struct super_block *sb)
 	sbinfo = au_sbi(sb);
 	mnt_flags = au_mntflags(sb);
 	xinodir = !!au_opt_test(mnt_flags, XINODIR);
-	if (unlikely(!au_opt_test_xino(mnt_flags))) {
+	if (!au_opt_test_xino(mnt_flags)) {
 #ifdef CONFIG_AUFS_DEBUG
 		AuDebugOn(sbinfo->si_xib);
 		bend = au_sbend(sb);
@@ -326,7 +332,7 @@ int sysaufs_sbi_xino(struct seq_file *seq, struct super_block *sb)
 			seq_printf(seq, "%ld, %llux%lu %lld",
 				   (long)file_count(xf), st.blocks, st.blksize,
 				   (long long)st.size);
-			if (unlikely(xinodir)) {
+			if (xinodir) {
 				path.dentry = xf->f_dentry;
 				path.mnt = xf->f_vfsmnt;
 				seq_putc(seq, ' ');
@@ -424,6 +430,7 @@ ssize_t sysaufs_sbi_show(struct kobject *kobj, struct attribute *attr,
 			 char *buf)
 {
 	ssize_t err;
+	long l;
 	struct au_sbinfo *sbinfo;
 	struct super_block *sb;
 	struct seq_file *seq;
@@ -454,7 +461,9 @@ ssize_t sysaufs_sbi_show(struct kobject *kobj, struct attribute *attr,
 
 	if (!strncmp(name, SysaufsBr_PREFIX, sizeof(SysaufsBr_PREFIX) - 1)) {
 		name += sizeof(SysaufsBr_PREFIX) - 1;
-		err = sysaufs_sbi_br(seq, sb, simple_strtol(name, NULL, 10));
+		err = strict_strtol(name, 10, &l);
+		if (!err)
+			err = sysaufs_sbi_br(seq, sb, (aufs_bindex_t)l);
 		goto out_seq;
 	}
 	BUG();

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * superblock private data
  *
- * $Id: sbinfo.c,v 1.13 2008/10/06 00:30:32 sfjro Exp $
+ * $Id: sbinfo.c,v 1.16 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include <linux/smp_lock.h>
@@ -72,7 +72,7 @@ int au_si_alloc(struct super_block *sb)
 		goto out_br;
 
 	au_rw_init_wlock(&sbinfo->si_rwsem);
-	//au_dbg_lock_sbi_reg(sb);
+	//au_dbg_locked_si_reg(sb, 1);
 	sbinfo->si_generation = 0;
 	sbinfo->au_si_status = 0;
 	sbinfo->si_bend = -1;

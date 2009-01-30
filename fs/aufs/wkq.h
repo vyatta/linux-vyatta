@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * workqueue for asynchronous/super-io/delegated operations
  *
- * $Id: wkq.h,v 1.8 2008/09/29 03:45:13 sfjro Exp $
+ * $Id: wkq.h,v 1.10 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #ifndef __AUFS_WKQ_H__
@@ -82,16 +82,16 @@ void au_wkq_fin(void);
 static inline int au_test_nowait_wkq(struct task_struct *tsk)
 {
 	static const char *p = "events";
-	return (!tsk->mm && !strncmp(tsk->comm, p, strlen(p)));
+	return !tsk->mm && !strncmp(tsk->comm, p, strlen(p));
 }
 
 static inline int au_test_wkq(struct task_struct *tsk)
 {
-	return (!tsk->mm && !strcmp(tsk->comm, AUFS_WKQ_NAME));
+	return !tsk->mm && !strcmp(tsk->comm, AUFS_WKQ_NAME);
 #if 0 /* reserved for future use, per-cpu workqueue */
-	return (!tsk->mm
+	return !tsk->mm
 		&& !memcmp(tsk->comm, AUFS_WKQ_NAME "/",
-			   sizeof(AUFS_WKQ_NAME)));
+			   sizeof(AUFS_WKQ_NAME));
 #endif
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * inode functions
  *
- * $Id: inode.c,v 1.14 2008/09/29 03:44:49 sfjro Exp $
+ * $Id: inode.c,v 1.18 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -86,7 +86,7 @@ int au_refresh_hinode_self(struct inode *inode)
 		goto out;
 
 	if (1 || first != au_h_iptr(inode, iinfo->ii_bstart))
-		au_cpup_attr_all(inode);
+		au_cpup_attr_all(inode, /*force*/0);
 	if (update && S_ISDIR(inode->i_mode))
 		inode->i_version++;
 	au_update_iigen(inode);
@@ -153,7 +153,7 @@ int au_refresh_hinode(struct inode *inode, struct dentry *dentry)
 		goto out;
 
 	if (1 || first != au_h_iptr(inode, iinfo->ii_bstart))
-		au_cpup_attr_all(inode);
+		au_cpup_attr_all(inode, /*force*/0);
 	if (update && isdir)
 		inode->i_version++;
 	au_update_iigen(inode);
@@ -209,6 +209,7 @@ static int set_inode(struct inode *inode, struct dentry *dentry)
 	case S_IFIFO:
 	case S_IFSOCK:
 		btail = au_dbtail(dentry);
+		inode->i_op = &aufs_iop;
 		init_special_inode(inode, mode,
 				   au_h_rdev(h_inode, /*h_mnt*/NULL, h_dentry));
 		break;
@@ -220,11 +221,10 @@ static int set_inode(struct inode *inode, struct dentry *dentry)
 
 	/* do not set inotify for whiteouted dirs (SHWH mode) */
 	flags = au_hi_flags(inode, isdir);
-	if (unlikely(au_opt_test(au_mntflags(dentry->d_sb), SHWH)
-		     && au_ftest_hi(flags, NOTIFY)
-		     && dentry->d_name.len > AUFS_WH_PFX_LEN
-		     && !memcmp(dentry->d_name.name, AUFS_WH_PFX,
-				AUFS_WH_PFX_LEN)))
+	if (au_opt_test(au_mntflags(dentry->d_sb), SHWH)
+	    && au_ftest_hi(flags, NOTIFY)
+	    && dentry->d_name.len > AUFS_WH_PFX_LEN
+	    && !memcmp(dentry->d_name.name, AUFS_WH_PFX, AUFS_WH_PFX_LEN))
 		au_fclr_hi(flags, NOTIFY);
 	iinfo = au_ii(inode);
 	iinfo->ii_bstart = bstart;
@@ -237,7 +237,7 @@ static int set_inode(struct inode *inode, struct dentry *dentry)
 		au_set_h_iptr(inode, bindex, au_igrab(h_dentry->d_inode),
 			      flags);
 	}
-	au_cpup_attr_all(inode);
+	au_cpup_attr_all(inode, /*force*/1);
 
  out:
 	AuTraceErr(err);
@@ -281,7 +281,7 @@ static int reval_inode(struct inode *inode, struct dentry *dentry, int *matched)
 			   || !au_test_higen(inode, h_inode))); */
 			*matched = 1;
 			err = 0;
-			if (unlikely(au_iigen(inode) != au_digen(dentry)))
+			if (au_iigen(inode) != au_digen(dentry))
 				err = au_refresh_hinode(inode, dentry);
 			break;
 		}
@@ -413,9 +413,9 @@ int au_test_h_perm(struct inode *h_inode, int mask, int dlgt)
 
 int au_test_h_perm_sio(struct inode *h_inode, int mask, int dlgt)
 {
-	if (unlikely(au_test_nfs(h_inode->i_sb)
-		     && (mask & MAY_WRITE)
-		     && S_ISDIR(h_inode->i_mode)))
+	if (au_test_nfs(h_inode->i_sb)
+	    && (mask & MAY_WRITE)
+	    && S_ISDIR(h_inode->i_mode))
 		mask |= MAY_READ; /* force permission check */
 	return au_test_h_perm(h_inode, mask, dlgt);
 }

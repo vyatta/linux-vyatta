@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * mount options/flags
  *
- * $Id: opts.c,v 1.16 2008/10/06 00:29:48 sfjro Exp $
+ * $Id: opts.c,v 1.20 2009/01/26 06:24:05 sfjro Exp $
  */
 
 #include <linux/types.h> /* a distribution requires */
@@ -51,6 +51,7 @@ enum {
 	Opt_dlgt, Opt_nodlgt,
 	Opt_refrof, Opt_norefrof,
 	Opt_verbose, Opt_noverbose,
+	Opt_sum, Opt_nosum, Opt_wsum,
 	Opt_tail, Opt_ignore, Opt_ignore_silent, Opt_err
 };
 
@@ -114,16 +115,15 @@ static match_table_t options = {
 
 #ifdef CONFIG_AUFS_DLGT
 	{Opt_dlgt, "dlgt"},
-	{Opt_nodlgt, "nodlgt"},
-
 	{Opt_dirperm1, "dirperm1"},
-	{Opt_nodirperm1, "nodirperm1"},
 #endif
+	{Opt_nodlgt, "nodlgt"},
+	{Opt_nodirperm1, "nodirperm1"},
 
 #ifdef CONFIG_AUFS_SHWH
 	{Opt_shwh, "shwh"},
-	{Opt_noshwh, "noshwh"},
 #endif
+	{Opt_noshwh, "noshwh"},
 
 	{Opt_rendir, "rendir=%d"},
 	{Opt_rendir, "rendir:%d"},
@@ -137,6 +137,10 @@ static match_table_t options = {
 	{Opt_noverbose, "quiet"},
 	{Opt_noverbose, "q"},
 	{Opt_noverbose, "silent"},
+
+	{Opt_sum, "sum"},
+	{Opt_nosum, "nosum"},
+	{Opt_wsum, "wsum"},
 
 	{Opt_rdcache, "rdcache=%d"},
 	{Opt_rdcache, "rdcache:%d"},
@@ -287,23 +291,28 @@ static match_table_t au_wbr_create_policy = {
 };
 
 /* cf. linux/lib/parser.c */
-static int au_match_ull(substring_t *s, unsigned long long *result, int base)
+static int au_match_ull(substring_t *s, unsigned long long *result)
 {
-	char *endp;
-	char *buf;
-	int ret;
+	int err;
+	unsigned int len;
+	char a[32];
 
-	buf = kmalloc(s->to - s->from + 1, GFP_NOFS);
-	if (!buf)
-		return -ENOMEM;
-	memcpy(buf, s->from, s->to - s->from);
-	buf[s->to - s->from] = '\0';
-	*result = simple_strtoull(buf, &endp, base);
-	ret = 0;
-	if (endp == buf)
-		ret = -EINVAL;
-	kfree(buf);
-	return ret;
+	err = -ERANGE;
+	len = s->to - s->from;
+	if (len + 1 <= sizeof(a)) {
+		memcpy(a, s->from, len);
+		a[len] = '\0';
+#if 1
+		err = strict_strtoull(a, 0, result);
+#else
+		char *next;
+		*result = memparse(a, &next);
+		err = *result;
+		if (!IS_ERR((void *)err))
+			err = 0;
+#endif
+	}
+	return err;
 }
 
 static int au_wbr_mfs_wmark(substring_t *arg, char *str,
@@ -313,7 +322,7 @@ static int au_wbr_mfs_wmark(substring_t *arg, char *str,
 	unsigned long long ull;
 
 	err = 0;
-	if (!au_match_ull(arg, &ull, 0))
+	if (!au_match_ull(arg, &ull))
 		create->mfsrr_watermark = ull;
 	else {
 		AuErr("bad integer in %s\n", str);
@@ -555,6 +564,15 @@ static void dump_opts(struct au_opts *opts)
 		case Opt_noverbose:
 			LKTRLabel(noverbose);
 			break;
+		case Opt_sum:
+			LKTRLabel(sum);
+			break;
+		case Opt_nosum:
+			LKTRLabel(nosum);
+			break;
+		case Opt_wsum:
+			LKTRLabel(wsum);
+			break;
 		case Opt_coo:
 			LKTRTrace("coo %d, %s\n",
 				  opt->coo, au_optstr_coo(opt->coo));
@@ -624,8 +642,8 @@ void au_opts_free(struct au_opts *opts)
 	}
 }
 
-static int opt_add(struct au_opt *opt, char *opt_str, struct super_block *sb,
-		   aufs_bindex_t bindex)
+static int opt_add(struct au_opt *opt, char *opt_str, unsigned long sb_flags,
+		   struct super_block *sb, aufs_bindex_t bindex)
 {
 	int err;
 	struct au_opt_add *add = &opt->add;
@@ -637,7 +655,7 @@ static int opt_add(struct au_opt *opt, char *opt_str, struct super_block *sb,
 	add->perm = AuBrPerm_Last;
 	add->path = opt_str;
 	p = strchr(opt_str, '=');
-	if (unlikely(p)) {
+	if (p) {
 		*p++ = 0;
 		if (*p)
 			add->perm = br_perm_val(p);
@@ -651,7 +669,7 @@ static int opt_add(struct au_opt *opt, char *opt_str, struct super_block *sb,
 			add->perm = AuBrPerm_RO;
 			if (au_test_def_rr(add->nd.path.dentry->d_sb))
 				add->perm = AuBrPerm_RR;
-			if (!bindex && !(sb->s_flags & MS_RDONLY))
+			if (!bindex && !(sb_flags & MS_RDONLY))
 				add->perm = AuBrPerm_RW;
 #ifdef CONFIG_AUFS_COMPAT
 			add->perm = AuBrPerm_RW;
@@ -669,8 +687,7 @@ static int opt_add(struct au_opt *opt, char *opt_str, struct super_block *sb,
 }
 
 /* called without aufs lock */
-int au_opts_parse(struct super_block *sb, unsigned long flags, char *str,
-		  struct au_opts *opts)
+int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 {
 	int err, n, token;
 	struct dentry *root;
@@ -718,7 +735,8 @@ int au_opts_parse(struct super_block *sb, unsigned long flags, char *str,
 			err = 0;
 			while (!err && (opt_str = strsep(&a->args[0].from, ":"))
 			       && *opt_str) {
-				err = opt_add(opt, opt_str, sb, bindex++);
+				err = opt_add(opt, opt_str, opts->sb_flags, sb,
+					      bindex++);
 				if (unlikely(!err && ++opt > opt_tail)) {
 					err = -E2BIG;
 					break;
@@ -733,16 +751,18 @@ int au_opts_parse(struct super_block *sb, unsigned long flags, char *str,
 				break;
 			}
 			bindex = n;
-			err = opt_add(opt, a->args[1].from, sb, bindex);
+			err = opt_add(opt, a->args[1].from, opts->sb_flags, sb,
+				      bindex);
 			break;
 		case Opt_append:
-			err = opt_add(opt, a->args[0].from, sb,
+			err = opt_add(opt, a->args[0].from, opts->sb_flags, sb,
 				      /*dummy bindex*/1);
 			if (!err)
 				opt->type = token;
 			break;
 		case Opt_prepend:
-			err = opt_add(opt, a->args[0].from, sb, /*bindex*/0);
+			err = opt_add(opt, a->args[0].from, opts->sb_flags, sb,
+				      /*bindex*/0);
 			if (!err)
 				opt->type = token;
 			break;
@@ -932,7 +952,7 @@ int au_opts_parse(struct super_block *sb, unsigned long flags, char *str,
 			break;
 
 		case Opt_shwh:
-			if (flags & MS_RDONLY) {
+			if (opts->sb_flags & MS_RDONLY) {
 				err = 0;
 				opt->type = token;
 			} else
@@ -961,6 +981,9 @@ int au_opts_parse(struct super_block *sb, unsigned long flags, char *str,
 		case Opt_norefrof:
 		case Opt_verbose:
 		case Opt_noverbose:
+		case Opt_sum:
+		case Opt_nosum:
+		case Opt_wsum:
 			err = 0;
 			opt->type = token;
 			break;
@@ -996,8 +1019,13 @@ int au_opts_parse(struct super_block *sb, unsigned long flags, char *str,
 		case Opt_coo:
 			opt->coo = coo_val(a->args[0].from);
 			if (opt->coo >= 0) {
-				err = 0;
-				opt->type = token;
+				if (opt->coo == AuOpt_COO_NONE
+				    || !(opts->sb_flags & MS_RDONLY)) {
+					err = 0;
+					opt->type = token;
+				} else
+					AuErr("bad %s for readonly mount\n",
+					      opt_str);
 			} else
 				AuErr("wrong value, %s\n", opt_str);
 			break;
@@ -1112,6 +1140,17 @@ static int au_opt_simple(struct super_block *sb, struct au_opt *opt,
 		au_opt_clr(sbinfo->si_mntflags, VERBOSE);
 		break;
 
+	case Opt_sum:
+		au_opt_set(sbinfo->si_mntflags, SUM);
+		break;
+	case Opt_wsum:
+		au_opt_clr(sbinfo->si_mntflags, SUM);
+		au_opt_set(sbinfo->si_mntflags, SUM_W);
+	case Opt_nosum:
+		au_opt_clr(sbinfo->si_mntflags, SUM);
+		au_opt_clr(sbinfo->si_mntflags, SUM_W);
+		break;
+
 	case Opt_wbr_create:
 		create = &opt->wbr_create;
 		if (sbinfo->si_wbr_create_ops->fin) {
@@ -1217,7 +1256,7 @@ static int au_opt_br(struct super_block *sb, struct au_opt *opt,
 	switch (opt->type) {
 	case Opt_append:
 		opt->add.bindex = au_sbend(sb) + 1;
-		if (unlikely(opt->add.bindex < 0))
+		if (opt->add.bindex < 0)
 			opt->add.bindex = 0;
 		goto add;
 	case Opt_prepend:
@@ -1229,7 +1268,7 @@ static int au_opt_br(struct super_block *sb, struct au_opt *opt,
 		if (!err) {
 			err = 1;
 			au_fset_opts(opts->flags, REFRESH_DIR);
-			if (unlikely(au_br_whable(opt->add.perm)))
+			if (au_br_whable(opt->add.perm))
 				au_fset_opts(opts->flags, REFRESH_NONDIR);
 		}
 		break;
@@ -1253,7 +1292,7 @@ static int au_opt_br(struct super_block *sb, struct au_opt *opt,
 				&do_refresh);
 		if (!err) {
 			err = 1;
-			if (unlikely(do_refresh)) {
+			if (do_refresh) {
 				au_fset_opts(opts->flags, REFRESH_DIR);
 				au_fset_opts(opts->flags, REFRESH_NONDIR);
 			}
@@ -1299,8 +1338,8 @@ static int au_opt_xino(struct super_block *sb, struct au_opt *opt,
 	return err;
 }
 
-static int verify_opts(struct super_block *sb, unsigned int pending,
-		       int remount)
+int verify_opts(struct super_block *sb, unsigned long sb_flags,
+		unsigned int pending, int remount)
 {
 	int err;
 	aufs_bindex_t bindex, bend;
@@ -1316,11 +1355,14 @@ static int verify_opts(struct super_block *sb, unsigned int pending,
 	AuDebugOn(!(mnt_flags & AuOptMask_COO));
 	AuDebugOn(!(mnt_flags & AuOptMask_UDBA));
 
-	if (!(sb->s_flags & MS_RDONLY)) {
+	if (!(sb_flags & MS_RDONLY)) {
 		if (unlikely(!au_br_writable(au_sbr_perm(sb, 0))))
 			AuWarn("first branch should be rw\n");
 		if (unlikely(au_opt_test(mnt_flags, SHWH)))
 			AuWarn("shwh should be used with ro\n");
+	} else if (unlikely(!au_opt_test(mnt_flags, COO_NONE))) {
+		AuWarn("resetting coo for readonly mount\n");
+		au_opt_set_coo(au_sbi(sb)->si_mntflags, COO_NONE);
 	}
 
 	if (unlikely(au_opt_test((mnt_flags | pending), UDBA_INOTIFY)
@@ -1465,7 +1507,7 @@ int au_opts_mount(struct super_block *sb, struct au_opts *opts)
 		goto out;
 
 	/* todo: test this error case? */
-	err = verify_opts(sb, tmp, /*remount*/0);
+	err = verify_opts(sb, sb->s_flags, tmp, /*remount*/0);
 	if (unlikely(err))
 		goto out;
 
@@ -1535,7 +1577,7 @@ int au_opts_remount(struct super_block *sb, struct au_opts *opts)
 					  opts);
 
 		/* restore it */
-		if (unlikely(dlgt))
+		if (dlgt)
 			au_opt_set(sbinfo->si_mntflags, DLGT);
 		opt++;
 	}
@@ -1547,13 +1589,14 @@ int au_opts_remount(struct super_block *sb, struct au_opts *opts)
 
 	/* todo: test this error case? */
 	au_opt_clr(sbinfo->si_mntflags, DLGT);
-	rerr = verify_opts(sb, sbinfo->si_mntflags, /*remount*/1);
+	rerr = verify_opts(sb, opts->sb_flags, sbinfo->si_mntflags,
+			   /*remount*/1);
 	if (unlikely(dlgt))
 		au_opt_set(sbinfo->si_mntflags, DLGT);
 	if (unlikely(rerr && !err))
 		err = rerr;
 
-	if (unlikely(au_ftest_opts(opts->flags, TRUNC_XIB))) {
+	if (au_ftest_opts(opts->flags, TRUNC_XIB)) {
 		rerr = au_xib_trunc(sb);
 		if (unlikely(rerr && !err))
 			err = rerr;

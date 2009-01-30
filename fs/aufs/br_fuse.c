@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * special handling for inode attributes on FUSE branch
  *
- * $Id: br_fuse.c,v 1.6 2008/07/27 22:49:28 sfjro Exp $
+ * $Id: br_fuse.c,v 1.8 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -33,9 +33,9 @@ int au_update_fuse_h_inode(struct vfsmount *h_mnt, struct dentry *h_dentry)
 	LKTRTrace("%.*s\n", AuDLNPair(h_dentry));
 
 	err = 0;
-	if (unlikely(h_dentry->d_inode
-		     /* && atomic_read(&h_dentry->d_inode->i_count) */
-		     && au_test_fuse(h_dentry->d_sb))) {
+	if (h_dentry->d_inode
+	    /* && atomic_read(&h_dentry->d_inode->i_count) */
+	    && au_test_fuse(h_dentry->d_sb)) {
 		err = vfsub_getattr(h_mnt, h_dentry, &st, /*dlgt*/0);
 		if (unlikely(err)) {
 			AuDbg("err %d\n", err);
@@ -69,7 +69,7 @@ int vfsub_i_attr(struct vfsmount *mnt, struct dentry *dentry, int dlgt)
 
 	err = 0;
 	op = inode->i_op;
-	if (unlikely(op && op->getattr && !au_test_aufs(dentry->d_sb))) {
+	if (op && op->getattr && !au_test_aufs(dentry->d_sb)) {
 		err = security_inode_getattr(mnt, dentry);
 		if (!err)
 			err = op->getattr(mnt, dentry, &st);

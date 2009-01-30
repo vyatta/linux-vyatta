@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * sub-routines for VFS
  *
- * $Id: vfsub.c,v 1.11 2008/08/04 00:32:35 sfjro Exp $
+ * $Id: vfsub.c,v 1.15 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include <linux/uaccess.h>
@@ -32,7 +32,7 @@ void vfsub_args_init(struct vfsub_args *vargs, struct au_hin_ignore *ign,
 {
 	do_vfsub_args_reinit(vargs, ign);
 	vargs->flags = 0;
-	if (unlikely(dlgt))
+	if (dlgt)
 		vfsub_fset(vargs->flags, DLGT);
 	if (force_unlink)
 		vfsub_fset(vargs->flags, FORCE_UNLINK);
@@ -201,6 +201,7 @@ int do_vfsub_rename(struct inode *src_dir, struct dentry *src_dentry,
 		  dir->i_ino, AuDLNPair(dentry));
 	IMustLock(dir);
 	IMustLock(src_dir);
+	AuDebugOn(src_dir != dir && !vfsub_is_rename_mutex_locked(dir->i_sb));
 
 	lockdep_off();
 	err = vfs_rename(src_dir, src_dentry, dir, dentry);
@@ -270,8 +271,8 @@ ssize_t do_vfsub_read_u(struct file *file, char __user *ubuf, size_t count,
 {
 	ssize_t err;
 
-	LKTRTrace("%.*s, cnt %lu, pos %lld\n",
-		  AuDLNPair(file->f_dentry), (unsigned long)count, *ppos);
+	LKTRTrace("%.*s, cnt %zu, pos %lld\n",
+		  AuDLNPair(file->f_dentry), count, *ppos);
 
 	/* todo: always off, regardless nfs branch? */
 	au_br_nfs_lockdep_off(file->f_vfsmnt->mnt_sb);
@@ -302,8 +303,8 @@ ssize_t do_vfsub_write_u(struct file *file, const char __user *ubuf,
 {
 	ssize_t err;
 
-	LKTRTrace("%.*s, cnt %lu, pos %lld\n",
-		  AuDLNPair(file->f_dentry), (unsigned long)count, *ppos);
+	LKTRTrace("%.*s, cnt %zu, pos %lld\n",
+		  AuDLNPair(file->f_dentry), count, *ppos);
 
 	lockdep_off();
 	err = vfs_write(file, ubuf, count, ppos);
@@ -349,8 +350,8 @@ long do_vfsub_splice_to(struct file *in, loff_t *ppos,
 {
 	long err;
 
-	LKTRTrace("%.*s, pos %lld, len %lu, 0x%x\n",
-		  AuDLNPair(in->f_dentry), *ppos, (unsigned long)len, flags);
+	LKTRTrace("%.*s, pos %lld, len %zu, 0x%x\n",
+		  AuDLNPair(in->f_dentry), *ppos, len, flags);
 
 	lockdep_off();
 	err = vfs_splice_to(in, ppos, pipe, len, flags);
@@ -365,8 +366,8 @@ long do_vfsub_splice_from(struct pipe_inode_info *pipe, struct file *out,
 {
 	long err;
 
-	LKTRTrace("%.*s, pos %lld, len %lu, 0x%x\n",
-		  AuDLNPair(out->f_dentry), *ppos, (unsigned long)len, flags);
+	LKTRTrace("%.*s, pos %lld, len %zu, 0x%x\n",
+		  AuDLNPair(out->f_dentry), *ppos, len, flags);
 
 	lockdep_off();
 	err = vfs_splice_from(pipe, out, ppos, len, flags);

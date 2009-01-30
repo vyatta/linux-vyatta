@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * internal/hidden inotify handler
  *
- * $Id: hinotify.c,v 1.18 2008/10/06 00:30:02 sfjro Exp $
+ * $Id: hinotify.c,v 1.23 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -77,7 +77,7 @@ void au_hin_free(struct au_hinode *hinode)
 	AuTraceEnter();
 
 	hin = hinode->hi_notify;
-	if (unlikely(hin)) {
+	if (hin) {
 		err = 0;
 		if (atomic_read(&hin->hin_watch.count))
 			err = inotify_rm_watch(in_handle, &hin->hin_watch);
@@ -135,7 +135,7 @@ void au_reset_hinotify(struct inode *inode, unsigned int flags)
 		if (hi) {
 			/* mutex_lock_nested(&hi->i_mutex, AuLsc_I_CHILD); */
 			iwhdentry = au_hi_wh(inode, bindex);
-			if (unlikely(iwhdentry))
+			if (iwhdentry)
 				dget(iwhdentry);
 			au_igrab(hi);
 			au_set_h_iptr(inode, bindex, NULL, 0);
@@ -175,8 +175,8 @@ int au_hin_verify_gen(struct dentry *dentry)
 
 	sigen = au_sigen(dentry->d_sb);
 	inode = dentry->d_inode;
-	return (au_digen(dentry) != sigen
-		|| (inode && au_iigen(inode) != sigen));
+	return au_digen(dentry) != sigen
+		|| (inode && au_iigen(inode) != sigen);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -285,7 +285,7 @@ static void au_hin_unignore(struct au_hin_ignore *ign)
 
 	hin = hinode->hi_notify;
 	h_inode = hinode->hi_inode;
-	if (unlikely(!h_inode || !hin))
+	if (!h_inode || !hin)
 		return;
 	LKTRTrace("hi%lu\n", h_inode->i_ino);
 #ifdef DbgInotify
@@ -347,7 +347,7 @@ void vfsub_ignore(struct vfsub_args *vargs)
 	hinode = ign->ign_hinode;
 	sb = hinode->hi_notify->hin_aufs_inode->i_sb;
 	h_inode = hinode->hi_inode;
-	if (unlikely(au_opt_test(au_mntflags(sb), UDBA_INOTIFY))) {
+	if (au_opt_test(au_mntflags(sb), UDBA_INOTIFY)) {
 		if (!mutex_is_locked(&h_inode->i_mutex))
 			au_dbg_blocked();
 		IMustLock(h_inode);
@@ -390,6 +390,7 @@ void au_dbg_hin_list(struct vfsub_args *vargs)
 		ign--;
 		AuDbg("%d: pid %d, 0x%x\n",
 		      n + 1, ign->ign_pid, ign->ign_events);
+		au_hin_unignore(ign);
 		ign++;
 		au_dbg_blocked();
 	}
@@ -401,7 +402,8 @@ void au_dbg_hin_list(struct vfsub_args *vargs)
 static char *in_name(u32 mask)
 {
 #ifdef CONFIG_AUFS_DEBUG
-#define test_ret(flag)	if (mask & flag) return #flag;
+#define test_ret(flag)	if (mask & flag) \
+				return #flag;
 	test_ret(IN_ACCESS);
 	test_ret(IN_MODIFY);
 	test_ret(IN_ATTRIB);
@@ -695,7 +697,7 @@ static void hin_attr(struct inode *inode, struct inode *h_inode)
 		dput(h_dentry);
 	}
 
-	au_cpup_attr_all(inode);
+	au_cpup_attr_all(inode, /*force*/1);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -762,8 +764,11 @@ static int hin_job(struct hin_job_args *a)
 	}
 
 	/* update the attr */
-	if (au_ftest_hinjob(a->flags, ATTR) && a->inode && a->h_inode)
+	if (au_ftest_hinjob(a->flags, ATTR) && a->inode && a->h_inode) {
+		mutex_lock_nested(&a->h_inode->i_mutex, AuLsc_I_CHILD);
 		hin_attr(a->inode, a->h_inode);
+		mutex_unlock(&a->h_inode->i_mutex);
+	}
 
 	/* can do nothing but warn */
 	if (au_ftest_hinjob(a->flags, MNTPNT)
@@ -813,6 +818,16 @@ static void postproc(void *_args)
 	 * do not lock a->dir->i_mutex here
 	 * because of d_revalidate() may cause a deadlock.
 	 */
+#if 0
+	/*
+	 * just wait for the dir becoming non-busy.
+	 * for instance, prevent NFSD lookup from "nlink == 0" message.
+	 * but it is not guranteed.
+	 */
+	mutex_lock(&a->dir->i_mutex);
+	mutex_unlock(&a->dir->i_mutex);
+#endif
+
 	sb = a->dir->i_sb;
 	AuDebugOn(!sb);
 	sbinfo = au_sbi(sb);
@@ -936,8 +951,7 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd, u32 mask,
 		return;
 	}
 #if 0 /* tmp debug */
-	//if (h_child_name && !strcmp(h_child_name, AUFS_XINO_FNAME))
-	{
+	if (h_child_name && !strcmp(h_child_name, AUFS_XINO_FNAME)) {
 	AuDbg("i%lu, wd %d, mask 0x%x %s, cookie 0x%x, hcname %s, hi%lu\n",
 		  watch->inode->i_ino, wd, mask, in_name(mask), cookie,
 		  h_child_name ? h_child_name : "",

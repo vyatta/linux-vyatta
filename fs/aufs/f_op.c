@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * file and vm operations
  *
- * $Id: f_op.c,v 1.12 2008/10/06 00:29:57 sfjro Exp $
+ * $Id: f_op.c,v 1.16 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include <linux/fs_stack.h>
@@ -136,8 +136,7 @@ static ssize_t aufs_read(struct file *file, char __user *buf, size_t count,
 	struct inode *h_inode;
 
 	dentry = file->f_dentry;
-	LKTRTrace("%.*s, cnt %lu, pos %lld\n",
-		  AuDLNPair(dentry), (unsigned long)count, *ppos);
+	LKTRTrace("%.*s, cnt %zu, pos %lld\n", AuDLNPair(dentry), count, *ppos);
 
 	sb = dentry->d_sb;
 	si_read_lock(sb, AuLock_FLUSH);
@@ -180,8 +179,7 @@ static ssize_t aufs_write(struct file *file, const char __user *ubuf,
 	struct au_pin pin;
 
 	dentry = file->f_dentry;
-	LKTRTrace("%.*s, cnt %lu, pos %lld\n",
-		  AuDLNPair(dentry), (unsigned long)count, *ppos);
+	LKTRTrace("%.*s, cnt %zu, pos %lld\n", AuDLNPair(dentry), count, *ppos);
 
 	inode = dentry->d_inode;
 	mutex_lock(&inode->i_mutex);
@@ -243,8 +241,7 @@ static ssize_t aufs_splice_read(struct file *file, loff_t *ppos,
 	struct super_block *sb;
 
 	dentry = file->f_dentry;
-	LKTRTrace("%.*s, pos %lld, len %lu\n",
-		  AuDLNPair(dentry), *ppos, (unsigned long)len);
+	LKTRTrace("%.*s, pos %lld, len %zu\n", AuDLNPair(dentry), *ppos, len);
 
 	sb = dentry->d_sb;
 	si_read_lock(sb, AuLock_FLUSH);
@@ -256,7 +253,7 @@ static ssize_t aufs_splice_read(struct file *file, loff_t *ppos,
 	err = -EINVAL;
 	/* support LSM and notify */
 	h_file = au_h_fptr(file, au_fbstart(file));
-	if (/* unlikely */(au_test_loopback())) {
+	if (au_test_loopback()) {
 		file->f_mapping = h_file->f_mapping;
 		smp_mb(); /* unnecessary? */
 	}
@@ -289,8 +286,7 @@ aufs_splice_write(struct pipe_inode_info *pipe, struct file *file, loff_t *ppos,
 	struct au_pin pin;
 
 	dentry = file->f_dentry;
-	LKTRTrace("%.*s, len %lu, pos %lld\n",
-		  AuDLNPair(dentry), (unsigned long)len, *ppos);
+	LKTRTrace("%.*s, len %zu, pos %lld\n", AuDLNPair(dentry), len, *ppos);
 
 	inode = dentry->d_inode;
 	mutex_lock(&inode->i_mutex);
@@ -471,7 +467,7 @@ static int aufs_mmap(struct file *file, struct vm_area_struct *vma)
 		di_downgrade_lock(dentry, AuLock_IR);
 
 	h_file = au_h_fptr(file, au_fbstart(file));
-	if (unlikely(au_test_fuse(h_file->f_dentry->d_sb))) {
+	if (au_test_fuse(h_file->f_dentry->d_sb)) {
 		/*
 		 * by this assignment, f_mapping will differs from aufs inode
 		 * i_mapping.
@@ -572,7 +568,7 @@ static int aufs_fsync_nondir(struct file *file, struct dentry *dentry,
 	inode = dentry->d_inode;
 
 	IMustLock(file->f_mapping->host);
-	if (unlikely(inode != file->f_mapping->host)) {
+	if (inode != file->f_mapping->host) {
 		mutex_unlock(&file->f_mapping->host->i_mutex);
 		mutex_lock(&inode->i_mutex);
 	}
@@ -612,7 +608,7 @@ static int aufs_fsync_nondir(struct file *file, struct dentry *dentry,
 	fi_write_unlock(file);
  out:
 	si_read_unlock(sb);
-	if (unlikely(inode != file->f_mapping->host)) {
+	if (inode != file->f_mapping->host) {
 		mutex_unlock(&inode->i_mutex);
 		mutex_lock(&file->f_mapping->host->i_mutex);
 	}
@@ -652,9 +648,18 @@ static int aufs_fasync(int fd, struct file *file, int flag)
 /* ---------------------------------------------------------------------- */
 
 struct file_operations aufs_file_fop = {
+	/*
+	 * while generic_file_llseek/_unlocked() don't use BKL,
+	 * don't use it since it operates file->f_mapping->host.
+	 * in aufs, it may be a real file and may confuse users by UDBA.
+	 */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
+	/* .llseek		= generic_file_llseek, */
+#endif
 	.read		= aufs_read,
 	.write		= aufs_write,
 	.poll		= aufs_poll,
+	/* .unlocked_ioctl	= aufs_ioctl, */
 	.mmap		= aufs_mmap,
 	.open		= aufs_open_nondir,
 	.flush		= aufs_flush,

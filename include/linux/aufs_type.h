@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,14 +16,14 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-/* $Id: aufs_type.h,v 1.122 2008/09/08 02:40:24 sfjro Exp $ */
+/* $Id: aufs_type.h,v 1.134 2009/01/26 06:24:45 sfjro Exp $ */
 
 #include <linux/ioctl.h>
 
 #ifndef __AUFS_TYPE_H__
 #define __AUFS_TYPE_H__
 
-#define AUFS_VERSION	"20080908"
+#define AUFS_VERSION	"20090126"
 
 /* move this to linux-2.6.19/include/magic.h */
 #define AUFS_SUPER_MAGIC	('a' << 24 | 'u' << 16 | 'f' << 8 | 's')
@@ -73,10 +73,14 @@ typedef short aufs_bindex_t;
 #endif
 #define AUFS_WH_DIROPQ		AUFS_WH_PFX AUFS_DIROPQ_NAME
 
-/* will be whiteouted doubly */
-#define AUFS_WH_BASENAME	AUFS_WH_PFX AUFS_NAME
-#define AUFS_WH_PLINKDIR	AUFS_WH_PFX "plnk"
-#define AUFS_WH_TMPDIR		AUFS_WH_PFX ".tmp"
+#define AUFS_BASE_NAME		AUFS_WH_PFX AUFS_NAME
+#define AUFS_PLINKDIR_NAME	AUFS_WH_PFX "plnk"
+#define AUFS_TMPDIR_NAME	AUFS_WH_PFX ".tmp"
+
+/* doubly whiteouted */
+#define AUFS_WH_BASE		AUFS_WH_PFX AUFS_BASE_NAME
+#define AUFS_WH_PLINKDIR	AUFS_WH_PFX AUFS_PLINKDIR_NAME
+#define AUFS_WH_TMPDIR		AUFS_WH_PFX AUFS_TMPDIR_NAME
 
 /* ---------------------------------------------------------------------- */
 
@@ -87,28 +91,37 @@ enum {
 	AuCtlErr_Last
 };
 enum {
+	AuCtl_DIROPQ_GET, AuCtl_DIROPQ_SET,
+	AuCtl_MOVE,
+	AuCtl_MVDOWN,
+
+	/* unimplmented */
 	AuCtl_REFRESH, AuCtl_REFRESHV,
 	AuCtl_FLUSH_PLINK,
 	AuCtl_CPUP,
-	AuCtl_CPDOWN, AuCtl_MVDOWN,
-	AuCtl_DIROPQ
+	AuCtl_CPDOWN
 };
 
-struct aufs_ctl_cp {
-	int bsrc, bdst;
+struct aufs_ctl {
 	int err;
+	aufs_bindex_t bsrc, bdst;
+	char *path;
 };
 
 #define AuCtlType		'A'
+#define AUFS_CTL_DIROPQ_GET	_IO(AuCtlType, AuCtl_DIROPQ_GET)
+#define AUFS_CTL_DIROPQ_SET	_IOW(AuCtlType, AuCtl_DIROPQ_SET, aufs_bindex_t)
+#define AUFS_CTL_MOVE \
+	_IOW(AuCtlType, AuCtl_MVDOWN, aufs_bindex_t)
+#define AUFS_CTL_MVDOWN \
+	_IOWR(AuCtlType, AuCtl_MVDOWN, struct aufs_ctl)
+
 #define AUFS_CTL_REFRESH	_IO(AuCtlType, AuCtl_REFRESH)
 #define AUFS_CTL_REFRESHV	_IO(AuCtlType, AuCtl_REFRESHV)
 #define AUFS_CTL_FLUSH_PLINK	_IOR(AuCtlType, AuCtl_FLUSH_PLINK)
-#define AUFS_CTL_CPUP		_IOWR(AuCtlType, AuCtl_CPUP, struct aufs_ctl_cp)
+#define AUFS_CTL_CPUP		_IOWR(AuCtlType, AuCtl_CPUP, struct aufs_ctl)
 #define AUFS_CTL_CPDOWN \
 	_IOWR(AuCtlType, AuCtl_CPDOWN, struct aufs_ctl_cp)
-#define AUFS_CTL_MVDOWN \
-	_IOWR(AuCtlType, AuCtl_MVDOWN, struct aufs_ctl_cp)
-#define AUFS_CTL_DIROPQ		_IO(AuCtlType, AuCtl_DIROPQ)
 #endif
 
 #endif /* __AUFS_TYPE_H__ */

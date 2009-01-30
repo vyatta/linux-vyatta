@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * super_block operations
  *
- * $Id: super.h,v 1.16 2008/10/06 00:30:40 sfjro Exp $
+ * $Id: super.h,v 1.22 2009/01/26 06:24:15 sfjro Exp $
  */
 
 #ifndef __AUFS_SUPER_H__
@@ -181,9 +181,9 @@ struct au_sbinfo {
 
 /* policy to select one among writable branches */
 #define AuWbrCopyup(sbinfo, args...) \
-	(sbinfo)->si_wbr_copyup_ops->copyup(args)
+	((sbinfo)->si_wbr_copyup_ops->copyup(args))
 #define AuWbrCreate(sbinfo, args...) \
-	(sbinfo)->si_wbr_create_ops->create(args)
+	((sbinfo)->si_wbr_create_ops->create(args))
 
 /* flags for si_read_lock()/aufs_read_lock()/di_read_lock() */
 #define AuLock_DW		1		/* write-lock dentry */
@@ -287,13 +287,22 @@ static inline const char *au_sbtype(struct super_block *sb)
 
 static inline int au_test_aufs(struct super_block *sb)
 {
-	return (sb->s_magic == AUFS_SUPER_MAGIC);
+	return sb->s_magic == AUFS_SUPER_MAGIC;
 }
 
 static inline int au_test_nfs(struct super_block *sb)
 {
 #ifdef CONFIG_AUFS_BR_NFS
-	return (sb->s_magic == NFS_SUPER_MAGIC);
+	return sb->s_magic == NFS_SUPER_MAGIC;
+#else
+	return 0;
+#endif
+}
+
+static inline int au_test_nfs4(struct super_block *sb)
+{
+#ifdef CONFIG_AUFS_BR_NFS_V4
+	return au_test_nfs(sb) && !strcmp(sb->s_type->name, "nfs4");
 #else
 	return 0;
 #endif
@@ -302,7 +311,7 @@ static inline int au_test_nfs(struct super_block *sb)
 static inline int au_test_fuse(struct super_block *sb)
 {
 #ifdef CONFIG_AUFS_WORKAROUND_FUSE
-	return (sb->s_magic == FUSE_SUPER_MAGIC);
+	return sb->s_magic == FUSE_SUPER_MAGIC;
 #else
 	return 0;
 #endif
@@ -311,7 +320,7 @@ static inline int au_test_fuse(struct super_block *sb)
 static inline int au_test_xfs(struct super_block *sb)
 {
 #ifdef CONFIG_AUFS_BR_XFS
-	return (sb->s_magic == XFS_SB_MAGIC);
+	return sb->s_magic == XFS_SB_MAGIC;
 #else
 	return 0;
 #endif
@@ -320,7 +329,17 @@ static inline int au_test_xfs(struct super_block *sb)
 static inline int au_test_tmpfs(struct super_block *sb)
 {
 #ifdef CONFIG_TMPFS
-	return (sb->s_magic == TMPFS_MAGIC);
+	return sb->s_magic == TMPFS_MAGIC;
+#else
+	return 0;
+#endif
+}
+
+static inline int au_test_ecryptfs(struct super_block *sb)
+{
+#if defined(CONFIG_ECRYPT_FS) || defined(CONFIG_ECRYPT_FS_MODULE)
+	/* why don't they use s_magic? */
+	return !strcmp(sb->s_type->name, "ecryptfs");
 #else
 	return 0;
 #endif
@@ -359,19 +378,7 @@ void au_export_init(struct super_block *sb);
 
 static inline int au_test_nfsd(struct task_struct *tsk)
 {
-	return (!tsk->mm && !strcmp(tsk->comm, "nfsd"));
-}
-
-static inline void au_nfsd_lockdep_off(void)
-{
-	if (au_test_nfsd(current))
-		lockdep_off();
-}
-
-static inline void au_nfsd_lockdep_on(void)
-{
-	if (au_test_nfsd(current))
-		lockdep_on();
+	return !tsk->mm && !strcmp(tsk->comm, "nfsd");
 }
 
 static inline void au_export_put(struct au_sbinfo *sbinfo)
@@ -383,7 +390,6 @@ int au_xigen_inc(struct inode *inode);
 int au_xigen_new(struct inode *inode);
 int au_xigen_set(struct super_block *sb, struct file *base);
 void au_xigen_clr(struct super_block *sb);
-
 #else
 static inline void au_export_init(struct super_block *sb)
 {
@@ -394,9 +400,6 @@ static inline int au_test_nfsd(struct task_struct *tsk)
 {
 	return 0;
 }
-
-#define au_nfsd_lockdep_off()	do {} while (0)
-#define au_nfsd_lockdep_on()	do {} while (0)
 
 static inline void au_export_put(struct au_sbinfo *sbinfo)
 {
@@ -421,14 +424,6 @@ static inline int au_xigen_set(struct super_block *sb, struct file *base)
 static inline void au_xigen_clr(struct super_block *sb)
 {
 	/* empty */
-}
-
-/* cf. dir.h */
-static inline
-int au_nfsd_read_lock(struct dentry *dentry, unsigned int flags)
-{
-	aufs_read_lock(dentry, flags);
-	return 0;
 }
 #endif /* CONFIG_AUFS_EXPORT */
 
@@ -463,36 +458,94 @@ static inline void au_robr_lvma_init(struct au_sbinfo *sbinfo)
 
 /* lock superblock. mainly for entry point functions */
 /*
- * si_noflush_read_lock, si_noflush_write_lock,
- * si_read_unlock, si_write_unlock, si_downgrade_lock
+ * si_do_noflush_read_lock, si_do_noflush_write_lock,
+ * si_do_read_unlock, si_do_write_unlock, si_do_downgrade_lock
  */
-AuSimpleLockRwsemFuncs(si_noflush, struct super_block *sb,
+AuSimpleLockRwsemFuncs(si_do_noflush, struct super_block *sb,
 		       au_sbi(sb)->si_rwsem);
-AuSimpleUnlockRwsemFuncs(si, struct super_block *sb, au_sbi(sb)->si_rwsem);
+AuSimpleUnlockRwsemFuncs(si_do, struct super_block *sb, au_sbi(sb)->si_rwsem);
+
+static inline void si_noflush_read_lock(struct super_block *sb)
+{
+	au_dbg_locking_si_reg(sb, 0);
+	si_do_noflush_read_lock(sb);
+	au_dbg_locking_si_unreg(sb, 0);
+	au_dbg_locked_si_reg(sb, 0);
+}
+
+static inline void si_noflush_write_lock(struct super_block *sb)
+{
+	au_dbg_locking_si_reg(sb, 1);
+	si_do_noflush_write_lock(sb);
+	au_dbg_locking_si_unreg(sb, 1);
+	au_dbg_locked_si_reg(sb, 1);
+}
+
+static inline int si_noflush_read_trylock(struct super_block *sb)
+{
+	int locked;
+
+	au_dbg_locking_si_reg(sb, 0);
+	locked = si_do_noflush_read_trylock(sb);
+	au_dbg_locking_si_unreg(sb, 0);
+	if (locked)
+		au_dbg_locked_si_reg(sb, 0);
+	return locked;
+}
+
+static inline int si_noflush_write_trylock(struct super_block *sb)
+{
+	int locked;
+
+	au_dbg_locking_si_reg(sb, 1);
+	locked = si_do_noflush_write_trylock(sb);
+	au_dbg_locking_si_unreg(sb, 1);
+	if (locked)
+		au_dbg_locked_si_reg(sb, 1);
+	return locked;
+}
+
+static inline void si_read_unlock(struct super_block *sb)
+{
+	si_do_read_unlock(sb);
+	au_dbg_locked_si_unreg(sb, 0);
+}
+
+static inline void si_write_unlock(struct super_block *sb)
+{
+	si_do_write_unlock(sb);
+	au_dbg_locked_si_unreg(sb, 1);
+}
+
+static inline void si_downgrade_lock(struct super_block *sb)
+{
+	si_do_downgrade_lock(sb);
+}
 
 static inline void si_read_lock(struct super_block *sb, int flags)
 {
-	if (au_ftest_lock(flags, FLUSH))
+	if (/* !au_test_nfsd(current) &&  */au_ftest_lock(flags, FLUSH))
 		au_nwt_flush(&au_sbi(sb)->si_nowait);
 	si_noflush_read_lock(sb);
 }
 
 static inline void si_write_lock(struct super_block *sb)
 {
+	//WARN_ON(au_test_nfsd(current));
 	au_nwt_flush(&au_sbi(sb)->si_nowait);
 	si_noflush_write_lock(sb);
 }
 
 static inline int si_read_trylock(struct super_block *sb, int flags)
 {
-	if (au_ftest_lock(flags, FLUSH))
+	if (/* !au_test_nfsd(current) &&  */au_ftest_lock(flags, FLUSH))
 		au_nwt_flush(&au_sbi(sb)->si_nowait);
 	return si_noflush_read_trylock(sb);
 }
 
 static inline int si_write_trylock(struct super_block *sb, int flags)
 {
-	if (au_ftest_lock(flags, FLUSH))
+	if (/* !au_test_nfsd(current) &&  */au_ftest_lock(flags, FLUSH))
 		au_nwt_flush(&au_sbi(sb)->si_nowait);
 	return si_noflush_write_trylock(sb);
 }

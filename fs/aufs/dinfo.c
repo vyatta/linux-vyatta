@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * dentry private data
  *
- * $Id: dinfo.c,v 1.8 2008/09/29 03:43:37 sfjro Exp $
+ * $Id: dinfo.c,v 1.10 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -37,7 +37,7 @@ int au_alloc_dinfo(struct dentry *dentry)
 	if (dinfo) {
 		sb = dentry->d_sb;
 		nbr = au_sbend(sb) + 1;
-		if (unlikely(nbr <= 0))
+		if (nbr <= 0)
 			nbr = 1;
 		dinfo->di_hdentry = kcalloc(nbr, sizeof(*dinfo->di_hdentry),
 					    GFP_NOFS);
@@ -353,7 +353,7 @@ void au_update_dbrange(struct dentry *dentry, int do_put_zero)
 	DiMustWriteLock(dentry);
 
 	dinfo = au_di(dentry);
-	if (unlikely(!dinfo) || dinfo->di_bstart < 0)
+	if (!dinfo || dinfo->di_bstart < 0)
 		return;
 
 	if (do_put_zero) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
  */
 
 /*
- * $Id: misc.h,v 1.9 2008/10/06 00:30:28 sfjro Exp $
+ * $Id: misc.h,v 1.11 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #ifndef __AUFS_MISC_H__
@@ -62,6 +62,8 @@ static inline void au_spl_del(struct list_head *list, struct au_splhead *spl)
 	list_del(list);
 	spin_unlock(&spl->spin);
 }
+
+/* ---------------------------------------------------------------------- */
 
 struct au_rwsem {
 	struct rw_semaphore	rwsem;

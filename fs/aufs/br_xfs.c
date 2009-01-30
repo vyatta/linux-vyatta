@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * special handling inode attributes on XFS branch in linux-2.6.24 and later
  *
- * $Id: br_xfs.c,v 1.3 2008/07/07 01:12:38 sfjro Exp $
+ * $Id: br_xfs.c,v 1.4 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"

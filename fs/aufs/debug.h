@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * debug print functions
  *
- * $Id: debug.h,v 1.9 2008/09/29 03:43:27 sfjro Exp $
+ * $Id: debug.h,v 1.12 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #ifndef __AUFS_DEBUG_H__
@@ -104,17 +104,20 @@ static inline int au_debug_test(void)
 #define AuIOErrWhck(fmt, arg...) AuErr("I/O Error, try whck. " fmt, ##arg)
 #define AuWarn1(fmt, arg...) do { \
 	static unsigned char _c; \
-	if (!_c++) AuWarn(fmt, ##arg); \
+	if (!_c++) \
+		AuWarn(fmt, ##arg); \
 } while (0)
 
 #define AuErr1(fmt, arg...) do { \
 	static unsigned char _c; \
-	if (!_c++) AuErr(fmt, ##arg); \
+	if (!_c++) \
+		AuErr(fmt, ##arg); \
 } while (0)
 
 #define AuIOErr1(fmt, arg...) do { \
 	static unsigned char _c; \
-	if (!_c++) AuIOErr(fmt, ##arg); \
+	if (!_c++) \
+		AuIOErr(fmt, ##arg); \
 } while (0)
 
 #define AuUnsupportMsg	"This operation is not supported." \
@@ -240,15 +243,50 @@ static inline int au_sysrq_init(void)
 #define au_dbg_blocked()	do {} while (0)
 #endif /* CONFIG_AUFS_MAGIC_SYSRQ */
 
-enum {AuDbgLock_DI_LOCKING, AuDbgLock_DI_LOCKED, AuDbgLock_II, AuDbgLock_Last};
+enum {
+	AuDbgLock_SI_LOCKING,
+	AuDbgLock_SI_LOCKED,
+	AuDbgLock_DI_LOCKING,
+	AuDbgLock_DI_LOCKED,
+	AuDbgLock_II_LOCKING,
+	AuDbgLock_II_LOCKED,
+	AuDbgLock_Last
+};
 #ifdef CONFIG_AUFS_DEBUG_LOCK
+void au_dbg_locking_si_reg(struct super_block *sb, int flags);
+void au_dbg_locking_si_unreg(struct super_block *sb, int flags);
+void au_dbg_locked_si_reg(struct super_block *sb, int flags);
+void au_dbg_locked_si_unreg(struct super_block *sb, int flags);
 void au_dbg_locking_di_reg(struct dentry *d, int flags, unsigned int lsc);
 void au_dbg_locking_di_unreg(struct dentry *d, int flags);
 void au_dbg_locked_di_reg(struct dentry *d, int flags, unsigned int lsc);
 void au_dbg_locked_di_unreg(struct dentry *d, int flags);
-void au_dbg_lock_ii_reg(struct inode *i, unsigned int lsc);
-void au_dbg_lock_ii_unreg(struct inode *i);
+void au_dbg_locking_ii_reg(struct inode *i, int flags, unsigned int lsc);
+void au_dbg_locking_ii_unreg(struct inode *i, int flags);
+void au_dbg_locked_ii_reg(struct inode *i, int flags, unsigned int lsc);
+void au_dbg_locked_ii_unreg(struct inode *i, int flags);
 #else
+static inline
+void au_dbg_locking_si_reg(struct super_block *sb, int flags)
+{
+	/* empty */
+}
+static inline
+void au_dbg_locking_si_unreg(struct super_block *sb, int flags)
+{
+	/* empty */
+}
+static inline
+void au_dbg_locked_si_reg(struct super_block *sb, int flags)
+{
+	/* empty */
+}
+static inline
+void au_dbg_locked_si_unreg(struct super_block *sb, int flags)
+{
+	/* empty */
+}
+
 static inline
 void au_dbg_locking_di_reg(struct dentry *d, int flags, unsigned int lsc)
 {
@@ -270,12 +308,22 @@ void au_dbg_locked_di_unreg(struct dentry *d, int flags)
 	/* empty */
 }
 static inline
-void au_dbg_lock_ii_reg(struct inode *i, unsigned int lsc)
+void au_dbg_locking_ii_reg(struct inode *i, int flags, unsigned int lsc)
 {
 	/* empty */
 }
 static inline
-void au_dbg_lock_ii_unreg(struct inode *i)
+void au_dbg_locking_ii_unreg(struct inode *i, int flags)
+{
+	/* empty */
+}
+static inline
+void au_dbg_locked_ii_reg(struct inode *i, int flags, unsigned int lsc)
+{
+	/* empty */
+}
+static inline
+void au_dbg_locked_ii_unreg(struct inode *i, int flags)
 {
 	/* empty */
 }

@@ -1,5 +1,5 @@
 # AUFS Makefile for the Linux 2.6.25 and later
-# $Id: Makefile,v 1.9 2008/09/29 03:43:19 sfjro Exp $
+# $Id: Makefile,v 1.10 2008/10/20 01:47:24 sfjro Exp $
 
 # the environment variables are not inherited since 2.6.23
 ifdef AUFS_EXTRA_CFLAGS
@@ -25,7 +25,7 @@ ifdef CONFIG_XFS_FS
 ccflags-y += -DXFS_SB_MAGIC=0x58465342
 endif
 
-# defined in ${srctree}/mm/shmem.c in linux-2.6.26 and earlier
+# defined in ${srctree}/mm/shmem.c
 # tristate
 ifdef CONFIG_TMPFS
 ccflags-y += -DTMPFS_MAGIC=0x01021994

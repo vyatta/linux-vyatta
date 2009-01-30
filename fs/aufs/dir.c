@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * directory operations
  *
- * $Id: dir.c,v 1.15 2008/10/06 00:30:09 sfjro Exp $
+ * $Id: dir.c,v 1.19 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include <linux/fs_stack.h>
@@ -263,8 +263,6 @@ static int aufs_fsync_dir(struct file *file, struct dentry *dentry,
 static int aufs_readdir(struct file *file, void *dirent, filldir_t filldir)
 {
 	int err;
-	const int nfsd = au_test_nfsd(current);
-	struct au_nfsd_readdir_pid pid;
 	struct dentry *dentry;
 	struct inode *inode;
 	struct super_block *sb;
@@ -279,23 +277,30 @@ static int aufs_readdir(struct file *file, void *dirent, filldir_t filldir)
 	err = au_reval_and_lock_fdi(file, reopen_dir, /*wlock*/1, /*locked*/1);
 	if (unlikely(err))
 		goto out;
-	if (unlikely(nfsd && !au_ii(inode)->ii_nfsd_readdir))
-		err = au_nfsd_readdir_alloc(inode);
-	if (!err)
-		err = au_vdir_init(file);
+	err = au_vdir_init(file);
 	di_downgrade_lock(dentry, AuLock_IR);
 	if (unlikely(err))
 		goto out_unlock;
 
-	if (!nfsd)
+	if (!au_test_nfsd(current)) {
 		err = au_vdir_fill_de(file, dirent, filldir);
-	else {
-		au_nfsd_readdir_reg(inode, &pid);
-		/* nfsd filldir calls lookup_one_len() or others */
+	} else {
+		/*
+		 * nfsd filldir may call lookup_one_len(), vfs_getattr(),
+		 * encode_fh() and others.
+		 */
+		struct inode *h_inode = au_h_iptr(inode, au_ibstart(inode));
+
+		di_read_unlock(dentry, AuLock_IR);
+		si_read_unlock(sb);
 		lockdep_off();
 		err = au_vdir_fill_de(file, dirent, filldir);
 		lockdep_on();
-		au_nfsd_readdir_unreg(inode, &pid);
+		fsstack_copy_attr_atime(inode, h_inode);
+		fi_write_unlock(file);
+
+		AuTraceErr(err);
+		return err;
 	}
 
 	fsstack_copy_attr_atime(inode, au_h_iptr(inode, au_ibstart(inode)));
@@ -388,8 +393,8 @@ static int do_test_empty(struct dentry *dentry, struct test_empty_arg *arg)
 	if (IS_ERR(h_file))
 		goto out;
 	err = 0;
-	if (unlikely(au_opt_test(au_mntflags(dentry->d_sb), UDBA_INOTIFY)
-		     && !h_file->f_dentry->d_inode->i_nlink))
+	if (au_opt_test(au_mntflags(dentry->d_sb), UDBA_INOTIFY)
+	    && !h_file->f_dentry->d_inode->i_nlink)
 		goto out_put;
 
 	dlgt = au_ftest_testempty(arg->flags, DLGT);
@@ -482,9 +487,9 @@ int au_test_empty_lower(struct dentry *dentry)
 	mnt_flags = au_mntflags(dentry->d_sb);
 	arg.whlist = whlist;
 	arg.flags = 0;
-	if (unlikely(au_test_dlgt(mnt_flags)))
+	if (au_test_dlgt(mnt_flags))
 		au_fset_testempty(arg.flags, DLGT);
-	if (unlikely(au_opt_test(mnt_flags, SHWH)))
+	if (au_opt_test(mnt_flags, SHWH))
 		au_fset_testempty(arg.flags, SHWH);
 	arg.bindex = bstart;
 	err = do_test_empty(dentry, &arg);
@@ -492,7 +497,7 @@ int au_test_empty_lower(struct dentry *dentry)
 		goto out_whlist;
 
 	au_fset_testempty(arg.flags, WHONLY);
-	if (unlikely(au_test_dirperm1(mnt_flags)))
+	if (au_test_dirperm1(mnt_flags))
 		au_fset_testempty(arg.flags, DIRPERM1);
 	btail = au_dbtaildir(dentry);
 	for (bindex = bstart + 1; !err && bindex <= btail; bindex++) {
@@ -525,7 +530,7 @@ int au_test_empty(struct dentry *dentry, struct au_nhash *whlist)
 	err = 0;
 	arg.whlist = whlist;
 	arg.flags = AuTestEmpty_WHONLY;
-	if (unlikely(au_opt_test(au_mntflags(dentry->d_sb), SHWH)))
+	if (au_opt_test(au_mntflags(dentry->d_sb), SHWH))
 		au_fset_testempty(arg.flags, SHWH);
 	btail = au_dbtaildir(dentry);
 	for (bindex = au_dbstart(dentry); !err && bindex <= btail; bindex++) {
@@ -546,6 +551,7 @@ int au_test_empty(struct dentry *dentry, struct au_nhash *whlist)
 struct file_operations aufs_dir_fop = {
 	.read		= generic_read_dir,
 	.readdir	= aufs_readdir,
+	/* .unlocked_ioctl	= aufs_ioctl_dir, */
 	.open		= aufs_open_dir,
 	.release	= aufs_release_dir,
 	.flush		= aufs_flush,

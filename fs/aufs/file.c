@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * handling file/dir, and address_space operation
  *
- * $Id: file.c,v 1.17 2008/10/06 00:29:57 sfjro Exp $
+ * $Id: file.c,v 1.20 2009/01/26 06:24:29 sfjro Exp $
  */
 
 #include <linux/pagemap.h>
@@ -96,7 +96,7 @@ struct file *au_h_open(struct dentry *dentry, aufs_bindex_t bindex, int flags,
 	flags &= ~O_CREAT;
 
 	h_file = NULL;
-	if (unlikely(file && au_test_nfs(h_dentry->d_sb)))
+	if (file && au_test_nfs(h_dentry->d_sb))
 		h_file = au_h_intent(dentry, bindex, file);
 	if (!h_file)
 		h_file = dentry_open(dget(h_dentry), mntget(br->br_mnt), flags);
@@ -154,7 +154,7 @@ static int do_coo(struct dentry *dentry, aufs_bindex_t bstart)
 
 	di_downgrade_lock(parent, AuLock_IR);
 	pin_flags = AuPin_DI_LOCKED | AuPin_MNT_WRITE;
-	if (unlikely(au_opt_test(au_mntflags(sb), UDBA_INOTIFY)))
+	if (au_opt_test(au_mntflags(sb), UDBA_INOTIFY))
 		au_fset_pin(pin_flags, DO_GPARENT);
 	err = au_pin(&pin, dentry, bcpup, pin_flags);
 	if (unlikely(err))
@@ -192,14 +192,15 @@ int au_do_open(struct inode *inode, struct file *file,
 	sb = dentry->d_sb;
 	si_read_lock(sb, AuLock_FLUSH);
 	coo = 0;
-	switch (au_mntflags(sb) & AuOptMask_COO) {
-	case AuOpt_COO_LEAF:
-		coo = !S_ISDIR(inode->i_mode);
-		break;
-	case AuOpt_COO_ALL:
-		coo = 1;
-		break;
-	}
+	if (!(sb->s_flags & MS_RDONLY))
+		switch (au_mntflags(sb) & AuOptMask_COO) {
+		case AuOpt_COO_LEAF:
+			coo = !S_ISDIR(inode->i_mode);
+			break;
+		case AuOpt_COO_ALL:
+			coo = 1;
+			break;
+		}
 	err = au_finfo_init(file);
 	if (unlikely(err))
 		goto out;
@@ -369,7 +370,7 @@ int au_ready_to_write(struct file *file, loff_t len, struct au_pin *pin)
 	}
 
 	pin_flags = AuPin_DI_LOCKED | AuPin_MNT_WRITE;
-	if (unlikely(au_opt_test(au_mntflags(sb), UDBA_INOTIFY)))
+	if (au_opt_test(au_mntflags(sb), UDBA_INOTIFY))
 		au_fset_pin(pin_flags, DO_GPARENT);
 	err = au_pin(pin, dentry, bcpup, pin_flags);
 	if (unlikely(err))
@@ -439,7 +440,7 @@ static int au_file_refresh_by_inode(struct file *file, int *need_reopen)
 	sb = dentry->d_sb;
 	mnt_flags = au_mntflags(sb);
 	pin_flags = AuPin_DI_LOCKED | AuPin_MNT_WRITE;
-	if (unlikely(au_opt_test(mnt_flags, UDBA_INOTIFY)))
+	if (au_opt_test(mnt_flags, UDBA_INOTIFY))
 		au_fset_pin(pin_flags, DO_GPARENT);
  again:
 	bstart = au_ibstart(inode);
@@ -480,7 +481,8 @@ static int au_file_refresh_by_inode(struct file *file, int *need_reopen)
 #if 1
 		err = au_pin(&pin, dentry, bstart, pin_flags);
 		if (!err)
-			err = au_sio_cpup_simple(dentry, bstart, -1, AuCpup_DTIME);
+			err = au_sio_cpup_simple(dentry, bstart, -1,
+						 AuCpup_DTIME);
 		au_unpin(&pin);
 #else /* reserved for future use */
 		if (!au_test_wkq(current)) {
@@ -671,8 +673,8 @@ int au_reval_and_lock_fdi(struct file *file, int (*reopen)(struct file *file),
 	}
 
 	LKTRTrace("sgen %d, fgen %d\n", sgen, fgen);
-	if (unlikely(sgen != au_digen(dentry)
-		     || sgen != au_iigen(dentry->d_inode))) {
+	if (sgen != au_digen(dentry)
+	    || sgen != au_iigen(dentry->d_inode)) {
 		/*
 		 * d_path() and path_lookup() is a simple and good approach
 		 * to revalidate. but si_rwsem in DEBUG_RWSEM will cause a
@@ -715,12 +717,14 @@ static int aufs_readpage(struct file *file, struct page *page)
 
 /* they will never be called. */
 #ifdef CONFIG_AUFS_DEBUG
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 28)
 static int aufs_prepare_write(struct file *file, struct page *page,
 			      unsigned from, unsigned to)
 { AuUnsupport(); return 0; }
 static int aufs_commit_write(struct file *file, struct page *page,
 			     unsigned from, unsigned to)
 { AuUnsupport(); return 0; }
+#endif
 static int aufs_write_begin(struct file *file, struct address_space *mapping,
 			    loff_t pos, unsigned len, unsigned flags,
 			    struct page **pagep, void **fsdata)
@@ -757,8 +761,10 @@ struct address_space_operations aufs_aop = {
 	.writepage	= aufs_writepage,
 	.sync_page	= aufs_sync_page,
 	.set_page_dirty	= aufs_set_page_dirty,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 28)
 	.prepare_write	= aufs_prepare_write,
 	.commit_write	= aufs_commit_write,
+#endif
 	.write_begin	= aufs_write_begin,
 	.write_end	= aufs_write_end,
 	.invalidatepage	= aufs_invalidatepage,

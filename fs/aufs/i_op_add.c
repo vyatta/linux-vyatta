@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * inode operations (add entry)
  *
- * $Id: i_op_add.c,v 1.17 2008/10/13 03:09:44 sfjro Exp $
+ * $Id: i_op_add.c,v 1.21 2009/01/26 06:24:01 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -73,7 +73,7 @@ static int epilog(struct inode *dir, aufs_bindex_t bindex,
 
 	/* revert */
 	ndx.flags = 0;
-	if (unlikely(au_test_dlgt(au_mntflags(sb))))
+	if (au_test_dlgt(au_mntflags(sb)))
 		au_fset_ndx(ndx.flags, DLGT);
 	ndx.nfsmnt = au_nfsmnt(sb, bwh);
 	ndx.nd = NULL;
@@ -85,10 +85,8 @@ static int epilog(struct inode *dir, aufs_bindex_t bindex,
 		AuIOErr("%.*s reverting whiteout failed(%d, %d)\n",
 			AuDLNPair(dentry), err, rerr);
 		err = -EIO;
-	} else {
-		err = 0;
+	} else
 		dput(wh);
-	}
 
  out:
 	AuTraceErr(err);
@@ -140,7 +138,7 @@ int au_may_add(struct dentry *dentry, aufs_bindex_t bindex,
 		goto out;
 	err = 0;
 
-	if (unlikely(au_opt_test(au_mntflags(dentry->d_sb), UDBA_INOTIFY))) {
+	if (au_opt_test(au_mntflags(dentry->d_sb), UDBA_INOTIFY)) {
 		struct dentry *h_latest;
 		struct qstr *qstr = &dentry->d_name;
 
@@ -158,7 +156,7 @@ int au_may_add(struct dentry *dentry, aufs_bindex_t bindex,
 		err = -EIO;
 		dput(h_latest);
 		/* fuse d_revalidate always return 0 for negative dentries */
-		if (au_test_fuse(h_dentry->d_sb) || h_latest == h_dentry)
+		if (h_latest == h_dentry || au_test_fuse(h_dentry->d_sb))
 			err = 0;
 	}
 
@@ -197,7 +195,7 @@ lock_hdir_lkup_wh(struct dentry *dentry, struct au_dtime *dt,
 	sb = dentry->d_sb;
 	mnt_flags = au_mntflags(sb);
 	pin_flags = AuPin_DI_LOCKED | AuPin_MNT_WRITE;
-	if (unlikely(dt && au_opt_test(mnt_flags, UDBA_INOTIFY)))
+	if (dt && au_opt_test(mnt_flags, UDBA_INOTIFY))
 		au_fset_pin(pin_flags, DO_GPARENT);
 	err = au_pin(pin, dentry, bcpup, pin_flags);
 	wh_dentry = ERR_PTR(err);
@@ -206,7 +204,7 @@ lock_hdir_lkup_wh(struct dentry *dentry, struct au_dtime *dt,
 
 	ndx.nfsmnt = au_nfsmnt(sb, bcpup);
 	ndx.flags = 0;
-	if (unlikely(au_test_dlgt(mnt_flags)))
+	if (au_test_dlgt(mnt_flags))
 		au_fset_ndx(ndx.flags, DLGT);
 	ndx.nd = NULL;
 	/* ndx.br = NULL; */
@@ -216,7 +214,7 @@ lock_hdir_lkup_wh(struct dentry *dentry, struct au_dtime *dt,
 	if (!au_opt_test(mnt_flags, UDBA_NONE) && au_dbstart(dentry) == bcpup) {
 		struct nameidata nd;
 
-		if (unlikely(ndx.nfsmnt)) {
+		if (ndx.nfsmnt) {
 			/* todo: dirty? */
 			ndx.nd = &nd;
 			ndx.br = au_sbr(sb, bcpup);
@@ -357,6 +355,8 @@ static int add_simple(struct inode *dir, struct dentry *dentry,
 	di_write_unlock(parent);
 	aufs_read_unlock(dentry, AuLock_DW);
 	AuTraceErr(err);
+	if (unlikely(err == -EBUSY && au_test_nfsd(current)))
+		err = -ESTALE;
 	return err;
 }
 
@@ -425,7 +425,7 @@ static int au_cpup_before_link(struct dentry *src_dentry, struct inode *dir,
 	AuDebugOn(au_dbstart(src_dentry) != a->bsrc);
 	h_mtx = &au_h_dptr(src_dentry, a->bsrc)->d_inode->i_mutex;
 	a->pin_flags = AuPin_DI_LOCKED | AuPin_MNT_WRITE;
-	if (unlikely(hinotify))
+	if (hinotify)
 		au_fset_pin(a->pin_flags, DO_GPARENT);
 	err = au_pin(&a->pin, src_dentry, a->bdst, a->pin_flags);
 	if (unlikely(err))
@@ -568,8 +568,7 @@ int aufs_link(struct dentry *src_dentry, struct inode *dir,
 			if (!err) {
 				a->pin_flags
 					= AuPin_DI_LOCKED | AuPin_MNT_WRITE;
-				if (unlikely(au_opt_test(a->mnt_flags,
-							 UDBA_INOTIFY)))
+				if (au_opt_test(a->mnt_flags, UDBA_INOTIFY))
 					au_fset_pin(a->pin_flags, DO_GPARENT);
 				di_write_lock_parent(a->parent);
 				err = au_pin(&a->pin, dentry, a->bdst,
@@ -599,7 +598,7 @@ int aufs_link(struct dentry *src_dentry, struct inode *dir,
 
 #if 0 /* cannot support it */
 	/* fuse has different memory inode for the same inode number */
-	if (unlikely(au_test_fuse(a->h_dentry->d_sb))) {
+	if (au_test_fuse(a->h_dentry->d_sb)) {
 		LKTRLabel(here);
 		d_drop(a->h_dentry);
 		/*d_drop(h_src_dentry);
@@ -650,6 +649,8 @@ int aufs_link(struct dentry *src_dentry, struct inode *dir,
 	kfree(a);
  out:
 	AuTraceErr(err);
+	if (unlikely(err == -EBUSY && au_test_nfsd(current)))
+		err = -ESTALE;
 	return err;
 }
 
@@ -750,5 +751,7 @@ int aufs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	di_write_unlock(parent);
 	aufs_read_unlock(dentry, AuLock_DW);
 	AuTraceErr(err);
+	if (unlikely(err == -EBUSY && au_test_nfsd(current)))
+		err = -ESTALE;
 	return err;
 }

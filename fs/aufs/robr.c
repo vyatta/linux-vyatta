@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * 'robr', aufs as readonly branch of another aufs
  *
- * $Id: robr.c,v 1.7 2008/10/06 00:30:02 sfjro Exp $
+ * $Id: robr.c,v 1.9 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -56,7 +56,9 @@ struct file *au_robr_safe_file(struct vm_area_struct *vma)
 	unsigned char found, warn;
 
 	AuTraceEnter();
-	AuDebugOn(!au_test_aufs(sb));
+
+	if (!file->private_data || !au_test_aufs(sb))
+		return NULL;
 
 	warn = 0;
 	found = 0;

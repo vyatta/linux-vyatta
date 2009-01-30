@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
  * inode operation (rename entry)
  * todo: this is crazy monster
  *
- * $Id: i_op_ren.c,v 1.16 2008/10/06 00:30:21 sfjro Exp $
+ * $Id: i_op_ren.c,v 1.20 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -311,7 +311,7 @@ int do_rename(struct au_ren_args *a)
 	}
 
 	a->ndx.nfsmnt = au_nfsmnt(a->sb, a->btgt);
-	if (unlikely(au_ftest_ren(a->flags, DLGT)))
+	if (au_ftest_ren(a->flags, DLGT))
 		au_fset_ndx(a->ndx.flags, DLGT);
 
 	/* create whiteout for src_dentry */
@@ -393,7 +393,9 @@ int do_rename(struct au_ren_args *a)
 	AuDebugOn(au_dbstart(a->src_dentry) != a->btgt);
 	a->h_src = au_h_dptr(a->src_dentry, a->btgt);
 	au_update_fuse_h_inode(NULL, a->h_src); /*ignore*/
-	/* fsstack_copy_attr_atime(a->src_dentry->d_inode, a->h_src->d_inode); */
+	/*
+	 * fsstack_copy_attr_atime(a->src_dentry->d_inode, a->h_src->d_inode);
+	 */
 	a->src_dentry->d_inode->i_ctime = a->h_src->d_inode->i_ctime;
 
 	/* remove whiteout for dentry */
@@ -612,9 +614,12 @@ static int au_may_ren(struct au_ren_args *a)
  *       + ii_read_lock_gparent()
  *     + di_read_lock_gparent2()
  *       + ii_read_lock_gparent2()
+ *     + mutex_lock(s_vfs_rename_mutex)
  *     + mutex_lock_gparent()
  *     + mutex_lock_gparent2()
- *   + lower src_dir and dir by vfsub_lock_rename()?
+ *     + mutex_lock_parent()
+ *     + mutex_lock_parent2()
+ *   + else lower src_dir and dir by vfsub_lock_rename()
  *   + verify the every relations between child, parent and grand parent. if any
  *     of them failed, unlock all and return -EBUSY.
  */
@@ -671,8 +676,16 @@ static int au_ren_pin4(int higher, int lower, struct au_ren_args *a)
 	struct au_pin1 *p4[4];
 	struct inode *h_dir;
 
+#if 0
+	lktr_set_pid(current->pid, LktrArrayPid);
+	LKTRTrace("i%lu, %.*s, i%lu, %.*s\n",
+		  a->src_dir->i_ino, AuDLNPair(a->src_dentry),
+		  a->dir->i_ino, AuDLNPair(a->dentry));
+	lktr_clear_pid(current->pid, LktrArrayPid);
+#endif
 	LKTRTrace("%d, %d\n", higher, lower);
 
+	err = 0;
 	p = a->pin + higher;
 	p4[0] = au_pin_gp(p); /* highest */
 	p4[1] = p->pin + AuPin_PARENT;
@@ -691,6 +704,11 @@ static int au_ren_pin4(int higher, int lower, struct au_ren_args *a)
 	}
 	au_pin_do_set_parent(p4[3], a->parent[lower]);
 
+#if 0
+	lktr_set_pid(current->pid, LktrArrayPid);
+	for (i = 0; i < 4; i++)
+		AuDbgDentry(p4[i]->parent);
+#endif
 	DiMustWriteLock(p4[3]->parent);
 	di_write_unlock(p4[1]->parent);
 	if (p4[2]->parent)
@@ -698,6 +716,10 @@ static int au_ren_pin4(int higher, int lower, struct au_ren_args *a)
 	di_write_lock_parent3(p4[1]->parent);
 	if (p4[0]->parent)
 		di_read_lock_parent4(p4[0]->parent, AuLock_IR);
+	//lktr_clear_pid(current->pid, LktrArrayPid);
+
+	vfsub_lock_rename_mutex(au_sbr_sb(a->dentry->d_sb, a->btgt));
+	au_fset_ren(a->flags, VFSLOCK);
 
 	lsc = AuLsc_I_PARENT;
 	for (i = 0; i < 4; i++, lsc++) {
@@ -708,7 +730,6 @@ static int au_ren_pin4(int higher, int lower, struct au_ren_args *a)
 		}
 	}
 
-	err = 0;
 	AuTraceErr(err);
 	return err;
 }
@@ -722,6 +743,8 @@ static struct dentry *au_ren_pin3(int higher, int lower, struct au_ren_args *a)
 	LKTRTrace("%d, %d\n", higher, lower);
 
 	p = a->pin + higher;
+	AuDebugOn(!au_pin_gp(p));
+	au_fset_pin(au_pin_gp(p)->flags, VFS_RENAME);
 	err = au_do_pin(p->pin + AuPin_PARENT, au_pin_gp(p));
 	h_trap = ERR_PTR(err);
 	if (unlikely(err))
@@ -731,6 +754,7 @@ static struct dentry *au_ren_pin3(int higher, int lower, struct au_ren_args *a)
 	err = au_do_pin(p->pin + AuPin_PARENT, NULL);
 	h_trap = ERR_PTR(err);
 	if (unlikely(err)) {
+		p = a->pin + higher;
 		au_do_unpin(p->pin + AuPin_PARENT, au_pin_gp(p));
 		goto out;
 	}
@@ -747,11 +771,9 @@ static struct dentry *au_ren_pin(struct au_ren_args *a)
 	struct inode *h_gdir;
 	int err, i, same_gp;
 
+	//lktr_set_pid(current->pid, LktrArrayPid);
 	AuTraceEnter();
 	AuDebugOn(!au_opt_test(a->mnt_flags, UDBA_INOTIFY));
-
-	vfsub_lock_rename_mutex(a->h_dentry[SRC]->d_sb);
-	au_fset_ren(a->flags, VFSLOCK);
 
 	/* gdir is not locked */
 	same_gp = 0;
@@ -774,6 +796,7 @@ static struct dentry *au_ren_pin(struct au_ren_args *a)
 	err = 0;
 	h_trap = ERR_PTR(-EBUSY);
 	if (a->gparent[SRC] == a->parent[DST]) {
+		//AuDbg("here\n");
 		LKTRLabel(here);
 		au_ren_pin_init(a->pin + DST, a->dentry, a->pin + SRC,
 				a->src_dentry, a->btgt);
@@ -785,6 +808,7 @@ static struct dentry *au_ren_pin(struct au_ren_args *a)
 				h_trap = ERR_PTR(-EBUSY);
 		}
 	} else if (a->parent[SRC] == a->gparent[DST] || same_gp) {
+		//AuDbg("here\n");
 		LKTRLabel(here);
 		au_ren_pin_init(a->pin + SRC, a->src_dentry, a->pin + DST,
 				a->dentry, a->btgt);
@@ -801,6 +825,7 @@ static struct dentry *au_ren_pin(struct au_ren_args *a)
 	} else if (a->gparent[SRC]
 		   && (h_trap = au_test_subdir(a->gparent[SRC],
 					       a->parent[DST]))) {
+		//AuDbg("here\n");
 		LKTRLabel(here);
 		au_ren_pin_init(a->pin + DST, a->dentry, a->pin + SRC,
 				a->src_dentry, a->btgt);
@@ -813,9 +838,29 @@ static struct dentry *au_ren_pin(struct au_ren_args *a)
 			t = au_ren_pin3(DST, SRC, a);
 			AuDebugOn(t == h_trap);
 		}
+#if 1
+	} else if (a->gparent[DST]
+		   && (h_trap = au_test_subdir(a->gparent[DST],
+					       a->parent[SRC]))) {
+		/* todo: is this really necessary? */
+		//AuDbg("here\n");
+		LKTRLabel(here);
+		au_ren_pin_init(a->pin + SRC, a->src_dentry, a->pin + DST,
+				a->dentry, a->btgt);
+		if (a->gparent[SRC]) {
+			err = au_ren_pin4(SRC, DST, a);
+			if (unlikely(err))
+				h_trap = ERR_PTR(err);
+		} else {
+			struct dentry *t;
+			t = au_ren_pin3(SRC, DST, a);
+			AuDebugOn(t == h_trap);
+		}
+#endif
 	} else /* if (a->gparent[DST]
 		  && (h_trap = au_test_subdir(a->gparent[DST],
 		  a->parent[SRC]))) */ {
+		//AuDbg("here\n");
 		LKTRLabel(here);
 		h_trap = NULL;
 		if (a->gparent[DST])
@@ -836,14 +881,17 @@ static struct dentry *au_ren_pin(struct au_ren_args *a)
 			if (h_gdir)
 				err = au_verify_parent(a->h_parent[i], h_gdir);
 		}
-		if (unlikely(err))
+		if (unlikely(err)) {
 			h_trap = ERR_PTR(err);
+			//AuDbg("here\n");
+		}
 	}
 
 	dput(a->gparent[SRC]);
 	dput(a->gparent[DST]);
-	/* memset(a->gparent, 0, sizeof(a->gparent)); */
+	memset(a->gparent, 0, sizeof(a->gparent));
 	AuTraceErrPtr(h_trap);
+	//lktr_clear_pid(current->pid, LktrArrayPid);
 	return h_trap;
 }
 
@@ -863,9 +911,9 @@ static void au_ren_unlock(struct au_ren_args *a)
 		memset(a->gparent, 0, sizeof(a->gparent));
 	}
 	if (au_ftest_ren(a->flags, VFSLOCK))
-		vfsub_unlock_rename_mutex(a->h_dentry[SRC]->d_sb);
+		vfsub_unlock_rename_mutex(au_sbr_sb(a->dentry->d_sb, a->btgt));
 	for (i = 0; i < 2; i++)
-		if (unlikely(a->gparent[i])) {
+		if (a->gparent[i]) {
 			di_read_unlock(a->gparent[i], AuLock_IR);
 			dput(a->gparent[i]);
 		}
@@ -955,7 +1003,6 @@ int aufs_rename(struct inode *src_dir, struct dentry *src_dentry,
 		.flags		= AuWrDir_ADD_ENTRY
 	};
 
-	//lktr_set_pid(current->pid, LktrArrayPid);
 	LKTRTrace("i%lu, %.*s, i%lu, %.*s\n",
 		  src_dir->i_ino, AuDLNPair(src_dentry),
 		  dir->i_ino, AuDLNPair(dentry));
@@ -991,7 +1038,7 @@ int aufs_rename(struct inode *src_dir, struct dentry *src_dentry,
 		aufs_read_and_write_lock2(dentry, src_dentry, 0);
 
 	p->a.mnt_flags = au_mntflags(p->a.sb);
-	if (unlikely(au_test_dlgt(p->a.mnt_flags)))
+	if (au_test_dlgt(p->a.mnt_flags))
 		au_fset_ren(p->a.flags, DLGT);
 	p->a.parent[SRC] = src_dentry->d_parent; /* dir inode is locked */
 	p->a.parent[DST] = dentry->d_parent; /* dir inode is locked */
@@ -1044,7 +1091,7 @@ int aufs_rename(struct inode *src_dir, struct dentry *src_dentry,
 	if (src_dir != dir) {
 		/*
 		 * this temporary unlock is safe,
-		 * because dir->i_mutex is locked.
+		 * because both dir->i_mutex are locked.
 		 */
 		di_write_unlock(p->a.parent[DST]);
 		di_write_lock_parent(p->a.parent[SRC]);
@@ -1073,7 +1120,7 @@ int aufs_rename(struct inode *src_dir, struct dentry *src_dentry,
 
 	if (!au_opt_test(p->a.mnt_flags, UDBA_NONE)) {
 		p->a.ndx.nfsmnt	= au_nfsmnt(p->a.sb, p->a.btgt);
-		if (unlikely(au_ftest_ren(p->a.flags, DLGT)))
+		if (au_ftest_ren(p->a.flags, DLGT))
 			au_fset_ndx(p->a.ndx.flags, DLGT);
 		err = au_may_ren(&p->a);
 		if (unlikely(err))
@@ -1088,7 +1135,8 @@ int aufs_rename(struct inode *src_dir, struct dentry *src_dentry,
 		       /* hgdir[SRC] */);
 	if (!au_ftest_ren(p->a.flags, ISSAMEDIR))
 		au_dtime_store(p->dt[PARENT] + DST, p->a.parent[DST],
-			       p->a.h_parent[DST], au_pinned_hdir(p->a.pin + DST),
+			       p->a.h_parent[DST],
+			       au_pinned_hdir(p->a.pin + DST),
 			       au_pinned_hgdir(p->a.pin + DST)
 			       /* hgdir[DST] */);
 	do_dt_dstdir = 0;
@@ -1117,7 +1165,7 @@ int aufs_rename(struct inode *src_dir, struct dentry *src_dentry,
 		au_cpup_attr_timesizes(inode[SRC]);
 		/* mutex_unlock(&inode[SRC]->i_mutex); */
 
-		au_cpup_attr_nlink(dir);
+		au_cpup_attr_nlink(dir, /*force*/1);
 		if (inode[DST]) {
 			clear_nlink(inode[DST]);
 			au_cpup_attr_timesizes(inode[DST]);
@@ -1129,7 +1177,7 @@ int aufs_rename(struct inode *src_dir, struct dentry *src_dentry,
 	if (!au_ftest_ren(p->a.flags, ISSAMEDIR)) {
 		src_dir->i_version++;
 		if (au_ftest_ren(p->a.flags, ISDIR))
-			au_cpup_attr_nlink(src_dir);
+			au_cpup_attr_nlink(src_dir, /*force*/1);
 		if (au_ibstart(src_dir) == p->a.btgt)
 			au_cpup_attr_timesizes(src_dir);
 	}
@@ -1207,5 +1255,7 @@ int aufs_rename(struct inode *src_dir, struct dentry *src_dentry,
 	iput(inode[DST]);
 	AuTraceErr(err);
 	//lktr_clear_pid(current->pid, LktrArrayPid);
+	if (unlikely(err == -EBUSY && au_test_nfsd(current)))
+		err = -ESTALE;
 	return err;
 }

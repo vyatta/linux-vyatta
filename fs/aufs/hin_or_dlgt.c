@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * sub-routines for vfs in hinotify or dlgt mode
  *
- * $Id: hin_or_dlgt.c,v 1.6 2008/07/14 00:15:10 sfjro Exp $
+ * $Id: hin_or_dlgt.c,v 1.9 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include <linux/uaccess.h>
@@ -376,9 +376,8 @@ struct read_args {
 static void call_read_k(void *args)
 {
 	struct read_args *a = args;
-	LKTRTrace("%.*s, cnt %lu, pos %lld\n",
-		  AuDLNPair(a->file->f_dentry), (unsigned long)a->count,
-		  *a->ppos);
+	LKTRTrace("%.*s, cnt %zu, pos %lld\n",
+		  AuDLNPair(a->file->f_dentry), a->count, *a->ppos);
 	*a->errp = do_vfsub_read_k(a->file, a->kbuf, a->count, a->ppos);
 }
 
@@ -397,7 +396,7 @@ ssize_t vfsub_read_u(struct file *file, char __user *ubuf, size_t count,
 			.ppos	= ppos
 		};
 
-		if (unlikely(!count))
+		if (!count)
 			return 0;
 
 		/*
@@ -509,7 +508,7 @@ ssize_t vfsub_write_u(struct file *file, const char __user *ubuf, size_t count,
 			.vargs	= vargs
 		};
 
-		if (unlikely(!count))
+		if (!count)
 			return 0;
 
 		/*

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * whiteout for logical deletion and opaque directory
  *
- * $Id: whout.c,v 1.15 2008/10/13 03:10:00 sfjro Exp $
+ * $Id: whout.c,v 1.19 2009/01/26 06:24:19 sfjro Exp $
  */
 
 #include <linux/fs.h>
@@ -196,7 +196,7 @@ struct dentry *au_whtmp_lkup(struct dentry *h_parent, struct qstr *prefix,
 	BUG();
 
  out_name:
-	if (unlikely(name != defname))
+	if (name != defname)
 		kfree(name);
  out:
 	AuTraceErrPtr(dentry);
@@ -232,7 +232,7 @@ int au_whtmp_ren(struct inode *dir, aufs_bindex_t bindex,
 	sb = dir->i_sb;
 	mnt_flags = au_mntflags(sb);
 	dlgt = !!au_test_dlgt(mnt_flags);
-	if (unlikely(dlgt))
+	if (dlgt)
 		au_fset_ndx(ndx.flags, DLGT);
 	ndx.nfsmnt = au_nfsmnt(sb, bindex);
 	tmp_dentry = au_whtmp_lkup(h_parent, &h_dentry->d_name, &ndx);
@@ -389,7 +389,7 @@ static int au_whdir(struct inode *h_dir, struct path *path,
 	err = -EEXIST;
 	if (!path->dentry->d_inode) {
 		int mode = S_IRWXU;
-		if (unlikely(au_test_nfs(path->dentry->d_sb)))
+		if (au_test_nfs(path->dentry->d_sb))
 			mode |= S_IXUGO;
 		err = au_mnt_want_write(path->mnt);
 		if (!err) {
@@ -428,16 +428,16 @@ int au_wh_init(struct dentry *h_root, struct au_branch *br,
 	struct vfsmount *nfsmnt = au_do_nfsmnt(h_mnt);
 	static const struct qstr base_name[] = {
 		[AuBrWh_BASE] = {
-			.name	= AUFS_WH_BASENAME,
-			.len	= sizeof(AUFS_WH_BASENAME) - 1
+			.name	= AUFS_BASE_NAME,
+			.len	= sizeof(AUFS_BASE_NAME) - 1
 		},
 		[AuBrWh_PLINK] = {
-			.name	= AUFS_WH_PLINKDIR,
-			.len	= sizeof(AUFS_WH_PLINKDIR) - 1
+			.name	= AUFS_PLINKDIR_NAME,
+			.len	= sizeof(AUFS_PLINKDIR_NAME) - 1
 		},
 		[AuBrWh_TMP] = {
-			.name	= AUFS_WH_TMPDIR,
-			.len	= sizeof(AUFS_WH_TMPDIR) - 1
+			.name	= AUFS_TMPDIR_NAME,
+			.len	= sizeof(AUFS_TMPDIR_NAME) - 1
 		}
 	};
 	struct {
@@ -477,9 +477,15 @@ int au_wh_init(struct dentry *h_root, struct au_branch *br,
 		if (IS_ERR(d))
 			goto out;
 		base[i].dentry = d;
-		AuDebugOn(wbr
-			  && wbr->wbr_wh[i]
-			  && wbr->wbr_wh[i] != base[i].dentry);
+		if (!au_test_ecryptfs(d->d_sb))
+			AuDebugOn(wbr
+				  && wbr->wbr_wh[i]
+				  && wbr->wbr_wh[i] != base[i].dentry);
+		else
+			/* ecryptfs problem?: it returns different dentry */
+			AuDebugOn(wbr
+				  && wbr->wbr_wh[i]
+				  && !!wbr->wbr_wh[i] != !!base[i].dentry);
 	}
 
 	if (wbr)
@@ -490,7 +496,7 @@ int au_wh_init(struct dentry *h_root, struct au_branch *br,
 
 	err = 0;
 	hdir = NULL;
-	if (unlikely(bindex >= 0 && do_hinotify))
+	if (bindex >= 0 && do_hinotify)
 		hdir = au_hi(sb->s_root->d_inode, bindex);
 	vfsub_args_init(&vargs, &ign, au_test_dlgt(mnt_flags), 0);
 
@@ -552,13 +558,12 @@ int au_wh_init(struct dentry *h_root, struct au_branch *br,
 			if (!err) {
 				vfsub_args_reinit(&vargs);
 				vfsub_ign_hinode(&vargs, IN_CREATE, hdir);
-				err = au_h_create(h_dir, base[AuBrWh_BASE].dentry,
-						  WH_MASK, &vargs, /*nd*/NULL,
-						  nfsmnt);
+				err = au_h_create
+					(h_dir, base[AuBrWh_BASE].dentry,
+					 WH_MASK, &vargs, /*nd*/NULL, nfsmnt);
 				au_mnt_drop_write(h_mnt);
 			}
-		}
-		else if (S_ISREG(base[AuBrWh_BASE].dentry->d_inode->i_mode))
+		} else if (S_ISREG(base[AuBrWh_BASE].dentry->d_inode->i_mode))
 			err = 0;
 		else
 			AuErr("unknown %.*s/%.*s exists\n",
@@ -626,7 +631,7 @@ static void reinit_br_wh(void *arg)
 	wbr = a->br->br_wbr;
 	/* big aufs lock */
 	si_noflush_write_lock(a->sb);
-	if (unlikely(!au_br_writable(a->br->br_perm)))
+	if (!au_br_writable(a->br->br_perm))
 		goto out;
 	bindex = au_br_index(a->sb, a->br->br_id);
 	if (unlikely(bindex < 0))
@@ -736,7 +741,7 @@ static int link_or_create_wh(struct super_block *sb, aufs_bindex_t bindex,
 	wbr_wh_read_lock(wbr);
 	if (wbr->wbr_whbase) {
 		vfsub_args_init(&vargs, &ign, dlgt, 0);
-		if (unlikely(dir))
+		if (dir)
 			vfsub_ign_hinode(&vargs, IN_CREATE, au_hi(dir, bindex));
 		err = vfsub_link(wbr->wbr_whbase, h_dir, wh, &vargs);
 		if (!err || err != -EMLINK)
@@ -748,7 +753,7 @@ static int link_or_create_wh(struct super_block *sb, aufs_bindex_t bindex,
 
 	/* return this error in this context */
 	vfsub_args_init(&vargs, &ign, dlgt, 0);
-	if (unlikely(dir))
+	if (dir)
 		vfsub_ign_hinode(&vargs, IN_CREATE, au_hi(dir, bindex));
 	err = au_h_create(h_dir, wh, WH_MASK, &vargs, /*nd*/NULL,
 			  au_do_nfsmnt(br->br_mnt));
@@ -788,7 +793,7 @@ static struct dentry *do_diropq(struct dentry *dentry, aufs_bindex_t bindex,
 	sb = dentry->d_sb;
 	ndx.nfsmnt = au_nfsmnt(sb, bindex);
 	dlgt = 0;
-	if (unlikely(au_ftest_diropq(flags, DLGT))) {
+	if (au_ftest_diropq(flags, DLGT)) {
 		dlgt = 1;
 		au_fset_ndx(ndx.flags, DLGT);
 	}
@@ -1025,7 +1030,7 @@ int au_whtmp_rmdir(struct inode *dir, aufs_bindex_t bindex,
 	sb = dir->i_sb;
 	mnt_flags = au_mntflags(sb);
 	dlgt = !!au_test_dlgt(mnt_flags);
-	if (unlikely(dlgt))
+	if (dlgt)
 		au_fset_ndx(ndx.flags, DLGT);
 	ndx.nfsmnt = au_nfsmnt(sb, bindex);
 	wh_inode = wh_dentry->d_inode;

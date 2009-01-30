@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * pseudo-link
  *
- * $Id: plink.c,v 1.11 2008/10/13 03:09:51 sfjro Exp $
+ * $Id: plink.c,v 1.13 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -143,7 +143,7 @@ static int do_whplink(char *tgt, int len, struct dentry *h_parent,
 	AuTraceEnter();
 
 	dlgt = !!au_test_dlgt(au_mntflags(sb));
-	if (unlikely(dlgt))
+	if (dlgt)
 		au_fset_ndx(ndx.flags, DLGT);
 	h_tgt = au_lkup_one(tgt, h_parent, len, &ndx);
 	err = PTR_ERR(h_tgt);
@@ -154,7 +154,7 @@ static int do_whplink(char *tgt, int len, struct dentry *h_parent,
 	vfsub_args_init(&vargs, NULL, dlgt, 0);
 	/* wh.plink dir is not monitored */
 	h_dir = h_parent->d_inode;
-	if (unlikely(h_tgt->d_inode && h_tgt->d_inode != h_dentry->d_inode))
+	if (h_tgt->d_inode && h_tgt->d_inode != h_dentry->d_inode)
 		err = vfsub_unlink(h_dir, h_tgt, &vargs);
 	if (!err && !h_tgt->d_inode) {
 		err = vfsub_link(h_dentry, h_dir, h_tgt, &vargs);

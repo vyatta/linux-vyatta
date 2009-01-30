@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * module global variables and operations
  *
- * $Id: module.c,v 1.10 2008/08/25 01:50:37 sfjro Exp $
+ * $Id: module.c,v 1.13 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include <linux/module.h>
@@ -165,12 +165,6 @@ module_exit(aufs_exit);
 /* fake Kconfig */
 #if 1
 
-#ifdef CONFIG_AUFS_HINOTIFY
-#ifndef CONFIG_INOTIFY
-#error enable CONFIG_INOTIFY to use CONFIG_AUFS_HINOTIFY.
-#endif
-#endif /* CONFIG_AUFS_HINOTIFY */
-
 #if AUFS_BRANCH_MAX > 511 && PAGE_SIZE > 4096
 #warning pagesize is larger than 4kb, \
 	CONFIG_AUFS_BRANCH_MAX_511 or smaller is recommended.
@@ -186,36 +180,54 @@ module_exit(aufs_exit);
 #warning CONFIG_AUFS_SYSAUFS is unnecessary for linux-2.6.25 and later.
 #endif
 
+#ifdef CONFIG_AUFS_HINOTIFY
+#ifndef CONFIG_INOTIFY
+#error enable CONFIG_INOTIFY to use CONFIG_AUFS_HINOTIFY.
+#endif
+#endif /* CONFIG_AUFS_HINOTIFY */
+
 #ifdef CONFIG_AUFS_EXPORT
 #if !defined(CONFIG_EXPORTFS) && !defined(CONFIG_EXPORTFS_MODULE)
 #error CONFIG_AUFS_EXPORT requires CONFIG_EXPORTFS
 #endif
 #if defined(CONFIG_EXPORTFS_MODULE) && defined(CONFIG_AUFS)
-#error need CONFIG_EXPORTFS = y to link aufs statically with CONFIG_AUFS_EXPORT
+#error need CONFIG_EXPORTFS = y to link aufs statically with CONFIG_AUFS_EXPORT.
 #endif
 #endif /* CONFIG_AUFS_EXPORT */
 
 #ifdef CONFIG_AUFS_SEC_PERM_PATCH
 #ifndef CONFIG_SECURITY
-#warning CONFIG_AUFS_SEC_PERM_PATCH is unnecessary since CONFIG_SECURITY is disabled.
+#warning AUFS_SEC_PERM_PATCH is unnecessary since SECURITY is disabled.
 #endif
 #ifdef CONFIG_AUFS
-#warning CONFIG_AUFS_SEC_PERM_PATCH is unnecessary since CONFIG_AUFS is not a module.
+#warning AUFS_SEC_PERM_PATCH is unnecessary since AUFS is not a module.
 #endif
 #endif
-
-#ifdef CONFIG_AUFS_PUT_FILP_PATCH
-#if !defined(CONFIG_NFS_FS) && !defined(CONFIG_NFS_FS_MODULE)
-#warning CONFIG_AUFS_PUT_FILP_PATCH is unnecessary since CONFIG_NFS_FS is disabled.
-#endif
-#ifdef CONFIG_AUFS
-#warning CONFIG_AUFS_PUT_FILP_PATCH is unnecessary since CONFIG_AUFS is not a module.
-#endif
-#endif /* CONFIG_AUFS_PUT_FILP_PATCH */
 
 #ifdef CONFIG_AUFS_LHASH_PATCH
 #if !defined(CONFIG_NFS_FS) && !defined(CONFIG_NFS_FS_MODULE)
 #warning CONFIG_AUFS_LHASH_PATCH is unnecessary since CONFIG_NFS_FS is disabled.
+#endif
+#endif
+
+#ifdef CONFIG_AUFS_PUT_FILP_PATCH
+#ifndef CONFIG_NFS_V4
+#warning AUFS_PUT_FILP_PATCH is unnecessary since NFS_V4 is disabled.
+#endif
+#ifdef CONFIG_AUFS
+#warning AUFS_PUT_FILP_PATCH is unnecessary since AUFS is not a module.
+#endif
+#endif /* CONFIG_AUFS_PUT_FILP_PATCH */
+
+#ifdef CONFIG_AUFS_FSYNC_SUPER_PATCH
+#ifdef CONFIG_AUFS
+#warning AUFS_FSYNC_SUPER_PATCH is unnecessary since AUFS is not a module.
+#endif
+#endif
+
+#ifdef CONFIG_AUFS_DENY_WRITE_ACCESS_PATCH
+#ifdef CONFIG_AUFS
+#warning AUFS_DENY_WRITE_ACCESS_PATCH is unnecessary since AUFS is not a module.
 #endif
 #endif
 
@@ -229,9 +241,9 @@ module_exit(aufs_exit);
 #endif
 #endif
 
-#ifdef CONFIG_DEBUG_PROVE_LOCKING
-#if MAX_LOCKDEP_SUBCLASSES < AuLsc_I_End
-#warning lockdep will not work since aufs uses deeper locks.
+#ifdef CONFIG_AUFS_DEBUG_LOCK
+#ifndef CONFIG_AUFS_MAGIC_SYSRQ
+#warning CONFIG_AUFS_DEBUG_LOCK is enabled but CONFIG_AUFS_MAGIC_SYSRQ.
 #endif
 #endif
 
@@ -239,9 +251,19 @@ module_exit(aufs_exit);
 #warning CONFIG_AUFS_COMPAT will be removed in the near future.
 #endif
 
-#if defined(CONFIG_AUFS_UNIONFS23_PATCH) \
-	&& !defined(CONFIG_AUFS_UNIONFS22_PATCH)
-#error mis-configuration. CONFIG_AUFS_UNIONFS23_PATCH is enabled but CONFIG_AUFS_UNIONFS22_PATCH.
+#ifdef CONFIG_AUFS_UNIONFS23_PATCH
+#ifndef CONFIG_AUFS_UNIONFS22_PATCH
+#error mis-config. AUFS_UNIONFS23_PATCH is enabled but AUFS_UNIONFS22_PATCH.
+#endif
+#ifndef CONFIG_AUFS_SPLICE_PATCH
+#error mis-config. AUFS_UNIONFS23_PATCH is enabled but AUFS_SPLICE_PATCH.
+#endif
+#endif
+
+#ifdef CONFIG_DEBUG_PROVE_LOCKING
+#if MAX_LOCKDEP_SUBCLASSES < AuLsc_I_End
+#warning lockdep will not work since aufs uses deeper locks.
+#endif
 #endif
 
 #endif

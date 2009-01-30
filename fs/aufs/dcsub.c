@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * sub-routines for dentry cache
  *
- * $Id: dcsub.c,v 1.7 2008/07/21 02:54:22 sfjro Exp $
+ * $Id: dcsub.c,v 1.9 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -141,7 +141,7 @@ int au_dcsub_pages(struct au_dcsub_pages *dpages, struct dentry *root,
 		struct dentry *dentry = list_entry(tmp, struct dentry,
 						   d_u.d_child);
 		next = tmp->next;
-		if (unlikely(/*d_unhashed(dentry) || */!dentry->d_inode))
+		if (/*d_unhashed(dentry) || */!dentry->d_inode)
 			continue;
 		if (!list_empty(&dentry->d_subdirs)) {
 			this_parent = dentry;

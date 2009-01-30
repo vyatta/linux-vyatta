@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,12 +19,125 @@
 /*
  * inode operations (except add/del/rename)
  *
- * $Id: i_op.c,v 1.22 2008/10/13 03:09:40 sfjro Exp $
+ * $Id: i_op.c,v 1.28 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include <linux/fs_stack.h>
 #include <linux/uaccess.h>
 #include "aufs.h"
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
+static int h_permission(struct inode *h_inode, int mask,
+			struct vfsmount *h_mnt, int brperm, int dlgt)
+{
+	int err, submask;
+	const int write_mask = (mask & (MAY_WRITE | MAY_APPEND));
+
+	LKTRTrace("ino %lu, mask 0x%x, brperm 0x%x\n",
+		  h_inode->i_ino, mask, brperm);
+
+	err = -EACCES;
+	if ((write_mask && IS_IMMUTABLE(h_inode))
+	    || ((mask & MAY_EXEC) && S_ISREG(h_inode->i_mode)
+		&& (h_mnt->mnt_flags & MNT_NOEXEC)))
+		goto out;
+
+	/*
+	 * - skip hidden fs test in the case of write to ro branch.
+	 * - nfs dir permission write check is optimized, but a policy for
+	 *   link/rename requires a real check.
+	 */
+	submask = mask & ~MAY_APPEND;
+	if ((write_mask && !au_br_writable(brperm))
+	    || (au_test_nfs(h_inode->i_sb) && S_ISDIR(h_inode->i_mode)
+		&& write_mask && !(mask & MAY_READ))
+	    || !h_inode->i_op
+	    || !h_inode->i_op->permission) {
+		/* LKTRLabel(generic_permission); */
+		err = generic_permission(h_inode, submask, NULL);
+	} else {
+		/* LKTRLabel(h_inode->permission); */
+		err = h_inode->i_op->permission(h_inode, submask);
+		AuTraceErr(err);
+	}
+
+#if 1 /* todo: export? */
+	if (!err)
+		err = au_security_inode_permission(h_inode, mask, NULL,
+						   dlgt);
+#endif
+
+ out:
+	AuTraceErr(err);
+	return err;
+}
+
+static int aufs_permission(struct inode *inode, int mask)
+{
+	int err;
+	aufs_bindex_t bindex, bend;
+	unsigned char dlgt;
+	const unsigned char isdir = S_ISDIR(inode->i_mode);
+	struct inode *h_inode;
+	struct super_block *sb;
+	unsigned int mnt_flags;
+	const int write_mask = (mask & (MAY_WRITE | MAY_APPEND));
+
+	LKTRTrace("ino %lu, mask 0x%x, isdir %d, write_mask %d\n",
+		  inode->i_ino, mask, isdir, write_mask);
+
+	sb = inode->i_sb;
+	si_read_lock(sb, AuLock_FLUSH);
+	ii_read_lock_child(inode);
+	mnt_flags = au_mntflags(sb);
+	dlgt = !!au_test_dlgt(mnt_flags);
+
+	if (!isdir || write_mask || au_test_dirperm1(mnt_flags)) {
+		h_inode = au_h_iptr(inode, au_ibstart(inode));
+		AuDebugOn(!h_inode
+			  || ((h_inode->i_mode & S_IFMT)
+			      != (inode->i_mode & S_IFMT)));
+		err = 0;
+		bindex = au_ibstart(inode);
+		LKTRTrace("b%d\n", bindex);
+		err = h_permission(h_inode, mask, au_sbr_mnt(sb, bindex),
+				   au_sbr_perm(sb, bindex), dlgt);
+
+		if (write_mask && !err) {
+			/* test whether the upper writable branch exists */
+			err = -EROFS;
+			for (; bindex >= 0; bindex--)
+				if (!au_br_rdonly(au_sbr(sb, bindex))) {
+					err = 0;
+					break;
+				}
+		}
+		goto out;
+	}
+
+	/* non-write to dir */
+	err = 0;
+	bend = au_ibend(inode);
+	for (bindex = au_ibstart(inode); !err && bindex <= bend; bindex++) {
+		h_inode = au_h_iptr(inode, bindex);
+		if (!h_inode)
+			continue;
+		AuDebugOn(!S_ISDIR(h_inode->i_mode));
+
+		LKTRTrace("b%d\n", bindex);
+		err = h_permission(h_inode, mask, au_sbr_mnt(sb, bindex),
+				   au_sbr_perm(sb, bindex), dlgt);
+	}
+
+ out:
+	ii_read_unlock(inode);
+	si_read_unlock(sb);
+	AuTraceErr(err);
+	if (unlikely(err == -EBUSY && au_test_nfsd(current)))
+		err = -ESTALE;
+	return err;
+}
+#else
 
 static int silly_lock(struct inode *inode, struct nameidata *nd)
 {
@@ -73,117 +186,6 @@ static void silly_unlock(int locked, struct inode *inode, struct nameidata *nd)
 	}
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
-static int h_permission(struct inode *h_inode, int mask,
-			struct vfsmount *h_mnt, int brperm, int dlgt)
-{
-	int err, submask;
-	const int write_mask = (mask & (MAY_WRITE | MAY_APPEND));
-
-	LKTRTrace("ino %lu, mask 0x%x, brperm 0x%x\n",
-		  h_inode->i_ino, mask, brperm);
-
-	err = -EACCES;
-	if (unlikely((write_mask && IS_IMMUTABLE(h_inode))
-		     || ((mask & MAY_EXEC) && S_ISREG(h_inode->i_mode)
-			 && (h_mnt->mnt_flags & MNT_NOEXEC))
-		    ))
-		goto out;
-
-	/*
-	 * - skip hidden fs test in the case of write to ro branch.
-	 * - nfs dir permission write check is optimized, but a policy for
-	 *   link/rename requires a real check.
-	 */
-	submask = mask & ~MAY_APPEND;
-	if ((write_mask && !au_br_writable(brperm))
-	    || (au_test_nfs(h_inode->i_sb) && S_ISDIR(h_inode->i_mode)
-		&& write_mask && !(mask & MAY_READ))
-	    || !h_inode->i_op
-	    || !h_inode->i_op->permission) {
-		/* LKTRLabel(generic_permission); */
-		err = generic_permission(h_inode, submask, NULL);
-	} else {
-		/* LKTRLabel(h_inode->permission); */
-		err = h_inode->i_op->permission(h_inode, submask);
-		AuTraceErr(err);
-	}
-
-#if 1 /* todo: export? */
-	if (!err)
-		err = au_security_inode_permission(h_inode, mask, NULL,
-						   dlgt);
-#endif
-
- out:
-	AuTraceErr(err);
-	return err;
-}
-
-static int aufs_permission(struct inode *inode, int mask)
-{
-	int err;
-	aufs_bindex_t bindex, bend;
-	unsigned char locked, dlgt;
-	const unsigned char isdir = S_ISDIR(inode->i_mode);
-	struct inode *h_inode;
-	struct super_block *sb;
-	unsigned int mnt_flags;
-	const int write_mask = (mask & (MAY_WRITE | MAY_APPEND));
-
-	LKTRTrace("ino %lu, mask 0x%x, isdir %d, write_mask %d\n",
-		  inode->i_ino, mask, isdir, write_mask);
-
-	sb = inode->i_sb;
-	locked = silly_lock(inode, NULL);
-	mnt_flags = au_mntflags(sb);
-	dlgt = !!au_test_dlgt(mnt_flags);
-
-	if (/* unlikely */(!isdir || write_mask
-			   || au_test_dirperm1(mnt_flags))) {
-		h_inode = au_h_iptr(inode, au_ibstart(inode));
-		AuDebugOn(!h_inode
-			  || ((h_inode->i_mode & S_IFMT)
-			      != (inode->i_mode & S_IFMT)));
-		err = 0;
-		bindex = au_ibstart(inode);
-		LKTRTrace("b%d\n", bindex);
-		err = h_permission(h_inode, mask, au_sbr_mnt(sb, bindex),
-				   au_sbr_perm(sb, bindex), dlgt);
-
-		if (write_mask && !err) {
-			/* test whether the upper writable branch exists */
-			err = -EROFS;
-			for (; bindex >= 0; bindex--)
-				if (!au_br_rdonly(au_sbr(sb, bindex))) {
-					err = 0;
-					break;
-				}
-		}
-		goto out;
-	}
-
-	/* non-write to dir */
-	err = 0;
-	bend = au_ibend(inode);
-	for (bindex = au_ibstart(inode); !err && bindex <= bend; bindex++) {
-		h_inode = au_h_iptr(inode, bindex);
-		if (!h_inode)
-			continue;
-		AuDebugOn(!S_ISDIR(h_inode->i_mode));
-
-		LKTRTrace("b%d\n", bindex);
-		err = h_permission(h_inode, mask, au_sbr_mnt(sb, bindex),
-				   au_sbr_perm(sb, bindex), dlgt);
-	}
-
- out:
-	silly_unlock(locked, inode, NULL);
-	AuTraceErr(err);
-	return err;
-}
-#else
-
 static int h_permission(struct inode *h_inode, int mask,
 			struct nameidata *fake_nd, int brperm, int dlgt)
 {
@@ -194,11 +196,10 @@ static int h_permission(struct inode *h_inode, int mask,
 		  h_inode->i_ino, mask, brperm);
 
 	err = -EACCES;
-	if (unlikely((write_mask && IS_IMMUTABLE(h_inode))
-		     || ((mask & MAY_EXEC) && S_ISREG(h_inode->i_mode)
-			 && fake_nd && fake_nd->path.mnt
-			 && (fake_nd->path.mnt->mnt_flags & MNT_NOEXEC))
-		    ))
+	if ((write_mask && IS_IMMUTABLE(h_inode))
+	    || ((mask & MAY_EXEC) && S_ISREG(h_inode->i_mode)
+		&& fake_nd && fake_nd->path.mnt
+		&& (fake_nd->path.mnt->mnt_flags & MNT_NOEXEC)))
 		goto out;
 
 	/*
@@ -254,8 +255,7 @@ static int aufs_permission(struct inode *inode, int mask, struct nameidata *nd)
 	mnt_flags = au_mntflags(sb);
 	dlgt = !!au_test_dlgt(mnt_flags);
 
-	if (/* unlikely */(!isdir || write_mask
-			   || au_test_dirperm1(mnt_flags))) {
+	if (!isdir || write_mask || au_test_dirperm1(mnt_flags)) {
 		h_inode = au_h_iptr(inode, au_ibstart(inode));
 		AuDebugOn(!h_inode
 			  || ((h_inode->i_mode & S_IFMT)
@@ -325,6 +325,8 @@ static int aufs_permission(struct inode *inode, int mask, struct nameidata *nd)
  out:
 	silly_unlock(locked, inode, nd);
 	AuTraceErr(err);
+	if (unlikely(err == -EBUSY && au_test_nfsd(current)))
+		err = -ESTALE;
 	return err;
 }
 #endif /* KERNEL_VERSION(2, 6, 27) */
@@ -335,7 +337,7 @@ static struct dentry *aufs_lookup(struct inode *dir, struct dentry *dentry,
 				  struct nameidata *nd)
 {
 	struct dentry *ret, *parent;
-	int err, npositive, no_lock;
+	int err, npositive;
 	struct inode *inode, *h_inode;
 	struct nameidata tmp_nd, *ndp;
 	aufs_bindex_t bstart;
@@ -357,10 +359,9 @@ static struct dentry *aufs_lookup(struct inode *dir, struct dentry *dentry,
 	/* nd can be NULL */
 	ndp = au_dup_nd(au_sbi(sb), &tmp_nd, nd);
 	parent = dentry->d_parent; /* dir inode is locked */
-	no_lock = di_nfsd_read_lock_parent(parent, AuLock_IR);
+	di_read_lock_parent(parent, AuLock_IR);
 	npositive = au_lkup_dentry(dentry, au_dbstart(parent), /*type*/0, ndp);
-	if (!no_lock)
-		di_read_unlock(parent, AuLock_IR);
+	di_read_unlock(parent, AuLock_IR);
 	err = npositive;
 	ret = ERR_PTR(err);
 	if (unlikely(err < 0))
@@ -381,7 +382,7 @@ static struct dentry *aufs_lookup(struct inode *dir, struct dentry *dentry,
 			inode = au_new_inode(dentry, /*must_new*/0);
 			mutex_unlock(mtx);
 		} else
-			inode = au_new_inode(dentry, /*must_new*/1);
+			inode = au_new_inode(dentry, /*must_new*/0);
 		ret = (void *)inode;
 	}
 	if (!IS_ERR(inode)) {
@@ -400,6 +401,8 @@ static struct dentry *aufs_lookup(struct inode *dir, struct dentry *dentry,
  out:
 	si_read_unlock(sb);
 	AuTraceErrPtr(ret);
+	if (unlikely(err == -EBUSY && au_test_nfsd(current)))
+		err = -ESTALE;
 	return ret;
 }
 
@@ -443,9 +446,12 @@ int au_wr_dir(struct dentry *dentry, struct dentry *src_dentry,
 			if (add_entry)
 				err = AuWbrCopyup(sbinfo, dentry);
 			else {
-				di_read_lock_parent(parent, !AuLock_IR);
-				err = AuWbrCopyup(sbinfo, dentry);
-				di_read_unlock(parent, !AuLock_IR);
+				if (!IS_ROOT(dentry)) {
+					di_read_lock_parent(parent, !AuLock_IR);
+					err = AuWbrCopyup(sbinfo, dentry);
+					di_read_unlock(parent, !AuLock_IR);
+				} else
+					err = AuWbrCopyup(sbinfo, dentry);
 			}
 			bcpup = err;
 			if (unlikely(err < 0))
@@ -518,17 +524,21 @@ struct dentry *au_do_pinned_h_parent(struct au_pin1 *pin)
 
 void au_do_unpin(struct au_pin1 *p, struct au_pin1 *gp)
 {
-	LKTRTrace("p{%.*s, %d, %d, %d, %d}, gp %p\n",
-		  AuDLNPair(p->dentry), p->lsc_di, p->lsc_hi,
-		  !!p->parent, !!p->h_dir, gp);
+	if (p->dentry)
+		LKTRTrace("%.*s\n", AuDLNPair(p->dentry));
+	LKTRTrace("p{%d, %d, %d, %d, 0x%x}, gp %p\n",
+		  p->lsc_di, p->lsc_hi, !!p->parent, !!p->h_dir, p->flags, gp);
 
 	if (au_ftest_pin(p->flags, MNT_WRITE))
 		au_br_drop_write(au_sbr(p->dentry->d_sb, p->bindex));
-	if (unlikely(!p->h_dir))
+	if (au_ftest_pin(p->flags, VFS_RENAME))
+		vfsub_unlock_rename_mutex(au_sbr_sb(p->dentry->d_sb,
+						    p->bindex));
+	if (!p->h_dir)
 		return;
 
 	mutex_unlock(&p->h_dir->i_mutex);
-	if (unlikely(gp))
+	if (gp)
 		au_do_unpin(gp, NULL);
 	if (!au_ftest_pin(p->flags, DI_LOCKED))
 		di_read_unlock(p->parent, AuLock_IR);
@@ -549,7 +559,10 @@ int au_do_pin(struct au_pin1 *p, struct au_pin1 *gp)
 	/* AuDebugOn(!do_gp && gp); */
 
 	err = 0;
-	if (unlikely(IS_ROOT(p->dentry))) {
+	if (IS_ROOT(p->dentry)) {
+		if (au_ftest_pin(p->flags, VFS_RENAME))
+			vfsub_lock_rename_mutex(au_sbr_sb(p->dentry->d_sb,
+							  p->bindex));
 		if (au_ftest_pin(p->flags, MNT_WRITE)) {
 			err = au_br_want_write(au_sbr(p->dentry->d_sb,
 						      p->bindex));
@@ -580,15 +593,22 @@ int au_do_pin(struct au_pin1 *p, struct au_pin1 *gp)
 		goto out;
 	}
 
-	if (unlikely(au_ftest_pin(p->flags, DO_GPARENT))) {
+	if (au_ftest_pin(p->flags, DO_GPARENT)) {
 		gp->dentry = p->parent;
 		err = au_do_pin(gp, NULL);
 		if (unlikely(err))
 			gp->dentry = NULL;
 	}
+	if (au_ftest_pin(p->flags, VFS_RENAME))
+		vfsub_lock_rename_mutex(p->h_dir->i_sb);
 	mutex_lock_nested(&p->h_dir->i_mutex, p->lsc_hi);
 	if (!err) {
 		/* todo: call d_revalidate() here? */
+#if 0
+		if (h_dentry && h_dentry->d_op && h_dentry->d_op->d_revalidate
+		    && !h_dentry->d_op->d_revalidate(h_dentry, NULL))
+			err = -EIO;
+#endif
 		if (!h_dentry
 		    || !au_ftest_pin(p->flags, VERIFY)
 		    || !au_verify_parent(h_dentry, p->h_dir)) {
@@ -612,7 +632,7 @@ int au_do_pin(struct au_pin1 *p, struct au_pin1 *gp)
 		AuDbgDentry(h_dentry->d_parent);
 
 	au_do_unpin(p, gp);
-	if (unlikely(au_ftest_pin(p->flags, DO_GPARENT)))
+	if (au_ftest_pin(p->flags, DO_GPARENT))
 		gp->dentry = NULL;
 
  out:
@@ -643,7 +663,7 @@ void au_pin_init(struct au_pin *args, struct dentry *dentry,
 
 	f = p->flags;
 	p = au_pin_gp(args);
-	if (unlikely(p)) {
+	if (p) {
 		p->lsc_di = lsc_di + 1; /* child first */
 		p->lsc_hi = lsc_hi - 1; /* parent first */
 		p->bindex = bindex;
@@ -698,7 +718,7 @@ static int au_lock_and_icpup(struct dentry *dentry, loff_t sz,
 	sb = dentry->d_sb;
 	inode = dentry->d_inode;
 	a->isdir = !!S_ISDIR(inode->i_mode);
-	if (unlikely(a->isdir))
+	if (a->isdir)
 		au_fset_wrdir(wr_dir_args.flags, ISDIR);
 	/* plink or hi_wh() */
 	if (bstart != au_ibstart(inode))
@@ -713,7 +733,7 @@ static int au_lock_and_icpup(struct dentry *dentry, loff_t sz,
 	/* crazy udba locks */
 	a->pin_flags = AuPin_MNT_WRITE;
 	a->hinotify = !!au_opt_test(au_mntflags(sb), UDBA_INOTIFY);
-	if (unlikely(a->hinotify))
+	if (a->hinotify)
 		au_fset_pin(a->pin_flags, DO_GPARENT);
 	parent = NULL;
 	if (!IS_ROOT(dentry)) {
@@ -845,10 +865,10 @@ static int aufs_setattr(struct dentry *dentry, struct iattr *ia)
 		ia->ia_valid &= ~ATTR_MODE;
 
 	events = 0;
-	if (unlikely(a->hinotify)) {
+	if (a->hinotify) {
 		events = vfsub_events_notify_change(ia);
 		if (events) {
-			if (unlikely(a->isdir))
+			if (a->isdir)
 				vfsub_ign_hinode(&a->vargs, events,
 						 au_hi(inode, a->btgt));
 			vfsub_ign_hinode(&a->vargs, events,
@@ -873,6 +893,8 @@ static int aufs_setattr(struct dentry *dentry, struct iattr *ia)
 	kfree(a);
  out:
 	AuTraceErr(err);
+	if (unlikely(err == -EBUSY && au_test_nfsd(current)))
+		err = -ESTALE;
 	return err;
 }
 
@@ -913,6 +935,8 @@ static int aufs_readlink(struct dentry *dentry, char __user *buf, int bufsiz)
 	err = h_readlink(dentry, au_dbstart(dentry), buf, bufsiz);
 	aufs_read_unlock(dentry, AuLock_IR);
 	AuTraceErr(err);
+	if (unlikely(err == -EBUSY && au_test_nfsd(current)))
+		err = -ESTALE;
 	return err;
 }
 
@@ -949,6 +973,8 @@ static void *aufs_follow_link(struct dentry *dentry, struct nameidata *nd)
  out:
 	path_put(&nd->path);
 	AuTraceErr(err);
+	if (unlikely(err == -EBUSY && au_test_nfsd(current)))
+		err = -ESTALE;
 	return ERR_PTR(err);
 }
 

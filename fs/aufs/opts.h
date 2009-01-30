@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * mount options/flags
  *
- * $Id: opts.h,v 1.6 2008/08/17 23:03:27 sfjro Exp $
+ * $Id: opts.h,v 1.9 2009/01/26 06:24:05 sfjro Exp $
  */
 
 #ifndef __AUFS_OPTS_H__
@@ -53,6 +53,8 @@
 #define AuOpt_ALWAYS_DIROPQ	(1 << 14)
 #define AuOpt_REFROF		(1 << 15)
 #define AuOpt_VERBOSE		(1 << 16)
+#define AuOpt_SUM		(1 << 17)
+#define AuOpt_SUM_W		(1 << 18)	/* unimplemented */
 
 #if 1 /* ndef CONFIG_AUFS_EXPORT */ /* reserved for future use */
 #undef AuOpt_XINODIR
@@ -195,6 +197,7 @@ struct au_opts {
 
 	unsigned int	given_udba;
 	unsigned int	flags;
+	unsigned long	sb_flags;
 };
 
 /* ---------------------------------------------------------------------- */
@@ -206,8 +209,9 @@ const char *au_optstr_wbr_copyup(int wbr_copyup);
 const char *au_optstr_wbr_create(int wbr_create);
 
 void au_opts_free(struct au_opts *opts);
-int au_opts_parse(struct super_block *sb, unsigned long flags, char *str,
-		  struct au_opts *opts);
+int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts);
+int verify_opts(struct super_block *sb, unsigned long sb_flags,
+		unsigned int pending, int remount);
 int au_opts_mount(struct super_block *sb, struct au_opts *opts);
 int au_opts_remount(struct super_block *sb, struct au_opts *opts);
 
@@ -217,7 +221,7 @@ int au_opts_remount(struct super_block *sb, struct au_opts *opts);
 
 static inline int au_opt_test_xino(unsigned int flags)
 {
-	return (flags & (AuOpt_XINO | AuOpt_XINODIR));
+	return flags & (AuOpt_XINO | AuOpt_XINODIR);
 }
 
 #define au_opt_set(flags, name) do { \
@@ -239,12 +243,12 @@ static inline int au_opt_test_xino(unsigned int flags)
 
 static inline int au_test_dlgt(unsigned int flags)
 {
-	return (au_opt_test(flags, DLGT) && !au_test_wkq(current));
+	return au_opt_test(flags, DLGT) && !au_test_wkq(current);
 }
 
 static inline int au_test_dirperm1(unsigned int flags)
 {
-	return (au_opt_test(flags, DIRPERM1) && !au_test_wkq(current));
+	return au_opt_test(flags, DIRPERM1) && !au_test_wkq(current);
 }
 
 #endif /* __KERNEL__ */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
  */
 
 /*
- * $Id: misc.c,v 1.18 2008/09/29 03:44:58 sfjro Exp $
+ * $Id: misc.c,v 1.20 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -129,6 +129,31 @@ int au_h_create(struct inode *h_dir, struct dentry *h_dentry, int mode,
 
 /* ---------------------------------------------------------------------- */
 
+/* empty_zero_page is not exported on PPC before 2.6.26 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 26) \
+	&& (defined(CONFIG_PPC) || defined(CONFIG_PPC64))
+static char *au_zp_alloc(void)
+{
+	return (void *)get_zeroed_page(GFP_NOFS);
+}
+
+static void au_zp_free(char *p)
+{
+	if (p)
+		free_page((unsigned long)p);
+}
+#else
+static char *au_zp_alloc(void)
+{
+	return page_address(ZERO_PAGE(0));
+}
+
+static void au_zp_free(char *p)
+{
+	/* empty */
+}
+#endif
+
 int au_copy_file(struct file *dst, struct file *src, loff_t len,
 		 struct au_hinode *hdir, struct super_block *sb,
 		 struct vfsub_args *vargs)
@@ -152,7 +177,9 @@ int au_copy_file(struct file *dst, struct file *src, loff_t len,
 #endif
 
 	err = -ENOMEM;
-	zp = page_address(ZERO_PAGE(0));
+	zp = au_zp_alloc();
+	if (unlikely(!zp))
+		goto out;
 	blksize = dst->f_dentry->d_sb->s_blocksize;
 	if (!blksize || PAGE_SIZE < blksize)
 		blksize = PAGE_SIZE;
@@ -245,7 +272,7 @@ int au_copy_file(struct file *dst, struct file *src, loff_t len,
 	}
 
 	/* the last block may be a hole */
-	if (unlikely(!err && all_zero)) {
+	if (!err && all_zero) {
 		struct dentry *h_d = dst->f_dentry;
 		struct inode *h_i = h_d->d_inode;
 
@@ -275,6 +302,7 @@ int au_copy_file(struct file *dst, struct file *src, loff_t len,
 		free_page((unsigned long)buf);
 
  out:
+	au_zp_free(zp);
 	AuTraceErr(err);
 	return err;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2008 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 /*
  * branch filesystems and xino for them
  *
- * $Id: branch.h,v 1.13 2008/10/06 00:29:52 sfjro Exp $
+ * $Id: branch.h,v 1.17 2009/01/26 06:23:47 sfjro Exp $
  */
 
 #ifndef __AUFS_BRANCH_H__
@@ -127,27 +127,27 @@ enum {
 
 static inline int au_br_writable(int brperm)
 {
-	return (brperm == AuBrPerm_RW || brperm == AuBrPerm_RWNoLinkWH);
+	return brperm == AuBrPerm_RW || brperm == AuBrPerm_RWNoLinkWH;
 }
 
 static inline int au_br_whable(int brperm)
 {
-	return (brperm == AuBrPerm_RW
+	return brperm == AuBrPerm_RW
 		|| brperm == AuBrPerm_ROWH
-		|| brperm == AuBrPerm_RRWH);
+		|| brperm == AuBrPerm_RRWH;
 }
 
 #if 0 /* reserved for future use */
 static inline int au_br_linkable_wh(int brperm)
 {
-	return (brperm == AuBrPerm_RW);
+	return brperm == AuBrPerm_RW;
 }
 #endif
 
 static inline int au_br_hinotifyable(int brperm)
 {
 #ifdef CONFIG_AUFS_HINOTIFY
-	return (brperm != AuBrPerm_RR && brperm != AuBrPerm_RRWH);
+	return brperm != AuBrPerm_RR && brperm != AuBrPerm_RRWH;
 #else
 	return 0;
 #endif
@@ -324,14 +324,15 @@ static inline int au_test_unique_ino(struct dentry *h_dentry, ino_t h_ino)
 {
 #if defined(CONFIG_CRAMFS) || defined(CONFIG_CRAMFS_MODULE)
 	if (unlikely(h_dentry->d_sb->s_magic == CRAMFS_MAGIC))
-		return (h_ino != 1);
+		return h_ino != 1;
 #endif
 	return 1;
 }
 
 static inline struct vfsmount *au_do_nfsmnt(struct vfsmount *h_mnt)
 {
-	if (!au_test_nfs(h_mnt->mnt_sb))
+	if (!au_test_nfs(h_mnt->mnt_sb)
+	    && !au_test_ecryptfs(h_mnt->mnt_sb))
 		return NULL;
 	return h_mnt;
 }
@@ -367,9 +368,10 @@ struct vfsmount *au_nfsmnt(struct super_block *sb, aufs_bindex_t bindex)
 #else
 static inline int au_test_unsupported_nfs(struct super_block *h_sb)
 {
-	return (h_sb->s_magic == NFS_SUPER_MAGIC);
+	return h_sb->s_magic == NFS_SUPER_MAGIC;
 }
 
+/* it doesn't mntget() */
 static inline
 struct vfsmount *au_nfsmnt(struct super_block *sb, aufs_bindex_t bindex)
 {
@@ -380,6 +382,32 @@ struct vfsmount *au_nfsmnt(struct super_block *sb, aufs_bindex_t bindex)
 	", try some configurations and patches included in aufs source CVS."
 
 #endif /* CONFIG_AUFS_BR_NFS */
+
+#ifdef CONFIG_AUFS_BR_NFS_V4
+static inline int au_test_unsupported_nfs4(struct super_block *h_sb)
+{
+	return 0;
+}
+
+#define AuNoNfsv4BranchMsg "dummy"
+
+#else
+static inline int au_test_unsupported_nfs4(struct super_block *h_sb)
+{
+	return h_sb->s_magic == NFS_SUPER_MAGIC
+		&& !strcmp(h_sb->s_type->name, "nfs4");
+}
+
+#define AuNoNfsv4BranchMsg "NFSv4 branch is not supported" \
+	", try some configurations and patches included in aufs source CVS."
+
+#endif /* CONFIG_AUFS_BR_NFS_v4 */
+
+/* support atomic open */
+static inline int au_test_fs_intent(struct super_block *h_sb)
+{
+	return au_test_nfs4(h_sb) /*|| au_test_fuse(h_sb)*/;
+}
 
 /* ---------------------------------------------------------------------- */
 
