@@ -376,12 +376,8 @@
   	*(.initcall5.init)						\
   	*(.initcall5s.init)						\
 	*(.initcallrootfs.init)						\
-	*(.initcall6s.init)						\
-	VMLINUX_SYMBOL(__async_initcall_start) = .;			\
-	*(.initcall6a.init)						\
-	VMLINUX_SYMBOL(__async_initcall_end) = .;			\
   	*(.initcall6.init)						\
-	VMLINUX_SYMBOL(__device_initcall_end) = .;			\
+  	*(.initcall6s.init)						\
   	*(.initcall7.init)						\
   	*(.initcall7s.init)
 
