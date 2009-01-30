@@ -40,13 +40,6 @@ do { if ((priv->debug_level & (level)) && net_ratelimit()) \
   dev_printk(KERN_ERR, &(priv->hw->wiphy->dev), "%c %s " fmt, \
 	 in_interrupt() ? 'I' : 'U', __func__ , ## args); } while (0)
 
-#define iwl_print_hex_dump(priv, level, p, len) 			\
-do {                                            			\
-	if (priv->debug_level & level)          			\
-		print_hex_dump(KERN_DEBUG, "iwl data: ",		\
-			       DUMP_PREFIX_OFFSET, 16, 1, p, len, 1);	\
-} while (0)
-
 #ifdef CONFIG_IWLWIFI_DEBUGFS
 struct iwl_debugfs {
 	const char *name;
@@ -77,9 +70,6 @@ void iwl_dbgfs_unregister(struct iwl_priv *priv);
 #else
 #define IWL_DEBUG(level, fmt, args...)
 #define IWL_DEBUG_LIMIT(level, fmt, args...)
-static inline void iwl_print_hex_dump(struct iwl_priv *priv, int level,
-				      void *p, u32 len)
-{}
 #endif				/* CONFIG_IWLWIFI_DEBUG */
 
 
@@ -111,20 +101,20 @@ static inline void iwl_dbgfs_unregister(struct iwl_priv *priv)
  *
  * To add your debug level to the list of levels seen when you perform
  *
- * % cat /sys/class/net/wlanX/device/debug_level
+ * % cat /proc/net/iwl/debug_level
  *
  * you simply need to add your entry to the iwl_debug_levels array.
  *
- * If you do not see debug_level in  /sys/class/net/wlanX/device/debug_level
- * then you do not have CONFIG_IWLWIFI_DEBUG defined in your kernel config file
+ * If you do not see debug_level in /proc/net/iwl then you do not have
+ * CONFIG_IWLWIFI_DEBUG defined in your kernel configuration
+ *
  */
 
-#define IWL_DL_INFO		(1 << 0)
-#define IWL_DL_MAC80211		(1 << 1)
-#define IWL_DL_HCMD		(1 << 2)
-#define IWL_DL_STATE		(1 << 3)
+#define IWL_DL_INFO          (1 << 0)
+#define IWL_DL_MAC80211      (1 << 1)
+#define IWL_DL_HOST_COMMAND  (1 << 2)
+#define IWL_DL_STATE         (1 << 3)
 #define IWL_DL_MACDUMP		(1 << 4)
-#define IWL_DL_HCMD_DUMP	(1 << 5)
 #define IWL_DL_RADIO         (1 << 7)
 #define IWL_DL_POWER         (1 << 8)
 #define IWL_DL_TEMP          (1 << 9)
@@ -172,8 +162,7 @@ static inline void iwl_dbgfs_unregister(struct iwl_priv *priv)
 #define IWL_DEBUG_ISR(f, a...)    IWL_DEBUG(IWL_DL_ISR, f, ## a)
 #define IWL_DEBUG_LED(f, a...) IWL_DEBUG(IWL_DL_LED, f, ## a)
 #define IWL_DEBUG_WEP(f, a...)    IWL_DEBUG(IWL_DL_WEP, f, ## a)
-#define IWL_DEBUG_HC(f, a...) IWL_DEBUG(IWL_DL_HCMD, f, ## a)
-#define IWL_DEBUG_HC_DUMP(f, a...) IWL_DEBUG(IWL_DL_HCMD_DUMP, f, ## a)
+#define IWL_DEBUG_HC(f, a...) IWL_DEBUG(IWL_DL_HOST_COMMAND, f, ## a)
 #define IWL_DEBUG_CALIB(f, a...) IWL_DEBUG(IWL_DL_CALIB, f, ## a)
 #define IWL_DEBUG_FW(f, a...) IWL_DEBUG(IWL_DL_FW, f, ## a)
 #define IWL_DEBUG_RF_KILL(f, a...) IWL_DEBUG(IWL_DL_RF_KILL, f, ## a)
@@ -192,8 +181,6 @@ static inline void iwl_dbgfs_unregister(struct iwl_priv *priv)
 #define IWL_DEBUG_STATS(f, a...) IWL_DEBUG(IWL_DL_STATS, f, ## a)
 #define IWL_DEBUG_STATS_LIMIT(f, a...) IWL_DEBUG_LIMIT(IWL_DL_STATS, f, ## a)
 #define IWL_DEBUG_TX_REPLY(f, a...) IWL_DEBUG(IWL_DL_TX_REPLY, f, ## a)
-#define IWL_DEBUG_TX_REPLY_LIMIT(f, a...) \
-	IWL_DEBUG_LIMIT(IWL_DL_TX_REPLY, f, ## a)
 #define IWL_DEBUG_QOS(f, a...)   IWL_DEBUG(IWL_DL_QOS, f, ## a)
 #define IWL_DEBUG_RADIO(f, a...)  IWL_DEBUG(IWL_DL_RADIO, f, ## a)
 #define IWL_DEBUG_POWER(f, a...)  IWL_DEBUG(IWL_DL_POWER, f, ## a)

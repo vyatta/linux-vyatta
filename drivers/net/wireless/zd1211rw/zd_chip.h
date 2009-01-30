@@ -897,7 +897,7 @@ int zd_chip_lock_phy_regs(struct zd_chip *chip);
 int zd_chip_unlock_phy_regs(struct zd_chip *chip);
 
 enum led_status {
-	LED_OFF_ZD = 0,
+	LED_OFF = 0,
 	LED_SCANNING = 1,
 	LED_ASSOCIATED = 2,
 };

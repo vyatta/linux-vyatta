@@ -1,5 +1,5 @@
-#ifndef P54PCI_H
-#define P54PCI_H
+#ifndef PRISM54PCI_H
+#define PRISM54PCI_H
 
 /*
  * Defines for PCI based mac80211 Prism54 driver
@@ -68,7 +68,7 @@ struct p54p_csr {
 } __attribute__ ((packed));
 
 /* usb backend only needs the register defines above */
-#ifndef P54USB_H
+#ifndef PRISM54USB_H
 struct p54p_desc {
 	__le32 host_addr;
 	__le32 device_addr;
@@ -92,19 +92,15 @@ struct p54p_priv {
 	struct p54_common common;
 	struct pci_dev *pdev;
 	struct p54p_csr __iomem *map;
-	struct tasklet_struct rx_tasklet;
 
 	spinlock_t lock;
 	struct p54p_ring_control *ring_control;
 	dma_addr_t ring_control_dma;
-	u32 rx_idx_data, tx_idx_data;
-	u32 rx_idx_mgmt, tx_idx_mgmt;
-	struct sk_buff *rx_buf_data[8];
-	struct sk_buff *rx_buf_mgmt[4];
-	void *tx_buf_data[32];
-	void *tx_buf_mgmt[4];
+	u32 rx_idx, tx_idx;
+	struct sk_buff *rx_buf[8];
+	void *tx_buf[32];
 	struct completion boot_comp;
 };
 
-#endif /* P54USB_H */
-#endif /* P54PCI_H */
+#endif /* PRISM54USB_H */
+#endif /* PRISM54PCI_H */

@@ -12,8 +12,9 @@
 #include <linux/kthread.h>
 #include <linux/kfifo.h>
 #include <linux/stddef.h>
-#include <linux/ieee80211.h>
+
 #include <net/iw_handler.h>
+#include <net/ieee80211.h>
 
 #include "host.h"
 #include "decl.h"
@@ -222,7 +223,7 @@ u8 lbs_data_rate_to_fw_index(u32 rate)
 static ssize_t lbs_anycast_get(struct device *dev,
 		struct device_attribute *attr, char * buf)
 {
-	struct lbs_private *priv = netdev_priv(to_net_dev(dev));
+	struct lbs_private *priv = to_net_dev(dev)->priv;
 	struct cmd_ds_mesh_access mesh_access;
 	int ret;
 
@@ -241,7 +242,7 @@ static ssize_t lbs_anycast_get(struct device *dev,
 static ssize_t lbs_anycast_set(struct device *dev,
 		struct device_attribute *attr, const char * buf, size_t count)
 {
-	struct lbs_private *priv = netdev_priv(to_net_dev(dev));
+	struct lbs_private *priv = to_net_dev(dev)->priv;
 	struct cmd_ds_mesh_access mesh_access;
 	uint32_t datum;
 	int ret;
@@ -269,7 +270,7 @@ static void lbs_remove_mesh(struct lbs_private *priv);
 static ssize_t lbs_rtap_get(struct device *dev,
 		struct device_attribute *attr, char * buf)
 {
-	struct lbs_private *priv = netdev_priv(to_net_dev(dev));
+	struct lbs_private *priv = to_net_dev(dev)->priv;
 	return snprintf(buf, 5, "0x%X\n", priv->monitormode);
 }
 
@@ -280,7 +281,7 @@ static ssize_t lbs_rtap_set(struct device *dev,
 		struct device_attribute *attr, const char * buf, size_t count)
 {
 	int monitor_mode;
-	struct lbs_private *priv = netdev_priv(to_net_dev(dev));
+	struct lbs_private *priv = to_net_dev(dev)->priv;
 
 	sscanf(buf, "%x", &monitor_mode);
 	if (monitor_mode) {
@@ -290,11 +291,9 @@ static ssize_t lbs_rtap_set(struct device *dev,
 			if (priv->infra_open || priv->mesh_open)
 				return -EBUSY;
 			if (priv->mode == IW_MODE_INFRA)
-				lbs_cmd_80211_deauthenticate(priv,
-							     priv->curbssparams.bssid,
-							     WLAN_REASON_DEAUTH_LEAVING);
+				lbs_send_deauthentication(priv);
 			else if (priv->mode == IW_MODE_ADHOC)
-				lbs_adhoc_stop(priv);
+				lbs_stop_adhoc_network(priv);
 			lbs_add_rtap(priv);
 		}
 		priv->monitormode = monitor_mode;
@@ -331,7 +330,7 @@ static DEVICE_ATTR(lbs_rtap, 0644, lbs_rtap_get, lbs_rtap_set );
 static ssize_t lbs_mesh_get(struct device *dev,
 		struct device_attribute *attr, char * buf)
 {
-	struct lbs_private *priv = netdev_priv(to_net_dev(dev));
+	struct lbs_private *priv = to_net_dev(dev)->priv;
 	return snprintf(buf, 5, "0x%X\n", !!priv->mesh_dev);
 }
 
@@ -341,7 +340,7 @@ static ssize_t lbs_mesh_get(struct device *dev,
 static ssize_t lbs_mesh_set(struct device *dev,
 		struct device_attribute *attr, const char * buf, size_t count)
 {
-	struct lbs_private *priv = netdev_priv(to_net_dev(dev));
+	struct lbs_private *priv = to_net_dev(dev)->priv;
 	int enable;
 	int ret, action = CMD_ACT_MESH_CONFIG_STOP;
 
@@ -392,7 +391,7 @@ static struct attribute_group lbs_mesh_attr_group = {
  */
 static int lbs_dev_open(struct net_device *dev)
 {
-	struct lbs_private *priv = netdev_priv(dev) ;
+	struct lbs_private *priv = (struct lbs_private *) dev->priv ;
 	int ret = 0;
 
 	lbs_deb_enter(LBS_DEB_NET);
@@ -434,7 +433,7 @@ static int lbs_dev_open(struct net_device *dev)
  */
 static int lbs_mesh_stop(struct net_device *dev)
 {
-	struct lbs_private *priv = dev->ml_priv;
+	struct lbs_private *priv = (struct lbs_private *) (dev->priv);
 
 	lbs_deb_enter(LBS_DEB_MESH);
 	spin_lock_irq(&priv->driver_lock);
@@ -461,7 +460,7 @@ static int lbs_mesh_stop(struct net_device *dev)
  */
 static int lbs_eth_stop(struct net_device *dev)
 {
-	struct lbs_private *priv = netdev_priv(dev);
+	struct lbs_private *priv = (struct lbs_private *) dev->priv;
 
 	lbs_deb_enter(LBS_DEB_NET);
 
@@ -478,7 +477,7 @@ static int lbs_eth_stop(struct net_device *dev)
 
 static void lbs_tx_timeout(struct net_device *dev)
 {
-	struct lbs_private *priv = netdev_priv(dev);
+	struct lbs_private *priv = (struct lbs_private *) dev->priv;
 
 	lbs_deb_enter(LBS_DEB_TX);
 
@@ -530,7 +529,7 @@ EXPORT_SYMBOL_GPL(lbs_host_to_card_done);
  */
 static struct net_device_stats *lbs_get_stats(struct net_device *dev)
 {
-	struct lbs_private *priv = netdev_priv(dev);
+	struct lbs_private *priv = (struct lbs_private *) dev->priv;
 
 	lbs_deb_enter(LBS_DEB_NET);
 	return &priv->stats;
@@ -539,7 +538,7 @@ static struct net_device_stats *lbs_get_stats(struct net_device *dev)
 static int lbs_set_mac_address(struct net_device *dev, void *addr)
 {
 	int ret = 0;
-	struct lbs_private *priv = netdev_priv(dev);
+	struct lbs_private *priv = (struct lbs_private *) dev->priv;
 	struct sockaddr *phwaddr = addr;
 	struct cmd_ds_802_11_mac_address cmd;
 
@@ -673,7 +672,7 @@ static void lbs_set_mcast_worker(struct work_struct *work)
 
 static void lbs_set_multicast_list(struct net_device *dev)
 {
-	struct lbs_private *priv = netdev_priv(dev);
+	struct lbs_private *priv = dev->priv;
 
 	schedule_work(&priv->mcast_work);
 }
@@ -689,7 +688,7 @@ static void lbs_set_multicast_list(struct net_device *dev)
 static int lbs_thread(void *data)
 {
 	struct net_device *dev = data;
-	struct lbs_private *priv = netdev_priv(dev);
+	struct lbs_private *priv = dev->priv;
 	wait_queue_t wait;
 
 	lbs_deb_enter(LBS_DEB_THREAD);
@@ -957,23 +956,16 @@ EXPORT_SYMBOL_GPL(lbs_resume);
 static int lbs_setup_firmware(struct lbs_private *priv)
 {
 	int ret = -1;
-	s16 curlevel = 0, minlevel = 0, maxlevel = 0;
 
 	lbs_deb_enter(LBS_DEB_FW);
 
-	/* Read MAC address from firmware */
+	/*
+	 * Read MAC address from HW
+	 */
 	memset(priv->current_addr, 0xff, ETH_ALEN);
 	ret = lbs_update_hw_spec(priv);
 	if (ret)
 		goto done;
-
-	/* Read power levels if available */
-	ret = lbs_get_tx_power(priv, &curlevel, &minlevel, &maxlevel);
-	if (ret == 0) {
-		priv->txpower_cur = curlevel;
-		priv->txpower_min = minlevel;
-		priv->txpower_max = maxlevel;
-	}
 
 	lbs_set_mac_control(priv);
 done:
@@ -1050,7 +1042,7 @@ static int lbs_init_adapter(struct lbs_private *priv)
 	priv->mode = IW_MODE_INFRA;
 	priv->curbssparams.channel = DEFAULT_AD_HOC_CHANNEL;
 	priv->mac_control = CMD_ACT_MAC_RX_ON | CMD_ACT_MAC_TX_ON;
-	priv->radio_on = 1;
+	priv->radioon = RADIO_ON;
 	priv->enablehwauto = 1;
 	priv->capability = WLAN_CAPABILITY_SHORT_PREAMBLE;
 	priv->psmode = LBS802_11POWERMODECAM;
@@ -1124,7 +1116,7 @@ struct lbs_private *lbs_add_card(void *card, struct device *dmdev)
 		lbs_pr_err("init ethX device failed\n");
 		goto done;
 	}
-	priv = netdev_priv(dev);
+	priv = dev->priv;
 
 	if (lbs_init_adapter(priv)) {
 		lbs_pr_err("failed to initialize adapter structure.\n");
@@ -1377,7 +1369,7 @@ static int lbs_add_mesh(struct lbs_private *priv)
 		ret = -ENOMEM;
 		goto done;
 	}
-	mesh_dev->ml_priv = priv;
+	mesh_dev->priv = priv;
 	priv->mesh_dev = mesh_dev;
 
 	mesh_dev->open = lbs_dev_open;
@@ -1590,7 +1582,7 @@ static int lbs_rtap_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static struct net_device_stats *lbs_rtap_get_stats(struct net_device *dev)
 {
-	struct lbs_private *priv = dev->ml_priv;
+	struct lbs_private *priv = dev->priv;
 	lbs_deb_enter(LBS_DEB_NET);
 	return &priv->stats;
 }
@@ -1631,7 +1623,7 @@ static int lbs_add_rtap(struct lbs_private *priv)
 	rtap_dev->stop = lbs_rtap_stop;
 	rtap_dev->get_stats = lbs_rtap_get_stats;
 	rtap_dev->hard_start_xmit = lbs_rtap_hard_start_xmit;
-	rtap_dev->ml_priv = priv;
+	rtap_dev->priv = priv;
 	SET_NETDEV_DEV(rtap_dev, priv->dev->dev.parent);
 
 	ret = register_netdev(rtap_dev);
@@ -1645,6 +1637,33 @@ out:
 	lbs_deb_leave_args(LBS_DEB_MAIN, "ret %d", ret);
 	return ret;
 }
+
+#ifndef CONFIG_IEEE80211
+const char *escape_essid(const char *essid, u8 essid_len)
+{
+	static char escaped[IW_ESSID_MAX_SIZE * 2 + 1];
+	const char *s = essid;
+	char *d = escaped;
+
+	if (ieee80211_is_empty_essid(essid, essid_len)) {
+		memcpy(escaped, "<hidden>", sizeof("<hidden>"));
+		return escaped;
+	}
+
+	essid_len = min(essid_len, (u8) IW_ESSID_MAX_SIZE);
+	while (essid_len--) {
+		if (*s == '\0') {
+			*d++ = '\\';
+			*d++ = '0';
+			s++;
+		} else {
+			*d++ = *s++;
+		}
+	}
+	*d = '\0';
+	return escaped;
+}
+#endif
 
 module_init(lbs_init_module);
 module_exit(lbs_exit_module);

@@ -28,7 +28,7 @@
 */
 
 #include "xmit.h"
-#include "phy_common.h"
+#include "phy.h"
 #include "dma.h"
 #include "pio.h"
 
@@ -46,6 +46,7 @@ static int b43_plcp_get_bitrate_idx_cck(struct b43_plcp_hdr6 *plcp)
 	case 0x6E:
 		return 3;
 	}
+	B43_WARN_ON(1);
 	return -1;
 }
 
@@ -72,6 +73,7 @@ static u8 b43_plcp_get_bitrate_idx_ofdm(struct b43_plcp_hdr6 *plcp, bool aphy)
 	case 0xC:
 		return base + 7;
 	}
+	B43_WARN_ON(1);
 	return -1;
 }
 
@@ -183,7 +185,7 @@ int b43_generate_txhdr(struct b43_wldev *dev,
 		       u8 *_txhdr,
 		       const unsigned char *fragment_data,
 		       unsigned int fragment_len,
-		       struct ieee80211_tx_info *info,
+		       const struct ieee80211_tx_info *info,
 		       u16 cookie)
 {
 	struct b43_txhdr *txhdr = (struct b43_txhdr *)_txhdr;
@@ -200,14 +202,13 @@ int b43_generate_txhdr(struct b43_wldev *dev,
 	u16 phy_ctl = 0;
 	u8 extra_ft = 0;
 	struct ieee80211_rate *txrate;
-	struct ieee80211_tx_rate *rates;
 
 	memset(txhdr, 0, sizeof(*txhdr));
 
 	txrate = ieee80211_get_tx_rate(dev->wl->hw, info);
 	rate = txrate ? txrate->hw_value : B43_CCK_RATE_1MB;
 	rate_ofdm = b43_is_ofdm_rate(rate);
-	fbrate = ieee80211_get_alt_retry_rate(dev->wl->hw, info, 0) ? : txrate;
+	fbrate = ieee80211_get_alt_retry_rate(dev->wl->hw, info) ? : txrate;
 	rate_fb = fbrate->hw_value;
 	rate_fb_ofdm = b43_is_ofdm_rate(rate_fb);
 
@@ -251,7 +252,7 @@ int b43_generate_txhdr(struct b43_wldev *dev,
 		}
 
 		/* Hardware appends ICV. */
-		plcp_fragment_len += info->control.hw_key->icv_len;
+		plcp_fragment_len += info->control.icv_len;
 
 		key_idx = b43_kidx_to_fw(dev, key_idx);
 		mac_ctl |= (key_idx << B43_TXH_MAC_KEYIDX_SHIFT) &
@@ -259,7 +260,7 @@ int b43_generate_txhdr(struct b43_wldev *dev,
 		mac_ctl |= (key->algorithm << B43_TXH_MAC_KEYALG_SHIFT) &
 			   B43_TXH_MAC_KEYALG;
 		wlhdr_len = ieee80211_hdrlen(fctl);
-		iv_len = min((size_t) info->control.hw_key->iv_len,
+		iv_len = min((size_t) info->control.iv_len,
 			     ARRAY_SIZE(txhdr->iv));
 		memcpy(txhdr->iv, ((u8 *) wlhdr) + wlhdr_len, iv_len);
 	}
@@ -290,7 +291,7 @@ int b43_generate_txhdr(struct b43_wldev *dev,
 		phy_ctl |= B43_TXH_PHY_ENC_OFDM;
 	else
 		phy_ctl |= B43_TXH_PHY_ENC_CCK;
-	if (info->control.rates[0].flags & IEEE80211_TX_RC_USE_SHORT_PREAMBLE)
+	if (info->flags & IEEE80211_TX_CTL_SHORT_PREAMBLE)
 		phy_ctl |= B43_TXH_PHY_SHORTPRMBL;
 
 	switch (b43_ieee80211_antenna_sanitize(dev, info->antenna_sel_tx)) {
@@ -313,7 +314,6 @@ int b43_generate_txhdr(struct b43_wldev *dev,
 		B43_WARN_ON(1);
 	}
 
-	rates = info->control.rates;
 	/* MAC control */
 	if (!(info->flags & IEEE80211_TX_CTL_NO_ACK))
 		mac_ctl |= B43_TXH_MAC_ACK;
@@ -324,22 +324,12 @@ int b43_generate_txhdr(struct b43_wldev *dev,
 		mac_ctl |= B43_TXH_MAC_STMSDU;
 	if (phy->type == B43_PHYTYPE_A)
 		mac_ctl |= B43_TXH_MAC_5GHZ;
-
-	/* Overwrite rates[0].count to make the retry calculation
-	 * in the tx status easier. need the actual retry limit to
-	 * detect whether the fallback rate was used.
-	 */
-	if ((rates[0].flags & IEEE80211_TX_RC_USE_RTS_CTS) ||
-	    (rates[0].count <= dev->wl->hw->conf.long_frame_max_tx_count)) {
-		rates[0].count = dev->wl->hw->conf.long_frame_max_tx_count;
+	if (info->flags & IEEE80211_TX_CTL_LONG_RETRY_LIMIT)
 		mac_ctl |= B43_TXH_MAC_LONGFRAME;
-	} else {
-		rates[0].count = dev->wl->hw->conf.short_frame_max_tx_count;
-	}
 
 	/* Generate the RTS or CTS-to-self frame */
-	if ((rates[0].flags & IEEE80211_TX_RC_USE_RTS_CTS) ||
-	    (rates[0].flags & IEEE80211_TX_RC_USE_CTS_PROTECT)) {
+	if ((info->flags & IEEE80211_TX_CTL_USE_RTS_CTS) ||
+	    (info->flags & IEEE80211_TX_CTL_USE_CTS_PROTECT)) {
 		unsigned int len;
 		struct ieee80211_hdr *hdr;
 		int rts_rate, rts_rate_fb;
@@ -354,7 +344,7 @@ int b43_generate_txhdr(struct b43_wldev *dev,
 		rts_rate_fb = b43_calc_fallback_rate(rts_rate);
 		rts_rate_fb_ofdm = b43_is_ofdm_rate(rts_rate_fb);
 
-		if (rates[0].flags & IEEE80211_TX_RC_USE_CTS_PROTECT) {
+		if (info->flags & IEEE80211_TX_CTL_USE_CTS_PROTECT) {
 			struct ieee80211_cts *cts;
 
 			if (b43_is_old_txhdr_format(dev)) {
@@ -441,7 +431,6 @@ static s8 b43_rssi_postprocess(struct b43_wldev *dev,
 			       int adjust_2053, int adjust_2050)
 {
 	struct b43_phy *phy = &dev->phy;
-	struct b43_phy_g *gphy = phy->g;
 	s32 tmp;
 
 	switch (phy->radio_ver) {
@@ -461,8 +450,7 @@ static s8 b43_rssi_postprocess(struct b43_wldev *dev,
 			    boardflags_lo & B43_BFL_RSSI) {
 				if (in_rssi > 63)
 					in_rssi = 63;
-				B43_WARN_ON(phy->type != B43_PHYTYPE_G);
-				tmp = gphy->nrssi_lt[in_rssi];
+				tmp = phy->nrssi_lt[in_rssi];
 				tmp = 31 - tmp;
 				tmp *= -131;
 				tmp /= 128;
@@ -606,8 +594,6 @@ void b43_rx(struct b43_wldev *dev, struct sk_buff *skb, const void *_rxhdr)
 						phytype == B43_PHYTYPE_A);
 	else
 		status.rate_idx = b43_plcp_get_bitrate_idx_cck(plcp);
-	if (unlikely(status.rate_idx == -1))
-		goto drop;
 	status.antenna = !!(phystat0 & B43_RX_PHYST0_ANT);
 
 	/*
@@ -692,25 +678,15 @@ void b43_handle_txstatus(struct b43_wldev *dev,
 		b43_pio_handle_txstatus(dev, status);
 	else
 		b43_dma_handle_txstatus(dev, status);
-
-	b43_phy_txpower_check(dev, 0);
 }
 
 /* Fill out the mac80211 TXstatus report based on the b43-specific
  * txstatus report data. This returns a boolean whether the frame was
  * successfully transmitted. */
-bool b43_fill_txstatus_report(struct b43_wldev *dev,
-			      struct ieee80211_tx_info *report,
+bool b43_fill_txstatus_report(struct ieee80211_tx_info *report,
 			      const struct b43_txstatus *status)
 {
 	bool frame_success = 1;
-	int retry_limit;
-
-	/* preserve the confiured retry limit before clearing the status
-	 * The xmit function has overwritten the rc's value with the actual
-	 * retry limit done by the hardware */
-	retry_limit = report->status.rates[0].count;
-	ieee80211_tx_info_clear_status(report);
 
 	if (status->acked) {
 		/* The frame was ACKed. */
@@ -720,32 +696,14 @@ bool b43_fill_txstatus_report(struct b43_wldev *dev,
 		if (!(report->flags & IEEE80211_TX_CTL_NO_ACK)) {
 			/* ...but we expected an ACK. */
 			frame_success = 0;
+			report->status.excessive_retries = 1;
 		}
 	}
 	if (status->frame_count == 0) {
 		/* The frame was not transmitted at all. */
-		report->status.rates[0].count = 0;
-	} else if (status->rts_count > dev->wl->hw->conf.short_frame_max_tx_count) {
-		/*
-		 * If the short retries (RTS, not data frame) have exceeded
-		 * the limit, the hw will not have tried the selected rate,
-		 * but will have used the fallback rate instead.
-		 * Don't let the rate control count attempts for the selected
-		 * rate in this case, otherwise the statistics will be off.
-		 */
-		report->status.rates[0].count = 0;
-		report->status.rates[1].count = status->frame_count;
-	} else {
-		if (status->frame_count > retry_limit) {
-			report->status.rates[0].count = retry_limit;
-			report->status.rates[1].count = status->frame_count -
-					retry_limit;
-
-		} else {
-			report->status.rates[0].count = status->frame_count;
-			report->status.rates[1].idx = -1;
-		}
-	}
+		report->status.retry_count = 0;
+	} else
+		report->status.retry_count = status->frame_count - 1;
 
 	return frame_success;
 }

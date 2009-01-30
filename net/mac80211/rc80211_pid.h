@@ -49,7 +49,7 @@
 
 /* Arithmetic right shift for positive and negative values for ISO C. */
 #define RC_PID_DO_ARITH_RIGHT_SHIFT(x, y) \
-	((x) < 0 ? -((-(x)) >> (y)) : (x) >> (y))
+	(x) < 0 ? -((-(x)) >> (y)) : (x) >> (y)
 
 enum rc_pid_event_type {
 	RC_PID_EVENT_TYPE_TX_STATUS,
@@ -61,7 +61,6 @@ enum rc_pid_event_type {
 union rc_pid_event_data {
 	/* RC_PID_EVENT_TX_STATUS */
 	struct {
-		u32 flags;
 		struct ieee80211_tx_info tx_status;
 	};
 	/* RC_PID_EVENT_TYPE_RATE_CHANGE */
@@ -125,6 +124,7 @@ struct rc_pid_events_file_info {
  * struct rc_pid_debugfs_entries - tunable parameters
  *
  * Algorithm parameters, tunable via debugfs.
+ * @dir: the debugfs directory for a specific phy
  * @target: target percentage for failed frames
  * @sampling_period: error sampling interval in milliseconds
  * @coeff_p: absolute value of the proportional coefficient
@@ -143,6 +143,7 @@ struct rc_pid_events_file_info {
  *	ordering of rates)
  */
 struct rc_pid_debugfs_entries {
+	struct dentry *dir;
 	struct dentry *target;
 	struct dentry *sampling_period;
 	struct dentry *coeff_p;
@@ -178,8 +179,6 @@ struct rc_pid_sta_info {
 
 	u32 tx_num_failed;
 	u32 tx_num_xmit;
-
-	int txrate_idx;
 
 	/* Average failed frames percentage error (i.e. actual vs. target
 	 * percentage), scaled by RC_PID_SMOOTHING. This value is computed

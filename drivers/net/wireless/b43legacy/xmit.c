@@ -188,11 +188,12 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 			       struct b43legacy_txhdr_fw3 *txhdr,
 			       const unsigned char *fragment_data,
 			       unsigned int fragment_len,
-			       struct ieee80211_tx_info *info,
+			       const struct ieee80211_tx_info *info,
 			       u16 cookie)
 {
 	const struct ieee80211_hdr *wlhdr;
 	int use_encryption = !!info->control.hw_key;
+	u16 fctl;
 	u8 rate;
 	struct ieee80211_rate *rate_fb;
 	int rate_ofdm;
@@ -201,9 +202,9 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 	u32 mac_ctl = 0;
 	u16 phy_ctl = 0;
 	struct ieee80211_rate *tx_rate;
-	struct ieee80211_tx_rate *rates;
 
 	wlhdr = (const struct ieee80211_hdr *)fragment_data;
+	fctl = le16_to_cpu(wlhdr->frame_control);
 
 	memset(txhdr, 0, sizeof(*txhdr));
 
@@ -211,7 +212,7 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 
 	rate = tx_rate->hw_value;
 	rate_ofdm = b43legacy_is_ofdm_rate(rate);
-	rate_fb = ieee80211_get_alt_retry_rate(dev->wl->hw, info, 0) ? : tx_rate;
+	rate_fb = ieee80211_get_alt_retry_rate(dev->wl->hw, info) ? : tx_rate;
 	rate_fb_ofdm = b43legacy_is_ofdm_rate(rate_fb->hw_value);
 
 	txhdr->mac_frame_ctl = wlhdr->frame_control;
@@ -244,7 +245,7 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 
 		if (key->enabled) {
 			/* Hardware appends ICV. */
-			plcp_fragment_len += info->control.hw_key->icv_len;
+			plcp_fragment_len += info->control.icv_len;
 
 			key_idx = b43legacy_kidx_to_fw(dev, key_idx);
 			mac_ctl |= (key_idx << B43legacy_TX4_MAC_KEYIDX_SHIFT) &
@@ -252,8 +253,8 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 			mac_ctl |= (key->algorithm <<
 				   B43legacy_TX4_MAC_KEYALG_SHIFT) &
 				   B43legacy_TX4_MAC_KEYALG;
-			wlhdr_len = ieee80211_hdrlen(wlhdr->frame_control);
-			iv_len = min((size_t)info->control.hw_key->iv_len,
+			wlhdr_len = ieee80211_get_hdrlen(fctl);
+			iv_len = min((size_t)info->control.iv_len,
 				     ARRAY_SIZE(txhdr->iv));
 			memcpy(txhdr->iv, ((u8 *)wlhdr) + wlhdr_len, iv_len);
 		} else {
@@ -275,7 +276,7 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 	/* PHY TX Control word */
 	if (rate_ofdm)
 		phy_ctl |= B43legacy_TX4_PHY_OFDM;
-	if (info->control.rates[0].flags & IEEE80211_TX_RC_USE_SHORT_PREAMBLE)
+	if (dev->short_preamble)
 		phy_ctl |= B43legacy_TX4_PHY_SHORTPRMBL;
 	switch (info->antenna_sel_tx) {
 	case 0:
@@ -292,7 +293,6 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 	}
 
 	/* MAC control */
-	rates = info->control.rates;
 	if (!(info->flags & IEEE80211_TX_CTL_NO_ACK))
 		mac_ctl |= B43legacy_TX4_MAC_ACK;
 	if (info->flags & IEEE80211_TX_CTL_ASSIGN_SEQ)
@@ -301,22 +301,12 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 		mac_ctl |= B43legacy_TX4_MAC_STMSDU;
 	if (rate_fb_ofdm)
 		mac_ctl |= B43legacy_TX4_MAC_FALLBACKOFDM;
-
-	/* Overwrite rates[0].count to make the retry calculation
-	 * in the tx status easier. need the actual retry limit to
-	 * detect whether the fallback rate was used.
-	 */
-	if ((rates[0].flags & IEEE80211_TX_RC_USE_RTS_CTS) ||
-	    (rates[0].count <= dev->wl->hw->conf.long_frame_max_tx_count)) {
-		rates[0].count = dev->wl->hw->conf.long_frame_max_tx_count;
+	if (info->flags & IEEE80211_TX_CTL_LONG_RETRY_LIMIT)
 		mac_ctl |= B43legacy_TX4_MAC_LONGFRAME;
-	} else {
-		rates[0].count = dev->wl->hw->conf.short_frame_max_tx_count;
-	}
 
 	/* Generate the RTS or CTS-to-self frame */
-	if ((rates[0].flags & IEEE80211_TX_RC_USE_RTS_CTS) ||
-	    (rates[0].flags & IEEE80211_TX_RC_USE_CTS_PROTECT)) {
+	if ((info->flags & IEEE80211_TX_CTL_USE_RTS_CTS) ||
+	    (info->flags & IEEE80211_TX_CTL_USE_CTS_PROTECT)) {
 		unsigned int len;
 		struct ieee80211_hdr *hdr;
 		int rts_rate;
@@ -331,7 +321,7 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 		if (rts_rate_fb_ofdm)
 			mac_ctl |= B43legacy_TX4_MAC_CTSFALLBACKOFDM;
 
-		if (rates[0].flags & IEEE80211_TX_RC_USE_CTS_PROTECT) {
+		if (info->flags & IEEE80211_TX_CTL_USE_CTS_PROTECT) {
 			ieee80211_ctstoself_get(dev->wl->hw,
 						info->control.vif,
 						fragment_data,
@@ -374,7 +364,7 @@ int b43legacy_generate_txhdr(struct b43legacy_wldev *dev,
 			      u8 *txhdr,
 			      const unsigned char *fragment_data,
 			      unsigned int fragment_len,
-			      struct ieee80211_tx_info *info,
+			      const struct ieee80211_tx_info *info,
 			      u16 cookie)
 {
 	return generate_txhdr_fw3(dev, (struct b43legacy_txhdr_fw3 *)txhdr,

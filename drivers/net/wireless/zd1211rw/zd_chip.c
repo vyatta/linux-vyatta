@@ -28,6 +28,7 @@
 
 #include "zd_def.h"
 #include "zd_chip.h"
+#include "zd_ieee80211.h"
 #include "zd_mac.h"
 #include "zd_rf.h"
 
@@ -1280,7 +1281,7 @@ int zd_chip_control_leds(struct zd_chip *chip, enum led_status status)
 	other_led = chip->link_led == LED1 ? LED2 : LED1;
 
 	switch (status) {
-	case LED_OFF_ZD:
+	case LED_OFF:
 		ioreqs[0].value = FW_LINK_OFF;
 		ioreqs[1].value = v[1] & ~(LED1|LED2);
 		break;

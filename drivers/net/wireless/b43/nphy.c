@@ -26,7 +26,7 @@
 #include <linux/types.h>
 
 #include "b43.h"
-#include "phy_n.h"
+#include "nphy.h"
 #include "tables_nphy.h"
 
 
@@ -34,14 +34,8 @@ void b43_nphy_set_rxantenna(struct b43_wldev *dev, int antenna)
 {//TODO
 }
 
-static void b43_nphy_op_adjust_txpower(struct b43_wldev *dev)
+void b43_nphy_xmitpower(struct b43_wldev *dev)
 {//TODO
-}
-
-static enum b43_txpwr_result b43_nphy_op_recalc_txpower(struct b43_wldev *dev,
-							bool ignore_tssi)
-{//TODO
-	return B43_TXPWR_RES_DONE;
 }
 
 static void b43_chantab_radio_upload(struct b43_wldev *dev,
@@ -87,8 +81,9 @@ static void b43_nphy_tx_power_fix(struct b43_wldev *dev)
 	//TODO
 }
 
-/* Tune the hardware to a new channel. */
-static int nphy_channel_switch(struct b43_wldev *dev, unsigned int channel)
+/* Tune the hardware to a new channel. Don't call this directly.
+ * Use b43_radio_selectchannel() */
+int b43_nphy_selectchannel(struct b43_wldev *dev, u8 channel)
 {
 	const struct b43_nphy_channeltab_entry *tabent;
 
@@ -167,7 +162,7 @@ static void b43_radio_init2055_post(struct b43_wldev *dev)
 	msleep(1);
 	b43_radio_mask(dev, B2055_CAL_LPOCTL, 0xFF7F);
 	msleep(1);
-	nphy_channel_switch(dev, dev->phy.channel);
+	b43_radio_selectchannel(dev, dev->phy.channel, 0);
 	b43_radio_write16(dev, B2055_C1_RX_BB_LPF, 0x9);
 	b43_radio_write16(dev, B2055_C2_RX_BB_LPF, 0x9);
 	b43_radio_write16(dev, B2055_C1_RX_BB_MIDACHP, 0x83);
@@ -489,140 +484,3 @@ int b43_phy_initn(struct b43_wldev *dev)
 	b43err(dev->wl, "IEEE 802.11n devices are not supported, yet.\n");
 	return 0;
 }
-
-static int b43_nphy_op_allocate(struct b43_wldev *dev)
-{
-	struct b43_phy_n *nphy;
-
-	nphy = kzalloc(sizeof(*nphy), GFP_KERNEL);
-	if (!nphy)
-		return -ENOMEM;
-	dev->phy.n = nphy;
-
-	return 0;
-}
-
-static void b43_nphy_op_prepare_structs(struct b43_wldev *dev)
-{
-	struct b43_phy *phy = &dev->phy;
-	struct b43_phy_n *nphy = phy->n;
-
-	memset(nphy, 0, sizeof(*nphy));
-
-	//TODO init struct b43_phy_n
-}
-
-static void b43_nphy_op_free(struct b43_wldev *dev)
-{
-	struct b43_phy *phy = &dev->phy;
-	struct b43_phy_n *nphy = phy->n;
-
-	kfree(nphy);
-	phy->n = NULL;
-}
-
-static int b43_nphy_op_init(struct b43_wldev *dev)
-{
-	return b43_phy_initn(dev);
-}
-
-static inline void check_phyreg(struct b43_wldev *dev, u16 offset)
-{
-#if B43_DEBUG
-	if ((offset & B43_PHYROUTE) == B43_PHYROUTE_OFDM_GPHY) {
-		/* OFDM registers are onnly available on A/G-PHYs */
-		b43err(dev->wl, "Invalid OFDM PHY access at "
-		       "0x%04X on N-PHY\n", offset);
-		dump_stack();
-	}
-	if ((offset & B43_PHYROUTE) == B43_PHYROUTE_EXT_GPHY) {
-		/* Ext-G registers are only available on G-PHYs */
-		b43err(dev->wl, "Invalid EXT-G PHY access at "
-		       "0x%04X on N-PHY\n", offset);
-		dump_stack();
-	}
-#endif /* B43_DEBUG */
-}
-
-static u16 b43_nphy_op_read(struct b43_wldev *dev, u16 reg)
-{
-	check_phyreg(dev, reg);
-	b43_write16(dev, B43_MMIO_PHY_CONTROL, reg);
-	return b43_read16(dev, B43_MMIO_PHY_DATA);
-}
-
-static void b43_nphy_op_write(struct b43_wldev *dev, u16 reg, u16 value)
-{
-	check_phyreg(dev, reg);
-	b43_write16(dev, B43_MMIO_PHY_CONTROL, reg);
-	b43_write16(dev, B43_MMIO_PHY_DATA, value);
-}
-
-static u16 b43_nphy_op_radio_read(struct b43_wldev *dev, u16 reg)
-{
-	/* Register 1 is a 32-bit register. */
-	B43_WARN_ON(reg == 1);
-	/* N-PHY needs 0x100 for read access */
-	reg |= 0x100;
-
-	b43_write16(dev, B43_MMIO_RADIO_CONTROL, reg);
-	return b43_read16(dev, B43_MMIO_RADIO_DATA_LOW);
-}
-
-static void b43_nphy_op_radio_write(struct b43_wldev *dev, u16 reg, u16 value)
-{
-	/* Register 1 is a 32-bit register. */
-	B43_WARN_ON(reg == 1);
-
-	b43_write16(dev, B43_MMIO_RADIO_CONTROL, reg);
-	b43_write16(dev, B43_MMIO_RADIO_DATA_LOW, value);
-}
-
-static void b43_nphy_op_software_rfkill(struct b43_wldev *dev,
-					enum rfkill_state state)
-{//TODO
-}
-
-static void b43_nphy_op_switch_analog(struct b43_wldev *dev, bool on)
-{
-	b43_phy_write(dev, B43_NPHY_AFECTL_OVER,
-		      on ? 0 : 0x7FFF);
-}
-
-static int b43_nphy_op_switch_channel(struct b43_wldev *dev,
-				      unsigned int new_channel)
-{
-	if (b43_current_band(dev->wl) == IEEE80211_BAND_2GHZ) {
-		if ((new_channel < 1) || (new_channel > 14))
-			return -EINVAL;
-	} else {
-		if (new_channel > 200)
-			return -EINVAL;
-	}
-
-	return nphy_channel_switch(dev, new_channel);
-}
-
-static unsigned int b43_nphy_op_get_default_chan(struct b43_wldev *dev)
-{
-	if (b43_current_band(dev->wl) == IEEE80211_BAND_2GHZ)
-		return 1;
-	return 36;
-}
-
-const struct b43_phy_operations b43_phyops_n = {
-	.allocate		= b43_nphy_op_allocate,
-	.free			= b43_nphy_op_free,
-	.prepare_structs	= b43_nphy_op_prepare_structs,
-	.init			= b43_nphy_op_init,
-	.phy_read		= b43_nphy_op_read,
-	.phy_write		= b43_nphy_op_write,
-	.radio_read		= b43_nphy_op_radio_read,
-	.radio_write		= b43_nphy_op_radio_write,
-	.software_rfkill	= b43_nphy_op_software_rfkill,
-	.switch_analog		= b43_nphy_op_switch_analog,
-	.switch_channel		= b43_nphy_op_switch_channel,
-	.get_default_chan	= b43_nphy_op_get_default_chan,
-	.recalc_txpower		= b43_nphy_op_recalc_txpower,
-	.adjust_txpower		= b43_nphy_op_adjust_txpower,
-};

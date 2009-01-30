@@ -10,6 +10,7 @@
 #include <linux/wireless.h>
 #include <linux/ethtool.h>
 #include <linux/debugfs.h>
+#include <net/ieee80211.h>
 
 #include "defs.h"
 #include "hostcmd.h"
@@ -57,7 +58,6 @@ struct lbs_802_11_security {
 	u8 WPA2enabled;
 	u8 wep_enabled;
 	u8 auth_mode;
-	u32 key_mgmt;
 };
 
 /** Current Basic Service Set State Structure */
@@ -240,6 +240,9 @@ struct lbs_private {
 	uint16_t enablehwauto;
 	uint16_t ratebitmap;
 
+	u32 fragthsd;
+	u32 rtsthsd;
+
 	u8 txretrycount;
 
 	/** Tx-related variables (for single packet tx) */
@@ -250,9 +253,7 @@ struct lbs_private {
 	u32 connect_status;
 	u32 mesh_connect_status;
 	u16 regioncode;
-	s16 txpower_cur;
-	s16 txpower_min;
-	s16 txpower_max;
+	u16 txpowerlevel;
 
 	/** POWER MANAGEMENT AND PnP SUPPORT */
 	u8 surpriseremoved;
@@ -277,12 +278,6 @@ struct lbs_private {
 	struct enc_key wpa_mcast_key;
 	struct enc_key wpa_unicast_key;
 
-/*
- * In theory, the IE is limited to the IE length, 255,
- * but in practice 64 bytes are enough.
- */
-#define MAX_WPA_IE_LEN 64
-
 	/** WPA Information Elements*/
 	u8 wpa_ie[MAX_WPA_IE_LEN];
 	u8 wpa_ie_len;
@@ -296,7 +291,8 @@ struct lbs_private {
 	u16 nextSNRNF;
 	u16 numSNRNF;
 
-	u8 radio_on;
+	u8 radioon;
+	u32 preamble;
 
 	/** data rate stuff */
 	u8 cur_rate;

@@ -73,10 +73,6 @@ extern struct pci_device_id iwl3945_hw_card_ids[];
 extern int iwl3945_param_hwcrypto;
 extern int iwl3945_param_queues_num;
 
-struct iwl3945_sta_priv {
-	struct iwl3945_rs_sta *rs_sta;
-};
-
 enum iwl3945_antenna {
 	IWL_ANTENNA_DIVERSITY,
 	IWL_ANTENNA_MAIN,
@@ -711,6 +707,7 @@ struct iwl3945_priv {
 
 	enum ieee80211_band band;
 	int alloc_rxb_skb;
+	bool add_radiotap;
 
 	void (*rx_handlers[REPLY_MAX])(struct iwl3945_priv *priv,
 				       struct iwl3945_rx_mem_buffer *rxb);
@@ -828,6 +825,8 @@ struct iwl3945_priv {
 	unsigned long last_statistics_time;
 
 	/* context information */
+	u8 essid[IW_ESSID_MAX_SIZE];
+	u8 essid_len;
 	u16 rates_mask;
 
 	u32 power_mode;
@@ -853,7 +852,7 @@ struct iwl3945_priv {
 	/* eeprom */
 	struct iwl3945_eeprom eeprom;
 
-	enum nl80211_iftype iw_mode;
+	enum ieee80211_if_types iw_mode;
 
 	struct sk_buff *ibss_beacon;
 
@@ -896,6 +895,7 @@ struct iwl3945_priv {
 	struct delayed_work thermal_periodic;
 	struct delayed_work gather_stats;
 	struct delayed_work scan_check;
+	struct delayed_work post_associate;
 
 #define IWL_DEFAULT_TX_POWER 0x0F
 	s8 user_txpower_limit;
@@ -951,8 +951,6 @@ static inline int is_channel_ibss(const struct iwl3945_channel_info *ch)
 
 extern const struct iwl3945_channel_info *iwl3945_get_channel_info(
 	const struct iwl3945_priv *priv, enum ieee80211_band band, u16 channel);
-
-extern int iwl3945_rs_next_rate(struct iwl3945_priv *priv, int rate);
 
 /* Requires full declaration of iwl3945_priv before including */
 #include "iwl-3945-io.h"

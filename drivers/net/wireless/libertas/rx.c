@@ -328,7 +328,7 @@ static int process_rxed_802_11_packet(struct lbs_private *priv,
 		lbs_deb_rx("rx err: frame received with bad length\n");
 		priv->stats.rx_length_errors++;
 		ret = -EINVAL;
-		kfree_skb(skb);
+		kfree(skb);
 		goto done;
 	}
 

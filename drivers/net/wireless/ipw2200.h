@@ -48,7 +48,6 @@
 #include <linux/jiffies.h>
 #include <asm/io.h>
 
-#include <net/lib80211.h>
 #include <net/ieee80211.h>
 #include <net/ieee80211_radiotap.h>
 
@@ -1395,13 +1394,13 @@ BIT_ARG16(x)
 #define IPW_DEBUG(level, fmt, args...) \
 do { if (ipw_debug_level & (level)) \
   printk(KERN_DEBUG DRV_NAME": %c %s " fmt, \
-         in_interrupt() ? 'I' : 'U', __func__ , ## args); } while (0)
+         in_interrupt() ? 'I' : 'U', __FUNCTION__ , ## args); } while (0)
 
 #ifdef CONFIG_IPW2200_DEBUG
 #define IPW_LL_DEBUG(level, fmt, args...) \
 do { if (ipw_debug_level & (level)) \
   printk(KERN_DEBUG DRV_NAME": %c %s " fmt, \
-         in_interrupt() ? 'I' : 'U', __func__ , ## args); } while (0)
+         in_interrupt() ? 'I' : 'U', __FUNCTION__ , ## args); } while (0)
 #else
 #define IPW_LL_DEBUG(level, fmt, args...) do {} while (0)
 #endif				/* CONFIG_IPW2200_DEBUG */

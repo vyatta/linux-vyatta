@@ -200,7 +200,7 @@ static int iwl3945_hwrate_to_plcp_idx(u8 plcp)
  * priv->eeprom  is used to determine if antenna AUX/MAIN are reversed
  * priv->antenna specifies the antenna diversity mode:
  *
- * IWL_ANTENNA_DIVERSITY - NIC selects best antenna by itself
+ * IWL_ANTENNA_DIVERISTY - NIC selects best antenna by itself
  * IWL_ANTENNA_MAIN      - Force MAIN antenna
  * IWL_ANTENNA_AUX       - Force AUX antenna
  */
@@ -261,35 +261,6 @@ static inline const char *iwl3945_get_tx_fail_reason(u32 status)
 }
 #endif
 
-/*
- * get ieee prev rate from rate scale table.
- * for A and B mode we need to overright prev
- * value
- */
-int iwl3945_rs_next_rate(struct iwl3945_priv *priv, int rate)
-{
-	int next_rate = iwl3945_get_prev_ieee_rate(rate);
-
-	switch (priv->band) {
-	case IEEE80211_BAND_5GHZ:
-		if (rate == IWL_RATE_12M_INDEX)
-			next_rate = IWL_RATE_9M_INDEX;
-		else if (rate == IWL_RATE_6M_INDEX)
-			next_rate = IWL_RATE_6M_INDEX;
-		break;
-/* XXX cannot be invoked in current mac80211 so not a regression
-	case MODE_IEEE80211B:
-		if (rate == IWL_RATE_11M_INDEX_TABLE)
-			next_rate = IWL_RATE_5M_INDEX_TABLE;
-		break;
- */
-	default:
-		break;
-	}
-
-	return next_rate;
-}
-
 
 /**
  * iwl3945_tx_queue_reclaim - Reclaim Tx queue entries already Tx'd
@@ -337,7 +308,6 @@ static void iwl3945_rx_reply_tx(struct iwl3945_priv *priv,
 	struct iwl3945_tx_resp *tx_resp = (void *)&pkt->u.raw[0];
 	u32  status = le32_to_cpu(tx_resp->status);
 	int rate_idx;
-	int fail, i;
 
 	if ((index >= txq->q.n_bd) || (iwl3945_x2_queue_used(&txq->q, index) == 0)) {
 		IWL_ERROR("Read index for DMA queue txq_id (%d) index %d "
@@ -348,36 +318,9 @@ static void iwl3945_rx_reply_tx(struct iwl3945_priv *priv,
 	}
 
 	info = IEEE80211_SKB_CB(txq->txb[txq->q.read_ptr].skb[0]);
-	ieee80211_tx_info_clear_status(info);
+	memset(&info->status, 0, sizeof(info->status));
 
-	/* Fill the MRR chain with some info about on-chip retransmissions */
-	rate_idx = iwl3945_hwrate_to_plcp_idx(tx_resp->rate);
-	if (info->band == IEEE80211_BAND_5GHZ)
-		rate_idx -= IWL_FIRST_OFDM_RATE;
-
-	fail = tx_resp->failure_frame;
-	for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
-		int next = iwl3945_rs_next_rate(priv, rate_idx);
-
-		info->status.rates[i].idx = rate_idx;
-
-		/*
-		 * Put remaining into the last count as best approximation
-		 * of saying exactly what the hardware would have done...
-		 */
-		if ((rate_idx == next) || (i == IEEE80211_TX_MAX_RATES - 1)) {
-			info->status.rates[i].count = fail;
-			break;
-		}
-
-		info->status.rates[i].count = priv->retry_rate;
-		fail -= priv->retry_rate;
-		rate_idx = next;
-		if (fail <= 0)
-			break;
-	}
-	info->status.rates[i].count++; /* add final attempt */
-
+	info->status.retry_count = tx_resp->failure_frame;
 	/* tx_status->rts_retry_count = tx_resp->failure_rts; */
 	info->flags |= ((status & TX_STATUS_MSK) == TX_STATUS_SUCCESS) ?
 				IEEE80211_TX_STAT_ACK : 0;
@@ -386,6 +329,10 @@ static void iwl3945_rx_reply_tx(struct iwl3945_priv *priv,
 			txq_id, iwl3945_get_tx_fail_reason(status), status,
 			tx_resp->rate, tx_resp->failure_frame);
 
+	rate_idx = iwl3945_hwrate_to_plcp_idx(tx_resp->rate);
+	if (info->band == IEEE80211_BAND_5GHZ)
+		rate_idx -= IWL_FIRST_OFDM_RATE;
+	info->tx_rate_idx = rate_idx;
 	IWL_DEBUG_TX_REPLY("Tx queue reclaim %d\n", index);
 	iwl3945_tx_queue_reclaim(priv, txq_id, index);
 
@@ -573,15 +520,108 @@ static int iwl3945_is_network_packet(struct iwl3945_priv *priv,
 	/* Filter incoming packets to determine if they are targeted toward
 	 * this network, discarding packets coming from ourselves */
 	switch (priv->iw_mode) {
-	case NL80211_IFTYPE_ADHOC: /* Header: Dest. | Source    | BSSID */
+	case IEEE80211_IF_TYPE_IBSS: /* Header: Dest. | Source    | BSSID */
 		/* packets to our IBSS update information */
 		return !compare_ether_addr(header->addr3, priv->bssid);
-	case NL80211_IFTYPE_STATION: /* Header: Dest. | AP{BSSID} | Source */
+	case IEEE80211_IF_TYPE_STA: /* Header: Dest. | AP{BSSID} | Source */
 		/* packets to our IBSS update information */
 		return !compare_ether_addr(header->addr2, priv->bssid);
 	default:
 		return 1;
 	}
+}
+
+static void iwl3945_add_radiotap(struct iwl3945_priv *priv,
+				 struct sk_buff *skb,
+				 struct iwl3945_rx_frame_hdr *rx_hdr,
+				 struct ieee80211_rx_status *stats)
+{
+	/* First cache any information we need before we overwrite
+	 * the information provided in the skb from the hardware */
+	s8 signal = stats->signal;
+	s8 noise = 0;
+	int rate = stats->rate_idx;
+	u64 tsf = stats->mactime;
+	__le16 phy_flags_hw = rx_hdr->phy_flags, antenna;
+
+	struct iwl3945_rt_rx_hdr {
+		struct ieee80211_radiotap_header rt_hdr;
+		__le64 rt_tsf;		/* TSF */
+		u8 rt_flags;		/* radiotap packet flags */
+		u8 rt_rate;		/* rate in 500kb/s */
+		__le16 rt_channelMHz;	/* channel in MHz */
+		__le16 rt_chbitmask;	/* channel bitfield */
+		s8 rt_dbmsignal;	/* signal in dBm, kluged to signed */
+		s8 rt_dbmnoise;
+		u8 rt_antenna;		/* antenna number */
+	} __attribute__ ((packed)) *iwl3945_rt;
+
+	if (skb_headroom(skb) < sizeof(*iwl3945_rt)) {
+		if (net_ratelimit())
+			printk(KERN_ERR "not enough headroom [%d] for "
+			       "radiotap head [%zd]\n",
+			       skb_headroom(skb), sizeof(*iwl3945_rt));
+		return;
+	}
+
+	/* put radiotap header in front of 802.11 header and data */
+	iwl3945_rt = (void *)skb_push(skb, sizeof(*iwl3945_rt));
+
+	/* initialise radiotap header */
+	iwl3945_rt->rt_hdr.it_version = PKTHDR_RADIOTAP_VERSION;
+	iwl3945_rt->rt_hdr.it_pad = 0;
+
+	/* total header + data */
+	put_unaligned_le16(sizeof(*iwl3945_rt), &iwl3945_rt->rt_hdr.it_len);
+
+	/* Indicate all the fields we add to the radiotap header */
+	put_unaligned_le32((1 << IEEE80211_RADIOTAP_TSFT) |
+			   (1 << IEEE80211_RADIOTAP_FLAGS) |
+			   (1 << IEEE80211_RADIOTAP_RATE) |
+			   (1 << IEEE80211_RADIOTAP_CHANNEL) |
+			   (1 << IEEE80211_RADIOTAP_DBM_ANTSIGNAL) |
+			   (1 << IEEE80211_RADIOTAP_DBM_ANTNOISE) |
+			   (1 << IEEE80211_RADIOTAP_ANTENNA),
+			&iwl3945_rt->rt_hdr.it_present);
+
+	/* Zero the flags, we'll add to them as we go */
+	iwl3945_rt->rt_flags = 0;
+
+	put_unaligned_le64(tsf, &iwl3945_rt->rt_tsf);
+
+	iwl3945_rt->rt_dbmsignal = signal;
+	iwl3945_rt->rt_dbmnoise = noise;
+
+	/* Convert the channel frequency and set the flags */
+	put_unaligned_le16(stats->freq, &iwl3945_rt->rt_channelMHz);
+	if (!(phy_flags_hw & RX_RES_PHY_FLAGS_BAND_24_MSK))
+		put_unaligned_le16(IEEE80211_CHAN_OFDM | IEEE80211_CHAN_5GHZ,
+			      &iwl3945_rt->rt_chbitmask);
+	else if (phy_flags_hw & RX_RES_PHY_FLAGS_MOD_CCK_MSK)
+		put_unaligned_le16(IEEE80211_CHAN_CCK | IEEE80211_CHAN_2GHZ,
+			      &iwl3945_rt->rt_chbitmask);
+	else	/* 802.11g */
+		put_unaligned_le16(IEEE80211_CHAN_OFDM | IEEE80211_CHAN_2GHZ,
+			      &iwl3945_rt->rt_chbitmask);
+
+	if (rate == -1)
+		iwl3945_rt->rt_rate = 0;
+	else {
+		if (stats->band == IEEE80211_BAND_5GHZ)
+			rate += IWL_FIRST_OFDM_RATE;
+
+		iwl3945_rt->rt_rate = iwl3945_rates[rate].ieee;
+	}
+
+	/* antenna number */
+	antenna = phy_flags_hw & RX_RES_PHY_FLAGS_ANTENNA_MSK;
+	iwl3945_rt->rt_antenna = le16_to_cpu(antenna) >> 4;
+
+	/* set the preamble flag if we have it */
+	if (phy_flags_hw & RX_RES_PHY_FLAGS_SHORT_PREAMBLE_MSK)
+		iwl3945_rt->rt_flags |= IEEE80211_RADIOTAP_F_SHORTPRE;
+
+	stats->flag |= RX_FLAG_RADIOTAP;
 }
 
 static void iwl3945_pass_packet_to_mac80211(struct iwl3945_priv *priv,
@@ -617,6 +657,9 @@ static void iwl3945_pass_packet_to_mac80211(struct iwl3945_priv *priv,
 		iwl3945_set_decrypted_flag(priv, rxb->skb,
 				       le32_to_cpu(rx_end->status), stats);
 
+	if (priv->add_radiotap)
+		iwl3945_add_radiotap(priv, rxb->skb, rx_hdr, stats);
+
 #ifdef CONFIG_IWL3945_LEDS
 	if (ieee80211_is_data(hdr->frame_control))
 		priv->rxtxpackets += len;
@@ -641,6 +684,7 @@ static void iwl3945_rx_reply_rx(struct iwl3945_priv *priv,
 	u16 rx_stats_noise_diff = le16_to_cpu(rx_stats->noise_diff);
 	u8 network_packet;
 
+	rx_status.antenna = 0;
 	rx_status.flag = 0;
 	rx_status.mactime = le64_to_cpu(rx_end->timestamp);
 	rx_status.freq =
@@ -651,13 +695,6 @@ static void iwl3945_rx_reply_rx(struct iwl3945_priv *priv,
 	rx_status.rate_idx = iwl3945_hwrate_to_plcp_idx(rx_hdr->rate);
 	if (rx_status.band == IEEE80211_BAND_5GHZ)
 		rx_status.rate_idx -= IWL_FIRST_OFDM_RATE;
-
-	rx_status.antenna = le16_to_cpu(rx_hdr->phy_flags &
-					RX_RES_PHY_FLAGS_ANTENNA_MSK) >> 4;
-
-	/* set the preamble flag if appropriate */
-	if (rx_hdr->phy_flags & RX_RES_PHY_FLAGS_SHORT_PREAMBLE_MSK)
-		rx_status.flag |= RX_FLAG_SHORTPRE;
 
 	if ((unlikely(rx_stats->phy_count > 20))) {
 		IWL_DEBUG_DROP
@@ -734,7 +771,100 @@ static void iwl3945_rx_reply_rx(struct iwl3945_priv *priv,
 		priv->last_rx_noise = rx_status.noise;
 	}
 
-	iwl3945_pass_packet_to_mac80211(priv, rxb, &rx_status);
+	if (priv->iw_mode == IEEE80211_IF_TYPE_MNTR) {
+		iwl3945_pass_packet_to_mac80211(priv, rxb, &rx_status);
+		return;
+	}
+
+	switch (le16_to_cpu(header->frame_control) & IEEE80211_FCTL_FTYPE) {
+	case IEEE80211_FTYPE_MGMT:
+		switch (le16_to_cpu(header->frame_control) &
+			IEEE80211_FCTL_STYPE) {
+		case IEEE80211_STYPE_PROBE_RESP:
+		case IEEE80211_STYPE_BEACON:{
+				/* If this is a beacon or probe response for
+				 * our network then cache the beacon
+				 * timestamp */
+				if ((((priv->iw_mode == IEEE80211_IF_TYPE_STA)
+				      && !compare_ether_addr(header->addr2,
+							     priv->bssid)) ||
+				     ((priv->iw_mode == IEEE80211_IF_TYPE_IBSS)
+				      && !compare_ether_addr(header->addr3,
+							     priv->bssid)))) {
+					struct ieee80211_mgmt *mgmt =
+					    (struct ieee80211_mgmt *)header;
+					__le32 *pos;
+					pos = (__le32 *)&mgmt->u.beacon.
+					    timestamp;
+					priv->timestamp0 = le32_to_cpu(pos[0]);
+					priv->timestamp1 = le32_to_cpu(pos[1]);
+					priv->beacon_int = le16_to_cpu(
+					    mgmt->u.beacon.beacon_int);
+					if (priv->call_post_assoc_from_beacon &&
+					    (priv->iw_mode ==
+						IEEE80211_IF_TYPE_STA))
+						queue_work(priv->workqueue,
+						    &priv->post_associate.work);
+
+					priv->call_post_assoc_from_beacon = 0;
+				}
+
+				break;
+			}
+
+		case IEEE80211_STYPE_ACTION:
+			/* TODO: Parse 802.11h frames for CSA... */
+			break;
+
+			/*
+			 * TODO: Use the new callback function from
+			 * mac80211 instead of sniffing these packets.
+			 */
+		case IEEE80211_STYPE_ASSOC_RESP:
+		case IEEE80211_STYPE_REASSOC_RESP:{
+				struct ieee80211_mgmt *mgnt =
+				    (struct ieee80211_mgmt *)header;
+
+				/* We have just associated, give some
+				 * time for the 4-way handshake if
+				 * any. Don't start scan too early. */
+				priv->next_scan_jiffies = jiffies +
+					IWL_DELAY_NEXT_SCAN_AFTER_ASSOC;
+
+				priv->assoc_id = (~((1 << 15) | (1 << 14)) &
+						  le16_to_cpu(mgnt->u.
+							      assoc_resp.aid));
+				priv->assoc_capability =
+				    le16_to_cpu(mgnt->u.assoc_resp.capab_info);
+				if (priv->beacon_int)
+					queue_work(priv->workqueue,
+					    &priv->post_associate.work);
+				else
+					priv->call_post_assoc_from_beacon = 1;
+				break;
+			}
+
+		case IEEE80211_STYPE_PROBE_REQ:{
+				DECLARE_MAC_BUF(mac1);
+				DECLARE_MAC_BUF(mac2);
+				DECLARE_MAC_BUF(mac3);
+				if (priv->iw_mode == IEEE80211_IF_TYPE_IBSS)
+					IWL_DEBUG_DROP
+					    ("Dropping (non network): %s"
+					     ", %s, %s\n",
+					     print_mac(mac1, header->addr1),
+					     print_mac(mac2, header->addr2),
+					     print_mac(mac3, header->addr3));
+				return;
+			}
+		}
+
+	case IEEE80211_FTYPE_DATA:
+		/* fall through */
+	default:
+		iwl3945_pass_packet_to_mac80211(priv, rxb, &rx_status);
+		break;
+	}
 }
 
 int iwl3945_hw_txq_attach_buf_to_tfd(struct iwl3945_priv *priv, void *ptr,
@@ -860,7 +990,7 @@ void iwl3945_hw_build_tx_cmd_rate(struct iwl3945_priv *priv,
 
 	priv->stations[sta_id].current_rate.rate_n_flags = rate;
 
-	if ((priv->iw_mode == NL80211_IFTYPE_ADHOC) &&
+	if ((priv->iw_mode == IEEE80211_IF_TYPE_IBSS) &&
 	    (sta_id != priv->hw_setting.bcast_sta_id) &&
 		(sta_id != IWL_MULTICAST_ID))
 		priv->stations[IWL_STA_ID].current_rate.rate_n_flags = rate;
@@ -1883,7 +2013,7 @@ static int iwl3945_hw_reg_comp_txpower_temp(struct iwl3945_priv *priv)
 		ref_temp = (s16)priv->eeprom.groups[ch_info->group_index].
 		    temperature;
 
-		/* get power index adjustment based on current and factory
+		/* get power index adjustment based on curr and factory
 		 * temps */
 		delta_index = iwl3945_hw_reg_adjust_power_by_temp(temperature,
 							      ref_temp);

@@ -17,21 +17,26 @@
 #include "rate.h"
 #include "mesh.h"
 
-static bool nl80211_type_check(enum nl80211_iftype type)
+static enum ieee80211_if_types
+nl80211_type_to_mac80211_type(enum nl80211_iftype type)
 {
 	switch (type) {
+	case NL80211_IFTYPE_UNSPECIFIED:
+		return IEEE80211_IF_TYPE_STA;
 	case NL80211_IFTYPE_ADHOC:
+		return IEEE80211_IF_TYPE_IBSS;
 	case NL80211_IFTYPE_STATION:
+		return IEEE80211_IF_TYPE_STA;
 	case NL80211_IFTYPE_MONITOR:
+		return IEEE80211_IF_TYPE_MNTR;
 #ifdef CONFIG_MAC80211_MESH
 	case NL80211_IFTYPE_MESH_POINT:
+		return IEEE80211_IF_TYPE_MESH_POINT;
 #endif
-	case NL80211_IFTYPE_AP:
-	case NL80211_IFTYPE_AP_VLAN:
 	case NL80211_IFTYPE_WDS:
-		return true;
+		return IEEE80211_IF_TYPE_WDS;
 	default:
-		return false;
+		return IEEE80211_IF_TYPE_INVALID;
 	}
 }
 
@@ -40,15 +45,17 @@ static int ieee80211_add_iface(struct wiphy *wiphy, char *name,
 			       struct vif_params *params)
 {
 	struct ieee80211_local *local = wiphy_priv(wiphy);
+	enum ieee80211_if_types itype;
 	struct net_device *dev;
 	struct ieee80211_sub_if_data *sdata;
 	int err;
 
-	if (!nl80211_type_check(type))
+	itype = nl80211_type_to_mac80211_type(type);
+	if (itype == IEEE80211_IF_TYPE_INVALID)
 		return -EINVAL;
 
-	err = ieee80211_if_add(local, name, &dev, type, params);
-	if (err || type != NL80211_IFTYPE_MONITOR || !flags)
+	err = ieee80211_if_add(local, name, &dev, itype, params);
+	if (err || itype != IEEE80211_IF_TYPE_MNTR || !flags)
 		return err;
 
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
@@ -59,16 +66,13 @@ static int ieee80211_add_iface(struct wiphy *wiphy, char *name,
 static int ieee80211_del_iface(struct wiphy *wiphy, int ifindex)
 {
 	struct net_device *dev;
-	struct ieee80211_sub_if_data *sdata;
 
 	/* we're under RTNL */
 	dev = __dev_get_by_index(&init_net, ifindex);
 	if (!dev)
 		return -ENODEV;
 
-	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
-
-	ieee80211_if_remove(sdata);
+	ieee80211_if_remove(dev);
 
 	return 0;
 }
@@ -77,7 +81,9 @@ static int ieee80211_change_iface(struct wiphy *wiphy, int ifindex,
 				  enum nl80211_iftype type, u32 *flags,
 				  struct vif_params *params)
 {
+	struct ieee80211_local *local = wiphy_priv(wiphy);
 	struct net_device *dev;
+	enum ieee80211_if_types itype;
 	struct ieee80211_sub_if_data *sdata;
 	int ret;
 
@@ -86,24 +92,25 @@ static int ieee80211_change_iface(struct wiphy *wiphy, int ifindex,
 	if (!dev)
 		return -ENODEV;
 
-	if (!nl80211_type_check(type))
+	itype = nl80211_type_to_mac80211_type(type);
+	if (itype == IEEE80211_IF_TYPE_INVALID)
 		return -EINVAL;
+
+	if (dev == local->mdev)
+		return -EOPNOTSUPP;
 
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
-	ret = ieee80211_if_change_type(sdata, type);
+	ret = ieee80211_if_change_type(sdata, itype);
 	if (ret)
 		return ret;
 
-	if (netif_running(sdata->dev))
-		return -EBUSY;
-
 	if (ieee80211_vif_is_mesh(&sdata->vif) && params->mesh_id_len)
-		ieee80211_sdata_set_mesh_id(sdata,
-					    params->mesh_id_len,
-					    params->mesh_id);
+		ieee80211_if_sta_set_mesh_id(&sdata->u.sta,
+					     params->mesh_id_len,
+					     params->mesh_id);
 
-	if (sdata->vif.type != NL80211_IFTYPE_MONITOR || !flags)
+	if (sdata->vif.type != IEEE80211_IF_TYPE_MNTR || !flags)
 		return 0;
 
 	sdata->u.mntr_flags = *flags;
@@ -114,11 +121,15 @@ static int ieee80211_add_key(struct wiphy *wiphy, struct net_device *dev,
 			     u8 key_idx, u8 *mac_addr,
 			     struct key_params *params)
 {
+	struct ieee80211_local *local = wiphy_priv(wiphy);
 	struct ieee80211_sub_if_data *sdata;
 	struct sta_info *sta = NULL;
 	enum ieee80211_key_alg alg;
 	struct ieee80211_key *key;
 	int err;
+
+	if (dev == local->mdev)
+		return -EOPNOTSUPP;
 
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
@@ -164,9 +175,13 @@ static int ieee80211_add_key(struct wiphy *wiphy, struct net_device *dev,
 static int ieee80211_del_key(struct wiphy *wiphy, struct net_device *dev,
 			     u8 key_idx, u8 *mac_addr)
 {
+	struct ieee80211_local *local = wiphy_priv(wiphy);
 	struct ieee80211_sub_if_data *sdata;
 	struct sta_info *sta;
 	int ret;
+
+	if (dev == local->mdev)
+		return -EOPNOTSUPP;
 
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
@@ -208,6 +223,7 @@ static int ieee80211_get_key(struct wiphy *wiphy, struct net_device *dev,
 			     void (*callback)(void *cookie,
 					      struct key_params *params))
 {
+	struct ieee80211_local *local = wiphy_priv(wiphy);
 	struct ieee80211_sub_if_data *sdata;
 	struct sta_info *sta = NULL;
 	u8 seq[6] = {0};
@@ -216,6 +232,9 @@ static int ieee80211_get_key(struct wiphy *wiphy, struct net_device *dev,
 	u32 iv32;
 	u16 iv16;
 	int err = -ENOENT;
+
+	if (dev == local->mdev)
+		return -EOPNOTSUPP;
 
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
@@ -292,7 +311,11 @@ static int ieee80211_config_default_key(struct wiphy *wiphy,
 					struct net_device *dev,
 					u8 key_idx)
 {
+	struct ieee80211_local *local = wiphy_priv(wiphy);
 	struct ieee80211_sub_if_data *sdata;
+
+	if (dev == local->mdev)
+		return -EOPNOTSUPP;
 
 	rcu_read_lock();
 
@@ -342,7 +365,7 @@ static int ieee80211_dump_station(struct wiphy *wiphy, struct net_device *dev,
 	sta = sta_info_get_by_idx(local, idx, dev);
 	if (sta) {
 		ret = 0;
-		memcpy(mac, sta->sta.addr, ETH_ALEN);
+		memcpy(mac, sta->addr, ETH_ALEN);
 		sta_set_sinfo(sta, sinfo);
 	}
 
@@ -396,8 +419,8 @@ static int ieee80211_config_beacon(struct ieee80211_sub_if_data *sdata,
 	 */
 	if (params->interval) {
 		sdata->local->hw.conf.beacon_int = params->interval;
-		ieee80211_hw_config(sdata->local,
-				    IEEE80211_CONF_CHANGE_BEACON_INTERVAL);
+		if (ieee80211_hw_config(sdata->local))
+			return -EINVAL;
 		/*
 		 * We updated some parameter so if below bails out
 		 * it's not an error.
@@ -474,12 +497,16 @@ static int ieee80211_config_beacon(struct ieee80211_sub_if_data *sdata,
 static int ieee80211_add_beacon(struct wiphy *wiphy, struct net_device *dev,
 				struct beacon_parameters *params)
 {
+	struct ieee80211_local *local = wiphy_priv(wiphy);
 	struct ieee80211_sub_if_data *sdata;
 	struct beacon_data *old;
 
+	if (dev == local->mdev)
+		return -EOPNOTSUPP;
+
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
-	if (sdata->vif.type != NL80211_IFTYPE_AP)
+	if (sdata->vif.type != IEEE80211_IF_TYPE_AP)
 		return -EINVAL;
 
 	old = sdata->u.ap.beacon;
@@ -493,12 +520,16 @@ static int ieee80211_add_beacon(struct wiphy *wiphy, struct net_device *dev,
 static int ieee80211_set_beacon(struct wiphy *wiphy, struct net_device *dev,
 				struct beacon_parameters *params)
 {
+	struct ieee80211_local *local = wiphy_priv(wiphy);
 	struct ieee80211_sub_if_data *sdata;
 	struct beacon_data *old;
 
+	if (dev == local->mdev)
+		return -EOPNOTSUPP;
+
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
-	if (sdata->vif.type != NL80211_IFTYPE_AP)
+	if (sdata->vif.type != IEEE80211_IF_TYPE_AP)
 		return -EINVAL;
 
 	old = sdata->u.ap.beacon;
@@ -511,12 +542,16 @@ static int ieee80211_set_beacon(struct wiphy *wiphy, struct net_device *dev,
 
 static int ieee80211_del_beacon(struct wiphy *wiphy, struct net_device *dev)
 {
+	struct ieee80211_local *local = wiphy_priv(wiphy);
 	struct ieee80211_sub_if_data *sdata;
 	struct beacon_data *old;
 
+	if (dev == local->mdev)
+		return -EOPNOTSUPP;
+
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
-	if (sdata->vif.type != NL80211_IFTYPE_AP)
+	if (sdata->vif.type != IEEE80211_IF_TYPE_AP)
 		return -EINVAL;
 
 	old = sdata->u.ap.beacon;
@@ -559,7 +594,7 @@ static void ieee80211_send_layer2_update(struct sta_info *sta)
 	 * Update response frame; IEEE Std 802.2-1998, 5.4.1.2.1 */
 
 	memset(msg->da, 0xff, ETH_ALEN);
-	memcpy(msg->sa, sta->sta.addr, ETH_ALEN);
+	memcpy(msg->sa, sta->addr, ETH_ALEN);
 	msg->len = htons(6);
 	msg->dsap = 0;
 	msg->ssap = 0x01;	/* NULL LSAP, CR Bit: Response */
@@ -583,8 +618,6 @@ static void sta_apply_parameters(struct ieee80211_local *local,
 	int i, j;
 	struct ieee80211_supported_band *sband;
 	struct ieee80211_sub_if_data *sdata = sta->sdata;
-
-	sband = local->hw.wiphy->bands[local->oper_channel->band];
 
 	/*
 	 * FIXME: updating the flags is racy when this function is
@@ -616,9 +649,9 @@ static void sta_apply_parameters(struct ieee80211_local *local,
 	 */
 
 	if (params->aid) {
-		sta->sta.aid = params->aid;
-		if (sta->sta.aid > IEEE80211_MAX_AID)
-			sta->sta.aid = 0; /* XXX: should this be an error? */
+		sta->aid = params->aid;
+		if (sta->aid > IEEE80211_MAX_AID)
+			sta->aid = 0; /* XXX: should this be an error? */
 	}
 
 	if (params->listen_interval >= 0)
@@ -626,6 +659,7 @@ static void sta_apply_parameters(struct ieee80211_local *local,
 
 	if (params->supported_rates) {
 		rates = 0;
+		sband = local->hw.wiphy->bands[local->oper_channel->band];
 
 		for (i = 0; i < params->supported_rates_len; i++) {
 			int rate = (params->supported_rates[i] & 0x7f) * 5;
@@ -634,13 +668,8 @@ static void sta_apply_parameters(struct ieee80211_local *local,
 					rates |= BIT(j);
 			}
 		}
-		sta->sta.supp_rates[local->oper_channel->band] = rates;
+		sta->supp_rates[local->oper_channel->band] = rates;
 	}
-
-	if (params->ht_capa)
-		ieee80211_ht_cap_ie_to_sta_ht_cap(sband,
-						  params->ht_capa,
-						  &sta->sta.ht_cap);
 
 	if (ieee80211_vif_is_mesh(&sdata->vif) && params->plink_action) {
 		switch (params->plink_action) {
@@ -662,6 +691,9 @@ static int ieee80211_add_station(struct wiphy *wiphy, struct net_device *dev,
 	struct ieee80211_sub_if_data *sdata;
 	int err;
 
+	if (dev == local->mdev || params->vlan == local->mdev)
+		return -EOPNOTSUPP;
+
 	/* Prevent a race with changing the rate control algorithm */
 	if (!netif_running(dev))
 		return -ENETDOWN;
@@ -669,8 +701,8 @@ static int ieee80211_add_station(struct wiphy *wiphy, struct net_device *dev,
 	if (params->vlan) {
 		sdata = IEEE80211_DEV_TO_SUB_IF(params->vlan);
 
-		if (sdata->vif.type != NL80211_IFTYPE_AP_VLAN &&
-		    sdata->vif.type != NL80211_IFTYPE_AP)
+		if (sdata->vif.type != IEEE80211_IF_TYPE_VLAN &&
+		    sdata->vif.type != IEEE80211_IF_TYPE_AP)
 			return -EINVAL;
 	} else
 		sdata = IEEE80211_DEV_TO_SUB_IF(dev);
@@ -689,7 +721,7 @@ static int ieee80211_add_station(struct wiphy *wiphy, struct net_device *dev,
 
 	sta_apply_parameters(local, sta, params);
 
-	rate_control_rate_init(sta);
+	rate_control_rate_init(sta, local);
 
 	rcu_read_lock();
 
@@ -700,8 +732,8 @@ static int ieee80211_add_station(struct wiphy *wiphy, struct net_device *dev,
 		return err;
 	}
 
-	if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN ||
-	    sdata->vif.type == NL80211_IFTYPE_AP)
+	if (sdata->vif.type == IEEE80211_IF_TYPE_VLAN ||
+	    sdata->vif.type == IEEE80211_IF_TYPE_AP)
 		ieee80211_send_layer2_update(sta);
 
 	rcu_read_unlock();
@@ -715,6 +747,9 @@ static int ieee80211_del_station(struct wiphy *wiphy, struct net_device *dev,
 	struct ieee80211_local *local = wiphy_priv(wiphy);
 	struct ieee80211_sub_if_data *sdata;
 	struct sta_info *sta;
+
+	if (dev == local->mdev)
+		return -EOPNOTSUPP;
 
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
@@ -747,6 +782,9 @@ static int ieee80211_change_station(struct wiphy *wiphy,
 	struct sta_info *sta;
 	struct ieee80211_sub_if_data *vlansdata;
 
+	if (dev == local->mdev || params->vlan == local->mdev)
+		return -EOPNOTSUPP;
+
 	rcu_read_lock();
 
 	/* XXX: get sta belonging to dev */
@@ -759,8 +797,8 @@ static int ieee80211_change_station(struct wiphy *wiphy,
 	if (params->vlan && params->vlan != sta->sdata->dev) {
 		vlansdata = IEEE80211_DEV_TO_SUB_IF(params->vlan);
 
-		if (vlansdata->vif.type != NL80211_IFTYPE_AP_VLAN &&
-		    vlansdata->vif.type != NL80211_IFTYPE_AP) {
+		if (vlansdata->vif.type != IEEE80211_IF_TYPE_VLAN &&
+		    vlansdata->vif.type != IEEE80211_IF_TYPE_AP) {
 			rcu_read_unlock();
 			return -EINVAL;
 		}
@@ -786,12 +824,15 @@ static int ieee80211_add_mpath(struct wiphy *wiphy, struct net_device *dev,
 	struct sta_info *sta;
 	int err;
 
+	if (dev == local->mdev)
+		return -EOPNOTSUPP;
+
 	if (!netif_running(dev))
 		return -ENETDOWN;
 
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
-	if (sdata->vif.type != NL80211_IFTYPE_MESH_POINT)
+	if (sdata->vif.type != IEEE80211_IF_TYPE_MESH_POINT)
 		return -ENOTSUPP;
 
 	rcu_read_lock();
@@ -801,13 +842,13 @@ static int ieee80211_add_mpath(struct wiphy *wiphy, struct net_device *dev,
 		return -ENOENT;
 	}
 
-	err = mesh_path_add(dst, sdata);
+	err = mesh_path_add(dst, dev);
 	if (err) {
 		rcu_read_unlock();
 		return err;
 	}
 
-	mpath = mesh_path_lookup(dst, sdata);
+	mpath = mesh_path_lookup(dst, dev);
 	if (!mpath) {
 		rcu_read_unlock();
 		return -ENXIO;
@@ -821,12 +862,10 @@ static int ieee80211_add_mpath(struct wiphy *wiphy, struct net_device *dev,
 static int ieee80211_del_mpath(struct wiphy *wiphy, struct net_device *dev,
 				 u8 *dst)
 {
-	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
-
 	if (dst)
-		return mesh_path_del(dst, sdata);
+		return mesh_path_del(dst, dev);
 
-	mesh_path_flush(sdata);
+	mesh_path_flush(dev);
 	return 0;
 }
 
@@ -839,12 +878,15 @@ static int ieee80211_change_mpath(struct wiphy *wiphy,
 	struct mesh_path *mpath;
 	struct sta_info *sta;
 
+	if (dev == local->mdev)
+		return -EOPNOTSUPP;
+
 	if (!netif_running(dev))
 		return -ENETDOWN;
 
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
-	if (sdata->vif.type != NL80211_IFTYPE_MESH_POINT)
+	if (sdata->vif.type != IEEE80211_IF_TYPE_MESH_POINT)
 		return -ENOTSUPP;
 
 	rcu_read_lock();
@@ -855,7 +897,7 @@ static int ieee80211_change_mpath(struct wiphy *wiphy,
 		return -ENOENT;
 	}
 
-	mpath = mesh_path_lookup(dst, sdata);
+	mpath = mesh_path_lookup(dst, dev);
 	if (!mpath) {
 		rcu_read_unlock();
 		return -ENOENT;
@@ -871,7 +913,7 @@ static void mpath_set_pinfo(struct mesh_path *mpath, u8 *next_hop,
 			    struct mpath_info *pinfo)
 {
 	if (mpath->next_hop)
-		memcpy(next_hop, mpath->next_hop->sta.addr, ETH_ALEN);
+		memcpy(next_hop, mpath->next_hop->addr, ETH_ALEN);
 	else
 		memset(next_hop, 0, ETH_ALEN);
 
@@ -910,16 +952,20 @@ static int ieee80211_get_mpath(struct wiphy *wiphy, struct net_device *dev,
 			       u8 *dst, u8 *next_hop, struct mpath_info *pinfo)
 
 {
+	struct ieee80211_local *local = wiphy_priv(wiphy);
 	struct ieee80211_sub_if_data *sdata;
 	struct mesh_path *mpath;
 
+	if (dev == local->mdev)
+		return -EOPNOTSUPP;
+
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
-	if (sdata->vif.type != NL80211_IFTYPE_MESH_POINT)
+	if (sdata->vif.type != IEEE80211_IF_TYPE_MESH_POINT)
 		return -ENOTSUPP;
 
 	rcu_read_lock();
-	mpath = mesh_path_lookup(dst, sdata);
+	mpath = mesh_path_lookup(dst, dev);
 	if (!mpath) {
 		rcu_read_unlock();
 		return -ENOENT;
@@ -934,16 +980,20 @@ static int ieee80211_dump_mpath(struct wiphy *wiphy, struct net_device *dev,
 				 int idx, u8 *dst, u8 *next_hop,
 				 struct mpath_info *pinfo)
 {
+	struct ieee80211_local *local = wiphy_priv(wiphy);
 	struct ieee80211_sub_if_data *sdata;
 	struct mesh_path *mpath;
 
+	if (dev == local->mdev)
+		return -EOPNOTSUPP;
+
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
-	if (sdata->vif.type != NL80211_IFTYPE_MESH_POINT)
+	if (sdata->vif.type != IEEE80211_IF_TYPE_MESH_POINT)
 		return -ENOTSUPP;
 
 	rcu_read_lock();
-	mpath = mesh_path_lookup_by_idx(idx, sdata);
+	mpath = mesh_path_lookup_by_idx(idx, dev);
 	if (!mpath) {
 		rcu_read_unlock();
 		return -ENOENT;
@@ -953,147 +1003,7 @@ static int ieee80211_dump_mpath(struct wiphy *wiphy, struct net_device *dev,
 	rcu_read_unlock();
 	return 0;
 }
-
-static int ieee80211_get_mesh_params(struct wiphy *wiphy,
-				struct net_device *dev,
-				struct mesh_config *conf)
-{
-	struct ieee80211_sub_if_data *sdata;
-	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
-
-	if (sdata->vif.type != NL80211_IFTYPE_MESH_POINT)
-		return -ENOTSUPP;
-	memcpy(conf, &(sdata->u.mesh.mshcfg), sizeof(struct mesh_config));
-	return 0;
-}
-
-static inline bool _chg_mesh_attr(enum nl80211_meshconf_params parm, u32 mask)
-{
-	return (mask >> (parm-1)) & 0x1;
-}
-
-static int ieee80211_set_mesh_params(struct wiphy *wiphy,
-				struct net_device *dev,
-				const struct mesh_config *nconf, u32 mask)
-{
-	struct mesh_config *conf;
-	struct ieee80211_sub_if_data *sdata;
-	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
-
-	if (sdata->vif.type != NL80211_IFTYPE_MESH_POINT)
-		return -ENOTSUPP;
-
-	/* Set the config options which we are interested in setting */
-	conf = &(sdata->u.mesh.mshcfg);
-	if (_chg_mesh_attr(NL80211_MESHCONF_RETRY_TIMEOUT, mask))
-		conf->dot11MeshRetryTimeout = nconf->dot11MeshRetryTimeout;
-	if (_chg_mesh_attr(NL80211_MESHCONF_CONFIRM_TIMEOUT, mask))
-		conf->dot11MeshConfirmTimeout = nconf->dot11MeshConfirmTimeout;
-	if (_chg_mesh_attr(NL80211_MESHCONF_HOLDING_TIMEOUT, mask))
-		conf->dot11MeshHoldingTimeout = nconf->dot11MeshHoldingTimeout;
-	if (_chg_mesh_attr(NL80211_MESHCONF_MAX_PEER_LINKS, mask))
-		conf->dot11MeshMaxPeerLinks = nconf->dot11MeshMaxPeerLinks;
-	if (_chg_mesh_attr(NL80211_MESHCONF_MAX_RETRIES, mask))
-		conf->dot11MeshMaxRetries = nconf->dot11MeshMaxRetries;
-	if (_chg_mesh_attr(NL80211_MESHCONF_TTL, mask))
-		conf->dot11MeshTTL = nconf->dot11MeshTTL;
-	if (_chg_mesh_attr(NL80211_MESHCONF_AUTO_OPEN_PLINKS, mask))
-		conf->auto_open_plinks = nconf->auto_open_plinks;
-	if (_chg_mesh_attr(NL80211_MESHCONF_HWMP_MAX_PREQ_RETRIES, mask))
-		conf->dot11MeshHWMPmaxPREQretries =
-			nconf->dot11MeshHWMPmaxPREQretries;
-	if (_chg_mesh_attr(NL80211_MESHCONF_PATH_REFRESH_TIME, mask))
-		conf->path_refresh_time = nconf->path_refresh_time;
-	if (_chg_mesh_attr(NL80211_MESHCONF_MIN_DISCOVERY_TIMEOUT, mask))
-		conf->min_discovery_timeout = nconf->min_discovery_timeout;
-	if (_chg_mesh_attr(NL80211_MESHCONF_HWMP_ACTIVE_PATH_TIMEOUT, mask))
-		conf->dot11MeshHWMPactivePathTimeout =
-			nconf->dot11MeshHWMPactivePathTimeout;
-	if (_chg_mesh_attr(NL80211_MESHCONF_HWMP_PREQ_MIN_INTERVAL, mask))
-		conf->dot11MeshHWMPpreqMinInterval =
-			nconf->dot11MeshHWMPpreqMinInterval;
-	if (_chg_mesh_attr(NL80211_MESHCONF_HWMP_NET_DIAM_TRVS_TIME,
-			   mask))
-		conf->dot11MeshHWMPnetDiameterTraversalTime =
-			nconf->dot11MeshHWMPnetDiameterTraversalTime;
-	return 0;
-}
-
 #endif
-
-static int ieee80211_change_bss(struct wiphy *wiphy,
-				struct net_device *dev,
-				struct bss_parameters *params)
-{
-	struct ieee80211_sub_if_data *sdata;
-	u32 changed = 0;
-
-	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
-
-	if (sdata->vif.type != NL80211_IFTYPE_AP)
-		return -EINVAL;
-
-	if (params->use_cts_prot >= 0) {
-		sdata->vif.bss_conf.use_cts_prot = params->use_cts_prot;
-		changed |= BSS_CHANGED_ERP_CTS_PROT;
-	}
-	if (params->use_short_preamble >= 0) {
-		sdata->vif.bss_conf.use_short_preamble =
-			params->use_short_preamble;
-		changed |= BSS_CHANGED_ERP_PREAMBLE;
-	}
-	if (params->use_short_slot_time >= 0) {
-		sdata->vif.bss_conf.use_short_slot =
-			params->use_short_slot_time;
-		changed |= BSS_CHANGED_ERP_SLOT;
-	}
-
-	if (params->basic_rates) {
-		int i, j;
-		u32 rates = 0;
-		struct ieee80211_local *local = wiphy_priv(wiphy);
-		struct ieee80211_supported_band *sband =
-			wiphy->bands[local->oper_channel->band];
-
-		for (i = 0; i < params->basic_rates_len; i++) {
-			int rate = (params->basic_rates[i] & 0x7f) * 5;
-			for (j = 0; j < sband->n_bitrates; j++) {
-				if (sband->bitrates[j].bitrate == rate)
-					rates |= BIT(j);
-			}
-		}
-		sdata->vif.bss_conf.basic_rates = rates;
-		changed |= BSS_CHANGED_BASIC_RATES;
-	}
-
-	ieee80211_bss_info_change_notify(sdata, changed);
-
-	return 0;
-}
-
-static int ieee80211_set_txq_params(struct wiphy *wiphy,
-				    struct ieee80211_txq_params *params)
-{
-	struct ieee80211_local *local = wiphy_priv(wiphy);
-	struct ieee80211_tx_queue_params p;
-
-	if (!local->ops->conf_tx)
-		return -EOPNOTSUPP;
-
-	memset(&p, 0, sizeof(p));
-	p.aifs = params->aifs;
-	p.cw_max = params->cwmax;
-	p.cw_min = params->cwmin;
-	p.txop = params->txop;
-	if (local->ops->conf_tx(local_to_hw(local), params->queue, &p)) {
-		printk(KERN_DEBUG "%s: failed to set TX queue "
-		       "parameters for queue %d\n", local->mdev->name,
-		       params->queue);
-		return -EINVAL;
-	}
-
-	return 0;
-}
 
 struct cfg80211_ops mac80211_config_ops = {
 	.add_virtual_intf = ieee80211_add_iface,
@@ -1117,9 +1027,5 @@ struct cfg80211_ops mac80211_config_ops = {
 	.change_mpath = ieee80211_change_mpath,
 	.get_mpath = ieee80211_get_mpath,
 	.dump_mpath = ieee80211_dump_mpath,
-	.set_mesh_params = ieee80211_set_mesh_params,
-	.get_mesh_params = ieee80211_get_mesh_params,
 #endif
-	.change_bss = ieee80211_change_bss,
-	.set_txq_params = ieee80211_set_txq_params,
 };

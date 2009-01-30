@@ -1,5 +1,5 @@
-#ifndef P54USB_H
-#define P54USB_H
+#ifndef PRISM54USB_H
+#define PRISM54USB_H
 
 /*
  * Defines for USB based mac80211 Prism54 driver
@@ -72,11 +72,6 @@ struct net2280_tx_hdr {
 	u8 padding[8];
 } __attribute__((packed));
 
-struct lm87_tx_hdr {
-	__le32 device_addr;
-	__le32 chksum;
-} __attribute__((packed));
-
 /* Some flags for the isl hardware registers controlling DMA inside the
  * chip */
 #define ISL38XX_DMA_STATUS_DONE			0x00000001
@@ -135,4 +130,4 @@ struct p54u_priv {
 	struct sk_buff_head rx_queue;
 };
 
-#endif /* P54USB_H */
+#endif /* PRISM54USB_H */

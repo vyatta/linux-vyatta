@@ -46,8 +46,6 @@
 
 #define IWL5000_UCODE_API  "-1"
 
-#define IWL5000_MODULE_FIRMWARE "iwlwifi-5000" IWL5000_UCODE_API ".ucode"
-
 static const u16 iwl5000_default_queue_to_tx_fifo[] = {
 	IWL_TX_FIFO_AC3,
 	IWL_TX_FIFO_AC2,
@@ -94,7 +92,7 @@ static int iwl5000_apm_init(struct iwl_priv *priv)
 	iwl_set_bit(priv, CSR_GIO_CHICKEN_BITS,
 		    CSR_GIO_CHICKEN_BITS_REG_BIT_L1A_NO_L0S_RX);
 
-	/* Set FH wait threshold to maximum (HW error during stress W/A) */
+	/* Set FH wait treshold to maximum (HW error during stress W/A) */
 	iwl_set_bit(priv, CSR_DBG_HPET_MEM_REG, CSR_DBG_HPET_MEM_REG_VAL);
 
 	/* enable HAP INTA to move device L1a -> L0s */
@@ -134,7 +132,7 @@ static int iwl5000_apm_init(struct iwl_priv *priv)
 	return ret;
 }
 
-/* FIXME: this is identical to 4965 */
+/* FIXME: this is indentical to 4965 */
 static void iwl5000_apm_stop(struct iwl_priv *priv)
 {
 	unsigned long flags;
@@ -211,15 +209,15 @@ static void iwl5000_nic_config(struct iwl_priv *priv)
 {
 	unsigned long flags;
 	u16 radio_cfg;
-	u16 link;
+	u8 val_link;
 
 	spin_lock_irqsave(&priv->lock, flags);
 
-	pci_read_config_word(priv->pci_dev, PCI_CFG_LINK_CTRL, &link);
+	pci_read_config_byte(priv->pci_dev, PCI_LINK_CTRL, &val_link);
 
 	/* L1 is enabled by BIOS */
-	if ((link & PCI_CFG_LINK_CTRL_VAL_L1_EN) == PCI_CFG_LINK_CTRL_VAL_L1_EN)
-		/* disable L0S disabled L1A enabled */
+	if ((val_link & PCI_LINK_VAL_L1_EN) == PCI_LINK_VAL_L1_EN)
+		/* diable L0S disabled L1A enabled */
 		iwl_set_bit(priv, CSR_GIO_REG, CSR_GIO_REG_VAL_L0S_ENABLED);
 	else
 		/* L0S enabled L1A disabled */
@@ -293,17 +291,30 @@ static u32 eeprom_indirect_address(const struct iwl_priv *priv, u32 address)
 	return (address & ADDRESS_MSK) + (offset << 1);
 }
 
-static u16 iwl5000_eeprom_calib_version(struct iwl_priv *priv)
+static int iwl5000_eeprom_check_version(struct iwl_priv *priv)
 {
+	u16 eeprom_ver;
 	struct iwl_eeprom_calib_hdr {
 		u8 version;
 		u8 pa_type;
 		u16 voltage;
 	} *hdr;
 
+	eeprom_ver = iwl_eeprom_query16(priv, EEPROM_VERSION);
+
 	hdr = (struct iwl_eeprom_calib_hdr *)iwl_eeprom_query_addr(priv,
 							EEPROM_5000_CALIB_ALL);
-	return hdr->version;
+
+	if (eeprom_ver < EEPROM_5000_EEPROM_VERSION ||
+	    hdr->version < EEPROM_5000_TX_POWER_VERSION)
+		goto err;
+
+	return 0;
+err:
+	IWL_ERROR("Unsuported EEPROM VER=0x%x < 0x%x CALIB=0x%x < 0x%x\n",
+		  eeprom_ver, EEPROM_5000_EEPROM_VERSION,
+		  hdr->version, EEPROM_5000_TX_POWER_VERSION);
+	return -EINVAL;
 
 }
 
@@ -337,10 +348,10 @@ static void iwl5000_gain_computation(struct iwl_priv *priv,
 			data->delta_gain_code[1], data->delta_gain_code[2]);
 
 	if (!data->radio_write) {
-		struct iwl_calib_chain_noise_gain_cmd cmd;
+		struct iwl5000_calibration_chain_noise_gain_cmd cmd;
 		memset(&cmd, 0, sizeof(cmd));
 
-		cmd.op_code = IWL_PHY_CALIBRATE_CHAIN_NOISE_GAIN_CMD;
+		cmd.op_code = IWL5000_PHY_CALIBRATE_CHAIN_NOISE_GAIN_CMD;
 		cmd.delta_gain_1 = data->delta_gain_code[1];
 		cmd.delta_gain_2 = data->delta_gain_code[2];
 		iwl_send_cmd_pdu_async(priv, REPLY_PHY_CALIBRATION_CMD,
@@ -364,10 +375,10 @@ static void iwl5000_chain_noise_reset(struct iwl_priv *priv)
 	struct iwl_chain_noise_data *data = &priv->chain_noise_data;
 
 	if ((data->state == IWL_CHAIN_NOISE_ALIVE) && iwl_is_associated(priv)) {
-		struct iwl_calib_chain_noise_reset_cmd cmd;
+		struct iwl5000_calibration_chain_noise_reset_cmd cmd;
 
 		memset(&cmd, 0, sizeof(cmd));
-		cmd.op_code = IWL_PHY_CALIBRATE_CHAIN_NOISE_RESET_CMD;
+		cmd.op_code = IWL5000_PHY_CALIBRATE_CHAIN_NOISE_RESET_CMD;
 		if (iwl_send_cmd_pdu(priv, REPLY_PHY_CALIBRATION_CMD,
 			sizeof(cmd), &cmd))
 			IWL_ERROR("Could not send REPLY_PHY_CALIBRATION_CMD\n");
@@ -379,8 +390,8 @@ static void iwl5000_chain_noise_reset(struct iwl_priv *priv)
 static void iwl5000_rts_tx_cmd_flag(struct ieee80211_tx_info *info,
 			__le32 *tx_flags)
 {
-	if ((info->control.rates[0].flags & IEEE80211_TX_RC_USE_RTS_CTS) ||
-	    (info->control.rates[0].flags & IEEE80211_TX_RC_USE_CTS_PROTECT))
+	if ((info->flags & IEEE80211_TX_CTL_USE_RTS_CTS) ||
+	    (info->flags & IEEE80211_TX_CTL_USE_CTS_PROTECT))
 		*tx_flags |= TX_CMD_FLG_RTS_CTS_MSK;
 	else
 		*tx_flags &= ~TX_CMD_FLG_RTS_CTS_MSK;
@@ -418,27 +429,28 @@ static const u8 *iwl5000_eeprom_query_addr(const struct iwl_priv *priv,
 /*
  *  Calibration
  */
-static int iwl5000_set_Xtal_calib(struct iwl_priv *priv)
+static int iwl5000_send_Xtal_calib(struct iwl_priv *priv)
 {
-	u8 data[sizeof(struct iwl_calib_hdr) +
-		sizeof(struct iwl_cal_xtal_freq)];
-	struct iwl_calib_cmd *cmd = (struct iwl_calib_cmd *)data;
-	struct iwl_cal_xtal_freq *xtal = (struct iwl_cal_xtal_freq *)cmd->data;
 	u16 *xtal_calib = (u16 *)iwl_eeprom_query_addr(priv, EEPROM_5000_XTAL);
 
-	cmd->hdr.op_code = IWL_PHY_CALIBRATE_CRYSTAL_FRQ_CMD;
-	xtal->cap_pin1 = (u8)xtal_calib[0];
-	xtal->cap_pin2 = (u8)xtal_calib[1];
-	return iwl_calib_set(&priv->calib_results[IWL_CALIB_XTAL],
-			     data, sizeof(data));
+	struct iwl5000_calibration cal_cmd = {
+		.op_code = IWL5000_PHY_CALIBRATE_CRYSTAL_FRQ_CMD,
+		.data = {
+			(u8)xtal_calib[0],
+			(u8)xtal_calib[1],
+		}
+	};
+
+	return iwl_send_cmd_pdu(priv, REPLY_PHY_CALIBRATION_CMD,
+				sizeof(cal_cmd), &cal_cmd);
 }
 
 static int iwl5000_send_calib_cfg(struct iwl_priv *priv)
 {
-	struct iwl_calib_cfg_cmd calib_cfg_cmd;
+	struct iwl5000_calib_cfg_cmd calib_cfg_cmd;
 	struct iwl_host_cmd cmd = {
 		.id = CALIBRATION_CFG_CMD,
-		.len = sizeof(struct iwl_calib_cfg_cmd),
+		.len = sizeof(struct iwl5000_calib_cfg_cmd),
 		.data = &calib_cfg_cmd,
 	};
 
@@ -455,7 +467,7 @@ static void iwl5000_rx_calib_result(struct iwl_priv *priv,
 			     struct iwl_rx_mem_buffer *rxb)
 {
 	struct iwl_rx_packet *pkt = (void *)rxb->skb->data;
-	struct iwl_calib_hdr *hdr = (struct iwl_calib_hdr *)pkt->u.raw;
+	struct iwl5000_calib_hdr *hdr = (struct iwl5000_calib_hdr *)pkt->u.raw;
 	int len = le32_to_cpu(pkt->len) & FH_RSCSR_FRAME_SIZE_MSK;
 	int index;
 
@@ -466,14 +478,14 @@ static void iwl5000_rx_calib_result(struct iwl_priv *priv,
 	 * uCode. iwl_send_calib_results sends them in a row according to their
 	 * index. We sort them here */
 	switch (hdr->op_code) {
-	case IWL_PHY_CALIBRATE_LO_CMD:
-		index = IWL_CALIB_LO;
+	case IWL5000_PHY_CALIBRATE_LO_CMD:
+		index = IWL5000_CALIB_LO;
 		break;
-	case IWL_PHY_CALIBRATE_TX_IQ_CMD:
-		index = IWL_CALIB_TX_IQ;
+	case IWL5000_PHY_CALIBRATE_TX_IQ_CMD:
+		index = IWL5000_CALIB_TX_IQ;
 		break;
-	case IWL_PHY_CALIBRATE_TX_IQ_PERD_CMD:
-		index = IWL_CALIB_TX_IQ_PERD;
+	case IWL5000_PHY_CALIBRATE_TX_IQ_PERD_CMD:
+		index = IWL5000_CALIB_TX_IQ_PERD;
 		break;
 	default:
 		IWL_ERROR("Unknown calibration notification %d\n",
@@ -523,7 +535,7 @@ static int iwl5000_load_section(struct iwl_priv *priv,
 
 	iwl_write_direct32(priv,
 		FH_TFDIB_CTRL1_REG(FH_SRVC_CHNL),
-		(iwl_get_dma_hi_addr(phy_addr)
+		(iwl_get_dma_hi_address(phy_addr)
 			<< FH_MEM_TFDIB_REG1_ADDR_BITSHIFT) | byte_cnt);
 
 	iwl_write_direct32(priv,
@@ -535,7 +547,7 @@ static int iwl5000_load_section(struct iwl_priv *priv,
 	iwl_write_direct32(priv,
 		FH_TCSR_CHNL_TX_CONFIG_REG(FH_SRVC_CHNL),
 		FH_TCSR_TX_CONFIG_REG_VAL_DMA_CHNL_ENABLE	|
-		FH_TCSR_TX_CONFIG_REG_VAL_DMA_CREDIT_DISABLE	|
+		FH_TCSR_TX_CONFIG_REG_VAL_DMA_CREDIT_DISABLE_VAL |
 		FH_TCSR_TX_CONFIG_REG_VAL_CIRQ_HOST_ENDTFD);
 
 	iwl_release_nic_access(priv);
@@ -549,13 +561,14 @@ static int iwl5000_load_given_ucode(struct iwl_priv *priv,
 {
 	int ret = 0;
 
-	ret = iwl5000_load_section(priv, inst_image, RTC_INST_LOWER_BOUND);
+	ret = iwl5000_load_section(
+		priv, inst_image, RTC_INST_LOWER_BOUND);
 	if (ret)
 		return ret;
 
 	IWL_DEBUG_INFO("INST uCode section being loaded...\n");
 	ret = wait_event_interruptible_timeout(priv->wait_command_queue,
-					priv->ucode_write_complete, 5 * HZ);
+				priv->ucode_write_complete, 5 * HZ);
 	if (ret == -ERESTARTSYS) {
 		IWL_ERROR("Could not load the INST uCode section due "
 			"to interrupt\n");
@@ -669,7 +682,7 @@ static void iwl5000_tx_queue_set_status(struct iwl_priv *priv,
 					int tx_fifo_id, int scd_retry)
 {
 	int txq_id = txq->q.id;
-	int active = test_bit(txq_id, &priv->txq_ctx_active_msk) ? 1 : 0;
+	int active = test_bit(txq_id, &priv->txq_ctx_active_msk)?1:0;
 
 	iwl_write_prph(priv, IWL50_SCD_QUEUE_STATUS_BITS(txq_id),
 			(active << IWL50_SCD_QUEUE_STTS_REG_POS_ACTIVE) |
@@ -721,9 +734,11 @@ static int iwl5000_alive_notify(struct iwl_priv *priv)
 		iwl_write_targ_mem(priv, a, 0);
 
 	iwl_write_prph(priv, IWL50_SCD_DRAM_BASE_ADDR,
-		       priv->scd_bc_tbls.dma >> 10);
+		(priv->shared_phys +
+		 offsetof(struct iwl5000_shared, queues_byte_cnt_tbls)) >> 10);
 	iwl_write_prph(priv, IWL50_SCD_QUEUECHAIN_SEL,
-		IWL50_SCD_QUEUECHAIN_SEL_ALL(priv->hw_params.max_txq_num));
+		IWL50_SCD_QUEUECHAIN_SEL_ALL(
+			priv->hw_params.max_txq_num));
 	iwl_write_prph(priv, IWL50_SCD_AGGR_SEL, 0);
 
 	/* initiate the queues */
@@ -750,7 +765,6 @@ static int iwl5000_alive_notify(struct iwl_priv *priv)
 	priv->cfg->ops->lib->txq_set_sched(priv, IWL_MASK(0, 7));
 
 	iwl5000_set_wr_ptrs(priv, IWL_CMD_QUEUE_NUM, 0);
-
 	/* map qos queues to fifos one-to-one */
 	for (i = 0; i < ARRAY_SIZE(iwl5000_default_queue_to_tx_fifo); i++) {
 		int ac = iwl5000_default_queue_to_tx_fifo[i];
@@ -770,8 +784,10 @@ static int iwl5000_alive_notify(struct iwl_priv *priv)
 
 	iwl5000_send_wimax_coex(priv);
 
-	iwl5000_set_Xtal_calib(priv);
-	iwl_send_calib_results(priv);
+	iwl5000_send_Xtal_calib(priv);
+
+	if (priv->ucode_type == UCODE_RT)
+		iwl_send_calib_results(priv);
 
 	return 0;
 }
@@ -786,8 +802,7 @@ static int iwl5000_hw_set_hw_params(struct iwl_priv *priv)
 	}
 
 	priv->hw_params.max_txq_num = priv->cfg->mod_params->num_of_queues;
-	priv->hw_params.scd_bc_tbls_size =
-			IWL50_NUM_QUEUES * sizeof(struct iwl5000_scd_bc_tbl);
+	priv->hw_params.first_ampdu_q = IWL50_FIRST_AMPDU_QUEUE;
 	priv->hw_params.max_stations = IWL5000_STATION_COUNT;
 	priv->hw_params.bcast_sta_id = IWL5000_BROADCAST_ID;
 	priv->hw_params.max_data_size = IWL50_RTC_DATA_SIZE;
@@ -799,14 +814,10 @@ static int iwl5000_hw_set_hw_params(struct iwl_priv *priv)
 
 	switch (priv->hw_rev & CSR_HW_REV_TYPE_MSK) {
 	case CSR_HW_REV_TYPE_5100:
-		priv->hw_params.tx_chains_num = 1;
-		priv->hw_params.rx_chains_num = 2;
-		priv->hw_params.valid_tx_ant = ANT_B;
-		priv->hw_params.valid_rx_ant = ANT_AB;
-		break;
 	case CSR_HW_REV_TYPE_5150:
 		priv->hw_params.tx_chains_num = 1;
 		priv->hw_params.rx_chains_num = 2;
+		/* FIXME: move to ANT_A, ANT_B, ANT_C enum */
 		priv->hw_params.valid_tx_ant = ANT_A;
 		priv->hw_params.valid_rx_ant = ANT_AB;
 		break;
@@ -822,35 +833,48 @@ static int iwl5000_hw_set_hw_params(struct iwl_priv *priv)
 	switch (priv->hw_rev & CSR_HW_REV_TYPE_MSK) {
 	case CSR_HW_REV_TYPE_5100:
 	case CSR_HW_REV_TYPE_5300:
-	case CSR_HW_REV_TYPE_5350:
-		/* 5X00 and 5350 wants in Celsius */
+		/* 5X00 wants in Celsius */
 		priv->hw_params.ct_kill_threshold = CT_KILL_THRESHOLD;
 		break;
 	case CSR_HW_REV_TYPE_5150:
-		/* 5150 wants in Kelvin */
+	case CSR_HW_REV_TYPE_5350:
+		/* 5X50 wants in Kelvin */
 		priv->hw_params.ct_kill_threshold =
 				CELSIUS_TO_KELVIN(CT_KILL_THRESHOLD);
 		break;
 	}
 
-	/* Set initial calibration set */
-	switch (priv->hw_rev & CSR_HW_REV_TYPE_MSK) {
-	case CSR_HW_REV_TYPE_5100:
-	case CSR_HW_REV_TYPE_5300:
-	case CSR_HW_REV_TYPE_5350:
-		priv->hw_params.calib_init_cfg =
-			BIT(IWL_CALIB_XTAL)		|
-			BIT(IWL_CALIB_LO)		|
-			BIT(IWL_CALIB_TX_IQ) 	|
-			BIT(IWL_CALIB_TX_IQ_PERD);
-		break;
-	case CSR_HW_REV_TYPE_5150:
-		priv->hw_params.calib_init_cfg = 0;
-		break;
-	}
+	return 0;
+}
 
+static int iwl5000_alloc_shared_mem(struct iwl_priv *priv)
+{
+	priv->shared_virt = pci_alloc_consistent(priv->pci_dev,
+					sizeof(struct iwl5000_shared),
+					&priv->shared_phys);
+	if (!priv->shared_virt)
+		return -ENOMEM;
+
+	memset(priv->shared_virt, 0, sizeof(struct iwl5000_shared));
+
+	priv->rb_closed_offset = offsetof(struct iwl5000_shared, rb_closed);
 
 	return 0;
+}
+
+static void iwl5000_free_shared_mem(struct iwl_priv *priv)
+{
+	if (priv->shared_virt)
+		pci_free_consistent(priv->pci_dev,
+				    sizeof(struct iwl5000_shared),
+				    priv->shared_virt,
+				    priv->shared_phys);
+}
+
+static int iwl5000_shared_mem_rx_idx(struct iwl_priv *priv)
+{
+	struct iwl5000_shared *s = priv->shared_virt;
+	return le32_to_cpu(s->rb_closed) & 0xFFF;
 }
 
 /**
@@ -860,18 +884,16 @@ static void iwl5000_txq_update_byte_cnt_tbl(struct iwl_priv *priv,
 					    struct iwl_tx_queue *txq,
 					    u16 byte_cnt)
 {
-	struct iwl5000_scd_bc_tbl *scd_bc_tbl = priv->scd_bc_tbls.addr;
-	int write_ptr = txq->q.write_ptr;
+	struct iwl5000_shared *shared_data = priv->shared_virt;
 	int txq_id = txq->q.id;
 	u8 sec_ctl = 0;
-	u8 sta_id = 0;
-	u16 len = byte_cnt + IWL_TX_CRC_SIZE + IWL_TX_DELIMITER_SIZE;
-	__le16 bc_ent;
+	u8 sta = 0;
+	int len;
 
-	WARN_ON(len > 0xFFF || write_ptr >= TFD_QUEUE_SIZE_MAX);
+	len = byte_cnt + IWL_TX_CRC_SIZE + IWL_TX_DELIMITER_SIZE;
 
 	if (txq_id != IWL_CMD_QUEUE_NUM) {
-		sta_id = txq->cmd[txq->q.write_ptr]->cmd.tx.sta_id;
+		sta = txq->cmd[txq->q.write_ptr]->cmd.tx.sta_id;
 		sec_ctl = txq->cmd[txq->q.write_ptr]->cmd.tx.sec_ctl;
 
 		switch (sec_ctl & TX_CMD_SEC_MSK) {
@@ -887,35 +909,40 @@ static void iwl5000_txq_update_byte_cnt_tbl(struct iwl_priv *priv,
 		}
 	}
 
-	bc_ent = cpu_to_le16((len & 0xFFF) | (sta_id << 12));
+	IWL_SET_BITS16(shared_data->queues_byte_cnt_tbls[txq_id].
+		       tfd_offset[txq->q.write_ptr], byte_cnt, len);
 
-	scd_bc_tbl[txq_id].tfd_offset[write_ptr] = bc_ent;
+	IWL_SET_BITS16(shared_data->queues_byte_cnt_tbls[txq_id].
+		       tfd_offset[txq->q.write_ptr], sta_id, sta);
 
-	if (txq->q.write_ptr < TFD_QUEUE_SIZE_BC_DUP)
-		scd_bc_tbl[txq_id].
-			tfd_offset[TFD_QUEUE_SIZE_MAX + write_ptr] = bc_ent;
+	if (txq->q.write_ptr < IWL50_MAX_WIN_SIZE) {
+		IWL_SET_BITS16(shared_data->queues_byte_cnt_tbls[txq_id].
+			tfd_offset[IWL50_QUEUE_SIZE + txq->q.write_ptr],
+			byte_cnt, len);
+		IWL_SET_BITS16(shared_data->queues_byte_cnt_tbls[txq_id].
+			tfd_offset[IWL50_QUEUE_SIZE + txq->q.write_ptr],
+			sta_id, sta);
+	}
 }
 
 static void iwl5000_txq_inval_byte_cnt_tbl(struct iwl_priv *priv,
 					   struct iwl_tx_queue *txq)
 {
-	struct iwl5000_scd_bc_tbl *scd_bc_tbl = priv->scd_bc_tbls.addr;
 	int txq_id = txq->q.id;
-	int read_ptr = txq->q.read_ptr;
-	u8 sta_id = 0;
-	__le16 bc_ent;
-
-	WARN_ON(read_ptr >= TFD_QUEUE_SIZE_MAX);
+	struct iwl5000_shared *shared_data = priv->shared_virt;
+	u8 sta = 0;
 
 	if (txq_id != IWL_CMD_QUEUE_NUM)
-		sta_id = txq->cmd[read_ptr]->cmd.tx.sta_id;
+		sta = txq->cmd[txq->q.read_ptr]->cmd.tx.sta_id;
 
-	bc_ent =  cpu_to_le16(1 | (sta_id << 12));
-	scd_bc_tbl[txq_id].tfd_offset[read_ptr] = bc_ent;
+	shared_data->queues_byte_cnt_tbls[txq_id].tfd_offset[txq->q.read_ptr].
+					val = cpu_to_le16(1 | (sta << 12));
 
-	if (txq->q.write_ptr < TFD_QUEUE_SIZE_BC_DUP)
-		scd_bc_tbl[txq_id].
-			tfd_offset[TFD_QUEUE_SIZE_MAX + read_ptr] =  bc_ent;
+	if (txq->q.write_ptr < IWL50_MAX_WIN_SIZE) {
+		shared_data->queues_byte_cnt_tbls[txq_id].
+			tfd_offset[IWL50_QUEUE_SIZE + txq->q.read_ptr].
+				val = cpu_to_le16(1 | (sta << 12));
+	}
 }
 
 static int iwl5000_tx_queue_set_q2ratid(struct iwl_priv *priv, u16 ra_tid,
@@ -1062,7 +1089,7 @@ static u16 iwl5000_build_addsta_hcmd(const struct iwl_addsta_cmd *cmd, u8 *data)
 
 
 /*
- * Activate/Deactivate Tx DMA/FIFO channels according tx fifos mask
+ * Activate/Deactivat Tx DMA/FIFO channels according tx fifos mask
  * must be called under priv->lock and mac access
  */
 static void iwl5000_txq_set_sched(struct iwl_priv *priv, u32 mask)
@@ -1109,10 +1136,10 @@ static int iwl5000_tx_status_reply_tx(struct iwl_priv *priv,
 				   agg->frame_count, agg->start_idx, idx);
 
 		info = IEEE80211_SKB_CB(priv->txq[txq_id].txb[idx].skb[0]);
-		info->status.rates[0].count = tx_resp->failure_frame + 1;
+		info->status.retry_count = tx_resp->failure_frame;
 		info->flags &= ~IEEE80211_TX_CTL_AMPDU;
 		info->flags |= iwl_is_tx_success(status)?
-					IEEE80211_TX_STAT_ACK : 0;
+			IEEE80211_TX_STAT_ACK : 0;
 		iwl_hwrate_to_tx_control(priv, rate_n_flags, info);
 
 		/* FIXME: code repetition end */
@@ -1198,9 +1225,9 @@ static void iwl5000_rx_reply_tx(struct iwl_priv *priv,
 	struct ieee80211_tx_info *info;
 	struct iwl5000_tx_resp *tx_resp = (void *)&pkt->u.raw[0];
 	u32  status = le16_to_cpu(tx_resp->status.status);
-	int tid;
-	int sta_id;
-	int freed;
+	int tid = MAX_TID_COUNT, sta_id = IWL_INVALID_STATION;
+	struct ieee80211_hdr *hdr;
+	u8 *qc = NULL;
 
 	if ((index >= txq->q.n_bd) || (iwl_queue_used(&txq->q, index) == 0)) {
 		IWL_ERROR("Read index for DMA queue txq_id (%d) index %d "
@@ -1213,12 +1240,24 @@ static void iwl5000_rx_reply_tx(struct iwl_priv *priv,
 	info = IEEE80211_SKB_CB(txq->txb[txq->q.read_ptr].skb[0]);
 	memset(&info->status, 0, sizeof(info->status));
 
-	tid = (tx_resp->ra_tid & IWL50_TX_RES_TID_MSK) >> IWL50_TX_RES_TID_POS;
-	sta_id = (tx_resp->ra_tid & IWL50_TX_RES_RA_MSK) >> IWL50_TX_RES_RA_POS;
+	hdr = iwl_tx_queue_get_hdr(priv, txq_id, index);
+	if (ieee80211_is_data_qos(hdr->frame_control)) {
+		qc = ieee80211_get_qos_ctl(hdr);
+		tid = qc[0] & 0xf;
+	}
+
+	sta_id = iwl_get_ra_sta_id(priv, hdr);
+	if (txq->sched_retry && unlikely(sta_id == IWL_INVALID_STATION)) {
+		IWL_ERROR("Station not known\n");
+		return;
+	}
 
 	if (txq->sched_retry) {
 		const u32 scd_ssn = iwl5000_get_scd_ssn(tx_resp);
 		struct iwl_ht_agg *agg = NULL;
+
+		if (!qc)
+			return;
 
 		agg = &priv->stations[sta_id].tid[tid].agg;
 
@@ -1229,58 +1268,58 @@ static void iwl5000_rx_reply_tx(struct iwl_priv *priv,
 			info->flags |= IEEE80211_TX_STAT_AMPDU_NO_BACK;
 
 		if (txq->q.read_ptr != (scd_ssn & 0xff)) {
+			int freed, ampdu_q;
 			index = iwl_queue_dec_wrap(scd_ssn & 0xff, txq->q.n_bd);
-			IWL_DEBUG_TX_REPLY("Retry scheduler reclaim "
-					"scd_ssn=%d idx=%d txq=%d swq=%d\n",
-					scd_ssn , index, txq_id, txq->swq_id);
-
+			IWL_DEBUG_TX_REPLY("Retry scheduler reclaim scd_ssn "
+					   "%d index %d\n", scd_ssn , index);
 			freed = iwl_tx_queue_reclaim(priv, txq_id, index);
 			priv->stations[sta_id].tid[tid].tfds_in_queue -= freed;
 
-			if (priv->mac80211_registered &&
-			    (iwl_queue_space(&txq->q) > txq->q.low_mark) &&
-			    (agg->state != IWL_EMPTYING_HW_QUEUE_DELBA)) {
+			if (iwl_queue_space(&txq->q) > txq->q.low_mark &&
+			    txq_id >= 0 && priv->mac80211_registered &&
+			    agg->state != IWL_EMPTYING_HW_QUEUE_DELBA) {
+				/* calculate mac80211 ampdu sw queue to wake */
+				ampdu_q = txq_id - IWL50_FIRST_AMPDU_QUEUE +
+					  priv->hw->queues;
 				if (agg->state == IWL_AGG_OFF)
 					ieee80211_wake_queue(priv->hw, txq_id);
 				else
-					ieee80211_wake_queue(priv->hw,
-							     txq->swq_id);
+					ieee80211_wake_queue(priv->hw, ampdu_q);
 			}
+			iwl_txq_check_empty(priv, sta_id, tid, txq_id);
 		}
 	} else {
-		BUG_ON(txq_id != txq->swq_id);
-
-		info->status.rates[0].count = tx_resp->failure_frame + 1;
-		info->flags |= iwl_is_tx_success(status) ?
-					IEEE80211_TX_STAT_ACK : 0;
+		info->status.retry_count = tx_resp->failure_frame;
+		info->flags =
+			iwl_is_tx_success(status) ? IEEE80211_TX_STAT_ACK : 0;
 		iwl_hwrate_to_tx_control(priv,
 					le32_to_cpu(tx_resp->rate_n_flags),
 					info);
 
-		IWL_DEBUG_TX_REPLY("TXQ %d status %s (0x%08x) rate_n_flags "
-				   "0x%x retries %d\n",
-				   txq_id,
-				   iwl_get_tx_fail_reason(status), status,
-				   le32_to_cpu(tx_resp->rate_n_flags),
-				   tx_resp->failure_frame);
+		IWL_DEBUG_TX("Tx queue %d Status %s (0x%08x) rate_n_flags "
+			     "0x%x retries %d\n", txq_id,
+				iwl_get_tx_fail_reason(status),
+				status, le32_to_cpu(tx_resp->rate_n_flags),
+				tx_resp->failure_frame);
 
-		freed = iwl_tx_queue_reclaim(priv, txq_id, index);
-		if (ieee80211_is_data_qos(tx_resp->frame_ctrl))
+		IWL_DEBUG_TX_REPLY("Tx queue reclaim %d\n", index);
+		if (index != -1) {
+		    int freed = iwl_tx_queue_reclaim(priv, txq_id, index);
+		    if (tid != MAX_TID_COUNT)
 			priv->stations[sta_id].tid[tid].tfds_in_queue -= freed;
-
-		if (priv->mac80211_registered &&
-		    (iwl_queue_space(&txq->q) > txq->q.low_mark))
+		    if (iwl_queue_space(&txq->q) > txq->q.low_mark &&
+			(txq_id >= 0) && priv->mac80211_registered)
 			ieee80211_wake_queue(priv->hw, txq_id);
+		    if (tid != MAX_TID_COUNT)
+			iwl_txq_check_empty(priv, sta_id, tid, txq_id);
+		}
 	}
-
-	if (ieee80211_is_data_qos(tx_resp->frame_ctrl))
-		iwl_txq_check_empty(priv, sta_id, tid, txq_id);
 
 	if (iwl_check_bits(status, TX_ABORT_REQUIRED_MSK))
 		IWL_ERROR("TODO:  Implement Tx ABORT REQUIRED!!!\n");
 }
 
-/* Currently 5000 is the superset of everything */
+/* Currently 5000 is the supperset of everything */
 static u16 iwl5000_get_hcmd_size(u8 cmd_id, u16 len)
 {
 	return len;
@@ -1427,6 +1466,9 @@ static struct iwl_hcmd_utils_ops iwl5000_hcmd_utils = {
 
 static struct iwl_lib_ops iwl5000_lib = {
 	.set_hw_params = iwl5000_hw_set_hw_params,
+	.alloc_shared_mem = iwl5000_alloc_shared_mem,
+	.free_shared_mem = iwl5000_free_shared_mem,
+	.shared_mem_rx_idx = iwl5000_shared_mem_rx_idx,
 	.txq_update_byte_cnt_tbl = iwl5000_txq_update_byte_cnt_tbl,
 	.txq_inval_byte_cnt_tbl = iwl5000_txq_inval_byte_cnt_tbl,
 	.txq_set_sched = iwl5000_txq_set_sched,
@@ -1440,13 +1482,13 @@ static struct iwl_lib_ops iwl5000_lib = {
 	.alive_notify = iwl5000_alive_notify,
 	.send_tx_power = iwl5000_send_tx_power,
 	.temperature = iwl5000_temperature,
-	.update_chain_flags = iwl_update_chain_flags,
+	.update_chain_flags = iwl4965_update_chain_flags,
 	.apm_ops = {
 		.init =	iwl5000_apm_init,
 		.reset = iwl5000_apm_reset,
 		.stop = iwl5000_apm_stop,
 		.config = iwl5000_nic_config,
-		.set_pwr_src = iwl_set_pwr_src,
+		.set_pwr_src = iwl4965_set_pwr_src,
 	},
 	.eeprom_ops = {
 		.regulatory_bands = {
@@ -1461,7 +1503,7 @@ static struct iwl_lib_ops iwl5000_lib = {
 		.verify_signature  = iwlcore_eeprom_verify_signature,
 		.acquire_semaphore = iwlcore_eeprom_acquire_semaphore,
 		.release_semaphore = iwlcore_eeprom_release_semaphore,
-		.calib_version	= iwl5000_eeprom_calib_version,
+		.check_version	= iwl5000_eeprom_check_version,
 		.query_addr = iwl5000_eeprom_query_addr,
 	},
 };
@@ -1484,60 +1526,48 @@ static struct iwl_mod_params iwl50_mod_params = {
 
 struct iwl_cfg iwl5300_agn_cfg = {
 	.name = "5300AGN",
-	.fw_name = IWL5000_MODULE_FIRMWARE,
+	.fw_name = "iwlwifi-5000" IWL5000_UCODE_API ".ucode",
 	.sku = IWL_SKU_A|IWL_SKU_G|IWL_SKU_N,
 	.ops = &iwl5000_ops,
 	.eeprom_size = IWL_5000_EEPROM_IMG_SIZE,
-	.eeprom_ver = EEPROM_5000_EEPROM_VERSION,
-	.eeprom_calib_ver = EEPROM_5000_TX_POWER_VERSION,
 	.mod_params = &iwl50_mod_params,
 };
 
 struct iwl_cfg iwl5100_bg_cfg = {
 	.name = "5100BG",
-	.fw_name = IWL5000_MODULE_FIRMWARE,
+	.fw_name = "iwlwifi-5000" IWL5000_UCODE_API ".ucode",
 	.sku = IWL_SKU_G,
 	.ops = &iwl5000_ops,
 	.eeprom_size = IWL_5000_EEPROM_IMG_SIZE,
-	.eeprom_ver = EEPROM_5000_EEPROM_VERSION,
-	.eeprom_calib_ver = EEPROM_5000_TX_POWER_VERSION,
 	.mod_params = &iwl50_mod_params,
 };
 
 struct iwl_cfg iwl5100_abg_cfg = {
 	.name = "5100ABG",
-	.fw_name = IWL5000_MODULE_FIRMWARE,
+	.fw_name = "iwlwifi-5000" IWL5000_UCODE_API ".ucode",
 	.sku = IWL_SKU_A|IWL_SKU_G,
 	.ops = &iwl5000_ops,
 	.eeprom_size = IWL_5000_EEPROM_IMG_SIZE,
-	.eeprom_ver = EEPROM_5000_EEPROM_VERSION,
-	.eeprom_calib_ver = EEPROM_5000_TX_POWER_VERSION,
 	.mod_params = &iwl50_mod_params,
 };
 
 struct iwl_cfg iwl5100_agn_cfg = {
 	.name = "5100AGN",
-	.fw_name = IWL5000_MODULE_FIRMWARE,
+	.fw_name = "iwlwifi-5000" IWL5000_UCODE_API ".ucode",
 	.sku = IWL_SKU_A|IWL_SKU_G|IWL_SKU_N,
 	.ops = &iwl5000_ops,
 	.eeprom_size = IWL_5000_EEPROM_IMG_SIZE,
-	.eeprom_ver = EEPROM_5000_EEPROM_VERSION,
-	.eeprom_calib_ver = EEPROM_5000_TX_POWER_VERSION,
 	.mod_params = &iwl50_mod_params,
 };
 
 struct iwl_cfg iwl5350_agn_cfg = {
 	.name = "5350AGN",
-	.fw_name = IWL5000_MODULE_FIRMWARE,
+	.fw_name = "iwlwifi-5000" IWL5000_UCODE_API ".ucode",
 	.sku = IWL_SKU_A|IWL_SKU_G|IWL_SKU_N,
 	.ops = &iwl5000_ops,
 	.eeprom_size = IWL_5000_EEPROM_IMG_SIZE,
-	.eeprom_ver = EEPROM_5050_EEPROM_VERSION,
-	.eeprom_calib_ver = EEPROM_5050_TX_POWER_VERSION,
 	.mod_params = &iwl50_mod_params,
 };
-
-MODULE_FIRMWARE(IWL5000_MODULE_FIRMWARE);
 
 module_param_named(disable50, iwl50_mod_params.disable, int, 0444);
 MODULE_PARM_DESC(disable50,

@@ -157,7 +157,7 @@ struct net_device *alloc_ieee80211(int sizeof_priv)
 	err = ieee80211_networks_allocate(ieee);
 	if (err) {
 		IEEE80211_ERROR("Unable to allocate beacon storage: %d\n", err);
-		goto failed_free_netdev;
+		goto failed;
 	}
 	ieee80211_networks_initialize(ieee);
 
@@ -193,9 +193,9 @@ struct net_device *alloc_ieee80211(int sizeof_priv)
 
 	return dev;
 
-failed_free_netdev:
-	free_netdev(dev);
-failed:
+      failed:
+	if (dev)
+		free_netdev(dev);
 	return NULL;
 }
 
@@ -308,5 +308,31 @@ MODULE_PARM_DESC(debug, "debug output mask");
 module_exit(ieee80211_exit);
 module_init(ieee80211_init);
 
+const char *escape_essid(const char *essid, u8 essid_len)
+{
+	static char escaped[IW_ESSID_MAX_SIZE * 2 + 1];
+	const char *s = essid;
+	char *d = escaped;
+
+	if (ieee80211_is_empty_essid(essid, essid_len)) {
+		memcpy(escaped, "<hidden>", sizeof("<hidden>"));
+		return escaped;
+	}
+
+	essid_len = min(essid_len, (u8) IW_ESSID_MAX_SIZE);
+	while (essid_len--) {
+		if (*s == '\0') {
+			*d++ = '\\';
+			*d++ = '0';
+			s++;
+		} else {
+			*d++ = *s++;
+		}
+	}
+	*d = '\0';
+	return escaped;
+}
+
 EXPORT_SYMBOL(alloc_ieee80211);
 EXPORT_SYMBOL(free_ieee80211);
+EXPORT_SYMBOL(escape_essid);
