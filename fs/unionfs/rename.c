@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2008 Erez Zadok
+ * Copyright (c) 2003-2009 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005-2006 Junjiro Okajima
@@ -8,8 +8,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2008 Stony Brook University
- * Copyright (c) 2003-2008 The Research Foundation of SUNY
+ * Copyright (c) 2003-2009 Stony Brook University
+ * Copyright (c) 2003-2009 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -162,7 +162,7 @@ static int do_unionfs_rename(struct inode *old_dir,
 			     struct dentry *new_parent)
 {
 	int err = 0;
-	int bindex, bwh_old;
+	int bindex;
 	int old_bstart, old_bend;
 	int new_bstart, new_bend;
 	int do_copyup = -1;
@@ -171,7 +171,6 @@ static int do_unionfs_rename(struct inode *old_dir,
 	int revert = 0;
 
 	old_bstart = dbstart(old_dentry);
-	bwh_old = old_bstart;
 	old_bend = dbend(old_dentry);
 
 	new_bstart = dbstart(new_dentry);
@@ -242,7 +241,19 @@ static int do_unionfs_rename(struct inode *old_dir,
 			/* if copyup failed, try next branch to the left */
 			if (err)
 				continue;
-			bwh_old = bindex;
+			/*
+			 * create whiteout before calling __unionfs_rename
+			 * because the latter will change the old_dentry's
+			 * lower name and parent dir, resulting in the
+			 * whiteout getting created in the wrong dir.
+			 */
+			err = create_whiteout(old_dentry, bindex);
+			if (err) {
+				printk(KERN_ERR "unionfs: can't create a "
+				       "whiteout for %s in rename (err=%d)\n",
+				       old_dentry->d_name.name, err);
+				continue;
+			}
 			err = __unionfs_rename(old_dir, old_dentry, old_parent,
 					       new_dir, new_dentry, new_parent,
 					       bindex);
@@ -260,16 +271,10 @@ static int do_unionfs_rename(struct inode *old_dir,
 	/*
 	 * Create whiteout for source, only if:
 	 * (1) There is more than one underlying instance of source.
-	 * (2) We did a copy_up
+	 * (We did a copy_up is taken care of above).
 	 */
-	if ((old_bstart != old_bend) || (do_copyup != -1)) {
-		if (bwh_old < 0) {
-			printk(KERN_ERR "unionfs: rename error (bwh_old=%d)\n",
-			       bwh_old);
-			err = -EIO;
-			goto out;
-		}
-		err = create_whiteout(old_dentry, bwh_old);
+	if ((old_bstart != old_bend) && (do_copyup == -1)) {
+		err = create_whiteout(old_dentry, old_bstart);
 		if (err) {
 			/* can't fix anything now, so we exit with -EIO */
 			printk(KERN_ERR "unionfs: can't create a whiteout for "
