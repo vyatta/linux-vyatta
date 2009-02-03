@@ -1,3 +1,102 @@
+linux-2.6 (2.6.27-1+vyatta+8) unstable; urgency=low
+
+  [ Miklos Szeredi ]
+  * fuse: destroy bdi on umount
+  * fuse: fix missing fput on error
+
+  [ Dan Carpenter ]
+  * fuse: fix NULL deref in fuse_file_alloc()
+
+  [ Vegard Nossum ]
+  * inotify: clean up inotify_read and fix locking problems
+
+  [ Brian Cavagnolo ]
+  * mac80211: decrement ref count to netdev after launching mesh
+    discovery
+
+  [ Greg Kroah-Hartman ]
+  * sysfs: fix problems with binary files
+
+  [ Peter Zijlstra ]
+  * x86, mm: fix pte_free()
+
+  [ Ivan Kokshaysky ]
+  * alpha: nautilus - fix compile failure with gcc-4.3
+
+  [ Brandon Philips ]
+  * it821x: Add ultra_mask quirk for Vortex86SX
+
+  [ JosephChan@via.com.tw ]
+  * libata: pata_via: support VX855, future chips whose IDE controller
+    use 0x0571
+
+  [ Larry Finger ]
+  * rtl8187: Add termination packet to prevent stall
+
+  [ Flavio Leitner ]
+  * serial_8250: support for Sealevel Systems Model 7803 COMM+8
+
+  [ Trond Myklebust ]
+  * SUNRPC: Fix a memory leak in rpcb_getport_async
+  * SUNRPC: Fix autobind on cloned rpc clients
+
+  [ Alan Stern ]
+  * USB: fix char-device disconnect handling
+
+  [ Oliver Neukum ]
+  * USB: storage: add unusual devs entry
+
+  [ Pete Zaitcev ]
+  * USB: usbmon: Implement compat_ioctl
+
+  [ Luke Yelavich ]
+  * ALSA: hda - add another MacBook Pro 4, 1 subsystem ID
+
+  [ Joerg Schirottke ]
+  * ALSA: hda - Add quirk for HP DV6700 laptop
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Fix PCM reference NID for STAC/IDT analog outputs
+
+  [ Eilon Greenstein ]
+  * bnx2x: Block nvram access when the device is inactive
+
+  [ Herbert Xu ]
+  * crypto: authenc - Fix zero-length IV crash
+
+  [ Jarod Wilson ]
+  * crypto: ccm - Fix handling of null assoc data
+
+  [ Davide Libenzi ]
+  * epoll: drop max_user_instances and rely only on max_user_watches
+
+  [ Theodore Ts'o ]
+  * ext3: Add sanity check to make_indexed_dir
+
+  [ Boaz Harrosh ]
+  * include/linux: Add bsg.h to the Kernel exported headers
+
+  [ Robin Holt ]
+  * sgi-xpc: ensure flags are updated before bte_copy
+  * sgi-xpc: Remove NULL pointer dereference.
+
+  [ Clemens Ladisch ]
+  * sound: virtuoso: do not overwrite EEPROM on Xonar D2/D2X
+
+  [ Larry Finger ]
+  * rtl8187: Fix error in setting OFDM power settings for RTL8187L
+
+  [ Jiri Slaby ]
+  * PCI hotplug: fix lock imbalance in pciehp
+  * relay: fix lock imbalance in relay_late_setup_files
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.27.14
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 02 Feb 2009 16:15:00 -0800
+
 linux-2.6 (2.6.27-1+vyatta+7) unstable; urgency=low
 
   * Revert "fastboot: sync the async execution before late_initcall and
