@@ -1,3 +1,126 @@
+linux-2.6 (2.6.27-1+vyatta+11) unstable; urgency=low
+
+  [ Jeff Layton ]
+  * cifs: make sure we allocate enough storage for socket address
+
+  [ Brandeburg, Jesse ]
+  * ixgb: fix bug when freeing resources
+
+  [ Adrian Bunk ]
+  * m68knommu: set NO_DMA
+
+  [ Mark Lord ]
+  * sata_mv: fix 8-port timeouts on 508x/6081 chips
+
+  [ Andi Kleen ]
+  * x86: use early clobbers in usercopy*.c
+
+  [ Paul Larson ]
+  * Add enable_ms to jsm driver
+
+  [ Risto Suominen ]
+  * fbdev/atyfb: Fix DSP config on some PowerMacs & PowerBooks
+
+  [ Mikulas Patocka ]
+  * Fix memory corruption in console selection
+
+  [ Matthew Garrett ]
+  * Input: atkbd - broaden the Dell DMI signatures
+
+  [ Stuart Hopkins ]
+  * Input: atkbd - Samsung NC10 key repeat fix
+
+  [ Patrick McHardy ]
+  * net: fix packet socket delivery in rx irq handler
+
+  [ J. Bruce Fields ]
+  * nfsd: Ensure nfsv4 calls the underlying filesystem on LOCKT
+
+  [ Jeff Layton ]
+  * nfsd: only set file_lock.fl_lmops in nfsd4_lockt if a stateowner is
+    found
+
+  [ Seth Heasley ]
+  * PCI: irq and pci_ids patch for Intel Tigerpoint DeviceIDs
+
+  [ Tejun Heo ]
+  * sata_nv: rename nv_nf2_hardreset()
+  * sata_nv: fix MCP5x reset
+  * sata_nv: ck804 has borked hardreset too
+
+  [ Karl Bongers ]
+  * USB: isp1760: Fix probe in PCI glue code
+
+  [ Suresh Siddha ]
+  * x86: fix page attribute corruption with cpa()
+
+  [ Venkatesh Pallipadi ]
+  * cpuidle: update the last_state acpi cpuidle reflecting actual state
+    entered
+  * cpuidle: upon BIOS bug, default to default_idle rather than polling
+  * cpuidle: use last_state which can reflect the actual state entered
+  * cpuidle: Add decaying history logic to menu idle predictor
+
+  [ Zhao Yakui ]
+  * ACPI: Avoid array address overflow when _CST MWAIT hint bits are set
+  * ACPI: Attach the ACPI device to the ACPI handle as early as possible
+
+  [ Lin Ming ]
+  * ACPICA: Fixed a couple memory leaks associated with "implicit
+    return"
+
+  [ Fiodor Suietov ]
+  * ACPICA: Add check for invalid handle in acpi_get_object_info
+
+  [ Matthew Wilcox ]
+  * ACPI: Change acpi_evaluate_integer to support 64-bit on 32-bit
+    kernels
+
+  [ Thomas Renninger ]
+  * ACPI: Fix compiler warnings introduced by 32 to 64 bit acpi
+    conversions
+
+  [ Alexey Starikovskiy ]
+  * ACPI EC: Fix regression due to use of uninitialized variable
+
+  [ Bob Moore ]
+  * ACPICA: Fix wrong resource descriptor length for 64-bit build
+
+  [ Torsten Krah ]
+  * asus-laptop: Add support for P30/P35
+
+  [ Corentin Chary ]
+  * asus-laptop: Fix the led behavior with value > 1
+
+  [ Zhang Rui ]
+  * video: always update the brightness when poking "brightness"
+  * don't load asus-acpi if model is not supported
+
+  [ Alexey Starikovskiy ]
+  * Newly inserted battery might differ from one just removed, so update
+    of battery info fields is required.
+
+  [ Rafael J. Wysocki ]
+  * ACPI: Do not modify SCI_EN directly
+  * ACPI suspend: Blacklist HP xw4600 Workstation for old code ordering
+
+  [ Jeff Layton ]
+  * dlm: initialize file_lock struct in GETLK before copying conflicting
+    lock
+
+  [ Mark Lord ]
+  * sata_mv: Fix chip type for Hightpoint RocketRaid 1740/1742
+
+  [ Lin Ming ]
+  * ACPICA: Allow multiple backslash prefix in namepaths
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.27.15
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 06 Feb 2009 17:20:16 -0800
+
 linux-2.6 (2.6.27-1+vyatta+10) unstable; urgency=low
 
   * update vyatta-virt config
