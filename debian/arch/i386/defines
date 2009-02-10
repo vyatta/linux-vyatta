@@ -1,6 +1,6 @@
 [base]
 flavours:
- 486-vyatta
+ 586-vyatta
 kernel-arch: i386
 kernel-header-dirs: i386 x86_64
 
@@ -9,7 +9,7 @@ conflicts: grub (<= 0.95+cvs20040624-17)
 suggests: grub (>= 0.97-3) | lilo (>= 19.1)
 type: plain
 
-[486-vyatta]
+[586-vyatta]
 class: x86
 longclass: x86 and compatible
 
