@@ -1,6 +1,6 @@
 [base]
 flavours:
- amd64-vyatta
+ amd64-vyatta vyatta-virt
 kernel-arch: x86_64
 kernel-header-dirs: i386 x86_64
 
@@ -10,6 +10,10 @@ suggests: grub (>= 0.97-3) | lilo (>= 19.1)
 type: plain
 
 [amd64-vyatta]
+class: amd64
+longclass: amd64 and compatible
+
+[vyatta-virt]
 class: amd64
 longclass: amd64 and compatible
 
