@@ -1,3 +1,2098 @@
+linux-2.6 (2.6.28-1+vyatta+1) UNRELEASED; urgency=low
+
+  [ Stephen Hemminger ]
+  * Merge to linux-2.6.28.5 and rebase
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 13 Feb 2009 10:50:13 -0800
+
+linux-2.6 (2.6.27-1+vyatta+13) UNRELEASED; urgency=low
+
+  [ Markus Metzger ]
+  * x86, ptrace: PEBS support
+
+  [ Andrew Morton ]
+  * x86, ptrace: PEBS support, warning fix
+
+  [ Cyrill Gorcunov ]
+  * x86: DS cleanup - dont treat 0 as NULL
+
+  [ Ingo Molnar ]
+  * x86: PEBS cleanup
+
+  [ Eric Dumazet ]
+  * percpu: introduce DEFINE_PER_CPU_PAGE_ALIGNED() macro
+
+  [ Kevin Hao ]
+  * x86: get irq for hpet timer
+
+  [ Krzysztof Oledzki ]
+  * x86: add another PCI ID for ICH6 force-hpet
+
+  [ Jiri Slaby ]
+  * MM: virtual address debug
+  * x86, MM: virtual address debug, v2
+
+  [ Ingo Molnar ]
+  * x86, MM: virtual address debug, cleanups
+
+  [ Joe Buehler ]
+  * x86: add PCI ID for 6300ESB force hpet
+
+  [ Suresh Siddha ]
+  * x64, x2apic/intr-remap: Intel vt-d, IOMMU code reorganization
+  * x64, x2apic/intr-remap: fix the need for sequential array allocation
+    of iommus
+  * x64, x2apic/intr-remap: code re-structuring, to be used by both DMA
+    and Interrupt remapping
+  * x64, x2apic/intr-remap: use CONFIG_DMAR for DMA-remapping specific
+    code
+  * x64, x2apic/intr-remap: Fix the need for RMRR in the DMA-remapping
+    detection
+  * x64, x2apic/intr-remap: parse ioapic scope under vt-d structures
+  * x64, x2apic/intr-remap: move IOMMU_WAIT_OP() macro to intel-iommu.h
+  * x64, x2apic/intr-remap: Queued invalidation infrastructure (part of
+    VT-d)
+  * x64, x2apic/intr-remap: Interrupt remapping infrastructure
+  * x64, x2apic/intr-remap: routines managing Interrupt remapping table
+    entries.
+  * x64, x2apic/intr-remap: generic irq migration support from process
+    context
+  * x64, x2apic/intr-remap: 8259 specific mask/unmask routines
+  * x64, x2apic/intr-remap: ioapic routines which deal with initial io-
+    apic RTE setup
+  * x64, x2apic/intr-remap: introduce read_apic_id() to genapic routines
+  * x64, x2apic/intr-remap: Interrupt-remapping and x2apic support, fix
+  * x64, x2apic/intr-remap: basic apic ops support
+  * x64, x2apic/intr-remap: cpuid bits for x2apic feature
+  * x64, x2apic/intr-remap: disable DMA-remapping if Interrupt-remapping
+    is detected (temporary quirk)
+  * x64, x2apic/intr-remap: x2apic ops for x2apic mode support
+  * x64, x2apic/intr-remap: introcude self IPI to genapic routines
+  * x64, x2apic/intr-remap: x2apic cluster mode support
+  * x64, x2apic/intr-remap: setup init_apic_ldr for UV
+  * x64, x2apic/intr-remap: IO-APIC support for interrupt-remapping
+  * x64, x2apic/intr-remap: MSI and MSI-X support for interrupt
+    remapping infrastructure
+  * x64, x2apic/intr-remap: add x2apic support, including enabling
+    interrupt-remapping
+  * x64, x2apic/intr-remap: support for x2apic physical mode support
+  * x64, x2apic/intr-remap: introduce CONFIG_INTR_REMAP
+  * x64, x2apic/intr-remap: Interrupt-remapping and x2apic support
+  * x2apic: uninline uv_init_apic_ldr()
+  * x2apic: xen64 paravirt basic apic ops
+  * x2apic: kernel-parameter documentation for "x2apic_phys"
+
+  [ Yinghai Lu ]
+  * x86: let 32bit use apic_ops too
+  * x86: mach_apicdef.h need to include before smp.h
+  * x86: make read_apic_id return final apicid
+  * x86: make 64bit have get_apic_id
+
+  [ Jesper Nilsson ]
+  * [CRIS] Rename boot-linkscripts and fix the path to them.
+
+  [ Yinghai Lu ]
+  * x86: let 32bit use apic_ops too - fix
+
+  [ Lai Jiangshan ]
+  * rcu classic: simplify the next pending batch
+  * rcu classic: new algorithm for callbacks-processing(v2)
+
+  [ Suresh Siddha ]
+  * x86: let 32bit use apic_ops too - fix
+  * x86: apic_ops for lguest
+
+  [ Eric W. Biederman ]
+  * genirq: enable polling for disabled screaming irqs
+
+  [ Suresh Siddha ]
+  * x86: APIC: Remove apic_write_around(); use alternatives, merge fix
+
+  [ Ingo Molnar ]
+  * x86, xen: fix apic_ops build on UP
+  * x86, lguest: fix apic_ops build on UP
+
+  [ Rene Herman ]
+  * ALSA: re-order AC97 codec ID table.
+
+  [ Matthew Ranostay ]
+  * ALSA: hda: digital pc-beep support hd-audio codecs
+
+  [ Thomas Gleixner ]
+  * genirq: remove last NO_IDLE_HZ leftovers
+
+  [ Yinghai Lu ]
+  * x86: add apic probe for genapic 64bit, v2
+
+  [ Ingo Molnar ]
+  * x86, cyrix: debug
+
+  [ Jaswinder Singh ]
+  * x86: Introducing asm/syscalls.h
+  * x86: process_32.c declare cpu_number before they get used
+  * x86: signal_XX.c declare do_notify_resume before they get used
+  * x86: time_XX.c declare functions before they get used
+  * x86: setup.c declare saved_video_mode before they get used
+  * x86: e820.c declare pci_mem_start before they get used
+  * x86: pci-dma.c declare iommu_bio_merge before they get used
+  * x86: pci-nommu.c declare nommu_dma_ops before they get used
+  * x86: i387.c declare dump_fpu() before they get used
+  * x86: ptrace.c declare functions before they get used
+  * x86: proc.c declare cpuinfo_op before they get used
+  * x86: common.c declare idle_regs before they get used
+  * x86: mtrr/main.c declare range_state as static
+
+  [ Suresh Siddha ]
+  * x64, apic: use generic apic_write() for ack_APIC_irq()
+
+  [ Vegard Nossum ]
+  * x86: fix spurious '#' in kvm header
+  * x86: consolidate header guards
+
+  [ H. Peter Anvin ]
+  * x86: doc: move x86-generic documentation from Doc/x86/i386
+  * x86: doc: boot.txt: fix the size of the start_sys field
+
+  [ Vegard Nossum ]
+  * x86: consolidate header guards
+
+  [ Jaswinder Singh ]
+  * x86: apic_XX.c declare functions before they get used
+  * x86: vm86_32.c declare functions before they get used
+  * x86: mm/init_XX.c declare functions before they get used
+  * x86: mm/fault.c declare do_page_fault before they get used
+  * x86: mm/ioremap.c declare early_ioremap_debug and
+    early_ioremap_nested as static
+  * x86: mm/pageattr.c declare arch_report_meminfo before they get used
+  * x86: mm/pgtable_32.c declare set_pmd_pfn before they get used
+  * x86: mach-default/setup.c declare no_broadcast before they get used
+
+  [ Prarit Bhargava ]
+  * x86, pci: iommu fix potential overflow in alloc_iommu()
+
+  [ Huang Weiyi ]
+  * arch/x86/kernel/genx2apic_uv_x.c: Removed duplicated include
+
+  [ Randy Dunlap ]
+  * documentation: move hpet.txt to timers/ subdirectory
+
+  [ Jeremy Fitzhardinge ]
+  * x86/paravirt/xen: properly fill out the ldt ops
+  * x86: split spinlock implementations out into their own files
+
+  [ Alexander van Heukelum ]
+  * x86, 64-bit, dwarf2: push pushes 8 bytes and popf pops 8
+
+  [ Maciej W. Rozycki ]
+  * x86: PIC, L-APIC and I/O APIC debug information
+  * x86: fix up a comment in ack_APIC_irq()
+
+  [ Yinghai Lu ]
+  * x86: move declaring x2apic_extra_bits
+
+  [ Cyrill Gorcunov ]
+  * x86: apic unification - merge down lapic_get_maxlvt
+  * x86: apic unification - merge down enable_NMI_through_LVT0
+
+  [ Jaswinder Singh ]
+  * x86_64: Declare new_utsname in asm-x86/syscalls.h
+  * X86_32: declare pt_regs_access as unsigned long
+  * X86_SMP: smp.c declare functions before they get used
+  * X86_SMP: smpboot.c declare idle_thread_array and smp_b_stepping as
+    static
+  * X86_SMP: ipi.c declare functions before they get used
+  * X86_SMP: tlb_XX.c declare smp_invalidate_interrupt before they get
+    used
+
+  [ Ingo Molnar ]
+  * x86: fix ds.c build error
+
+  [ Robert Richter ]
+  * x86: add PCI IDs for AMD Barcelona PCI devices
+  * x86: apic_*.c: add description to AMD's extended LVT functions
+
+  [ Barry Kasindorf ]
+  * oprofile: Add support for AMD Family 11h
+
+  [ Robert Richter ]
+  * x86/oprofile: introduce model specific init/exit functions
+  * x86/oprofile: Minor changes in op_model_athlon.c
+  * x86/oprofile: renaming athlon_*() into op_amd_*()
+  * drivers/oprofile: coding style fixes in buffer_sync.c
+  * OProfile: moving increment_tail() in buffer_sync.c
+  * OProfile: add IBS code macros
+
+  [ Barry Kasindorf ]
+  * x86/oprofile: add IBS support for AMD CPUs, IBS buffer handling
+    routines
+  * x86/oprofile: add IBS support for AMD CPUs, model specific code
+
+  [ Robert Richter ]
+  * x86/oprofile: separating the IBS handler
+  * OProfile: change IBS interrupt initialization
+  * OProfile: Fix build error in op_model_athlon.c
+  * OProfile: on_each_cpu(): kill unused retry parameter
+  * OProfile: fix setup_ibs_files() function interface
+  * OProfile: enable IBS for AMD CPUs
+  * OProfile: fix IBS build error for UP
+  * x86/oprofile: macro definition cleanup in op_model_athlon.c
+  * x86/oprofile: op_model_athlon.c: fix counter reset when reenabling
+    IBS OP
+  * x86: apic: export symbols for extended interrupt LVT functions
+  * x86: apic: changing export symbols to *_GPL
+  * x86/oprofile: add CONFIG_OPROFILE_IBS option
+  * oprofile: fix printk in cpu_buffer.c
+  * x86/oprofile: reanaming op_model_athlon.c to op_model_amd.c
+
+  [ Jason Yeh ]
+  * Oprofile Multiplexing Patch
+
+  [ Robert Richter ]
+  * x86/oprofile: fix on_each_cpu build error
+
+  [ Joerg Roedel ]
+  * x86: convert pci-dma.c from round_up to roundup
+  * x86: convert pageattr.c from round_up to roundup
+  * x86: convert init_64.c from round_up to roundup
+  * x86: convert numa_64.c from round_up to roundup
+  * x86: convert discontig_32.c from round_up to roundup
+
+  [ Yinghai Lu ]
+  * usb: move ehci reg def
+  * x86: usb debug port early console, v4
+  * x86: add setup_ioapic_ids for numaq in x86_quirks
+  * x86: mach-bigsmp to bigsmp
+  * x86: mach_es7000 to es7000
+  * x86: mach_summit to summit
+  * x86: mach-numaq to numaq
+
+  [ Huang Weiyi ]
+  * arch/x86/kernel/visws_quirks.c: Removed duplicated #include
+
+  [ Ingo Molnar ]
+  * x86: usb debug port early console, fix
+
+  [ Eduardo Habkost ]
+  * x86, xen: Use native_pte_flags instead of native_pte_val for
+    .pte_flags
+
+  [ Ingo Molnar ]
+  * x86: visws_quirks, fix build error
+
+  [ Roland McGrath ]
+  * x86: tracehook_signal_handler
+  * x86: tracehook syscall
+  * x86: tracehook: asm/syscall.h
+  * x86 signals: use asm/syscall.h
+  * x86: tracehook: TIF_NOTIFY_RESUME
+  * x86: tracehook: CONFIG_HAVE_ARCH_TRACEHOOK
+
+  [ Yinghai Lu ]
+  * x86: add apic probe for genapic 64bit - fix
+
+  [ Clemens Ladisch ]
+  * ALSA: usb-audio: add BOSS GT-10 support
+
+  [ Matthew Ranostay ]
+  * ALSA: hda: added 92HD81/83 support
+
+  [ Jeremy Fitzhardinge ]
+  * x86: fix initialization of 'l' bit in ldt descriptors
+  * xen: fix allocation and use of large ldts
+
+  [ Randy Dunlap ]
+  * documentation: move mtrr.txt to Doc/x86/ subdir
+
+  [ Jeremy Fitzhardinge ]
+  * generic, memparse(): constify argument
+  * xen-balloon: fix up sysfs issues
+  * xen-balloon: clean up unused functions
+
+  [ Mark Langsdorf ]
+  * x86: L3 cache index disable for 2.6.26
+
+  [ Ingo Molnar ]
+  * x86: L3 cache index disable for 2.6.26, cleanups
+
+  [ Mark Langsdorf ]
+  * x86: L3 cache index disable for 2.6.26
+
+  [ Ingo Molnar ]
+  * x86 l3 cache index disable for 2 6 26 fix
+
+  [ Jeremy Fitzhardinge ]
+  * xen: suppress known wrmsrs
+
+  [ Ingo Molnar ]
+  * x86: L3 cache index disable for 2.6.26, fix #2
+
+  [ Jaroslav Kysela ]
+  * ALSA: Fix commit: Add automatic model setting for the Acer Aspire
+    5920G laptop
+
+  [ Peter Oruba ]
+  * x86: AMD microcode patch loading support v2
+  * x86: moved Intel microcode patch loader declarations to seperate
+    header file
+  * x86: typedef removal
+  * x86: move per CPU microcode structure declaration to header file
+  * x86: move microcode.c to microcode_intel.c
+  * x86: code split to two parts
+  * x86: structure declaration renaming
+  * x86: add AMD specific declarations
+  * x86: first step of refactoring, introducing microcode_ops
+  * x86: major refactoring
+  * x86: AMD microcode patch loading support
+
+  [ Ingo Molnar ]
+  * x86, microcode support: fix build error
+  * x86, microcode: fix symbol exports
+  * x86, microcode: fix module license string
+
+  [ Mark Brown ]
+  * ALSA: Add jack reporting API
+  * ALSA: Build jack detection
+
+  [ Takashi Iwai ]
+  * ALSA: hda - use input_free_device()
+
+  [ Dmitry Baryshkov ]
+  * ALSA: ASoC: Permit simultaneous compilation of both PXA AC97 drivers
+
+  [ Mark Brown ]
+  * ALSA: ASoC: Allow codecs to override register display
+
+  [ Jon Smirl ]
+  * ALSA: ASoC: Convert bitfields in ASoC into full int width
+  * ALSA: ASoC: Rename mask to max to reflect usage
+
+  [ Grant Likely ]
+  * ALSA: ASoC: Add OpenFirmware helper for matching bus and codec
+    drivers
+
+  [ Mark Brown ]
+  * ALSA: ASoC: Make OpenFirmware helper include file conditional
+
+  [ Grant Likely ]
+  * ALSA: ASoC: Add mpc5200-psc I2S driver
+  * ALSA: ASoC: Add Texas Instruments TLV320AIC26 codec driver
+
+  [ Mark Brown ]
+  * ALSA: ASoC: Export DAI and codec for TLV320AIC26
+  * ALSA: ASoC: Staticise keyclick dev_attr in tlv320aic26
+
+  [ Cliff Cai ]
+  * ALSA: ASoC: AD1980 audio codec driver
+
+  [ Mark Brown ]
+  * ALSA: ASoC: Add all CODECs Kconfig option
+
+  [ Jon Smirl ]
+  * ALSA: ASoC: convert use of uint to unsigned int
+
+  [ Pawel MOLL ]
+  * ALSA: Fix limit of 8 PCM devices in SNDRV_CTL_IOCTL_PCM_NEXT_DEVICE
+
+  [ Dmitry Torokhov ]
+  * Input: gameport - make gameport_register_driver() return errors
+  * Input: gameport - check return value of gameport_register_driver()
+  * Input: gameport - mark gameport_register_driver() __must_check
+
+  [ Ville Syrjala ]
+  * Input: ati_remote2 - add loadable keymap support
+  * Input: ati_remote2 - add autosuspend support
+
+  [ Dmitry Torokhov ]
+  * Input: expand keycode space
+
+  [ Aristeu Rozanski ]
+  * Input: add keycodes for remote controls/phone keypads
+
+  [ Suresh Siddha ]
+  * x86, xsave: xsave cpuid feature bits
+  * x86, xsave: enable xsave/xrstor on cpus with xsave support
+  * x86, xsave: context switch support using xsave/xrstor
+  * x86, xsave: dynamically allocate sigframes fpstate instead of static
+    allocation
+  * x86, xsave: reorganization of signal save/restore fpstate code
+    layout
+  * x86, xsave: xsave/xrstor specific routines
+  * x86, xsave: struct _fpstate extensions to include extended state
+    information
+  * x86, xsave: save/restore the extended state context in sigframe
+  * x86, xsave: update xsave header bits during ptrace fpregs set
+
+  [ H. Peter Anvin ]
+  * x86, xsave: add <asm/xcr.h> header file for XCR registers
+  * x86, xsave: keep the XSAVE feature mask as an u64
+
+  [ Jeremy Fitzhardinge ]
+  * xen: compile irq functions without -pg for ftrace
+  * xen: fix allocation and use of large ldts, cleanup
+
+  [ Eduardo Habkost ]
+  * xen_alloc_ptpage: cast PFN_PHYS() argument to unsigned long
+
+  [ Gustavo F. Padovan ]
+  * x86: coding styles fixes to arch/x86/kernel/process_64.c
+  * x86: add KERN_INFO to printks on process_64.c
+  * x86: coding style fixes to arch/x86/kernel/crash_dump_64.c
+  * x86: coding style fixes to arch/x86/kernel/signal_64.c
+  * x86: coding style fixes to arch/x86/kernel/traps_64.c
+  * x86: coding style fixes to arch/x86/kernel/sys_x86_64.c
+
+  [ David Brownell ]
+  * hpet: /dev/hpet - fixes and cleanup
+  * hpet: /dev/hpet - fixes and cleanup, fix
+
+  [ Yinghai Lu ]
+  * x86: print per_cpu data address
+
+  [ Peter Oruba ]
+  * x86: AMD microcode patch loader style corrections
+  * x86: Intel microcode patch loader style corrections
+  * x86: moved function declarations out from AMD microcode patch loader
+    to heade file
+  * x86: minor pointer type cast in AMD microcode patch loader
+
+  [ Hiroshi Shimamoto ]
+  * x86_32: use apic_ops at print_local_APIC()
+
+  [ Pawel MOLL ]
+  * ALSA: IEC958 definition for consumer status channel update
+
+  [ Jaroslav Kysela ]
+  * sound: Revert "ALSA: Fix limit of 8 PCM devices in
+    SNDRV_CTL_IOCTL_PCM_NEXT_DEVICE"
+
+  [ Karsten Wiese ]
+  * ALSA: Add USB US122L driver
+
+  [ Pawel MOLL ]
+  * ALSA: Fix limit of 8 PCM devices in SNDRV_CTL_IOCTL_PCM_NEXT_DEVICE
+
+  [ Misha Zhilin ]
+  * ALSA: ice1724 - Support for Terrasoniq/MUSONIK TS22 PCI card
+
+  [ David Brownell ]
+  * [MTD] dataflash OTP support
+
+  [ Adrian Hunter ]
+  * [MTD] [OneNAND] Add defines for HF and sync write
+
+  [ Kumar Gala ]
+  * [MTD] remove code associated with !CONFIG_PPC_MERGE
+
+  [ Dominik Brodowski ]
+  * pcmcia: only copy CIS override data once
+
+  [ Julia Lawall ]
+  * [MTD] Use DIV_ROUND_UP
+
+  [ David Woodhouse ]
+  * [MTD] Remove references to TI 'toto' platform.
+
+  [ Adrian Bunk ]
+  * make selinux_write_opts() static
+
+  [ Vesa-Matti J Kari ]
+  * SELinux: Trivial minor fixes that change C null character style
+  * SELinux: trivial, remove unneeded local variable
+
+  [ David Howells ]
+  * SELinux: Fix a potentially uninitialised variable in SELinux hooks
+
+  [ Casey Schaufler ]
+  * smack: limit privilege by label
+
+  [ George G. Davis ]
+  * [MTD] [NOR] Add "Spansion" to MTD_CFI_AMDSTD kconfig menu
+    description
+
+  [ Alexey Korolev ]
+  * [MTD] [NOR] Add qry_mode_on()/qry_omde_off() to deal with odd chips
+
+  [ Anders Grafström ]
+  * [MTD] [NOR] cfi_cmdset_0001: Timeouts for erase, write and unlock
+    operations
+
+  [ Krzysztof Helt ]
+  * ALSA: wss_lib: move cs4231_lib into wss_lib
+  * ALSA: wss_lib: rename cs4231.h into wss.h
+  * ALSA: wss_lib: rename cs4321_foo to wss_foo
+  * ALSA: wss_lib: use struct snd_wss instead of snd_ad1848
+  * ALSA: wss_lib: use wss constants instead of ad1848 ones
+  * ALSA: wss_lib: replace ad1848 mixer element macros with wss ones
+  * ALSA: wss_lib: use CS4231P instead of AD1848P (kill the AD1848P)
+  * ALSA: wss_lib: use wss mixer code instead of ad1848 one
+  * ALSA: wss_lib: use wss pcm code instead of ad1848 one
+  * ALSA: wss_lib: use wss detection code instead of ad1848 one
+  * ALSA: wss_lib: fix opti93x capture formats limitations
+
+  [ Rene Herman ]
+  * ALSA: wss_lib: opti92x-ad1848 WSS_HW_DETECT fix
+
+  [ Krzysztof Helt ]
+  * ALSA: wss_lib: remove second mutexes initialization
+
+  [ Rene Herman ]
+  * ALSA: snd-cs4236: add Techmakers MF-4236PW PnP card ID
+  * ALSA: wss_lib: fix AZT2320 probe.
+
+  [ Pascal Terjan ]
+  * ALSA: hda - Fix sound on NEC Versa S9100
+
+  [ Mauro Carvalho Chehab ]
+  * ALSA: hda: Add support for ECS/PC Chips boards with Sigmatel codecs
+
+  [ Mark Brown ]
+  * ALSA: ASoC: Add WM8900 CODEC driver
+
+  [ Phillip Michael Jordan ]
+  * ALSA: snd_usb_audio: fix SB Extigy IR Remote regression
+
+  [ Takashi Iwai ]
+  * ALSA: ac97 - Enable mono-out on ALC203 codec as default
+
+  [ Rene Herman ]
+  * ALSA: wss_lib: rework snd_ad1848_probe()
+
+  [ Vesa-Matti Kari ]
+  * selinux: conditional expression type validation was off-by-one
+
+  [ David Brownell ]
+  * [MTD] Compile fix for dataflash OTP support
+  * [MTD] make dataflash write-verify be optional
+
+  [ David Woodhouse ]
+  * [MTD] [NOR] Rename and export new cfi_qry_*() functions
+
+  [ Alfred E. Heggestad ]
+  * Input: add driver for USB VoIP phones with CM109 chipset
+
+  [ Remi Herilier ]
+  * Input: wistron - add support for Fujitsu-Siemens Amilo Pro v3505
+
+  [ Uwe Kleine-König ]
+  * Input: gpio-keys - optimize interrupt handler
+  * Input: gpio-keys - simplify argument list for report_event
+
+  [ Sven Anders ]
+  * Input: appletouch - prepare for geyser 3/4 handling
+  * Input: appletouch - handle geyser 3/4 status bits
+
+  [ Marcin Slusarz ]
+  * x86, tsc: fix section mismatch warning
+  * x86: fix MP_processor_info section mismatch warning
+  * x86: mmconf: fix section mismatch warning
+  * x86: mpparse.c: fix section mismatch warning
+
+  [ Huang Weiyi ]
+  * arch/x86/kernel/acpi/boot.c: removed duplicated #include
+  * arch/x86/kernel/cpuid.c: removed duplicated #include
+
+  [ Paul E. McKenney ]
+  * rcu, debug: detect stalled grace periods
+
+  [ Ingo Molnar ]
+  * rcu, debug: detect stalled grace periods, cleanups
+
+  [ Peter Zijlstra ]
+  * printk: robustify printk
+
+  [ Ingo Molnar ]
+  * printk: robustify printk, fix
+
+  [ Cyrill Gorcunov ]
+  * x86: apic interrupts - move assignments to irqinit_32.c, v2
+
+  [ Dimitri Sivanich ]
+  * x86: remove EXPERIMENTAL restriction from CONFIG_HOTPLUG_CPU
+
+  [ Huang Weiyi ]
+  * [MTD] [NAND] drivers/mtd/nand/nandsim.c: remove duplicated #include
+
+  [ Chen Gong ]
+  * [MTD] m25p80.c erase enhance
+  * [MTD] m25p80.c code cleanup
+  * [MTD] m25p80.c extended jedec support
+
+  [ Andreas Herrmann ]
+  * x86: compile pat debugfs interface only if CONFIG_X86_PAT is set
+
+  [ Philipp Kohlbecher ]
+  * x86: fix comment in protected mode header
+
+  [ Andreas Herrmann ]
+  * x86: pda_init(): fix memory leak when using CPU hotplug
+  * x86: cpu_init(): fix memory leak when using CPU hotplug
+
+  [ Jeff Chua ]
+  * x86: make sparsemem more available
+
+  [ Adrian Hunter ]
+  * [MTD] Define and use MTD_FAIL_ADDR_UNKNOWN instead of 0xffffffff
+  * [MTD] [OneNAND] Add OMAP2 / OMAP3 OneNAND driver
+
+  [ Steven Whitehouse ]
+  * GFS2: Fix debugfs glock file iterator
+  * GFS2: Fix metafs mounts
+
+  [ Bob Peterson ]
+  * GFS2: rm on multiple nodes causes panic
+
+  [ Mark Brown ]
+  * ALSA: ASoC: Add WM8580 CODEC driver
+
+  [ Timur Tabi ]
+  * ALSA: ASoC - fix DMA channel selection in Freescale MPC8610 sound
+    drivers
+
+  [ roel kluin ]
+  * ALSA: au88x0: clipping ceiling loop wrong in comment
+
+  [ Rene Herman ]
+  * ALSA: wss_lib: missing closing brace in (ifdeffed out) debug
+    function.
+
+  [ Takashi Iwai ]
+  * ALSA: Introduce snd_BUG_ON() macro
+  * ALSA: Kill snd_assert() in sound/core/*
+  * ALSA: Kill snd_assert() in sound/isa/*
+  * ALSA: Kill snd_assert() in sound/pci/*
+  * ALSA: Kill snd_assert() in other places
+  * ALSA: Kill snd_assert() definition
+  * ALSA: Clean up snd_BUG()
+
+  [ Alexander Beregalov ]
+  * ALSA: ice1724/revo: simple clean up
+  * ALSA: sound/pci/Kconfig: update for ice1712/24
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Don't reset SPDIF in each status change
+  * ALSA: hda - initialize node 0x21 properly on AD1988 codecs
+
+  [ Alexander Beregalov ]
+  * ALSA: sound/pci: supported cards update
+  * ALSA: ALSA-Configuration.txt: supported cards update
+
+  [ Ingo Molnar ]
+  * x86: fix xsave build error
+
+  [ David Woodhouse ]
+  * Fix date output in x86 microcode driver.
+
+  [ Jaroslav Kysela ]
+  * ALSA: hda - put all HDA codec IDs to components for precise hw
+    detection
+
+  [ Suresh Siddha ]
+  * x86, xsave: remove the redundant access_ok() in setup_rt_frame()
+  * x86, xsave: clear the user buffer before doing fxsave/xsave
+  * x86, xsave: use BUG_ON() instead of BUILD_BUG_ON()
+
+  [ Adrian Hunter ]
+  * [JFFS2] Correct symlink name too long error code
+
+  [ Vesa-Matti Kari ]
+  * selinux: Unify for- and while-loop style
+
+  [ Julius Volz ]
+  * IPVS: Add genetlink interface definitions to ip_vs.h
+  * IPVS: Add genetlink interface implementation
+
+  [ Sven Wegener ]
+  * ipvs: Only call init_service, update_service and done_service for
+    schedulers if defined
+  * ipvs: Create init functions for estimator code
+
+  [ Simon Horman ]
+  * ipvs: rename __ip_vs_wlc_schedule in lblc and lblcr schedulers
+
+  [ Adrian Hunter ]
+  * [MTD] [OneNAND] OMAP3: add delay for GPIO
+
+  [ Takashi Iwai ]
+  * ALSA: Add missing description of usb-audio parameters
+  * ALSA: usb-audio - Add ignore_ctl_error parameter
+  * ALSA: fix a typo during snd_assert() removal
+
+  [ Matthew Ranostay ]
+  * ALSA: hda: dynamically create capture mux controls
+  * ALSA: hda: 92HD75xx fixes
+
+  [ Hiroshi Shimamoto ]
+  * x86_64: uml: fix rename header guard
+
+  [ Daniel THOMPSON ]
+  * sound: Fix esoteric double free in the dummy sound driver.
+
+  [ Jaroslav Kysela ]
+  * ALSA: dummy driver - do not use assignment in if condition
+  * ALSA: release v1.0.18rc1
+
+  [ Cyrill Gorcunov ]
+  * x86: apic - use SET_APIC_DEST_FIELD instead of hardcoded shift
+  * x86: apic - unify disable_apic_timer
+  * x86: apic - unify __setup_APIC_LVTT
+  * x86: apic - do not clear APIC twice in lapic_shutdown
+  * x86: apic - get rid of local_apic_timer_verify_ok
+  * x86: apic - unify verify_local_APIC
+  * x86: apic - unify sync_Arb_IDs
+
+  [ Paul E. McKenney ]
+  * rcu: prevent console flood when one CPU sees another AWOL via RCU
+  * rcu: classic RCU locking and memory-barrier cleanups
+
+  [ Tim Bird ]
+  * x86, bootup: add built-in kernel command line for x86 (v2)
+
+  [ Shaohua Li ]
+  * introduce two APIs for page attribute
+  * reduce tlb/cache flush times of agpgart memory allocation
+
+  [ Li Zefan ]
+  * x86: remove nesting CONFIG_HOTPLUG_CPU
+
+  [ Paolo Ciarrocchi ]
+  * x86: coding style fixes to arch/x86/boot/compressed/misc.c
+  * x86: coding style fixes to arch/x86/kernel/bios_uv.c
+  * x86: coding style fixes to arch/x86/lib/strstr_32.c
+  * x86: coding style fixes to arch/x86/lib/string_32.c
+  * x86: coding style fixes to arch/x86/kernel/paravirt_patch_32.c
+
+  [ Paul E. McKenney ]
+  * rcu: fixes to include/linux/rcupreempt.h
+  * rcu: remove list_for_each_rcu()
+
+  [ Richard Kennedy ]
+  * sched: reorder signal_struct to remove 8 bytes on 64 bit builds
+  * sched: reorder struct sched_rt_entity to remove padding on 64 bit
+    builds
+  * reorder struct prop_local_single to remove padding on 64 bit builds
+
+  [ Peter Oruba ]
+  * x86: Microcode patch loader style corrections
+  * x86: Fixed NULL function pointer dereference in AMD microcode patch
+    loader.
+
+  [ Nick Piggin ]
+  * x86, pat: avoid highmem cache attribute aliasing
+
+  [ Alexey Dobriyan ]
+  * x86_64: remove empty lines from stack traces/oopses
+
+  [ Steven Rostedt ]
+  * rcu: just rename call_rcu_bh instead of making it a macro
+  * rcu: trace fix possible mem-leak
+
+  [ Gustavo F. Padovan ]
+  * x86: coding style fixes to arch/x86/kernel/traps_64.c
+
+  [ Mathieu Desnoyers ]
+  * x86: alternatives : fix LOCK_PREFIX race with preemptible kernel and
+    CPU hotplug
+  * x86: revert replace LOCK_PREFIX in futex.h
+  * x86: spinlock use LOCK_PREFIX
+
+  [ frans ]
+  * [MTD] [NAND] nand_ecc.c: rewrite for improved performance
+
+  [ David Woodhouse ]
+  * [MTD] [NAND] Minor cleanup of nand_ecc.c
+
+  [ Cyrill Gorcunov ]
+  * x86: apic - sync_Arb_IDs style fixup
+  * x86: apic - unify init_bsp_APIC
+
+  [ Marek Vašut ]
+  * [ARM] 5199/1: PalmLD: PCMCIA driver
+
+  [ Huang Weiyi ]
+  * [MTD] removed unused #include <version.h>
+
+  [ Cyrill Gorcunov ]
+  * x86: apic - unify clear_local_APIC
+  * x86: apic - unify lapic_resume
+  * x86: apic - unify lapic_suspend
+  * x86: apic - rearrange functions and comments
+  * x86: apic - unify lapic_is_integrated
+  * x86: apic - unify xapic_icr_read
+
+  [ Francois Romieu ]
+  * r8169: get ethtool settings through the generic mii helper
+  * r8169: Tx performance tweak helper
+  * r8169: use pci_find_capability for the PCI-E features
+  * r8169: add 8168/8101 registers description
+  * r8169: add hw start helpers for the 8168 and the 8101
+  * r8169: additional 8101 and 8102 support
+
+  [ Paul E. McKenney ]
+  * rcu: fix classic RCU locking cleanup lockdep problem
+
+  [ FUJITA Tomonori ]
+  * x86 gart: allocate size-aligned address for alloc_coherent, v2
+
+  [ Yinghai Lu ]
+  * x86: apic - unify lapic_resume - fix
+
+  [ Paul E. McKenney ]
+  * rcu: remove redundant ACCESS_ONCE definition from rcupreempt.c
+
+  [ Thomas Petazzoni ]
+  * x86: make movsl_mask definition non-CPU specific
+  * x86: move cmpxchg fallbacks to a generic place
+  * x86: configuration options to compile out x86 CPU support code
+
+  [ David Woodhouse ]
+  * [JFFS2] Fill in f_fsid field in jffs2_statfs()
+
+  [ Cyrill Gorcunov ]
+  * x86: apic - rearrange maxcpu definition
+  * x86: apic - unify setup_boot_APIC_clock
+  * x86: apic - unify disable_local_APIC
+  * x86: apic - unify lapic_shutdown
+  * x86: apic - unify connect_bsp_APIC
+  * x86: apic - unify lapic_setup_esr
+  * x86: apic - unify __setup_APIC_LVTT
+  * x86: apic - unify disconnect_bsp_APIC
+  * x86: apic - generic_processor_info
+  * x86: apic - unify end_local_APIC_setup
+  * x86: apic - unify local_apic_timer_interrupt
+  * x86: apic - unify apic_set_verbosity
+  * x86: apic - unify disableapic and nolapic setup handlers
+  * x86: apic - rearrange parse_lapic_timer_c2_ok
+  * x86: apic - lapic_resume 32bit - unification fix
+  * x86: apic - compilation warnings fix
+
+  [ Harvey Harrison ]
+  * x86: early_printk.c trivial sparse fixes
+
+  [ H. Peter Anvin ]
+  * x86: boot: stub out unimplemented CPU feature words
+  * x86: add NOPL as a synthetic CPU feature bit
+  * x86: use X86_FEATURE_NOPL in alternatives
+  * x86: <asm/asm.h> consistency cleanups
+
+  [ Paolo Ciarrocchi ]
+  * x86: Coding style fixes to arch/x86/oprofile/op_model_p4.c
+
+  [ Paul E. McKenney ]
+  * rcu: fix locking cleanup fallout
+
+  [ Sven Wegener ]
+  * ipvs: Fix race conditions in lblc scheduler
+  * ipvs: Fix race conditions in lblcr scheduler
+
+  [ Ilpo Järvinen ]
+  * mpu401: reindent misindented spinlock
+
+  [ Paul Walmsley ]
+  * ARM: OMAP2: Powerdomain: Add base OMAP2/3 powerdomain code
+  * ARM: OMAP2: Powerdomain: Add OMAP2/3 common powerdomains
+  * ARM: OMAP2: Powerdomain: Add OMAP2 powerdomains
+  * ARM: OMAP: Powerdomain: Add OMAP3 powerdomains
+  * ARM: OMAP2: Clockdomain: Add base OMAP2/3 clockdomain code
+  * ARM: OMAP2: Clockdomain: Connect clockdomain code to powerdomain
+    code
+  * ARM: OMAP2: Clockdomain: Encode OMAP2/3 clockdomains
+  * ARM: OMAP2: Clockdomain: Associate clocks with clockdomains
+  * ARM: OMAP2: Clockdomain: Integrate OMAP3 clocks with clockdomain
+    code
+
+  [ Högander Jouni ]
+  * ARM: OMAP2: Clock: Combine 34xx l3_icks and l4_icks
+
+  [ Hiroshi Shimamoto ]
+  * rcuclassic: fix compilation NG
+
+  [ Peter Zijlstra ]
+  * sched: rt-bandwidth for user grouping interface
+  * sched: rt-bandwidth accounting fix
+  * sched: rt-bandwidth group disable fixes
+  * sched: extract walk_tg_tree()
+  * sched: rt-bandwidth fixes
+
+  [ Ian Molton ]
+  * [ARM] eseries: Split machine definitions
+  * [ARM] eseries: move LCD defs into machine files
+  * [ARM] eseries: move UDC defs to machine files
+
+  [ Mingming Cao ]
+  * percpu counter: clean up percpu_counter_sum_and_set()
+
+  [ Theodore Ts'o ]
+  * ext4: Add printk priority levels to clean up checkpatch warnings
+  * ext4: Fix long long checkpatch warnings
+  * ext4: Fix whitespace checkpatch warnings/errors
+
+  [ Aneesh Kumar K.V ]
+  * ext4: invalidate pages if delalloc block allocation fails.
+
+  [ Michael Ellerman ]
+  * powerpc: Streamline ret_from_except_lite for non-iSeries platforms
+
+  [ Harvey Harrison ]
+  * powerpc: Use the common ascii hex helpers
+  * powerpc: Replace __FUNCTION__ with __func__
+
+  [ Tony Breeds ]
+  * powerpc: Guard htab_dt_scan_hugepage_blocks appropriately
+  * powerpc: Guard from_rtc_time() in platforms/powermac/time.c
+  * powerpc: Guard print_device_node_tree() with #if 0
+
+  [ Michael Ellerman ]
+  * powerpc: fsl_msi doesn't need it's own of_node
+  * powerpc: Split-out common MSI bitmap logic into msi_bitmap.c
+  * powerpc: Convert the FSL MSI code to use msi_bitmap
+  * powerpc: Convert the MPIC MSI code to use msi_bitmap
+
+  [ Stephen Rothwell ]
+  * powerpc: Remove include of linux/of_platform.h from
+    asm/of_platform.h
+
+  [ David Gibson ]
+  * powerpc: Update in-kernel dtc and libfdt to version 1.2.0
+
+  [ Adrian Bunk ]
+  * powerpc: Use bcd2bin/bin2bcd
+
+  [ Nathan Lynch ]
+  * powerpc: Remove redundant sysfs_remove_file calls for cache info
+
+  [ Benjamin Herrenschmidt ]
+  * powerpc: Turn get/set_hard_smp_proccessor_id into inlines
+  * powerpc: Expose PMCs & cache topology in sysfs on 32-bit
+
+  [ Stephen Rothwell ]
+  * hotplug/rpaphp: Remove unused error path code
+  * powerpc/drivers: Use linux/of_device.h instead of asm/of_device.h
+  * powerpc: Remove include of linux/of_device.h from asm/of_device.h
+
+  [ Uros Bizjak ]
+  * x86, cleanup: use X86_CR4_PGE in x86/power/hibernate_asm_32.S
+
+  [ Randy Dunlap ]
+  * security: add/fix security kernel-doc
+
+  [ Dmitry Adamushko ]
+  * x86-microcode: fix unbalanced use of get_cpu()
+  * x86-microcode: generic interface refactoring
+
+  [ Peter Zijlstra ]
+  * printk: robustify printk, fix #2
+
+  [ Jeremy Fitzhardinge ]
+  * x86_64: use save/loadsegment in ia32 compat
+  * x86: another user of PTE_FLAGS_MASK
+  * xen: clean up domain mode predicates
+  * x86/paravirt: add spin_lock_flags lock op
+  * xen: clarify locking used when pinning a pagetable.
+  * xen: add xen_ prefixes to make tracing with ftrace easier
+
+  [ Jiri Kosina ]
+  * printk: robustify printk, update comment
+
+  [ frans ]
+  * [MTD] [NAND] nand_ecc.c: fix big endian, strengthen test, add printk
+
+  [ Alexey Korolev ]
+  * [MTD] [NAND] Fix missing kernel-doc
+
+  [ Marek Vašut ]
+  * [ARM] 5184/1: Split ucb1400_ts into core and touchscreen
+
+  [ Claudio Scordino ]
+  * sched: new documentation about CFS
+
+  [ David Howells ]
+  * clocksource: check range
+
+  [ John Stultz ]
+  * clocksource: keep track of original clocksource frequency
+
+  [ Roman Zippel ]
+  * clocksource: introduce clocksource_forward_now()
+
+  [ John Stultz ]
+  * clocksource: introduce CLOCK_MONOTONIC_RAW
+
+  [ Andrew Morton ]
+  * arch/x86/pci/irq.c: attempt to clean up code layout
+
+  [ Dave Young ]
+  * i386: vmalloc size fix
+
+  [ Yinghai Lu ]
+  * x86: fix apic version warning
+
+  [ Huang Weiyi ]
+  * arch/x86/kernel/apm_32.c: remove duplicated #include
+
+  [ Cihula, Joseph ]
+  * x86, e820: add support for AddressRangeUnusuable ACPI memory type
+
+  [ venkatesh.pallipadi@intel.com ]
+  * x86: PAT documentation updates with debug info
+
+  [ Oleg Nesterov ]
+  * migrate_timers: add comment, use spinlock_irq()
+
+  [ Ingo Molnar ]
+  * Revert "reduce tlb/cache flush times of agpgart memory allocation"
+  * Revert "introduce two APIs for page attribute"
+
+  [ Shaohua Li ]
+  * x86, pageattr: introduce APIs to change pageattr of a page array
+  * agp: generic_alloc_pages()
+  * agp: add agp_generic_destroy_pages()
+  * x86: fix pageattr-test
+
+  [ Jeremy Fitzhardinge ]
+  * xen: save previous spinlock when blocking
+  * xen: add debugfs support
+  * xen: allow interrupts to be enabled while doing a blocking spin
+  * xen: measure how long spinlocks spend blocking
+
+  [ Paul E. McKenney ]
+  * rcu: use irq-safe locks
+
+  [ Paul Walmsley ]
+  * [ARM] OMAP3 pwrdm: add hardware save-and-restore (SAR) support
+  * [ARM] OMAP: clockdomain: add clkdm_get_pwrdm()
+
+  [ Eduardo Habkost ]
+  * x86, paravirt_ops: use unsigned long instead of u32 for alloc_p*()
+    pfn args
+
+  [ Rene Herman ]
+  * x86: {reverve,free}_memtype() take a physical address
+  * x86: have set_memory_array_{uc,wb} coalesce memtypes.
+  * agp: enable optimized agp_alloc_pages methods
+
+  [ Roman Zippel ]
+  * ntp: fix ADJ_OFFSET_SS_READ bug and do_adjtimex() cleanup
+
+  [ Randy Dunlap ]
+  * x86, microcode_amd: fix shift warning
+
+  [ Anton Vorontsov ]
+  * genirq: fix irq_desc->depth handling with DEBUG_SHIRQ
+
+  [ Jeremy Fitzhardinge ]
+  * x86: build fix in "xen spinlock updates and performance
+    measurements"
+
+  [ Joerg Roedel ]
+  * x86: add alloc_coherent dma_ops callback to GART driver
+  * x86: add free_coherent dma_ops callback to GART driver
+  * x86: add free_coherent dma_ops callback to Calgary IOMMU driver
+  * x86: add alloc_coherent dma_ops callback to NOMMU driver
+  * x86: add free_coherent dma_ops callback to NOMMU driver
+  * x86: cleanup dma_*_coherent functions
+  * x86: move dma_*_coherent functions to include file
+  * x86, AMD IOMMU: remove obsolete FIXME comment
+
+  [ Ingo Molnar ]
+  * dma-coherent: export dma_[alloc|release]_from_coherent methods
+
+  [ FUJITA Tomonori ]
+  * dma-mapping.h, x86: remove last user of dma_mapping_ops->map_simple
+  * x86: dma_*_coherent rework patchset v2, fix
+
+  [ Yinghai Lu ]
+  * x86_64: printout msr -v2
+
+  [ Oleg Nesterov ]
+  * sched: do_wait_for_common: use signal_pending_state()
+  * wait_task_inactive(): don't consider task->nivcsw
+  * wait_task_inactive: "improve" the returned value for ->nvcsw == 0
+
+  [ Jeremy Fitzhardinge ]
+  * x86: export pv_lock_ops non-GPL
+
+  [ Herton Ronaldo Krzesinski ]
+  * rtl818x: merge tx/rx descriptor flags
+
+  [ Brian Cavagnolo ]
+  * libertas: support boot commands to write persistent firmware and
+    bootloader
+  * libertas: add sysfs hooks to update boot2 and persistent firmware
+
+  [ Julia Lawall ]
+  * net/ieee80211: adjust error handling
+
+  [ Andrey Yurovsky ]
+  * ath5k: add Mesh Point support
+
+  [ Daniel Wagner ]
+  * rt2x00mac: In error case stop netdev queue, free skb and return
+    NETDEV_TX_OK
+
+  [ Jiri Slaby ]
+  * Ath5k: unify resets
+
+  [ Robert P. J. Day ]
+  * WIRELESS: Make wireless one-click selectable.
+
+  [ Tomas Winkler ]
+  * mac80211: add ieee80211_queue_stopped)
+
+  [ Bruno Randolf ]
+  * ath5k: rates cleanup
+  * mac80211: add rx status flag for short preamble
+  * mac80211: radiotap: assume modulation from rates
+  * iwlwifi: use generic mac80211 radiotap headers
+
+  [ roel kluin ]
+  * iwl-4965: test below 0 on unsigned num_tbs
+
+  [ Tomas Winkler ]
+  * iwlwifi: kill struct iwl4965_lq_mngr
+
+  [ Esti Kummer ]
+  * iwlwifi: add level for debugging host command
+
+  [ Harvey Harrison ]
+  * b43legacy: use le16 frame control directly, avoid byteswapping
+  * iwlwifi: use le16 frame control directly, use QOS symbolic constant
+    mask
+  * ath5k: explicitly check skb->len
+  * mac80211: explicitly check skb->len
+  * mac80211: wme.h remove unused QOS_CONTROL_LEN
+  * mac80211: wep.c replace magic numbers in IV/ICV removal
+  * mac80211: rx.c/tx.c remove more users of tx/rx_data->fc
+  * mac80211: remove ieee80211_get_hdrlen
+  * mac80211: remove IEEE80211_FC helper
+  * mac80211: use ieee80211 frame control directly
+  * mac80211: remove rx/tx_data->fc member
+  * mac80211: remove WLAN_FC_DATA_PRESENT
+
+  [ Luis Carlos Cobo ]
+  * mac80211: allow no mac address until firmware load
+  * libertas_tf: header file
+  * libertas_tf: main.c, data paths and mac80211 handlers
+  * libertas_tf: command helper functions for libertas_tf
+  * libertas_tf: usb specific functions
+  * libertas_tf: config and makefile
+
+  [ Harvey Harrison ]
+  * wireless: replace __FUNCTION__ with __func__
+
+  [ Henrique de Moraes Holschuh ]
+  * rfkill: detect bogus double-registering (v2)
+  * rfkill: add default global states (v2)
+  * rfkill: add __must_check annotations
+  * rfkill: introduce RFKILL_STATE_MAX
+
+  [ Jasper Bryant-Greene ]
+  * move ETH_P_PAE from ieee80211_i.h to if_ether.h
+  * replace net_device arguments with ieee80211_{local,sub_if_data} as
+    appropriate
+
+  [ Tomas Winkler ]
+  * mac80211: filter probes in ieee80211_rx_mgmt_probe_resp
+
+  [ Ivo van Doorn ]
+  * rt2x00: Implement HW encryption
+  * rt2x00: Implement HW encryption (rt61pci)
+  * rt2x00: Implement HW encryption (rt73usb)
+  * rt2x00: Gather channel information in structure
+  * rt2x00: Release rt2x00 2.2.0
+
+  [ Bruno Randolf ]
+  * ath5k: set short preamble flag for rx
+
+  [ Tomas Winkler ]
+  * mac80211: cleanup mlme state namespace
+
+  [ Ivo van Doorn ]
+  * rt2x00: Move lna_gain calculation to config() callback
+  * rt2x00: Add module parameter to disable HW crypto
+
+  [ Ron Rindjunsky ]
+  * mac80211: change number of pre-assoc scans
+
+  [ Christian Lamparter ]
+  * p54: rename prism54xyz -> p54xyz
+
+  [ Ron Rindjunsky ]
+  * mac80211: add direct probe before association
+
+  [ Dominik Brodowski ]
+  * pcmcia: uniform device IDs of pata_pcmcia and ide-cs
+  * pcmcia: add pcmcia_loop_config() helper
+  * pcmcia: use pcmcia_loop_config in pata and ide drivers
+  * pcmcia: use pcmcia_loop_config in bluetooth drivers
+  * pcmcia: use pcmcia_loop_config in scsi pcmcia drivers
+  * pcmcia: use pcmcia_loop_config in ISDN pcmcia drivers
+  * pcmcia: use pcmcia_loop_config in net pcmcia drivers
+  * pcmcia: use pcmcia_loop_config in misc pcmcia drivers
+  * pcmcia: pcmcia_config_loop() ConfigIndex unification
+  * pcmcia: pcmcia_config_loop() default CIS entry handling
+  * pcmcia: pcmcia_config_loop() improvement by passing vcc
+
+  [ David Kilroy ]
+  * orinoco: Add ESSID specific scanning for Agere fw
+  * orinoco: Update scan translation
+  * orinoco: Specify all three parameters to every Hermes command.
+  * orinoco: Move EXPORT_SYMBOL declarations next to exported function
+  * orinoco: Add function to execute Hermes initialisation commands
+    synchronously
+  * orinoco: Move firmware download functionality into new module
+  * orinoco: Make firmware download logic more generic
+  * orinoco: Extend hermes_dld routines for Agere firmware
+  * orinoco: Invoke firmware download in main driver
+  * orinoco: Fix transmit for Agere/Lucent with fw 9.x
+  * orinoco: address checkpatch typedef warning
+  * orinoco: Use extended Agere scans available on 9.x series firmwares
+  * orinoco: Don't use boolean parameter to record encoding type
+  * orinoco: Split wevent work thread from wevent sending
+  * orinoco: Use a macro to define wireless handlers
+  * orinoco: Add WE-18 ioctls for WPA
+  * orinoco: Send association events to userspace
+  * orinoco: Process bulk of receive interrupt in a tasklet
+  * orinoco: Add MIC on TX and check on RX
+
+  [ Dominik Brodowski ]
+  * pcmcia: use dev_printk and dev_dbg in yenta_socket
+  * pcmcia: use dev_printk in module pcmcia_core
+  * pcmcia: use dev_printk in module pcmcia
+  * pcmcia: use dev_printk in module rsrc_nonstatic
+  * pcmcia: remove unused cs_socket_name() definition
+  * pcmcia: don't add extra DEBUG cflag
+  * pcmcia: remove remaining in-kernel pcmcia_get_configuration_info()
+    users
+  * pcmcia: move pccard_get_configuration_info to ioctl
+  * pcmcia: move config_info_t definition to ioctl-related parts in
+    header files
+  * pcmcia: deprecate CS_SUCCESS
+  * pcmcia: deprecate unused CS_ error codes
+  * pcmcia: deprecate CS_OUT_OF_RESOURCE
+  * pcmcia: deprecate CS_UNSUPPORTED_*
+  * pcmcia: deprecate CS_BAD_VCC and CS_BAD_VPP
+  * pcmcia: deprecate CS_NO_CARD
+  * pcmcia: deprecate CS_GENERAL_FAILURE
+  * pcmcia: deprecate CS_BAD_HANDLE
+  * pcmcia: deprecate CS_CONFIGURATION_LOCKED
+  * pcmcia: deprecate CS_IN_USE
+  * pcmcia: deprecate CS_NO_MORE_ITEMS
+  * pcmcia: deprecate CS_BAD_ATTRIBUTE, CS_BAD_TYPE and CS_BAD_PAGE
+  * pcmcia: deprecate CS_BAD_BASE, CS_BAD_IRQ, CS_BAD_OFFSET and
+    CS_BAD_SIZE
+  * pcmcia: deprecate CS_BAD_ARGS
+  * pcmcia: deprecate CS_BAD_TUPLE
+  * pcmcia: remove CS_ error codes alltogether
+  * pcmcia: use dev_printk for cs_error()
+
+  [ Ilpo Järvinen ]
+  * tcp: Add tcp_validate_incoming & put duplicated code there
+  * tcp: Add tcp_collapse_one to eliminate duplicated code
+  * tcp: Add tcp_parse_aligned_timestamp
+
+  [ Venki Pallipadi ]
+  * x86: have set_memory_array_{uc,wb} coalesce memtypes, fix
+
+  [ Suresh Siddha ]
+  * x86: use cpuid vector 0xb when available for detecting cpu topology
+  * x86: use x2apic id reported by cpuid during topology discovery
+
+  [ David S. Miller ]
+  * sparc64: Add JBUS NUMA detection.
+  * sparc: Add mutex for set property calls.
+  * sparc: Implement irq_of_parse_and_map() and irq_dispose_mapping().
+  * sparc: Add GPIO layer support.
+  * sparc64: Split syscall_trace() into two functions.
+  * sparc64: Kill duplicated sys_pause() implementation.
+  * hwmon: Add Ultra45 workstation hwmon driver.
+  * sparc64: Convert UltraSPARC-III memory controller driver to OF
+    driver probing.
+  * sparc64: Use consistent chmc_ prefix in variables, types, and
+    functions.
+  * sparc64: Add generic interface for registering a dimm printing
+    handler.
+  * sparc64: Allow chmc to be built as a module.
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Add definitions of HDMI-related verbs
+  * ALSA: hda - print a few HDMI information in proc
+  * ALSA: hda - set up HDMI channels
+
+  [ Krzysztof Helt ]
+  * ALSA: opl3sa2: drop snd_card pointer from the snd_opl3sa2 structure
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Add AD1882A codec support
+
+  [ Krzysztof Helt ]
+  * ALSA: wss_lib: snd_wss_calibrate_mute improvement
+
+  [ Takashi Iwai ]
+  * ALSA: hda - disable delayed period-ack with bdl_pos_adj=0
+
+  [ Thomas Bogendoerfer ]
+  * sound: oss: remove driver for SGI HAL2 audio device
+
+  [ Takashi Iwai ]
+  * ALSA: Update MAINTAINERS
+
+  [ Andreas Mohr ]
+  * ALSA: als4000 - Code clean up
+
+  [ Krzysztof Helt ]
+  * ALSA: opl3sa2: replace nd_opl3sa2_info_xxx() with snd_wss_info_xxx()
+
+  [ Roel Kluin ]
+  * ALSA: aoa - Remove duplicate assignment of
+    SNDRV_PCM_FMTBIT_S{16,24}_BE bits
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Create beep control on ALC269 codec
+
+  [ Alexander Beregalov ]
+  * ALSA: revo51: add headphone output
+
+  [ Takashi Iwai ]
+  * ALSA: Clean up SG-buffer helper functions and macros
+  * ALSA: Fix allocation size calculation in
+    snd_dma_alloc_pages_fallback()
+  * ALSA: Allocate larger pages in sgbuf
+  * ALSA: hda - check page continuity
+  * ALSA: via82xx - ignore buffer preallocation errors
+  * ALSA: via82xx - check continuous pages in buffer setup
+  * ALSA: hda - Fix ALC269 capture source
+
+  [ Andreas Mohr ]
+  * ALSA: ALS4000 driver work, step 2
+
+  [ Rene Herman ]
+  * ALSA: snd-ad1816a: add different TerraTec EWS64 S model
+
+  [ Krzysztof Helt ]
+  * ALSA: wss_lib: do not mess mixer settings during probe
+
+  [ Alex Nixon ]
+  * x86: add cpu hotplug hooks into smp_ops
+  * x86_32: clean up play_dead
+  * x86: unify x86_32 and x86_64 play_dead into one function
+  * x86: separate generic cpu disabling code from APIC writes in
+    cpu_disable
+
+  [ Robert Richter ]
+  * x86: cleanup in amd_cpu_notify()
+
+  [ Alex Nixon ]
+  * xen: implement CPU hotplugging
+
+  [ Stephen Rothwell ]
+  * linux-next: fix x86 tree build failure
+
+  [ Avi Kivity ]
+  * x86: default to reboot via ACPI
+
+  [ Huang Weiyi ]
+  * [MTD] [NAND] au1550nd.c: remove unused #include <version.h>
+
+  [ Singh, Vimal ]
+  * [MTD] [NAND] nand_ecc.c: adding support for 512 byte ecc
+
+  [ David S. Miller ]
+  * sparc64: Add JBUS UltraSPARC-IIIi support to memory controller
+    driver.
+
+  [ Dominik Brodowski ]
+  * pcmcia: cs_internal.h is internal
+  * pcmcia: cleanup cs_internal.h
+  * pcmcia: merge ds_internal.h into cs_internal.h
+  * pcmcia: cleanup socket services header file
+
+  [ David S. Miller ]
+  * sparc64: Use the cond_syscall()s in kernel/sys_ni.c instead of home-
+    grown copy.
+  * sparc64: Fix irq_of_parse_and_map() and irq_dispose_mapping().
+
+  [ H. Peter Anvin ]
+  * x86: msr-on-cpu: remove unnecessary level of abstraction
+
+  [ Kevin Diggs ]
+  * sched: add kernel doc for the completion, fix kernel-doc-nano-
+    HOWTO.txt
+
+  [ Jaya Kumar ]
+  * [ARM] 5186/1: metronomefb: convert printk to dev_dbg/err messages
+  * [ARM] 5209/1: metronomefb: changes to use platform framebuffer
+  * [ARM] 5200/1: am200epd: use fb notifiers and gpio api
+  * [ARM] 5197/1: gumstix: conversion to MFP support and add bluetooth
+    support
+
+  [ Robert Jarzmik ]
+  * [ARM] 5202/1: pxa: Added Mitac Mio A701 smartphone support.
+
+  [ Eric Miao ]
+  * [ARM] pxa: fix incorrect definitions of SSP3 on pxa320
+
+  [ Mark Brown ]
+  * [ARM] 5111/2: zylonite: Configure SSP
+  * [ARM] 5223/1: zylonite: Staticise zylonite_i2c_board_info
+
+  [ Mike Rapoport ]
+  * [ARM] 5215/2: Add support for CM-X300 board
+  * [ARM] 5216/1: Add CM-X300 defconfig
+  * [ARM] 5217/1: update maintainer entry for CompuLab machines
+
+  [ Serge E. Hallyn ]
+  * selinux: add support for installing a dummy policy (v2)
+
+  [ Julius Volz ]
+  * IPVS: Integrate ESP protocol into ip_vs_proto_ah.c
+  * IPVS: Rename ip_vs_proto_ah.c to ip_vs_proto_ah_esp.c
+
+  [ Wei Yongjun ]
+  * dccp: Always generate a Reset in response to option errors
+
+  [ Gerrit Renker ]
+  * dccp: Silently ignore options with nonsensical lengths
+  * dccp: Fill in the Data fields for "Option Error" Resets
+  * dccp: Empty the write queue when disconnecting
+  * dccp: Toggle debug output without module unloading
+  * dccp ccid-3: Replace lazy BUG_ON with condition
+
+  [ Hiroshi Shimamoto ]
+  * x86: acpi: move acpi_mcfg_64bit_base_addr into CONFIG_PCI_MMCONFIG
+
+  [ Suresh Siddha ]
+  * x86: use x2apic id reported by cpuid during topology discovery, fix
+
+  [ Hiroshi Shimamoto ]
+  * rcuclassic: fix compiler warning
+
+  [ Steven Whitehouse ]
+  * GFS2: Fix & clean up GFS2 rename
+
+  [ Suresh Siddha ]
+  * x86: xsave: restore xcr0 during resume
+
+  [ Eric Paris ]
+  * securityfs: do not depend on CONFIG_SECURITY
+
+  [ H. Peter Anvin ]
+  * x86: generate names for /proc/cpuinfo from <asm/cpufeature.h>
+  * x86: cpufeature: add Intel features from CPUID and AVX specs
+  * x86: <asm/cpufeature.h>: clean up overlong lines, whitespace
+  * x86: cpufeature: fix SMX flag
+
+  [ Andi Kleen ]
+  * tcp: Skip empty hash buckets faster in /proc/net/tcp
+  * inet_diag: Add empty bucket optimization to inet_diag too
+
+  [ Eric Dumazet ]
+  * ip: speedup /proc/net/rt_cache handling
+
+  [ Joe Korty ]
+  * x86: make poll_idle behave more like the other idle methods
+
+  [ Bharata B Rao ]
+  * sched: call resched_task() conditionally from new task wake up path
+
+  [ Joe Korty ]
+  * make might_sleep() display the oopsing process
+
+  [ Ingo Molnar ]
+  * sched: clean up __might_sleep()
+
+  [ Alexey Dobriyan ]
+  * net: more #ifdef CONFIG_COMPAT
+
+  [ Ingo Molnar ]
+  * sched: extract walk_tg_tree(), fix
+
+  [ Tirumala R Marri ]
+  * powerpc/44x: AMCC PPC460GT/EX PCI-E de-emphasis adjustment fix
+
+  [ Josh Boyer ]
+  * powerpc/44x: Add PowerPC 44x simple platform support
+  * powerpc/44x: Migrate Bamboo support to ppc44x_simple
+  * powerpc/44x: Migrate Canyonlands support to ppc44x_simple
+  * powerpc/44x: Migrate Katmai support to ppc44x_simple
+  * powerpc/44x: Migrate Rainier support to ppc44x_simple
+  * powerpc/44x: Migrate Sequoia support to ppc44x_simple
+  * powerpc/44x: Migrate Taishan support to ppc44x_simple
+  * powerpc/44x: Add explicit support for AMCC Glacier
+  * powerpc/44x: Add explicit Yosemite support
+
+  [ KaiGai Kohei ]
+  * SELinux: add boundary support and thread context assignment
+
+  [ Luiz Fernando N. Capitulino ]
+  * x86: remove 8254 timer texts from Documentation
+
+  [ David Teigland ]
+  * dlm: allow multiple lockspace creates
+  * dlm: detect available userspace daemon
+  * dlm: fix locking of lockspace list in dlm_scand
+
+  [ Adrian Bunk ]
+  * crypto: Kconfig - Replace leading spaces with tabs
+
+  [ Herbert Xu ]
+  * crypto: api - Export crypto_alg_lookup instead of
+    __crypto_alg_lookup
+  * crypto: api - Display larval objects properly
+  * crypto: tcrypt - Avoid using contiguous pages
+
+  [ Austin Zhang ]
+  * crypto: crc32c - Use Intel CRC32 instruction
+
+  [ Herbert Xu ]
+  * crypto: tcrypt - Abort and only log if there is an error
+  * crypto: tcrypt - Add alg_test interface
+  * crypto: cryptomgr - Add test infrastructure
+  * crypto: api - Use test infrastructure
+  * crypto: cryptomgr - Test ciphers using ECB
+  * crypto: skcipher - Move IV generators into their own modules
+
+  [ Neil Horman ]
+  * crypto: api - Add fips_enable flag
+  * crypto: rng - RNG interface and implementation
+
+  [ Herbert Xu ]
+  * crypto: skcipher - Use RNG interface instead of get_random_bytes
+
+  [ Dominik Brodowski ]
+  * pcmcia: cleanup device driver header file
+  * pcmcia: encapsulate ioaddr_t
+  * pcmcia: device_id header cleanup
+
+  [ Jaroslav Kysela ]
+  * ALSA: Cosmetic change: CA0106 on MSI K8N Diamond PLUS Motherboard
+
+  [ Mark Brown ]
+  * ALSA: ASoC: Add WM8903 CODEC driver
+
+  [ Kailang Yang ]
+  * ALSA: hda - fix spaces in patch_realtek.c
+  * ALSA: hda - Add support of HP DC7600
+  * ALSA: hda - Add support of Toshiba S06
+  * ALSA: hda - Add support of Acer Aspire One
+  * ALSA: hda - Add support of Quanta FL1
+  * ALSA: hda - support more ALC888 devices
+  * ALSA: hda - Add more ALC662/663 codec support
+
+  [ Jean Delvare ]
+  * ALSA: ASoC: Add missing new-line at end of strings
+
+  [ Mark Brown ]
+  * ALSA: ASoC: WM8903 I2C cleanups
+
+  [ Joseph Chan ]
+  * ALSA: hda - Fix VIA recording problem
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Add descriptions of missing model values
+
+  [ Mark Brown ]
+  * ALSA: ASoC: Convert DAPM pop time configuration to debugfs
+
+  [ Takashi Iwai ]
+  * ALSA: remove obsolete *_FIRMARE_IN_KERNEL in isa/Kconfig
+
+  [ John L. Utz III ]
+  * ALSA: ac97 - vt1618 7.1 Audio Support
+
+  [ Hiroshi Miura ]
+  * ALSA: hda - Add support of Toshiba RX1
+
+  [ Tejun Heo ]
+  * sound: make OSS sound core optional
+
+  [ David S. Miller ]
+  * sparc: Delete bare sbus char bpp driver, obsoleted by parport_sunbpp
+  * sparc: Kill videopix SBUS driver.
+  * sparc: Kill SBUS DVMA layer.
+  * sparc32: Make IOMMU and IO-UNIT init work with device nodes.
+  * sparc: Propagate SBUS iommu archdata into real of_device objects.
+  * sparc: Make SBUS DMA interfaces take struct device.
+  * sparc32: Make mmu_{get,release}_*() take a struct device pointer.
+  * sparc32: Implement more generic dma_*() interfaces.
+  * sparc: Convert all SBUS drivers to dma_*() interfaces.
+  * sparc: Move SBUS DMA attribute interfaces out of asm/sbus.h
+  * myri_sbus: Convert to pure OF driver.
+  * sunbmac: Convert to pure OF driver.
+  * sunhme: Convert to pure OF driver.
+  * sunlance: Convert to pure OF driver.
+  * sunqe: Convert to pure OF driver.
+  * parport_sunbpp: Convert to pure OF driver.
+  * sun_esp: Convert to pure OF driver.
+  * qlogicpti: Convert to pure OF driver.
+  * amd7930: Convert to pure OF driver.
+  * dbri: Convert to pure OF driver.
+  * cs4231: Use SNDRV_DMA_TYPE_DEV instead of SNDRV_DMA_TYPE_SBUS.
+  * alsa: Remove special SBUS dma support code.
+  * cs4231: Convert SBUS side to OF driver.
+  * fore200e: Convert over to pure OF driver.
+  * sparc: Convert flash driver to OF device probing.
+  * sparc: Convert uctrl driver to OF driver.
+  * sparc64: Convert SBUS floppy probing to use OF device objects.
+  * sparc32: Kill mmu_translate_dvma() usage.
+  * sparc32: Kill mmu_translate_dvma and implementations.
+  * sparc32: Make mmu_map_dma_area and mmu_unmap_dma_area take a device
+    pointer.
+  * sparc32: Convert apc to OF driver.
+  * sparc32: Convert pmc to OF driver.
+  * sparc32: Convert sun4d IRQ code to use generic device tree probing.
+  * sparc: Kill SBUS layer IRQ hooks.
+  * sparc: Remove SBUS layer resource and irq handling.
+  * sparc: Remove dinky old-style SBUS probing facilities.
+  * sparc: Convert remaining sbus_ioremap() and sbus_iounmap() users.
+  * sparc: Kill sbus_ioremap() and sbus_iounmap().
+  * sparc: Kill sbus_devaddr() and sbus_dev_slot().
+  * sparc: Kill OBP property members of sbus_dev and sbus_bus
+  * sparc32: Kill sbus_is_slave().
+  * sparc: Kill sbus_arch_preinit().
+  * sparc: Add OF archdata propagation helper.
+  * sparc: Remove generic SBUS probing layer.
+  * sparc: Kill sbus_bus_type.
+  * sparc32: Kill iounit_map_dma_*().
+  * sparc: Kill now spurious includes of sbus.h
+  * sparc: Delete asm/sbus*.h
+  * sparc: Remove Documentation/sparc/sbus_drivers.txt
+
+  [ Jaroslav Kysela ]
+  * ALSA: intel8x0: implement ac97_clock whitelist
+
+  [ Johannes Berg ]
+  * mac80211: fill start-sequence-number for BA session start
+
+  [ Jouni Malinen ]
+  * mac80211/cfg80211: Add BSS configuration options for AP mode
+
+  [ Sujith ]
+  * ath9k: Merge reset functions
+  * ath9k: RX Filter cleanup
+  * ath9k: Use bitfields for buffer type
+  * ath9k: Remove a few unnecessary macros
+  * ath9k: Remove ar5416hal and assign default values directly
+  * ath9k: Unused macros, variables
+  * ath9k: Use a single opmode variable
+  * ath9k: Use bitfields for sc operations
+  * ath9k: Use ah_curchan and remove sc_curchan which is redundant
+  * ath9k: Trim struct ath_softc
+
+  [ Jouni Malinen ]
+  * ath9k: Allow AP mode to be enabled
+  * ath9k: Updated Beacon generation to use mac80211-style
+  * ath9k: Fix TX status reporting
+  * ath9k: Assign seq# when mac80211 requests this
+  * ath9k: Fix TX control flag use for no ACK and RTS/CTS
+
+  [ Sujith ]
+  * ath9k: Remove remaining occurences of ath_skb_map functions
+  * ath9k: Random cleanup
+  * ath9k: Miscellaneous fixes
+  * mac80211: Add an 802.11n definition
+  * ath9k: Use definition from ieee80211.h
+  * ath9k: Add IEEE80211_HW_RX_INCLUDES_FCS to hw flags
+
+  [ Jouni Malinen ]
+  * mac80211: Handle scan result IEs in one block
+
+  [ Daniel Wagner ]
+  * mac80211: Use only precedence level of DSCP field for frame
+    classification
+
+  [ Larry Finger ]
+  * ssb: Update for Rev. 5 SPROM
+
+  [ Dan Williams ]
+  * libertas: convert CMD_802_11_RF_TX_POWER to a direct command
+  * libertas: convert CMD_802_11_DEAUTHENTICATE to a direct command
+  * libertas: convert CMD_802_11_RADIO_CONTROL to a direct command
+  * libertas: convert adhoc operations to direct commands
+
+  [ Larry Finger ]
+  * ssb: Clean up extraction of MAC addresses from SPROM
+
+  [ Jouni Malinen ]
+  * mac80211_hwsim: Add minimal IEEE 802.11n support
+  * ath9k: Use mac80211 for multicast power save buffering
+
+  [ Huang Weiyi ]
+  * wireless: remove unused #include <version.h>
+
+  [ Christian Lamparter ]
+  * p54: fix rssi auto calibration
+
+  [ Chr ]
+  * p54: take tx_queue's lock in rx_frame_sent
+  * p54: redo queue numbering
+
+  [ Christian Lamparter ]
+  * p54pci: rx tasklet refactoring
+
+  [ Jouni Malinen ]
+  * mac80211/cfg80211: HT capabilities for NEW_STA
+
+  [ Vasanthakumar Thiagarajan ]
+  * ath9k: Add LED support
+
+  [ Sujith ]
+  * ath9k: Remove more dead code
+  * ath9k: Do not update frame's duration field
+  * ath9k: Remove sc_lastrx as we don't use it anywhere
+  * ath9k: rc.h cleanup
+
+  [ Henrique de Moraes Holschuh ]
+  * rfkill: use strict_strtoul (v2)
+
+  [ Felipe Balbi ]
+  * rfkill: add missing line break
+
+  [ Henrique de Moraes Holschuh ]
+  * rfkill: add WARN and BUG_ON paranoia (v2)
+  * rfkill: rename rfkill_mutex to rfkill_global_mutex
+
+  [ Harvey Harrison ]
+  * libertas: use the common frame control functions
+
+  [ Ivo van Doorn ]
+  * rt2x00: Fix race conditions in flag handling
+  * rt2x00: Map extra_tx_headroom to DMA
+
+  [ Mattias Nissler ]
+  * rt2x00: Only configure hardware when radio is enabled
+
+  [ Ivo van Doorn ]
+  * rt2x00: Initialize txop during conf_tx() callback
+  * rt2x00: Add Signal type flag
+
+  [ Mattias Nissler ]
+  * rt2x00: skb->data pointer should not include TX descriptor
+
+  [ Ivo van Doorn ]
+  * rt2x00: Release rt2x00 2.2.1
+
+  [ Michael Buesch ]
+  * b43: Implement dynamic PHY API
+  * b43: Rewrite TX power adjustment
+
+  [ David S. Miller ]
+  * rtc: Allow RTC_DRV_CMOS to be used on SPARC.
+  * sparc64: Select RTC_CLASS
+  * sparc64: Check for RTC class device in update_persistent_clock().
+  * sparc64: Convert Mostek rtc to use generic RTC layer driver.
+  * sparc: asm/mostek.h is now 32-bit only
+  * sparc64: Use generic CMOS driver.
+  * rtc: Add TI BQ4802 RTC driver.
+  * sparc64: Use generic BQ4802 RTC driver.
+  * rtc: Add Sun4V hypervisor RTC driver.
+  * sparc64: Use generic sun4v RTC driver.
+  * rtc: Add Starfire platform RTC driver.
+  * sparc64: Use generic starfire RTC driver.
+  * riowatchdog: Convert to pure OF driver.
+  * riowatchdog: Move under drivers/watchdog
+  * riowd: Distinguish between driver name and OF device node name.
+  * cpwatchdog: Cleanup and convert to pure OF driver.
+  * cpwatchdog: Move to drivers/watchdog/cpwd.c
+  * sun_uflash: Convert to pure OF driver.
+  * display7seg: Convert to pure OF device driver.
+  * envctrl: Convert to pure OF driver.
+  * bbc_i2c: Convert to pure OF driver.
+  * sparc64: Propagate PCI device archdata into OF device tree for EBUS.
+  * bbc_envctrl: Fix build errors from bbc_i2c OF conversion.
+  * sparc: Move EBUS DMA interfaces into seperate header file.
+  * sparc64: Convert EBUS floppy support to pure OF driver.
+  * cs4231: Convert to EBUS side to pure OF driver.
+  * sparc32: Convert PC RTC probing to pure OF driver.
+  * sparc: Kill EBUS driver layer.
+  * sparc: Kill ebus_bus_type.
+  * sparc64: Don't invoke power_init() from pcibios_init().
+  * sparc64: Convert SCHIZO PCI controller driver into a real driver.
+  * sparc64: Convert SUN4V PCI controller driver into a real driver.
+  * sparc64: Convert PSYCHO PCI controller driver into a real driver.
+  * sparc64: Convert SABRE PCI controller driver into a real driver.
+  * sparc64: Convert FIRE PCI controller driver into a real driver.
+  * sparc: Stop setting NO_DMA.
+  * sparc: Annotate of_device_id arrays with const or __initdata.
+  * sparc64: Simplify error handling in PCI controller probing.
+  * sparc64: Delete starfire_cpu_setup().
+
+  [ Dominik Brodowski ]
+  * pcmcia: card services header cleanup
+  * pcmcia: remove unused argument to pcmcia_parse_tuple()
+  * pcmcia: cistpl header cleanup
+  * pcmcia: ioctl-internal definitions
+
+  [ Robert Jarzmik ]
+  * pda_power: Check and handle return value of set_irq_wake
+
+  [ Matthew Garrett ]
+  * power_supply: Add function to return system-wide power state
+
+  [ Rodolfo Giometti ]
+  * power_supply: Support for Texas Instruments BQ27200 battery managers
+
+  [ David S. Miller ]
+  * leds: Add driver for Sunfire UltraSPARC server LEDs.
+  * sparc64: Rewrite central driver.
+
+  [ Adrian Bunk ]
+  * sparc: remove CONFIG_SUN4
+
+  [ David S. Miller ]
+  * sparc64: Clean up CPU chip type probing code.
+  * sparc64: Apply const or __initdata to vio_device_id[]
+  * sparc64: Use ENTRY/ENDPROC in hypervisor asm.
+  * sparc64: Use ENTRY/ENDPROC in PCI SUN4V asm.
+
+  [ Alexey Dobriyan ]
+  * [JFFS2] Move JFFS2 config options out of fs/Kconfig
+
+  [ David Howells ]
+  * CRED: Wrap task credential accesses in the JFFS2 filesystem
+
+  [ Semun Lee ]
+  * [MTD] [NAND] pxa3xx_nand_flash: Add definition of STM2GbX16 NAND
+    flashes
+
+  [ Russell King ]
+  * [ARM] cputype: separate definitions, use them
+  * [ARM] cachetype: move definitions to separate header
+
+  [ Jean PIHET ]
+  * [ARM] 5195/1: ARMv7 Oprofile support
+
+  [ Russell King ]
+  * [ARM] Update arch/arm/Kconfig for drivers/Kconfig changes, add
+    cpuidle
+
+  [ Nicolas Pitre ]
+  * [ARM] 5206/1: remove kprobe_trap_handler() hack
+
+  [ Mikael Pettersson ]
+  * [ARM] 5218/1: arm: improved futex support
+
+  [ Nicolas Pitre ]
+  * [ARM] 5211/2: fix a couple warnings from BUG() usage
+  * [ARM] 5221/1: fix ldm/stm emulation for kprobes
+
+  [ Lennert Buytenhek ]
+  * [ARM] 5222/1: Allow configuring user:kernel split via Kconfig
+
+  [ Catalin Marinas ]
+  * [ARM] 5227/1: Add the ENDPROC declarations to the .S files
+  * [ARM] 5232/1: Do not post-index STRT instruction in clear_user.S
+  * [ARM] 5230/1: Replace post-indexed LDRT/STRT in uaccess.h
+  * [ARM] 5231/1: Do not save the frame pointer in the
+    csum_partial_copy_* functions
+
+  [ David Woodhouse ]
+  * [MTD] [NOR] Select MTD_CFI_UTIL when MTD_CFI probe routine is
+    enabled
+
+  [ Russell King ]
+  * [ARM] pxa: introduce PXA_HAVE_BOARD_IRQS
+
+  [ Marc Zyngier ]
+  * [ARM] 5233/1: Allow PXA to have ISA IRQs numbered 0-15
+
+  [ Enrico Scholz ]
+  * [MTD] [NAND] pxa3xx_nand: moved nand definitions into shared
+    platform header
+  * [MTD] [NAND] pxa3xx_nand: allow to define flash types in the
+    platform data
+  * [MTD] [NAND] pxa3xx_nand: allow to disable builtin flash-type table
+  * [MTD] [NAND] pxa3xx_nand: added some 'const' annotations to the
+    exported API
+  * [MTD] [NAND] pxa3xx_nand: moved some helper variables out from
+    platform data
+  * [MTD] [NAND] pxa3xx_nand: added warning which tells id of detected
+    NAND
+
+  [ David S. Miller ]
+  * sparc64: Kill the scan_bus function pointer in struct pci_pbm_info.
+  * sparc64: Pass proper parent device down into root pci_create_bus()
+    call.
+  * sparc64: Move reboot handling into seperate file and kill power reg
+    programming.
+  * sparc64: Implement SSTATE purely using notifiers and initcalls.
+  * pci_psycho: Use of_getintprop_default().
+  * pci_schizo: Use of_get_property() and delete spurious local vars.
+  * pci_sun4v: Use of_get_property().
+  * sparc32: Fix sun4c build warnings.
+
+  [ Ilya Yanok ]
+  * powerpc/4xx: Necessary fixes to PCI for 4GB RAM size
+
+  [ David Teigland ]
+  * dlm: fix address compare
+
+  [ Sascha Hauer ]
+  * [MTD] [NAND] Freescale i.MX2 NAND driver
+
+  [ David Woodhouse ]
+  * EFS: Don't set f_fsid in statfs().
+
+  [ Thomas Graf ]
+  * netlink: Remove compat API for nested attributes
+
+  [ David S. Miller ]
+  * sparc: Fix handling of LANCE and ESP parent nodes in of_device.c
+
+  [ Ben Hutchings ]
+  * sfc: Replace net_dev->priv with netdev_priv(net_dev)
+  * sfc: Change first parameter type of {set,clear}_bit_le() to unsigned
+
+  [ Steve Hodgson ]
+  * sfc: Remove unused field efx_channel::reset_work
+
+  [ Ben Hutchings ]
+  * sfc: Use separate hardware TX queues to select checksum generation
+  * sfc: Avoid mangling error codes in efx_test_loopback()
+  * sfc: Reduce delays in SFE4001 initialisation
+  * sfc: Remove mistaken hardware workaround
+  * sfc: XMAC statistics fix-ups
+  * sfc: Remove inclusion of workarounds.h from efx.c
+  * sfc: Reverse the XOFF/XON pause frame control fifo thresholds
+  * sfc: Reduce log level for XGXS lane status
+  * sfc: Self-test reporting cleanup
+  * sfc: Speed up loopback self-test
+  * sfc: Don't leak PCI DMA maps in the TSO code when the queue fills up
+  * sfc: Use pci_map_single() to map the skb header when doing TSO
+  * sfc: Reduce the size of struct efx_tx_buffer
+  * sfc: Use explicit bool for boolean variables, parameters and return
+    values
+  * sfc: Set net_device::vlan_features appropriately
+  * sfc: Cleaned up struct tso_state fields
+  * sfc: Removed forced inlining of long functions
+  * sfc: Export boot configuration in EEPROM through ethtool
+  * sfc: Move CPU counting for RSS into a separate function,
+    efx_wanted_rx_queues()
+  * sfc: Remove efx_channel::has_interrupt
+  * sfc: Cleanup RX queue information
+  * sfc: Remove initialisation of RX_FILTER_CTL_REG.NUM_KER
+  * sfc: Make efx_for_each_channel_rx_queue() more efficient
+  * sfc: Remove efx_channel::evqnum field
+  * sfc: Cleanup RX event processing
+  * sfc: Implement get_sset_count, replacing get_stats_count and
+    self_test_count
+  * sfc: Make PHY flash mode a device attribute, not a module parameter
+
+  [ Steve Hodgson ]
+  * sfc: Do not call netif_{stop,wake}_queue() before register_netdev
+
+  [ Ben Hutchings ]
+  * sfc: Enable TSO for 802.1q VLAN devices
+  * sfc: Remove efx_nic_dummy_op_int() as redundant with
+    efx_port_dummy_op_int()
+  * sfc: Remove remnants of multi-port abstraction for MAC registers
+  * sfc: Remove some unreachable error paths
+  * sfc: Cleanup reset code
+  * sfc: Rework the bitfield header so that we can identify fields by
+    bit number
+  * sfc: Extend self-tests
+  * sfc: Remove the STATE_RESETTING flag
+  * sfc: Rework efx_set_multicast_hash()
+
+  [ Brian Haley ]
+  * bonding: change some __constant_htons() to htons()
+
+  [ Randy Dunlap ]
+  * hp-plus: fix link objects
+
+  [ roel kluin ]
+  * ibm_newemac: MAL[12]_IER_EVENTS definition: 2x *_OTE -> *_DE
+
+  [ Jesse Brandeburg ]
+  * ixgbe: fix rx csum return status misinterpretation
+  * ixgbe: add little endian annotations for sparse
+
+  [ Christopher Leech ]
+  * ixgbe: Implement HAVE_SET_RX_MODE
+
+  [ Jesse Brandeburg ]
+  * ixgbe: do not update stats twice each receive
+  * ixgbe: Cleanup references to Tx and Rx rings to becommon across the
+    driver
+  * ixgbe: disable flow control by default
+  * ixgbe: Implement Tx Head Writeback
+  * ixgbe: Lock RSS seed, move rx_buf_len to the rx_ring
+  * ixgbe: should not use HW_CSUM, should use IP* flags
+  * ixgbe: update dca to new interface, fix CONFIG_DCA_MODULE
+  * ixgbe: fix bug where lro settings are per ring
+  * ixgbe: fix dca hints going to wrong processor
+
+  [ PJ Waskiewicz ]
+  * ixgbe: use different context for tso and offload
+
+  [ Bruce Allan ]
+  * e1000e: add support for the 82567LM-4 device
+  * e1000e: add support for 82567LM-3 and 82567LF-3 (ICH10D) parts
+  * e1000e: add support for new 82574L part
+
+  [ Alexander Duyck ]
+  * igb: remove unneeded cleaned variable in clean_tx_irq path
+  * igb: clean up a stray fake netdev code left in rx path
+  * ixgbe: change config srrctl to only program one register per
+    VMDq/RSS id
+
+  [ Stephen Hemminger ]
+  * sky2: EEPROM read/write bug fixes
+  * sky2: display product info on boot.
+
+  [ Kevin Lo ]
+  * via-rhine: changed to use netdev_alloc_skb() from dev_alloc_skb
+  * 8139cp: use netdev_alloc_skb
+  * 8139too: use netdev_alloc_skb
+
+  [ Huang Weiyi ]
+  * [netdrvr] removed unused #include <version.h>
+
+  [ Ilpo Järvinen ]
+  * s2io: reindented misleading for loop
+
+  [ Alexey Dobriyan ]
+  * x86 setup: remove remnants of CONFIG_VIDEO_SELECT (read: vga=)
+
+  [ Krzysztof Helt ]
+  * rtc-m48t59: reduce structure m48t59_private
+  * rtc-m48t59: add support for M48T02 and M48T59 chips
+  * rtc-m48t59: allow externally mapped ioaddr
+
+  [ David S. Miller ]
+  * sparc32: use RTC subsystem
+  * sparc: Kill sbus mostek RTC driver.
+  * sparc32: Kill remaining asm/mostek.h inclusions.
+  * sparc32: Kill asm/mostek.h.
+  * sparc: Remove asm/rtc.h
+
+  [ Robert Reif ]
+  * sparc32: add init memory poisoning
+
+  [ Wei Yongjun ]
+  * dccp: Always generate a Reset in response to option errors
+
+  [ Gerrit Renker ]
+  * dccp: Silently ignore options with nonsensical lengths
+  * dccp: Fill in the Data fields for "Option Error" Resets
+  * dccp: Empty the write queue when disconnecting
+  * dccp: Toggle debug output without module unloading
+  * dccp ccid-3: Replace lazy BUG_ON with condition
+  * dccp: Basic data structure for feature negotiation
+  * dccp: Implement lookup table for feature-negotiation information
+  * dccp: List management for new feature negotiation
+  * dccp: Per-socket initialisation of feature negotiation
+  * dccp: Cleanup routines for feature negotiation
+  * dccp: Limit feature negotiation to connection setup phase
+  * dccp: Registration routines for changing feature values
+  * dccp: Query supported CCIDs
+  * dccp: Resolve dependencies of features on choice of CCID
+  * dccp: Mechanism to resolve CCID dependencies
+  * dccp: Deprecate old setsockopt framework
+  * dccp: Feature negotiation for minimum-checksum-coverage
+  * dccp: Deprecate Ack Ratio sysctl
+
+ -- Gerrit Renker <gerrit@erg.abdn.ac.uk>  Fri, 13 Feb 2009 10:56:50 -0800
+
 linux-2.6 (2.6.27-1+vyatta+12) unstable; urgency=low
 
   * add amd64-vyatta flavor as default for amd64
