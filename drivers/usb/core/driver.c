@@ -269,7 +269,7 @@ static int usb_unbind_interface(struct device *dev)
 	 * supports "soft" unbinding.
 	 */
 	if (!driver->soft_unbind)
-		usb_disable_interface(udev, intf);
+		usb_disable_interface(udev, intf, false);
 
 	driver->disconnect(intf);
 
@@ -279,7 +279,12 @@ static int usb_unbind_interface(struct device *dev)
 	 * altsetting means creating new endpoint device entries).
 	 * When either of these happens, defer the Set-Interface.
 	 */
-	if (!error && intf->dev.power.status == DPM_ON)
+	if (intf->cur_altsetting->desc.bAlternateSetting == 0) {
+		/* Already in altsetting 0 so skip Set-Interface.
+		 * Just re-enable it without affecting the endpoint toggles.
+		 */
+		usb_enable_interface(udev, intf, false);
+	} else if (!error && intf->dev.power.status == DPM_ON)
 		usb_set_interface(udev, intf->altsetting[0].
 				desc.bInterfaceNumber, 0);
 	else
@@ -1070,7 +1075,8 @@ static int autosuspend_check(struct usb_device *udev, int reschedule)
 				struct usb_driver *driver;
 
 				driver = to_usb_driver(intf->dev.driver);
-				if (!driver->reset_resume)
+				if (!driver->reset_resume ||
+				    intf->needs_remote_wakeup)
 					return -EOPNOTSUPP;
 			}
 		}

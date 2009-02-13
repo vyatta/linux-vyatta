@@ -25,9 +25,8 @@
  *
  * @NL80211_CMD_GET_WIPHY: request information about a wiphy or dump request
  *	to get a list of all present wiphys.
- * @NL80211_CMD_SET_WIPHY: set wiphy parameters, needs %NL80211_ATTR_WIPHY or
- *	%NL80211_ATTR_IFINDEX; can be used to set %NL80211_ATTR_WIPHY_NAME
- *	and/or %NL80211_ATTR_WIPHY_TXQ_PARAMS.
+ * @NL80211_CMD_SET_WIPHY: set wiphy name, needs %NL80211_ATTR_WIPHY and
+ *	%NL80211_ATTR_WIPHY_NAME.
  * @NL80211_CMD_NEW_WIPHY: Newly created wiphy, response to get request
  *	or rename notification. Has attributes %NL80211_ATTR_WIPHY and
  *	%NL80211_ATTR_WIPHY_NAME.
@@ -107,12 +106,6 @@
  * 	to the the specified ISO/IEC 3166-1 alpha2 country code. The core will
  * 	store this as a valid request and then query userspace for it.
  *
- * @NL80211_CMD_GET_MESH_PARAMS: Get mesh networking properties for the
- *	interface identified by %NL80211_ATTR_IFINDEX
- *
- * @NL80211_CMD_SET_MESH_PARAMS: Set mesh networking properties for the
- *      interface identified by %NL80211_ATTR_IFINDEX
- *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
  */
@@ -155,9 +148,6 @@ enum nl80211_commands {
 	NL80211_CMD_SET_REG,
 	NL80211_CMD_REQ_SET_REG,
 
-	NL80211_CMD_GET_MESH_PARAMS,
-	NL80211_CMD_SET_MESH_PARAMS,
-
 	/* add new commands above here */
 
 	/* used to define NL80211_CMD_MAX below */
@@ -179,7 +169,6 @@ enum nl80211_commands {
  * @NL80211_ATTR_WIPHY: index of wiphy to operate on, cf.
  *	/sys/class/ieee80211/<phyname>/index
  * @NL80211_ATTR_WIPHY_NAME: wiphy name (used for renaming)
- * @NL80211_ATTR_WIPHY_TXQ_PARAMS: a nested array of TX queue parameters
  *
  * @NL80211_ATTR_IFINDEX: network interface index of the device to operate on
  * @NL80211_ATTR_IFNAME: network interface name
@@ -245,9 +234,6 @@ enum nl80211_commands {
  *	(u8, 0 or 1)
  * @NL80211_ATTR_BSS_SHORT_SLOT_TIME: whether short slot time enabled
  *	(u8, 0 or 1)
- * @NL80211_ATTR_BSS_BASIC_RATES: basic rates, array of basic
- *	rates in format defined by IEEE 802.11 7.3.2.2 but without the length
- *	restriction (at most %NL80211_MAX_SUPP_RATES).
  *
  * @NL80211_ATTR_HT_CAPABILITY: HT Capability information element (from
  *	association request when used with NL80211_CMD_NEW_STATION)
@@ -310,12 +296,6 @@ enum nl80211_attrs {
 	NL80211_ATTR_REG_ALPHA2,
 	NL80211_ATTR_REG_RULES,
 
-	NL80211_ATTR_MESH_PARAMS,
-
-	NL80211_ATTR_BSS_BASIC_RATES,
-
-	NL80211_ATTR_WIPHY_TXQ_PARAMS,
-
 	/* add attributes here, update the policy in nl80211.c */
 
 	__NL80211_ATTR_AFTER_LAST,
@@ -327,8 +307,6 @@ enum nl80211_attrs {
  * here
  */
 #define NL80211_ATTR_HT_CAPABILITY NL80211_ATTR_HT_CAPABILITY
-#define NL80211_ATTR_BSS_BASIC_RATES NL80211_ATTR_BSS_BASIC_RATES
-#define NL80211_ATTR_WIPHY_TXQ_PARAMS NL80211_ATTR_WIPHY_TXQ_PARAMS
 
 #define NL80211_MAX_SUPP_RATES			32
 #define NL80211_MAX_SUPP_REG_RULES		32
@@ -474,28 +452,16 @@ enum nl80211_mpath_info {
  *	an array of nested frequency attributes
  * @NL80211_BAND_ATTR_RATES: supported bitrates in this band,
  *	an array of nested bitrate attributes
- * @NL80211_BAND_ATTR_HT_MCS_SET: 16-byte attribute containing the MCS set as
- *	defined in 802.11n
- * @NL80211_BAND_ATTR_HT_CAPA: HT capabilities, as in the HT information IE
- * @NL80211_BAND_ATTR_HT_AMPDU_FACTOR: A-MPDU factor, as in 11n
- * @NL80211_BAND_ATTR_HT_AMPDU_DENSITY: A-MPDU density, as in 11n
  */
 enum nl80211_band_attr {
 	__NL80211_BAND_ATTR_INVALID,
 	NL80211_BAND_ATTR_FREQS,
 	NL80211_BAND_ATTR_RATES,
 
-	NL80211_BAND_ATTR_HT_MCS_SET,
-	NL80211_BAND_ATTR_HT_CAPA,
-	NL80211_BAND_ATTR_HT_AMPDU_FACTOR,
-	NL80211_BAND_ATTR_HT_AMPDU_DENSITY,
-
 	/* keep last */
 	__NL80211_BAND_ATTR_AFTER_LAST,
 	NL80211_BAND_ATTR_MAX = __NL80211_BAND_ATTR_AFTER_LAST - 1
 };
-
-#define NL80211_BAND_ATTR_HT_CAPA NL80211_BAND_ATTR_HT_CAPA
 
 /**
  * enum nl80211_frequency_attr - frequency attributes
@@ -626,115 +592,6 @@ enum nl80211_mntr_flags {
 	/* keep last */
 	__NL80211_MNTR_FLAG_AFTER_LAST,
 	NL80211_MNTR_FLAG_MAX = __NL80211_MNTR_FLAG_AFTER_LAST - 1
-};
-
-/**
- * enum nl80211_meshconf_params - mesh configuration parameters
- *
- * Mesh configuration parameters
- *
- * @__NL80211_MESHCONF_INVALID: internal use
- *
- * @NL80211_MESHCONF_RETRY_TIMEOUT: specifies the initial retry timeout in
- * millisecond units, used by the Peer Link Open message
- *
- * @NL80211_MESHCONF_CONFIRM_TIMEOUT: specifies the inital confirm timeout, in
- * millisecond units, used by the peer link management to close a peer link
- *
- * @NL80211_MESHCONF_HOLDING_TIMEOUT: specifies the holding timeout, in
- * millisecond units
- *
- * @NL80211_MESHCONF_MAX_PEER_LINKS: maximum number of peer links allowed
- * on this mesh interface
- *
- * @NL80211_MESHCONF_MAX_RETRIES: specifies the maximum number of peer link
- * open retries that can be sent to establish a new peer link instance in a
- * mesh
- *
- * @NL80211_MESHCONF_TTL: specifies the value of TTL field set at a source mesh
- * point.
- *
- * @NL80211_MESHCONF_AUTO_OPEN_PLINKS: whether we should automatically
- * open peer links when we detect compatible mesh peers.
- *
- * @NL80211_MESHCONF_HWMP_MAX_PREQ_RETRIES: the number of action frames
- * containing a PREQ that an MP can send to a particular destination (path
- * target)
- *
- * @NL80211_MESHCONF_PATH_REFRESH_TIME: how frequently to refresh mesh paths
- * (in milliseconds)
- *
- * @NL80211_MESHCONF_MIN_DISCOVERY_TIMEOUT: minimum length of time to wait
- * until giving up on a path discovery (in milliseconds)
- *
- * @NL80211_MESHCONF_HWMP_ACTIVE_PATH_TIMEOUT: The time (in TUs) for which mesh
- * points receiving a PREQ shall consider the forwarding information from the
- * root to be valid. (TU = time unit)
- *
- * @NL80211_MESHCONF_HWMP_PREQ_MIN_INTERVAL: The minimum interval of time (in
- * TUs) during which an MP can send only one action frame containing a PREQ
- * reference element
- *
- * @NL80211_MESHCONF_HWMP_NET_DIAM_TRVS_TIME: The interval of time (in TUs)
- * that it takes for an HWMP information element to propagate across the mesh
- *
- * @NL80211_MESHCONF_ATTR_MAX: highest possible mesh configuration attribute
- *
- * @__NL80211_MESHCONF_ATTR_AFTER_LAST: internal use
- */
-enum nl80211_meshconf_params {
-	__NL80211_MESHCONF_INVALID,
-	NL80211_MESHCONF_RETRY_TIMEOUT,
-	NL80211_MESHCONF_CONFIRM_TIMEOUT,
-	NL80211_MESHCONF_HOLDING_TIMEOUT,
-	NL80211_MESHCONF_MAX_PEER_LINKS,
-	NL80211_MESHCONF_MAX_RETRIES,
-	NL80211_MESHCONF_TTL,
-	NL80211_MESHCONF_AUTO_OPEN_PLINKS,
-	NL80211_MESHCONF_HWMP_MAX_PREQ_RETRIES,
-	NL80211_MESHCONF_PATH_REFRESH_TIME,
-	NL80211_MESHCONF_MIN_DISCOVERY_TIMEOUT,
-	NL80211_MESHCONF_HWMP_ACTIVE_PATH_TIMEOUT,
-	NL80211_MESHCONF_HWMP_PREQ_MIN_INTERVAL,
-	NL80211_MESHCONF_HWMP_NET_DIAM_TRVS_TIME,
-
-	/* keep last */
-	__NL80211_MESHCONF_ATTR_AFTER_LAST,
-	NL80211_MESHCONF_ATTR_MAX = __NL80211_MESHCONF_ATTR_AFTER_LAST - 1
-};
-
-/**
- * enum nl80211_txq_attr - TX queue parameter attributes
- * @__NL80211_TXQ_ATTR_INVALID: Attribute number 0 is reserved
- * @NL80211_TXQ_ATTR_QUEUE: TX queue identifier (NL80211_TXQ_Q_*)
- * @NL80211_TXQ_ATTR_TXOP: Maximum burst time in units of 32 usecs, 0 meaning
- *	disabled
- * @NL80211_TXQ_ATTR_CWMIN: Minimum contention window [a value of the form
- *	2^n-1 in the range 1..32767]
- * @NL80211_TXQ_ATTR_CWMAX: Maximum contention window [a value of the form
- *	2^n-1 in the range 1..32767]
- * @NL80211_TXQ_ATTR_AIFS: Arbitration interframe space [0..255]
- * @__NL80211_TXQ_ATTR_AFTER_LAST: Internal
- * @NL80211_TXQ_ATTR_MAX: Maximum TXQ attribute number
- */
-enum nl80211_txq_attr {
-	__NL80211_TXQ_ATTR_INVALID,
-	NL80211_TXQ_ATTR_QUEUE,
-	NL80211_TXQ_ATTR_TXOP,
-	NL80211_TXQ_ATTR_CWMIN,
-	NL80211_TXQ_ATTR_CWMAX,
-	NL80211_TXQ_ATTR_AIFS,
-
-	/* keep last */
-	__NL80211_TXQ_ATTR_AFTER_LAST,
-	NL80211_TXQ_ATTR_MAX = __NL80211_TXQ_ATTR_AFTER_LAST - 1
-};
-
-enum nl80211_txq_q {
-	NL80211_TXQ_Q_VO,
-	NL80211_TXQ_Q_VI,
-	NL80211_TXQ_Q_BE,
-	NL80211_TXQ_Q_BK
 };
 
 #endif /* __LINUX_NL80211_H */

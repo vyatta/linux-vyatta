@@ -346,83 +346,6 @@ UNUSUAL_DEV(  0x04b0, 0x0301, 0x0010, 0x0010,
 		US_SC_DEVICE, US_PR_DEVICE,NULL,
 		US_FL_NOT_LOCKABLE ),
 
-/* Reported by Stefan de Konink <skinkie@xs4all.nl> */
-UNUSUAL_DEV(  0x04b0, 0x0401, 0x0200, 0x0200,
-		"NIKON",
-		"NIKON DSC D100",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY),
-
-/* Reported by Tobias Kunze Briseno <t-linux@fictive.com> */
-UNUSUAL_DEV(  0x04b0, 0x0403, 0x0200, 0x0200,
-		"NIKON",
-		"NIKON DSC D2H",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY),
-
-/* Reported by Milinevsky Dmitry <niam.niam@gmail.com> */
-UNUSUAL_DEV(  0x04b0, 0x0409, 0x0100, 0x0100,
-		"NIKON",
-		"NIKON DSC D50",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY),
-
-/* Reported by Andreas Bockhold <andreas@bockionline.de> */
-UNUSUAL_DEV(  0x04b0, 0x0405, 0x0100, 0x0100,
-		"NIKON",
-		"NIKON DSC D70",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY),
-
-/* Reported by Jamie Kitson <jamie@staberinde.fsnet.co.uk> */
-UNUSUAL_DEV(  0x04b0, 0x040d, 0x0100, 0x0100,
-		"NIKON",
-		"NIKON DSC D70s",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY),
-
-/* Reported by Graber and Mike Pagano <mpagano-kernel@mpagano.com> */
-UNUSUAL_DEV(  0x04b0, 0x040f, 0x0100, 0x0200,
-		"NIKON",
-		"NIKON DSC D200",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY),
-
-/* Reported by Emil Larsson <emil@swip.net> */
-UNUSUAL_DEV(  0x04b0, 0x0411, 0x0100, 0x0111,
-		"NIKON",
-		"NIKON DSC D80",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY),
-
-/* Reported by Ortwin Glueck <odi@odi.ch> */
-UNUSUAL_DEV(  0x04b0, 0x0413, 0x0110, 0x0111,
-		"NIKON",
-		"NIKON DSC D40",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY),
-
-/* Reported by Paul Check <paul@openstreet.com> */
-UNUSUAL_DEV(  0x04b0, 0x0415, 0x0100, 0x0100,
-		"NIKON",
-		"NIKON DSC D2Xs",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY),
-
-/* Reported by Shan Destromp (shansan@gmail.com) */
-UNUSUAL_DEV(  0x04b0, 0x0417, 0x0100, 0x0100,
-		"NIKON",
-		"NIKON DSC D40X",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY),
-
-/* Reported by paul ready <lxtwin@homecall.co.uk> */
-UNUSUAL_DEV(  0x04b0, 0x0419, 0x0100, 0x0200,
-		"NIKON",
-		"NIKON DSC D300",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY),
-
 /* Reported by Doug Maxey (dwm@austin.ibm.com) */
 UNUSUAL_DEV(  0x04b3, 0x4001, 0x0110, 0x0110,
 		"IBM",
@@ -1381,21 +1304,6 @@ UNUSUAL_DEV( 0x0a17, 0x0004, 0x1000, 0x1000,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
-
-/* Submitted by Per Winkvist <per.winkvist@uk.com> */
-UNUSUAL_DEV( 0x0a17, 0x006, 0x0000, 0xffff,
-		"Pentax",
-		"Optio S/S4",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_INQUIRY ),
-
-/* Reported by Jaak Ristioja <Ristioja@gmail.com> */
-UNUSUAL_DEV( 0x0a17, 0x006e, 0x0100, 0x0100,
-		"Pentax",
-		"K10D",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY ),
-
 /* These are virtual windows driver CDs, which the zd1211rw driver
  * automatically converts into WLAN devices. */
 UNUSUAL_DEV( 0x0ace, 0x2011, 0x0101, 0x0101,
@@ -2061,27 +1969,6 @@ UNUSUAL_DEV(  0x22b8, 0x3010, 0x0001, 0x0001,
 		"RAZR V3x",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY | US_FL_IGNORE_RESIDUE ),
-
-/*
- * Patch by Pete Zaitcev <zaitcev@redhat.com>
- * Report by Mark Patton. Red Hat bz#208928.
- * Added support for rev 0x0002 (Motorola ROKR W5)
- * by Javier Smaldone <javier@smaldone.com.ar>
- */
-UNUSUAL_DEV(  0x22b8, 0x4810, 0x0001, 0x0002,
-		"Motorola",
-		"RAZR V3i/ROKR W5",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY),
-
-/*
- * Patch by Jost Diederichs <jost@qdusa.com>
- */
-UNUSUAL_DEV(0x22b8, 0x6410, 0x0001, 0x9999,
-		"Motorola Inc.",
-		"Motorola Phone (RAZRV3xx)",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY),
 
 /*
  * Patch by Constantin Baranov <const@tltsu.ru>

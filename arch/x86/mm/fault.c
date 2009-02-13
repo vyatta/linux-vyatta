@@ -35,6 +35,7 @@
 #include <asm/tlbflush.h>
 #include <asm/proto.h>
 #include <asm-generic/sections.h>
+#include <asm/traps.h>
 
 /*
  * Page fault error code bits
@@ -357,8 +358,6 @@ static int is_errata100(struct pt_regs *regs, unsigned long address)
 	return 0;
 }
 
-void do_invalid_op(struct pt_regs *, unsigned long);
-
 static int is_f00f_bug(struct pt_regs *regs, unsigned long address)
 {
 #ifdef CONFIG_X86_F00F_BUG
@@ -593,11 +592,6 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	unsigned long flags;
 #endif
 
-	/*
-	 * We can fault from pretty much anywhere, with unknown IRQ state.
-	 */
-	trace_hardirqs_fixup();
-
 	tsk = current;
 	mm = tsk->mm;
 	prefetchw(&mm->mmap_sem);
@@ -607,8 +601,6 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 
 	si_code = SEGV_MAPERR;
 
-	if (notify_page_fault(regs))
-		return;
 	if (unlikely(kmmio_fault(regs, address)))
 		return;
 
@@ -638,6 +630,9 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 		if (spurious_fault(address, error_code))
 			return;
 
+		/* kprobes don't want to hook the spurious faults. */
+		if (notify_page_fault(regs))
+			return;
 		/*
 		 * Don't take the mm semaphore here. If we fixup a prefetch
 		 * fault we could otherwise deadlock.
@@ -645,25 +640,27 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 		goto bad_area_nosemaphore;
 	}
 
-
-#ifdef CONFIG_X86_32
-	/* It's safe to allow irq's after cr2 has been saved and the vmalloc
-	   fault has been handled. */
-	if (regs->flags & (X86_EFLAGS_IF | X86_VM_MASK))
-		local_irq_enable();
+	/* kprobes don't want to hook the spurious faults. */
+	if (notify_page_fault(regs))
+		return;
 
 	/*
-	 * If we're in an interrupt, have no user context or are running in an
-	 * atomic region then we must not take the fault.
+	 * It's safe to allow irq's after cr2 has been saved and the
+	 * vmalloc fault has been handled.
+	 *
+	 * User-mode registers count as a user access even for any
+	 * potential system fault or CPU buglet.
 	 */
-	if (in_atomic() || !mm)
-		goto bad_area_nosemaphore;
-#else /* CONFIG_X86_64 */
-	if (likely(regs->flags & X86_EFLAGS_IF))
+	if (user_mode_vm(regs)) {
+		local_irq_enable();
+		error_code |= PF_USER;
+	} else if (regs->flags & X86_EFLAGS_IF)
 		local_irq_enable();
 
+#ifdef CONFIG_X86_64
 	if (unlikely(error_code & PF_RSVD))
 		pgtable_bad(address, regs, error_code);
+#endif
 
 	/*
 	 * If we're in an interrupt, have no user context or are running in an
@@ -672,15 +669,9 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	if (unlikely(in_atomic() || !mm))
 		goto bad_area_nosemaphore;
 
-	/*
-	 * User-mode registers count as a user access even for any
-	 * potential system fault or CPU buglet.
-	 */
-	if (user_mode_vm(regs))
-		error_code |= PF_USER;
 again:
-#endif
-	/* When running in the kernel we expect faults to occur only to
+	/*
+	 * When running in the kernel we expect faults to occur only to
 	 * addresses in user space.  All other faults represent errors in the
 	 * kernel and should generate an OOPS.  Unfortunately, in the case of an
 	 * erroneous fault occurring in a code path which already holds mmap_sem
@@ -743,9 +734,6 @@ good_area:
 			goto bad_area;
 	}
 
-#ifdef CONFIG_X86_32
-survive:
-#endif
 	/*
 	 * If for any reason at all we couldn't handle the fault,
 	 * make sure we exit gracefully rather than endlessly redo
@@ -880,12 +868,11 @@ out_of_memory:
 	up_read(&mm->mmap_sem);
 	if (is_global_init(tsk)) {
 		yield();
-#ifdef CONFIG_X86_32
-		down_read(&mm->mmap_sem);
-		goto survive;
-#else
+		/*
+		 * Re-lookup the vma - in theory the vma tree might
+		 * have changed:
+		 */
 		goto again;
-#endif
 	}
 
 	printk("VM: killing process %s\n", tsk->comm);
@@ -915,15 +902,15 @@ LIST_HEAD(pgd_list);
 
 void vmalloc_sync_all(void)
 {
-#ifdef CONFIG_X86_32
-	unsigned long start = VMALLOC_START & PGDIR_MASK;
 	unsigned long address;
 
+#ifdef CONFIG_X86_32
 	if (SHARED_KERNEL_PMD)
 		return;
 
-	BUILD_BUG_ON(TASK_SIZE & ~PGDIR_MASK);
-	for (address = start; address >= TASK_SIZE; address += PGDIR_SIZE) {
+	for (address = VMALLOC_START & PMD_MASK;
+	     address >= TASK_SIZE && address < FIXADDR_TOP;
+	     address += PMD_SIZE) {
 		unsigned long flags;
 		struct page *page;
 
@@ -936,10 +923,8 @@ void vmalloc_sync_all(void)
 		spin_unlock_irqrestore(&pgd_lock, flags);
 	}
 #else /* CONFIG_X86_64 */
-	unsigned long start = VMALLOC_START & PGDIR_MASK;
-	unsigned long address;
-
-	for (address = start; address <= VMALLOC_END; address += PGDIR_SIZE) {
+	for (address = VMALLOC_START & PGDIR_MASK; address <= VMALLOC_END;
+	     address += PGDIR_SIZE) {
 		const pgd_t *pgd_ref = pgd_offset_k(address);
 		unsigned long flags;
 		struct page *page;
