@@ -169,7 +169,9 @@ static int post_dock_fixups(struct notifier_block *nb, unsigned long val,
 }
 
 
-
+static struct acpi_dock_ops acpiphp_dock_ops = {
+	.handler = handle_hotplug_event_func,
+};
 
 /* callback routine to register each ACPI PCI slot object */
 static acpi_status
@@ -253,13 +255,13 @@ register_slot(acpi_handle handle, u32 lvl, void *context, void **rv)
 
 		bridge->nr_slots++;
 
-		dbg("found ACPI PCI Hotplug slot %d at PCI %04x:%02x:%02x\n",
+		dbg("found ACPI PCI Hotplug slot %llu at PCI %04x:%02x:%02x\n",
 				slot->sun, pci_domain_nr(bridge->pci_bus),
 				bridge->pci_bus->number, slot->device);
 		retval = acpiphp_register_hotplug_slot(slot);
 		if (retval) {
 			if (retval == -EBUSY)
-				warn("Slot %d already registered by another "
+				warn("Slot %llu already registered by another "
 					"hotplug driver\n", slot->sun);
 			else
 				warn("acpiphp_register_hotplug_slot failed "
@@ -285,7 +287,7 @@ register_slot(acpi_handle handle, u32 lvl, void *context, void **rv)
 		 */
 		newfunc->flags &= ~FUNC_HAS_EJ0;
 		if (register_hotplug_dock_device(handle,
-			handle_hotplug_event_func, newfunc))
+			&acpiphp_dock_ops, newfunc))
 			dbg("failed to register dock device\n");
 
 		/* we need to be notified when dock events happen

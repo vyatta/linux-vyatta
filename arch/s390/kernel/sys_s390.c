@@ -199,7 +199,7 @@ SYSCALL_DEFINE1(s390_newuname, struct new_utsname __user *, name)
 {
 	int ret = sys_newuname(name);
 
-	if (current->personality == PER_LINUX32 && !ret) {
+	if (personality(current->personality) == PER_LINUX32 && !ret) {
 		ret = copy_to_user(name->machine, "s390\0\0\0\0", 8);
 		if (ret) ret = -EFAULT;
 	}
