@@ -1,3 +1,10 @@
+linux-2.6 (2.6.28-1+vyatta+2) unstable; urgency=low
+
+  * fix amd64-vyatta kernel config for 2.6.28
+  * don't build WAN_ROUTER module (conflicts with wanpipe-modules).
+
+ -- An-Cheng Huang <ancheng@vyatta.com>  Sat, 14 Feb 2009 18:12:42 -0800
+
 linux-2.6 (2.6.28-1+vyatta+1) UNRELEASED; urgency=low
 
   [ Stephen Hemminger ]
