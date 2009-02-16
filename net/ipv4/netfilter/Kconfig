@@ -360,24 +360,39 @@ config IP_NF_SECURITY
 	 
 	  If unsure, say N.
 
+endif # IP_NF_IPTABLES
 
-config IP_NF_MATCH_RLSNMPSTATS
-	tristate "RouteLogics SNMP statitics support"
-	depends on IP_NF_IPTABLES
+# ARP tables
+config IP_NF_ARPTABLES
+	tristate "ARP tables support"
+	select NETFILTER_XTABLES
+	depends on NETFILTER_ADVANCED
 	help
-	  Allows RouteLogics to record snmp statistics.
+	  arptables is a general, extensible packet identification framework.
+	  The ARP packet filtering and mangling (manipulation)subsystems
+	  use this: say Y or M here if you want to use either of those.
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
-config IP_NF_MATCH_IPP2P
-	tristate  'IPP2P match support'
-	depends on IP_NF_IPTABLES
+if IP_NF_ARPTABLES
+
+config IP_NF_ARPFILTER
+	tristate "ARP packet filtering"
 	help
-	  This option makes possible to match some P2P packets
-	  therefore helps controlling such traffic.
-	
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  ARP packet filtering defines a table `filter', which has a series of
+	  rules for simple ARP packet filtering at local input and
+	  local output.  On a bridge, you can also specify filtering rules
+	  for forwarded ARP packets. See the man page for arptables(8).
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
+config IP_NF_ARP_MANGLE
+	tristate "ARP payload mangling"
+	help
+	  Allows altering the ARP packet payload: source and destination
+	  hardware and network addresses.
+
+endif # IP_NF_ARPTABLES
 
 
 config IP_NF_SET
@@ -435,7 +450,6 @@ config IP_NF_SET_PORTMAP
 	help
 	  This option adds the portmap set type support.
 
-
 	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_SET_IPHASH
@@ -462,6 +476,22 @@ config IP_NF_SET_IPPORTHASH
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
+config IP_NF_SET_IPPORTIPHASH
+	tristate "ipportiphash set support"
+	depends on IP_NF_SET
+	help
+	  This option adds the ipportiphash set type support.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
+config IP_NF_SET_IPPORTNETHASH
+	tristate "ipportnethash set support"
+	depends on IP_NF_SET
+	help
+	  This option adds the ipportnethash set type support.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
 config IP_NF_SET_IPTREE
 	tristate "iptree set support"
 	depends on IP_NF_SET
@@ -475,6 +505,14 @@ config IP_NF_SET_IPTREEMAP
 	depends on IP_NF_SET
 	help
 	  This option adds the iptreemap set type support.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
+config IP_NF_SET_SETLIST
+	tristate "setlist set support"
+	depends on IP_NF_SET
+	help
+	  This option adds the setlist set type support.
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
@@ -497,39 +535,4 @@ config IP_NF_TARGET_SET
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
-endif # IP_NF_IPTABLES
-
-# ARP tables
-config IP_NF_ARPTABLES
-	tristate "ARP tables support"
-	select NETFILTER_XTABLES
-	depends on NETFILTER_ADVANCED
-	help
-	  arptables is a general, extensible packet identification framework.
-	  The ARP packet filtering and mangling (manipulation)subsystems
-	  use this: say Y or M here if you want to use either of those.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-if IP_NF_ARPTABLES
-
-config IP_NF_ARPFILTER
-	tristate "ARP packet filtering"
-	help
-	  ARP packet filtering defines a table `filter', which has a series of
-	  rules for simple ARP packet filtering at local input and
-	  local output.  On a bridge, you can also specify filtering rules
-	  for forwarded ARP packets. See the man page for arptables(8).
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_ARP_MANGLE
-	tristate "ARP payload mangling"
-	help
-	  Allows altering the ARP packet payload: source and destination
-	  hardware and network addresses.
-
-endif # IP_NF_ARPTABLES
-
 endmenu
-

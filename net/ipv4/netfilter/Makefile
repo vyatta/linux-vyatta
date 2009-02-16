@@ -51,9 +51,6 @@ obj-$(CONFIG_IP_NF_SECURITY) += iptable_security.o
 obj-$(CONFIG_IP_NF_MATCH_ADDRTYPE) += ipt_addrtype.o
 obj-$(CONFIG_IP_NF_MATCH_AH) += ipt_ah.o
 obj-$(CONFIG_IP_NF_MATCH_ECN) += ipt_ecn.o
-obj-$(CONFIG_IP_NF_MATCH_RECENT) += ipt_recent.o
-obj-$(CONFIG_IP_NF_MATCH_IPP2P) += ipt_ipp2p.o
-obj-$(CONFIG_IP_NF_MATCH_TOS) += ipt_tos.o
 obj-$(CONFIG_IP_NF_MATCH_TTL) += ipt_ttl.o
 
 # targets
@@ -76,8 +73,6 @@ obj-$(CONFIG_IP_NF_ARPFILTER) += arptable_filter.o
 
 obj-$(CONFIG_IP_NF_QUEUE) += ip_queue.o
 
-# Vyatta
-obj-$(CONFIG_IP_NF_MATCH_RLSNMPSTATS) += ipt_rlsnmpstats.o
 # ipset
 obj-$(CONFIG_IP_NF_SET) += ip_set.o
 obj-$(CONFIG_IP_NF_SET_IPMAP) += ip_set_ipmap.o
@@ -86,8 +81,11 @@ obj-$(CONFIG_IP_NF_SET_MACIPMAP) += ip_set_macipmap.o
 obj-$(CONFIG_IP_NF_SET_IPHASH) += ip_set_iphash.o
 obj-$(CONFIG_IP_NF_SET_NETHASH) += ip_set_nethash.o
 obj-$(CONFIG_IP_NF_SET_IPPORTHASH) += ip_set_ipporthash.o
+obj-$(CONFIG_IP_NF_SET_IPPORTIPHASH) += ip_set_ipportiphash.o
+obj-$(CONFIG_IP_NF_SET_IPPORTNETHASH) += ip_set_ipportnethash.o
 obj-$(CONFIG_IP_NF_SET_IPTREE) += ip_set_iptree.o
 obj-$(CONFIG_IP_NF_SET_IPTREEMAP) += ip_set_iptreemap.o
+obj-$(CONFIG_IP_NF_SET_SETLIST) += ip_set_setlist.o
 
 # match and target
 obj-$(CONFIG_IP_NF_MATCH_SET) += ipt_set.o

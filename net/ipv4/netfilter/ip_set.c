@@ -19,17 +19,21 @@
 #include <linux/ip.h>
 #include <linux/skbuff.h>
 #include <linux/random.h>
-#include <linux/jhash.h>
-#include <linux/netfilter_ipv4/ip_tables.h>
+#include <linux/netfilter_ipv4/ip_set_jhash.h>
 #include <linux/errno.h>
+#include <linux/capability.h>
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,27)
+#include <asm/semaphore.h>
+#else
 #include <linux/semaphore.h>
+#endif
 #include <linux/spinlock.h>
-#include <linux/vmalloc.h>
 
 #define ASSERT_READ_LOCK(x)
 #define ASSERT_WRITE_LOCK(x)
+#include <linux/netfilter.h>
 #include <linux/netfilter_ipv4/ip_set.h>
 
 static struct list_head set_type_list;		/* all registered sets */
@@ -231,10 +235,10 @@ ip_set_testip_kernel(ip_set_id_t index,
 		 && follow_bindings(index, set, ip));
 	read_unlock_bh(&ip_set_lock);
 
-	return res;
+	return (res < 0 ? 0 : res);
 }
 
-void
+int
 ip_set_addip_kernel(ip_set_id_t index,
 		    const struct sk_buff *skb,
 		    const u_int32_t *flags)
@@ -264,9 +268,11 @@ ip_set_addip_kernel(ip_set_id_t index,
 	    && set->type->retry
 	    && (res = set->type->retry(set)) == 0)
 	    	goto retry;
+	
+	return res;
 }
 
-void
+int
 ip_set_delip_kernel(ip_set_id_t index,
 		    const struct sk_buff *skb,
 		    const u_int32_t *flags)
@@ -290,6 +296,8 @@ ip_set_delip_kernel(ip_set_id_t index,
 		 && flags[i]
 		 && follow_bindings(index, set, ip));
 	read_unlock_bh(&ip_set_lock);
+	
+	return res;
 }
 
 /* Register and deregister settype */
@@ -354,6 +362,29 @@ ip_set_unregister_set_type(struct ip_set_type *set_type)
 
 }
 
+ip_set_id_t
+__ip_set_get_byname(const char *name, struct ip_set **set)
+{
+	ip_set_id_t i, index = IP_SET_INVALID_ID;
+	
+	for (i = 0; i < ip_set_max; i++) {
+		if (ip_set_list[i] != NULL
+		    && SETNAME_EQ(ip_set_list[i]->name, name)) {
+			__ip_set_get(i);
+			index = i;
+			*set = ip_set_list[i];
+			break;
+		}
+	}
+	return index;
+}
+
+void __ip_set_put_byindex(ip_set_id_t index)
+{
+	if (ip_set_list[index])
+		__ip_set_put(index);
+}
+
 /*
  * Userspace routines
  */
@@ -404,11 +435,25 @@ ip_set_get_byindex(ip_set_id_t index)
 }
 
 /*
+ * Find the set id belonging to the index.
+ * We are protected by the mutex, so we do not need to use
+ * ip_set_lock. There is no need to reference the sets either.
+ */
+ip_set_id_t
+ip_set_id(ip_set_id_t index)
+{
+	if (index >= ip_set_max || !ip_set_list[index])
+		return IP_SET_INVALID_ID;
+	
+	return ip_set_list[index]->id;
+}
+
+/*
  * If the given set pointer points to a valid set, decrement
  * reference count by 1. The caller shall not assume the index
  * to be valid, after calling this function.
  */
-void ip_set_put(ip_set_id_t index)
+void ip_set_put_byindex(ip_set_id_t index)
 {
 	down(&ip_set_app_mutex);
 	if (ip_set_list[index])
@@ -486,7 +531,16 @@ ip_set_addip(ip_set_id_t index,
 	     const void *data,
 	     size_t size)
 {
+	struct ip_set *set = ip_set_list[index];
 
+	IP_SET_ASSERT(set);
+
+	if (size - sizeof(struct ip_set_req_adt) != set->type->reqsize) {
+		ip_set_printk("data length wrong (want %zu, have %zu)",
+			      set->type->reqsize,
+			      size - sizeof(struct ip_set_req_adt));
+		return -EINVAL;
+	}
 	return __ip_set_addip(index,
 			      data + sizeof(struct ip_set_req_adt),
 			      size - sizeof(struct ip_set_req_adt));
@@ -502,6 +556,13 @@ ip_set_delip(ip_set_id_t index,
 	int res;
 	
 	IP_SET_ASSERT(set);
+
+	if (size - sizeof(struct ip_set_req_adt) != set->type->reqsize) {
+		ip_set_printk("data length wrong (want %zu, have %zu)",
+			      set->type->reqsize,
+			      size - sizeof(struct ip_set_req_adt));
+		return -EINVAL;
+	}
 	write_lock_bh(&set->lock);
 	res = set->type->delip(set,
 			       data + sizeof(struct ip_set_req_adt),
@@ -522,6 +583,13 @@ ip_set_testip(ip_set_id_t index,
 	int res;
 
 	IP_SET_ASSERT(set);
+	
+	if (size - sizeof(struct ip_set_req_adt) != set->type->reqsize) {
+		ip_set_printk("data length wrong (want %zu, have %zu)",
+			      set->type->reqsize,
+			      size - sizeof(struct ip_set_req_adt));
+		return -EINVAL;
+	}
 	res = __ip_set_testip(set,
 			      data + sizeof(struct ip_set_req_adt),
 			      size - sizeof(struct ip_set_req_adt),
@@ -801,6 +869,7 @@ ip_set_create(const char *name,
 	int res = 0;
 
 	DP("setname: %s, typename: %s, id: %u", name, typename, restore);
+
 	/*
 	 * First, and without any locks, allocate and initialize
 	 * a normal base set structure.
@@ -843,6 +912,14 @@ ip_set_create(const char *name,
 		goto out;
 	}
 	read_unlock_bh(&ip_set_lock);
+
+	/* Check request size */
+	if (size != set->type->header_size) {
+		ip_set_printk("data length wrong (want %zu, have %zu)",
+			      set->type->header_size,
+			      size);
+		goto put_out;
+	}
 
 	/*
 	 * Without holding any locks, create private part.
@@ -1003,7 +1080,9 @@ ip_set_swap(ip_set_id_t from_index, ip_set_id_t to_index)
 	u_int32_t from_ref;
 
 	DP("set: %s to %s",  from->name, to->name);
-	/* Features must not change. Artifical restriction. */
+	/* Features must not change. 
+	 * Not an artifical restriction anymore, as we must prevent
+	 * possible loops created by swapping in setlist type of sets. */
 	if (from->type->features != to->type->features)
 		return -ENOEXEC;
 
@@ -1912,6 +1991,7 @@ static struct nf_sockopt_ops so_set = {
 };
 
 static int max_sets, hash_size;
+
 module_param(max_sets, int, 0600);
 MODULE_PARM_DESC(max_sets, "maximal number of sets");
 module_param(hash_size, int, 0600);
@@ -1954,6 +2034,7 @@ static int __init ip_set_init(void)
 		vfree(ip_set_hash);
 		return res;
 	}
+	
 	return 0;
 }
 
@@ -1971,7 +2052,10 @@ EXPORT_SYMBOL(ip_set_unregister_set_type);
 
 EXPORT_SYMBOL(ip_set_get_byname);
 EXPORT_SYMBOL(ip_set_get_byindex);
-EXPORT_SYMBOL(ip_set_put);
+EXPORT_SYMBOL(ip_set_put_byindex);
+EXPORT_SYMBOL(ip_set_id);
+EXPORT_SYMBOL(__ip_set_get_byname);
+EXPORT_SYMBOL(__ip_set_put_byindex);
 
 EXPORT_SYMBOL(ip_set_addip_kernel);
 EXPORT_SYMBOL(ip_set_delip_kernel);

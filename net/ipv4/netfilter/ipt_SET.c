@@ -10,17 +10,11 @@
 
 /* ipt_SET.c - netfilter target to manipulate IP sets */
 
-#include <linux/types.h>
-#include <linux/ip.h>
-#include <linux/timer.h>
 #include <linux/module.h>
-#include <linux/netfilter.h>
-#include <linux/netdevice.h>
-#include <linux/if.h>
-#include <linux/inetdevice.h>
+#include <linux/ip.h>
+#include <linux/skbuff.h>
 #include <linux/version.h>
-#include <net/protocol.h>
-#include <net/checksum.h>
+
 #include <linux/netfilter_ipv4.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,16)
 #include <linux/netfilter_ipv4/ip_tables.h>
@@ -63,16 +57,23 @@ target(struct sk_buff **pskb,
        unsigned int hooknum,
        const struct xt_target *target,
        const void *targinfo)
-#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24) */
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
 target(struct sk_buff *skb,
        const struct net_device *in,
        const struct net_device *out,
        unsigned int hooknum,
        const struct xt_target *target,
        const void *targinfo)
+#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,28) */
+target(struct sk_buff *skb,
+       const struct xt_target_param *par)
 #endif
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
 	const struct ipt_set_info_target *info = targinfo;
+#else
+	const struct ipt_set_info_target *info = par->targinfo;
+#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	struct sk_buff *skb = *pskb;
 #endif
@@ -119,16 +120,23 @@ checkentry(const char *tablename,
 	   const struct xt_target *target,
 	   void *targinfo,
 	   unsigned int hook_mask)
-#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23) */
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
 static bool
 checkentry(const char *tablename,
 	   const void *e,
 	   const struct xt_target *target,
 	   void *targinfo,
 	   unsigned int hook_mask)
+#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,28) */
+static bool
+checkentry(const struct xt_tgchk_param *par)
 #endif
 {
-	struct ipt_set_info_target *info = targinfo;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
+	const struct ipt_set_info_target *info = targinfo;
+#else
+	const struct ipt_set_info_target *info = par->targinfo;
+#endif
 	ip_set_id_t index;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,17)
@@ -171,12 +179,18 @@ static void destroy(void *targetinfo,
 static void destroy(const struct xt_target *target,
 		    void *targetinfo,
 		    unsigned int targetsize)
-#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19) */
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
 static void destroy(const struct xt_target *target,
 		    void *targetinfo)
+#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,28) */
+static void destroy(const struct xt_tgdtor_param *par)
 #endif
 {
-	struct ipt_set_info_target *info = targetinfo;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
+	const struct ipt_set_info_target *info = targetinfo;
+#else
+	const struct ipt_set_info_target *info = par->targinfo;
+#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,17)
 	if (targetsize != IPT_ALIGN(sizeof(struct ipt_set_info_target))) {
@@ -185,9 +199,9 @@ static void destroy(const struct xt_target *target,
 	}
 #endif
 	if (info->add_set.index != IP_SET_INVALID_ID)
-		ip_set_put(info->add_set.index);
+		ip_set_put_byindex(info->add_set.index);
 	if (info->del_set.index != IP_SET_INVALID_ID)
-		ip_set_put(info->del_set.index);
+		ip_set_put_byindex(info->del_set.index);
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,17)
