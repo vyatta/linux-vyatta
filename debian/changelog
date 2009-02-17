@@ -1,3 +1,12 @@
+linux-2.6 (2.6.28-1+vyatta+7) unstable; urgency=low
+
+  * Update amd64 config
+  * Rearrange IPP2P entry on Kconfig
+  * Remvoe IRDA and Phonet
+  * Add more derived files
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 17 Feb 2009 10:28:55 -0800
+
 linux-2.6 (2.6.28-1+vyatta+6) unstable; urgency=low
 
   [ Stephen Hemminger ]
