@@ -1,5 +1,5 @@
 #!/bin/sh
 set -e
 
-upstream="2.6.27"
+upstream="2.6.28"
 exec "/usr/src/kernel-patches/all/$upstream/apply/debian" "$upstream-0"

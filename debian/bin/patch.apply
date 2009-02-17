@@ -3,9 +3,9 @@
 import os, os.path, re, sys
 from warnings import warn
 
-_default_home = "/usr/src/kernel-patches/all/2.6.27/debian"
-_default_revisions = "1+vyatta+1 1+vyatta+2 1+vyatta+2.1 1+vyatta+3 1+vyatta+4 1+vyatta+5 1+vyatta+6 1+vyatta+7 1+vyatta+8 1+vyatta+9 1+vyatta+10 1+vyatta+11 1+vyatta+12"
-_default_source = "2.6.27-1+vyatta+12"
+_default_home = "/usr/src/kernel-patches/all/2.6.28/debian"
+_default_revisions = "1+vyatta+1 1+vyatta+2 1+vyatta+3 1+vyatta+4"
+_default_source = "2.6.28-1+vyatta+4"
 
 class series(list):
     def __init__(self, name, home, reverse = False):
