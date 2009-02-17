@@ -1,8 +1,15 @@
-linux-2.6 (2.6.28-1+vyatta+5) unstable; urgency=low
+linux-2.6 (2.6.28-1+vyatta+6) unstable; urgency=low
 
+  [ Stephen Hemminger ]
   * Update to ipset-2.4.9
   * add ipp2p back to config
   * Minor config changes
+
+ -- An-Cheng Huang <ancheng@vyatta.com>  Tue, 17 Feb 2009 09:42:48 -0800
+
+linux-2.6 (2.6.28-1+vyatta+5) unstable; urgency=low
+
+  * UNRELEASED
 
  -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 17 Feb 2009 09:21:02 -0800
 
