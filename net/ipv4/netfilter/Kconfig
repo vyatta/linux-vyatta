@@ -101,6 +101,18 @@ config IP_NF_MATCH_TTL
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
+config IP_NF_MATCH_STRICT_ES
+       tristate '"strict es" match support'
+	depends on NETFILTER_ADVANCED
+	help
+	  This option adds a Strict ES match, which allows you to
+	  match only packets that arrive with the destinaton address matching
+	  an IP address on the incoming interface. This can be used to implement
+	  Strong ES model (ad defined in RFC1122).
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
+
 # `filter', generic and specific targets
 config IP_NF_FILTER
 	tristate "Packet filtering"

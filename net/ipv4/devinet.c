@@ -237,6 +237,7 @@ int inet_addr_onlink(struct in_device *in_dev, __be32 a, __be32 b)
 	rcu_read_unlock();
 	return 0;
 }
+EXPORT_SYMBOL_GPL(inet_addr_onlink);
 
 static void __inet_del_ifa(struct in_device *in_dev, struct in_ifaddr **ifap,
 			 int destroy, struct nlmsghdr *nlh, u32 pid)
