@@ -1,3 +1,252 @@
+linux-2.6 (2.6.28-1+vyatta+8) unstable; urgency=low
+
+  [ Alok Kataria ]
+  * x86, vmi: put a missing paravirt_release_pmd in pgd_dtor
+
+  [ Paul Clements ]
+  * nbd: fix I/O hang on disconnected nbds
+
+  [ Johannes Berg ]
+  * mac80211: restrict to AP in outgoing interface heuristic
+
+  [ Ian Dall ]
+  * w1: w1 temp calculation overflow fix
+
+  [ Hin-Tak Leung ]
+  * zd1211rw: adding 0ace:0xa211 as a ZD1211 device
+  * zd1211rw: treat MAXIM_NEW_RF(0x08) as UW2453_RF(0x09) for TP-Link
+    WN322/422G
+
+  [ Jiri Slaby ]
+  * parport: parport_serial, don't bind netmos ibm 0299
+
+  [ Heiko Carstens ]
+  * syscall define: fix uml compile bug
+
+  [ Randy Dunlap ]
+  * kernel-doc: fix syscall wrapper processing
+
+  [ Nick Piggin ]
+  * Fix page writeback thinko, causing Berkeley DB slowdown
+
+  [ Artem Bityutskiy ]
+  * write-back: fix nr_to_write counter
+
+  [ Federico Cuello ]
+  * writeback: fix break condition
+
+  [ Jeremy Fitzhardinge ]
+  * mm: rearrange exit_mmap() to unlock before arch_exit_mmap
+
+  [ Kumar Gala ]
+  * powerpc/fsl-booke: Fix mapping functions to use phys_addr_t
+
+  [ J. Bruce Fields ]
+  * lockd: fix regression in lockd's handling of blocked locks
+
+  [ Vlad Yasevich ]
+  * sctp: Fix crc32c calculations on big-endian arhes.
+  * sctp: Correctly start rtx timer on new packet transmissions.
+  * sctp: Properly timestamp outgoing data chunks for rtx purposes
+
+  [ Herbert Xu ]
+  * net: Fix frag_list handling in skb_seq_read
+
+  [ Shyam Iyer ]
+  * net: Fix OOPS in skb_seq_read().
+
+  [ Roel Kluin ]
+  * drivers/net/skfp: if !capable(CAP_NET_ADMIN): inverted logic
+
+  [ Benjamin Zores ]
+  * ipv4: fix infinite retry loop in IP-Config
+
+  [ David S. Miller ]
+  * net: Fix userland breakage wrt. linux/if_tunnel.h
+
+  [ Sebastiano Di Paola ]
+  * net: packet socket packet_lookup_frame fix
+
+  [ Herbert Xu ]
+  * packet: Avoid lock_sock in mmap handler
+
+  [ Ilkka Virta ]
+  * sungem: Soft lockup in sungem on Netra AC200 when switching
+    interface up
+
+  [ Jesper Dangaard Brouer ]
+  * udp: Fix UDP short packet false positive
+
+  [ Eric Dumazet ]
+  * udp: increments sk_drops in __udp_queue_rcv_skb()
+
+  [ David S. Miller ]
+  * ipv6: Disallow rediculious flowlabel option sizes.
+
+  [ Herbert Xu ]
+  * ipv6: Copy cork options in ip6_append_data
+
+  [ Clément Lecigne ]
+  * net: 4 bytes kernel memory disclosure in SO_BSDCOMPAT gsopt try #2
+
+  [ Alexey Dobriyan ]
+  * sky2: fix hard hang with netconsoling and iface going up
+
+  [ David S. Miller ]
+  * tun: Add some missing TUN compat ioctl translations.
+
+  [ Alex Williamson ]
+  * tun: Fix unicast filter overflow
+  * virtio_net: Fix MAX_PACKET_LEN to support 802.1Q VLANs
+
+  [ Willy Tarreau ]
+  * tcp: splice as many packets as possible at once
+
+  [ Dimitris Michailidis ]
+  * tcp: Fix length tcp_splice_data_recv passes to skb_splice_bits.
+
+  [ Christian Borntraeger ]
+  * sparc: Enable syscall wrappers for 64-bit (CVE-2009-0029)
+
+  [ David S. Miller ]
+  * sparc64: Annotate sparc64 specific syscalls with SYSCALL_DEFINEx()
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Add missing terminator in slave dig-out array
+  * ALSA: mtpav - Fix initial value for input hwport
+
+  [ Jiri Kosina ]
+  * HID: adjust report descriptor fixup for MS 1028 receiver
+
+  [ Sergei Shtylyov ]
+  * ide/libata: fix ata_id_is_cfa() (take 4)
+
+  [ Tejun Heo ]
+  * libata: fix EH device failure handling
+
+  [ Eric Leblond ]
+  * netfilter: fix tuple inversion for Node information request
+
+  [ Qu Haoran ]
+  * netfilter: xt_sctp: sctp chunk mapping doesn't work
+
+  [ Andreas Herrmann ]
+  * x86: microcode_amd: fix wrong handling of equivalent CPU id
+
+  [ Borislav Petkov ]
+  * ide-cd: fix DMA for non bio-backed requests
+
+  [ Jarek Poplawski ]
+  * net: Fix data corruption when splicing from sockets.
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.28.6
+
+  [ Stephen Hemminger ]
+  * Add iptables module for strict ES checking
+
+  [ Eric W. Biederman ]
+  * pid: implement ns_of_pid
+
+  [ Sukadev Bhattiprolu ]
+  * mqueue: fix si_pid value in mqueue do_notify()
+
+  [ Wim Van Sebroeck ]
+  * WATCHDOG: iTCO_wdt: fix SMI_EN regression 2
+
+  [ Michael Neuling ]
+  * powerpc/vsx: Fix VSX alignment handler for regs 32-63
+
+  [ Tejun Heo ]
+  * sata_nv: give up hardreset on nf2
+
+  [ David Woodhouse ]
+  * Fix Intel IOMMU write-buffer flushing
+
+  [ Mike Christie ]
+  * SCSI: libiscsi: fix iscsi pool leak
+
+  [ Jeremy Fitzhardinge ]
+  * x86/cpa: make sure cpa is safe to call in lazy mmu mode
+
+  [ Peter Zijlstra ]
+  * sched: SCHED_OTHER vs SCHED_IDLE isolation
+
+  [ Thomas Gleixner ]
+  * x86, vm86: fix preemption bug
+
+  [ Zlatko Calusic ]
+  * Add support for VT6415 PCIE PATA IDE Host Controller
+
+  [ Carsten Otte ]
+  * ext2/xip: refuse to change xip flag during remount with busy inodes
+
+  [ Roel Kluin ]
+  * 3c505: do not set pcb->data.raw beyond its size
+
+  [ Tomas Winkler ]
+  * Bluetooth: Fix TX error path in btsdio driver
+
+  [ Theodore Ts'o ]
+  * ext4: Add support for non-native signed/unsigned htree hash
+    algorithms
+  * ext4: tone down ext4_da_writepages warnings
+
+  [ Aneesh Kumar K.V ]
+  * ext4: Fix the delalloc writepages to allocate blocks at the right
+    offset.
+  * ext4: avoid ext4_error when mounting a fs with a single bg
+
+  [ Yasunori Goto ]
+  * ext4: Widen type of ext4_sb_info.s_mb_maxs[]
+
+  [ Theodore Ts'o ]
+  * jbd2: Add barrier not supported test to
+    journal_wait_on_commit_record
+
+  [ Aneesh Kumar K.V ]
+  * ext4: Don't overwrite allocation_context ac_status
+  * ext4: Add blocks added during resize to bitmap
+  * ext4: Use EXT4_GROUP_INFO_NEED_INIT_BIT during resize
+  * ext4: cleanup mballoc header files
+  * ext4: don't use blocks freed but not yet committed in buddy cache
+    init
+  * ext4: Fix race between read_block_bitmap() and mark_diskspace_used()
+  * ext4: Fix the race between read_inode_bitmap() and ext4_new_inode()
+
+  [ Mark Fasheh ]
+  * jbd2: Add BH_JBDPrivateStart
+
+  [ Aneesh Kumar K.V ]
+  * ext4: Use new buffer_head flag to check uninit group bitmaps
+    initialization
+  * ext4: mark the blocks/inode bitmap beyond end of group as used
+  * ext4: Don't allow new groups to be added during block allocation
+  * ext4: Init the complete page while building buddy cache
+  * ext4: Fix s_dirty_blocks_counter if block allocation failed with
+    nodelalloc
+
+  [ Theodore Ts'o ]
+  * ext4: Add sanity checks for the superblock before mounting the
+    filesystem
+  * ext4: only use i_size_high for regular files
+  * ext4: Add sanity check to make_indexed_dir
+  * jbd2: On a __journal_expect() assertion failure printk "JBD2", not
+    "EXT3-fs"
+  * ext4: Initialize the new group descriptor when resizing the
+    filesystem
+
+  [ Alexey Dobriyan ]
+  * Fix longstanding "error: storage size of '__mod_dmi_device_table'
+    isn't known"
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.28.7
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 23 Feb 2009 15:12:40 -0800
+
 linux-2.6 (2.6.28-1+vyatta+7) unstable; urgency=low
 
   * Update amd64 config
