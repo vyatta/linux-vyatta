@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.28
-# Tue Mar 10 10:50:42 2009
+# Tue Mar 10 11:06:03 2009
 #
 # CONFIG_64BIT is not set
 CONFIG_X86_32=y
@@ -183,8 +183,8 @@ CONFIG_SCHED_NO_NO_OMIT_FRAME_POINTER=y
 # CONFIG_PARAVIRT_GUEST is not set
 # CONFIG_MEMTEST is not set
 # CONFIG_M386 is not set
-# CONFIG_M486 is not set
-CONFIG_M586=y
+CONFIG_M486=y
+# CONFIG_M586 is not set
 # CONFIG_M586TSC is not set
 # CONFIG_M586MMX is not set
 # CONFIG_M686 is not set

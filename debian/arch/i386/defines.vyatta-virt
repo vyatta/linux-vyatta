@@ -1,6 +1,5 @@
 [base]
-flavours:
- vyatta-virt
+flavours: vyatta-virt
 kernel-arch: i386
 kernel-header-dirs: i386 x86_64
 
