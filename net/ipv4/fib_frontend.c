@@ -259,11 +259,8 @@ int fib_validate_source(__be32 src, __be32 dst, u8 tos, int oif,
 	net = dev_net(dev);
 	if (fib_lookup(net, &fl, &res))
 		goto last_resort;
-	if (loop && res.type == RTN_LOCAL) {
-		*spec_dst = FIB_RES_PREFSRC(res);
-		fib_res_put(&res);
-		return 0;
-	}
+	if (loop && res.type == RTN_LOCAL)
+		goto loop;
 	if (res.type != RTN_UNICAST)
 		goto e_inval_res;
 	*spec_dst = FIB_RES_PREFSRC(res);
@@ -306,6 +303,11 @@ e_inval_res:
 	fib_res_put(&res);
 e_inval:
 	return -EINVAL;
+loop:
+	/* loopback over wire - send to self */
+	*spec_dst = FIB_RES_PREFSRC(res);
+	fib_res_put(&res);
+	return 0;
 }
 
 static inline __be32 sk_extract_addr(struct sockaddr *addr)
