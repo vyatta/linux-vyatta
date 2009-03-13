@@ -2003,6 +2003,13 @@ static int ip_route_input_slow(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 
 	if (res.type == RTN_LOCAL) {
 		int result;
+		int linkf = IN_DEV_LINKFILTER(in_dev);
+
+		if (linkf && !netif_running(res.fi->fib_dev))
+			goto no_route;
+		if (linkf > 1 && !netif_carrier_ok(res.fi->fib_dev))
+			goto no_route;
+
 		result = fib_validate_source(saddr, daddr, tos,
 					     net->loopback_dev->ifindex,
 					     dev, &spec_dst, &itag);
