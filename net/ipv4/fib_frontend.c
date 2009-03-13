@@ -922,6 +922,13 @@ static int fib_inetaddr_event(struct notifier_block *this, unsigned long event, 
 #endif
 		rt_cache_flush(dev_net(dev), -1);
 		break;
+	case NETDEV_CHANGE:
+		if (!netif_carrier_ok(dev)) {
+			struct in_device *in_dev = __in_dev_get_rtnl(dev);
+			if (in_dev && IN_DEV_LINKFILTER(in_dev) > 1)
+				rt_cache_flush(dev_net(dev), -1);
+		}
+		break;
 	case NETDEV_DOWN:
 		fib_del_ifaddr(ifa);
 		if (ifa->ifa_dev->ifa_list == NULL) {

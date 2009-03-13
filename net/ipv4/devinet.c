@@ -1455,6 +1455,7 @@ static struct devinet_sysctl_table {
 					      "force_igmp_version"),
 		DEVINET_SYSCTL_FLUSHING_ENTRY(PROMOTE_SECONDARIES,
 					      "promote_secondaries"),
+		DEVINET_SYSCTL_RW_ENTRY(LINKFILTER, "link_filter"),
 	},
 };
 
