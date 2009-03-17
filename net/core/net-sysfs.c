@@ -196,10 +196,9 @@ static ssize_t store_flags(struct device *dev, struct device_attribute *attr,
 
 NETDEVICE_SHOW(tx_queue_len, fmt_ulong);
 
-static int change_tx_queue_len(struct net_device *net, unsigned long new_len)
+static int change_tx_queue_len(struct net_device *netdev, unsigned long new_len)
 {
-	net->tx_queue_len = new_len;
-	return 0;
+	return dev_set_tx_queue_len(netdev, new_len);
 }
 
 static ssize_t store_tx_queue_len(struct device *dev,
