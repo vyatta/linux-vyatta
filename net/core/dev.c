@@ -984,6 +984,22 @@ int dev_set_alias(struct net_device *dev, const char *alias, size_t len)
 	return len;
 }
 
+/**
+ *
+ *	@dev: device
+ *	@len: limit of frames in transmit queue
+ *
+ *	Set ifalias for a device,
+ */
+int dev_set_tx_queue_len(struct net_device *dev, unsigned long len)
+{
+	if (dev->flags & IFF_UP)
+		dev_deactivate(dev);
+	dev->tx_queue_len = len;
+	if (dev->flags & IFF_UP)
+		dev_activate(dev);
+	return 0;
+}
 
 /**
  *	netdev_features_change - device changes features
@@ -3630,8 +3646,7 @@ static int dev_ifsioc(struct net *net, struct ifreq *ifr, unsigned int cmd)
 		case SIOCSIFTXQLEN:
 			if (ifr->ifr_qlen < 0)
 				return -EINVAL;
-			dev->tx_queue_len = ifr->ifr_qlen;
-			return 0;
+			return dev_set_tx_queue_len(dev, ifr->ifr_qlen);
 
 		case SIOCSIFNAME:
 			ifr->ifr_newname[IFNAMSIZ-1] = '\0';
