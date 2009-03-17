@@ -1,3 +1,10 @@
+linux-2.6 (2.6.28-1+vyatta+14) unstable; urgency=low
+
+  * Handle modifying transmit queue length on active devices
+  * Add link_filter control for IPV6
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 17 Mar 2009 15:39:16 -0700
+
 linux-2.6 (2.6.28-1+vyatta+13) unstable; urgency=low
 
   [ Eugene Teo ]
