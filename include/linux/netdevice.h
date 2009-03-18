@@ -1265,8 +1265,6 @@ extern int		dev_change_net_namespace(struct net_device *,
 extern int		dev_set_mtu(struct net_device *, int);
 extern int		dev_set_mac_address(struct net_device *,
 					    struct sockaddr *);
-extern int		dev_set_tx_queue_len(struct net_device *dev,
-					     unsigned long len);
 extern int		dev_hard_start_xmit(struct sk_buff *skb,
 					    struct net_device *dev,
 					    struct netdev_queue *txq);

@@ -884,7 +884,7 @@ static int do_setlink(struct net_device *dev, struct ifinfomsg *ifm,
 	}
 
 	if (tb[IFLA_TXQLEN])
-		dev_set_tx_queue_len(dev, nla_get_u32(tb[IFLA_TXQLEN]));
+		dev->tx_queue_len = nla_get_u32(tb[IFLA_TXQLEN]);
 
 	if (tb[IFLA_OPERSTATE])
 		set_operstate(dev, nla_get_u8(tb[IFLA_OPERSTATE]));
