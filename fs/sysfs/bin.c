@@ -66,9 +66,6 @@ read(struct file *file, char __user *userbuf, size_t bytes, loff_t *off)
 	if (!bytes)
 		return 0;
 
-	if (!bytes)
-		return 0;
-
 	if (size) {
 		if (offs > size)
 			return 0;
@@ -136,9 +133,6 @@ static ssize_t write(struct file *file, const char __user *userbuf,
 	loff_t offs = *off;
 	int count = min_t(size_t, bytes, PAGE_SIZE);
 	char *temp;
-
-	if (!bytes)
-		return 0;
 
 	if (!bytes)
 		return 0;

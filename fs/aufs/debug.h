@@ -1,25 +1,14 @@
 /*
- * Copyright (C) 2005-2009 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*
  * debug print functions
- *
- * $Id: debug.h,v 1.12 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #ifndef __AUFS_DEBUG_H__
@@ -27,28 +16,33 @@
 
 #ifdef __KERNEL__
 
+#include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/kd.h>
 #include <linux/vt_kern.h>
 #include <linux/sysrq.h>
-
-/* to debug easier, do not make it an inlined function */
-#define MtxMustLock(mtx)	AuDebugOn(!mutex_is_locked(mtx))
+#include <linux/aufs_type.h>
 
 #ifdef CONFIG_AUFS_DEBUG
-/* sparse warns about pointer */
-#define AuDebugOn(a)		BUG_ON(!!(a))
+#define AuDebugOn(a)		BUG_ON(a)
 extern atomic_t au_cond;
-#define au_debug_on()		atomic_inc_return(&au_cond)
-#define au_debug_off()		atomic_dec_return(&au_cond)
+static inline void au_debug(int n)
+{
+	atomic_set(&au_cond, n);
+	smp_mb();
+}
+
 static inline int au_debug_test(void)
 {
-	return atomic_read(&au_cond);
+	int ret;
+
+	ret = atomic_read(&au_cond);
+	smp_mb();
+	return ret;
 }
 #else
 #define AuDebugOn(a)		do {} while (0)
-#define au_debug_on()		do {} while (0)
-#define au_debug_off()		do {} while (0)
+#define au_debug()		do {} while (0)
 static inline int au_debug_test(void)
 {
 	return 0;
@@ -58,50 +52,19 @@ static inline int au_debug_test(void)
 /* ---------------------------------------------------------------------- */
 
 /* debug print */
-#if defined(CONFIG_LKTR) || defined(CONFIG_LKTR_MODULE)
-#include <linux/lktr.h>
-#ifdef CONFIG_AUFS_DEBUG
-#undef LktrCond
-#define LktrCond	unlikely(au_debug_test() || (lktr_cond && lktr_cond()))
-#endif
-#else
-#define LktrCond			au_debug_test()
-#define LKTRDumpVma(pre, vma, suf)	do {} while (0)
-#define LKTRDumpStack()			do {} while (0)
-#define LKTRTrace(fmt, args...) do { \
-	if (LktrCond) \
-		AuDbg(fmt, ##args); \
-} while (0)
-#define LKTRLabel(label)		LKTRTrace("%s\n", #label)
-#endif /* CONFIG_LKTR */
-
-#define AuTraceErr(e) do { \
-	if (unlikely((e) < 0)) \
-		LKTRTrace("err %d\n", (int)(e)); \
-} while (0)
-
-#define AuTraceErrPtr(p) do { \
-	if (IS_ERR(p)) \
-		LKTRTrace("err %ld\n", PTR_ERR(p)); \
-} while (0)
-
-#define AuTraceEnter()	LKTRLabel(enter)
-
-/* dirty macros for debug print, use with "%.*s" and caution */
-#define AuLNPair(qstr)		(qstr)->len, (qstr)->name
-#define AuDLNPair(d)		AuLNPair(&(d)->d_name)
-
-/* ---------------------------------------------------------------------- */
 
 #define AuDpri(lvl, fmt, arg...) \
 	printk(lvl AUFS_NAME " %s:%d:%s[%d]: " fmt, \
 	       __func__, __LINE__, current->comm, current->pid, ##arg)
-#define AuDbg(fmt, arg...)	AuDpri(KERN_DEBUG, fmt, ##arg)
+#define AuDbg(fmt, arg...) do { \
+	if (au_debug_test()) \
+		AuDpri(KERN_DEBUG, fmt, ##arg); \
+} while (0)
+#define AuLabel(l) 		AuDbg(#l "\n")
 #define AuInfo(fmt, arg...)	AuDpri(KERN_INFO, fmt, ##arg)
 #define AuWarn(fmt, arg...)	AuDpri(KERN_WARNING, fmt, ##arg)
 #define AuErr(fmt, arg...)	AuDpri(KERN_ERR, fmt, ##arg)
 #define AuIOErr(fmt, arg...)	AuErr("I/O Error, " fmt, ##arg)
-#define AuIOErrWhck(fmt, arg...) AuErr("I/O Error, try whck. " fmt, ##arg)
 #define AuWarn1(fmt, arg...) do { \
 	static unsigned char _c; \
 	if (!_c++) \
@@ -127,9 +90,24 @@ static inline int au_debug_test(void)
 	dump_stack(); \
 } while (0)
 
+#define AuTraceErr(e) do { \
+	if (unlikely((e) < 0)) \
+		AuDbg("err %d\n", (int)(e)); \
+} while (0)
+
+#define AuTraceErrPtr(p) do { \
+	if (IS_ERR(p)) \
+		AuDbg("err %ld\n", PTR_ERR(p)); \
+} while (0)
+
+/* dirty macros for debug print, use with "%.*s" and caution */
+#define AuLNPair(qstr)		(qstr)->len, (qstr)->name
+#define AuDLNPair(d)		AuLNPair(&(d)->d_name)
+
 /* ---------------------------------------------------------------------- */
 
 struct au_sbinfo;
+struct au_finfo;
 #ifdef CONFIG_AUFS_DEBUG
 extern char *au_plevel;
 struct au_nhash;
@@ -140,48 +118,51 @@ void au_dpri_inode(struct inode *inode);
 void au_dpri_dentry(struct dentry *dentry);
 void au_dpri_file(struct file *filp);
 void au_dpri_sb(struct super_block *sb);
-void au_dbg_sleep(int sec);
-void au_dbg_sleep_jiffy(int jiffy);
 
-#ifndef ATTR_TIMES_SET
-#define ATTR_TIMES_SET 0
-#endif
+void au_dbg_sleep_jiffy(int jiffy);
 void au_dbg_iattr(struct iattr *ia);
+
+void au_dbg_verify_dir_parent(struct dentry *dentry, unsigned int sigen);
+void au_dbg_verify_nondir_parent(struct dentry *dentry, unsigned int sigen);
+void au_dbg_verify_gen(struct dentry *parent, unsigned int sigen);
+void au_dbg_verify_hf(struct au_finfo *finfo);
+void au_dbg_verify_kthread(void);
+
 int __init au_debug_init(void);
 void au_debug_sbinfo_init(struct au_sbinfo *sbinfo);
 #define AuDbgWhlist(w) do { \
-	LKTRTrace(#w "\n"); \
+	AuDbg(#w "\n"); \
 	au_dpri_whlist(w); \
 } while (0)
 
 #define AuDbgVdir(v) do { \
-	LKTRTrace(#v "\n"); \
+	AuDbg(#v "\n"); \
 	au_dpri_vdir(v); \
 } while (0)
 
 #define AuDbgInode(i) do { \
-	LKTRTrace(#i "\n"); \
+	AuDbg(#i "\n"); \
 	au_dpri_inode(i); \
 } while (0)
 
 #define AuDbgDentry(d) do { \
-	LKTRTrace(#d "\n"); \
+	AuDbg(#d "\n"); \
 	au_dpri_dentry(d); \
 } while (0)
 
 #define AuDbgFile(f) do { \
-	LKTRTrace(#f "\n"); \
+	AuDbg(#f "\n"); \
 	au_dpri_file(f); \
 } while (0)
 
 #define AuDbgSb(sb) do { \
-	LKTRTrace(#sb "\n"); \
+	AuDbg(#sb "\n"); \
 	au_dpri_sb(sb); \
 } while (0)
 
 #define AuDbgSleep(sec) do { \
 	AuDbg("sleep %d sec\n", sec); \
-	au_dbg_sleep(sec); \
+	ssleep(sec); \
 } while (0)
 
 #define AuDbgSleepJiffy(jiffy) do { \
@@ -194,6 +175,29 @@ void au_debug_sbinfo_init(struct au_sbinfo *sbinfo);
 	au_dbg_iattr(ia); \
 } while (0)
 #else
+static inline void au_dbg_verify_dir_parent(struct dentry *dentry,
+					    unsigned int sigen)
+{
+	/* empty */
+}
+static inline void au_dbg_verify_nondir_parent(struct dentry *dentry,
+					   unsigned int sigen)
+{
+	/* empty */
+}
+static inline void au_dbg_verify_gen(struct dentry *parent, unsigned int sigen)
+{
+	/* empty */
+}
+static inline void au_dbg_verify_hf(struct au_finfo *finfo)
+{
+	/* empty */
+}
+static inline void au_dbg_verify_kthread(void)
+{
+	/* empty */
+}
+
 static inline int au_debug_init(void)
 {
 	return 0;
@@ -212,12 +216,6 @@ static inline void au_debug_sbinfo_init(struct au_sbinfo *sbinfo)
 #define AuDbgSleepJiffy(jiffy)	do {} while (0)
 #define AuDbgIAttr(ia)		do {} while (0)
 #endif /* CONFIG_AUFS_DEBUG */
-
-#ifdef DbgUdbaRace
-#define AuDbgSleep_UdbaRace()	AuDbgSleep(DbgUdbaRace)
-#else
-#define AuDbgSleep_UdbaRace()	do {} while (0)
-#endif
 
 /* ---------------------------------------------------------------------- */
 
@@ -242,92 +240,6 @@ static inline int au_sysrq_init(void)
 #define au_sysrq_fin()		do {} while (0)
 #define au_dbg_blocked()	do {} while (0)
 #endif /* CONFIG_AUFS_MAGIC_SYSRQ */
-
-enum {
-	AuDbgLock_SI_LOCKING,
-	AuDbgLock_SI_LOCKED,
-	AuDbgLock_DI_LOCKING,
-	AuDbgLock_DI_LOCKED,
-	AuDbgLock_II_LOCKING,
-	AuDbgLock_II_LOCKED,
-	AuDbgLock_Last
-};
-#ifdef CONFIG_AUFS_DEBUG_LOCK
-void au_dbg_locking_si_reg(struct super_block *sb, int flags);
-void au_dbg_locking_si_unreg(struct super_block *sb, int flags);
-void au_dbg_locked_si_reg(struct super_block *sb, int flags);
-void au_dbg_locked_si_unreg(struct super_block *sb, int flags);
-void au_dbg_locking_di_reg(struct dentry *d, int flags, unsigned int lsc);
-void au_dbg_locking_di_unreg(struct dentry *d, int flags);
-void au_dbg_locked_di_reg(struct dentry *d, int flags, unsigned int lsc);
-void au_dbg_locked_di_unreg(struct dentry *d, int flags);
-void au_dbg_locking_ii_reg(struct inode *i, int flags, unsigned int lsc);
-void au_dbg_locking_ii_unreg(struct inode *i, int flags);
-void au_dbg_locked_ii_reg(struct inode *i, int flags, unsigned int lsc);
-void au_dbg_locked_ii_unreg(struct inode *i, int flags);
-#else
-static inline
-void au_dbg_locking_si_reg(struct super_block *sb, int flags)
-{
-	/* empty */
-}
-static inline
-void au_dbg_locking_si_unreg(struct super_block *sb, int flags)
-{
-	/* empty */
-}
-static inline
-void au_dbg_locked_si_reg(struct super_block *sb, int flags)
-{
-	/* empty */
-}
-static inline
-void au_dbg_locked_si_unreg(struct super_block *sb, int flags)
-{
-	/* empty */
-}
-
-static inline
-void au_dbg_locking_di_reg(struct dentry *d, int flags, unsigned int lsc)
-{
-	/* empty */
-}
-static inline
-void au_dbg_locking_di_unreg(struct dentry *d, int flags)
-{
-	/* empty */
-}
-static inline
-void au_dbg_locked_di_reg(struct dentry *d, int flags, unsigned int lsc)
-{
-	/* empty */
-}
-static inline
-void au_dbg_locked_di_unreg(struct dentry *d, int flags)
-{
-	/* empty */
-}
-static inline
-void au_dbg_locking_ii_reg(struct inode *i, int flags, unsigned int lsc)
-{
-	/* empty */
-}
-static inline
-void au_dbg_locking_ii_unreg(struct inode *i, int flags)
-{
-	/* empty */
-}
-static inline
-void au_dbg_locked_ii_reg(struct inode *i, int flags, unsigned int lsc)
-{
-	/* empty */
-}
-static inline
-void au_dbg_locked_ii_unreg(struct inode *i, int flags)
-{
-	/* empty */
-}
-#endif /* CONFIG_AUFS_DEBUG_LOCK */
 
 #endif /* __KERNEL__ */
 #endif /* __AUFS_DEBUG_H__ */

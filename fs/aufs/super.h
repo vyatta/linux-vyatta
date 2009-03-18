@@ -1,25 +1,14 @@
 /*
- * Copyright (C) 2005-2009 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*
  * super_block operations
- *
- * $Id: super.h,v 1.22 2009/01/26 06:24:15 sfjro Exp $
  */
 
 #ifndef __AUFS_SUPER_H__
@@ -28,18 +17,17 @@
 #ifdef __KERNEL__
 
 #include <linux/fs.h>
-#include <linux/cramfs_fs.h>
 #include <linux/kobject.h>
-#include <linux/magic.h>
-#include <linux/mount.h>
 #include <linux/aufs_type.h>
-#include "misc.h"
+#include "rwsem.h"
+#include "spl.h"
 #include "wkq.h"
 
 typedef ssize_t (*au_readf_t)(struct file *, char __user *, size_t, loff_t *);
 typedef ssize_t (*au_writef_t)(struct file *, const char __user *, size_t,
 			       loff_t *);
 
+/* policies to select one among multiple writable branches */
 struct au_wbr_copyup_operations {
 	int (*copyup)(struct dentry *dentry);
 };
@@ -67,6 +55,7 @@ struct au_wbr_mfs {
  * if it is false, refreshing dirs at access time is unnecesary
  */
 #define AuSi_FAILED_REFRESH_DIRS	1
+#define AuSi_MAINTAIN_PLINK		(1 << 1)	/* ioctl */
 #define au_ftest_si(sbinfo, name)	((sbinfo)->au_si_status & AuSi_##name)
 #define au_fset_si(sbinfo, name) \
 	{ (sbinfo)->au_si_status |= AuSi_##name; }
@@ -78,10 +67,10 @@ struct au_sbinfo {
 	/* nowait tasks in the system-wide workqueue */
 	struct au_nowait_tasks	si_nowait;
 
-	struct au_rwsem		si_rwsem;
+	struct rw_semaphore	si_rwsem;
 
 	/* branch management */
-	au_gen_t		si_generation;
+	unsigned int		si_generation;
 
 	/* see above flags */
 	unsigned char		au_si_status;
@@ -114,18 +103,9 @@ struct au_sbinfo {
 	unsigned long		*si_xib_buf;
 	unsigned long		si_xib_last_pindex;
 	int			si_xib_next_bit;
+	aufs_bindex_t		si_xino_brid;
 	/* reserved for future use */
 	/* unsigned long long	si_xib_limit; */	/* Max xib file size */
-
-#ifdef CONFIG_AUFS_HINOTIFY
-	struct au_branch	*si_xino_def_br;
-#endif
-
-#ifdef CONFIG_AUFS_EXPORT
-	/* i_generation */
-	struct file		*si_xigen;
-	atomic_t		si_xigen_next;
-#endif
 
 	/* readdir cache time, max, in HZ */
 	unsigned long		si_rdcache;
@@ -144,37 +124,20 @@ struct au_sbinfo {
 	/* reserved for future use */
 	/* int			si_rendir; */
 
-	/* pseudo_link list */ /* todo: dirty? */
+	/* pseudo_link list */
 	struct au_splhead	si_plink;
-
-#if defined(CONFIG_AUFS_EXPORT) && LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 26)
-	/* dirty, for export, async ops, and sysfs */
-	spinlock_t		si_mntcache_lock;
-	struct vfsmount		*si_mntcache;	/* no get/put */
-#endif
+	wait_queue_head_t	si_plink_wq;
 
 	/*
 	 * sysfs and lifetime management.
 	 * this is not a small structure and it may be a waste of memory in case
 	 * of sysfs is disabled, particulary when many aufs-es are mounted.
+	 * but using sysfs is majority.
 	 */
 	struct kobject		si_kobj;
 
-#ifdef CONFIG_AUFS_ROBR
-	/* locked vma list for mmap() */ /* todo: dirty? */
-	struct au_splhead	si_lvma;
-#endif
-
-#ifdef CONFIG_AUFS_EXPORT /* reserved for future use */
-	struct path		si_xinodir;
-#endif
-
 	/* dirty, necessary for unmounting, sysfs and sysrq */
 	struct super_block	*si_sb;
-
-#ifdef CONFIG_AUFS_DEBUG_LOCK
-	struct au_splhead	si_dbg_lock[AuDbgLock_Last];
-#endif
 };
 
 /* ---------------------------------------------------------------------- */
@@ -204,9 +167,10 @@ struct inode *au_iget_locked(struct super_block *sb, ino_t ino);
 /* sbinfo.c */
 void au_si_free(struct kobject *kobj);
 int au_si_alloc(struct super_block *sb);
-struct au_branch *au_sbr(struct super_block *sb, aufs_bindex_t bindex);
-au_gen_t au_sigen_inc(struct super_block *sb);
-int au_find_bindex(struct super_block *sb, struct au_branch *br);
+int au_sbr_realloc(struct au_sbinfo *sbinfo, int nbr);
+
+unsigned int au_sigen_inc(struct super_block *sb);
+aufs_bindex_t au_new_br_id(struct super_block *sb);
 
 void aufs_read_lock(struct dentry *dentry, int flags);
 void aufs_read_unlock(struct dentry *dentry, int flags);
@@ -215,63 +179,10 @@ void aufs_write_unlock(struct dentry *dentry);
 void aufs_read_and_write_lock2(struct dentry *d1, struct dentry *d2, int isdir);
 void aufs_read_and_write_unlock2(struct dentry *d1, struct dentry *d2);
 
-aufs_bindex_t au_new_br_id(struct super_block *sb);
-
 /* wbr_policy.c */
 extern struct au_wbr_copyup_operations au_wbr_copyup_ops[];
 extern struct au_wbr_create_operations au_wbr_create_ops[];
 int au_cpdown_dirs(struct dentry *dentry, aufs_bindex_t bdst);
-
-/* ---------------------------------------------------------------------- */
-
-#if defined(CONFIG_AUFS_EXPORT) && LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 26)
-static inline void au_mnt_init(struct au_sbinfo *sbinfo, struct vfsmount *mnt)
-{
-	spin_lock_init(&sbinfo->si_mntcache_lock);
-	sbinfo->si_mntcache = mnt;
-}
-
-static inline void au_mnt_reset(struct au_sbinfo *sbinfo)
-{
-	spin_lock(&sbinfo->si_mntcache_lock);
-	sbinfo->si_mntcache = NULL;
-	spin_unlock(&sbinfo->si_mntcache_lock);
-}
-#else
-static inline void au_mnt_init(struct au_sbinfo *sbinfo, struct vfsmount *mnt)
-{
-	/* emptr */
-}
-
-static inline void au_mnt_reset(struct au_sbinfo *sbinfo)
-{
-	/* emptr */
-}
-#endif /* EXPORT && < 2.6.26 */
-
-/* ---------------------------------------------------------------------- */
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 26)
-static inline int au_mnt_want_write(struct vfsmount *h_mnt)
-{
-	return mnt_want_write(h_mnt);
-}
-
-static inline void au_mnt_drop_write(struct vfsmount *h_mnt)
-{
-	mnt_drop_write(h_mnt);
-}
-#else
-static inline int au_mnt_want_write(struct vfsmount *h_mnt)
-{
-	return 0;
-}
-
-static inline void au_mnt_drop_write(struct vfsmount *h_mnt)
-{
-	/* empty */
-}
-#endif
 
 /* ---------------------------------------------------------------------- */
 
@@ -280,299 +191,75 @@ static inline struct au_sbinfo *au_sbi(struct super_block *sb)
 	return sb->s_fs_info;
 }
 
-static inline const char *au_sbtype(struct super_block *sb)
-{
-	return sb->s_type->name;
-}
-
-static inline int au_test_aufs(struct super_block *sb)
-{
-	return sb->s_magic == AUFS_SUPER_MAGIC;
-}
-
-static inline int au_test_nfs(struct super_block *sb)
-{
-#ifdef CONFIG_AUFS_BR_NFS
-	return sb->s_magic == NFS_SUPER_MAGIC;
-#else
-	return 0;
-#endif
-}
-
-static inline int au_test_nfs4(struct super_block *sb)
-{
-#ifdef CONFIG_AUFS_BR_NFS_V4
-	return au_test_nfs(sb) && !strcmp(sb->s_type->name, "nfs4");
-#else
-	return 0;
-#endif
-}
-
-static inline int au_test_fuse(struct super_block *sb)
-{
-#ifdef CONFIG_AUFS_WORKAROUND_FUSE
-	return sb->s_magic == FUSE_SUPER_MAGIC;
-#else
-	return 0;
-#endif
-}
-
-static inline int au_test_xfs(struct super_block *sb)
-{
-#ifdef CONFIG_AUFS_BR_XFS
-	return sb->s_magic == XFS_SB_MAGIC;
-#else
-	return 0;
-#endif
-}
-
-static inline int au_test_tmpfs(struct super_block *sb)
-{
-#ifdef CONFIG_TMPFS
-	return sb->s_magic == TMPFS_MAGIC;
-#else
-	return 0;
-#endif
-}
-
-static inline int au_test_ecryptfs(struct super_block *sb)
-{
-#if defined(CONFIG_ECRYPT_FS) || defined(CONFIG_ECRYPT_FS_MODULE)
-	/* why don't they use s_magic? */
-	return !strcmp(sb->s_type->name, "ecryptfs");
-#else
-	return 0;
-#endif
-}
-
-/* ---------------------------------------------------------------------- */
-
-#ifdef CONFIG_AUFS_HINOTIFY
-static inline void au_xino_def_br_set(struct au_branch *br,
-				      struct au_sbinfo *sbinfo)
-{
-	sbinfo->si_xino_def_br = br;
-}
-
-static inline struct au_branch *au_xino_def_br(struct au_sbinfo *sbinfo)
-{
-	return sbinfo->si_xino_def_br;
-}
-#else
-static inline void au_xino_def_br_set(struct au_branch *br,
-				      struct au_sbinfo *sbinfo)
-{
-	/* empty */
-}
-
-static inline struct au_branch *au_xino_def_br(struct au_sbinfo *sbinfo)
-{
-	return NULL;
-}
-#endif
-
-/* ---------------------------------------------------------------------- */
-
-#ifdef CONFIG_AUFS_EXPORT
-void au_export_init(struct super_block *sb);
-
-static inline int au_test_nfsd(struct task_struct *tsk)
-{
-	return !tsk->mm && !strcmp(tsk->comm, "nfsd");
-}
-
-static inline void au_export_put(struct au_sbinfo *sbinfo)
-{
-	path_put(&sbinfo->si_xinodir);
-}
-
-int au_xigen_inc(struct inode *inode);
-int au_xigen_new(struct inode *inode);
-int au_xigen_set(struct super_block *sb, struct file *base);
-void au_xigen_clr(struct super_block *sb);
-#else
-static inline void au_export_init(struct super_block *sb)
-{
-	/* nothing */
-}
-
-static inline int au_test_nfsd(struct task_struct *tsk)
-{
-	return 0;
-}
-
-static inline void au_export_put(struct au_sbinfo *sbinfo)
-{
-	/* nothing */
-}
-
-static inline int au_xigen_inc(struct inode *inode)
-{
-	return 0;
-}
-
-static inline int au_xigen_new(struct inode *inode)
-{
-	return 0;
-}
-
-static inline int au_xigen_set(struct super_block *sb, struct file *base)
-{
-	return 0;
-}
-
-static inline void au_xigen_clr(struct super_block *sb)
-{
-	/* empty */
-}
-#endif /* CONFIG_AUFS_EXPORT */
-
-#ifdef CONFIG_AUFS_ROBR
-static inline int au_test_nested(struct super_block *h_sb)
-{
-	return 0;
-}
-
-static inline void au_robr_lvma_init(struct au_sbinfo *sbinfo)
-{
-	au_spl_init(&sbinfo->si_lvma);
-}
-#else
-static inline int au_test_nested(struct super_block *h_sb)
-{
-	int err = 0;
-	if (unlikely(au_test_aufs(h_sb))) {
-		err = -EINVAL;
-		AuTraceErr(err);
-	}
-	return err;
-}
-
-static inline void au_robr_lvma_init(struct au_sbinfo *sbinfo)
-{
-	/* empty */
-}
-#endif /* CONFIG_AUFS_ROBR */
-
 /* ---------------------------------------------------------------------- */
 
 /* lock superblock. mainly for entry point functions */
 /*
- * si_do_noflush_read_lock, si_do_noflush_write_lock,
- * si_do_read_unlock, si_do_write_unlock, si_do_downgrade_lock
+ * si_noflush_read_lock, si_noflush_write_lock,
+ * si_read_unlock, si_write_unlock, si_downgrade_lock
  */
-AuSimpleLockRwsemFuncs(si_do_noflush, struct super_block *sb,
-		       au_sbi(sb)->si_rwsem);
-AuSimpleUnlockRwsemFuncs(si_do, struct super_block *sb, au_sbi(sb)->si_rwsem);
-
-static inline void si_noflush_read_lock(struct super_block *sb)
-{
-	au_dbg_locking_si_reg(sb, 0);
-	si_do_noflush_read_lock(sb);
-	au_dbg_locking_si_unreg(sb, 0);
-	au_dbg_locked_si_reg(sb, 0);
-}
-
-static inline void si_noflush_write_lock(struct super_block *sb)
-{
-	au_dbg_locking_si_reg(sb, 1);
-	si_do_noflush_write_lock(sb);
-	au_dbg_locking_si_unreg(sb, 1);
-	au_dbg_locked_si_reg(sb, 1);
-}
-
-static inline int si_noflush_read_trylock(struct super_block *sb)
-{
-	int locked;
-
-	au_dbg_locking_si_reg(sb, 0);
-	locked = si_do_noflush_read_trylock(sb);
-	au_dbg_locking_si_unreg(sb, 0);
-	if (locked)
-		au_dbg_locked_si_reg(sb, 0);
-	return locked;
-}
-
-static inline int si_noflush_write_trylock(struct super_block *sb)
-{
-	int locked;
-
-	au_dbg_locking_si_reg(sb, 1);
-	locked = si_do_noflush_write_trylock(sb);
-	au_dbg_locking_si_unreg(sb, 1);
-	if (locked)
-		au_dbg_locked_si_reg(sb, 1);
-	return locked;
-}
-
-static inline void si_read_unlock(struct super_block *sb)
-{
-	si_do_read_unlock(sb);
-	au_dbg_locked_si_unreg(sb, 0);
-}
-
-static inline void si_write_unlock(struct super_block *sb)
-{
-	si_do_write_unlock(sb);
-	au_dbg_locked_si_unreg(sb, 1);
-}
-
-static inline void si_downgrade_lock(struct super_block *sb)
-{
-	si_do_downgrade_lock(sb);
-}
+AuSimpleLockRwsemFuncs(si_noflush, struct super_block *sb,
+		       &au_sbi(sb)->si_rwsem);
+AuSimpleUnlockRwsemFuncs(si, struct super_block *sb, &au_sbi(sb)->si_rwsem);
 
 static inline void si_read_lock(struct super_block *sb, int flags)
 {
-	if (/* !au_test_nfsd(current) &&  */au_ftest_lock(flags, FLUSH))
+	if (au_ftest_lock(flags, FLUSH))
 		au_nwt_flush(&au_sbi(sb)->si_nowait);
 	si_noflush_read_lock(sb);
 }
 
 static inline void si_write_lock(struct super_block *sb)
 {
-	//WARN_ON(au_test_nfsd(current));
 	au_nwt_flush(&au_sbi(sb)->si_nowait);
 	si_noflush_write_lock(sb);
 }
 
 static inline int si_read_trylock(struct super_block *sb, int flags)
 {
-	if (/* !au_test_nfsd(current) &&  */au_ftest_lock(flags, FLUSH))
+	if (au_ftest_lock(flags, FLUSH))
 		au_nwt_flush(&au_sbi(sb)->si_nowait);
 	return si_noflush_read_trylock(sb);
 }
 
 static inline int si_write_trylock(struct super_block *sb, int flags)
 {
-	if (/* !au_test_nfsd(current) &&  */au_ftest_lock(flags, FLUSH))
+	if (au_ftest_lock(flags, FLUSH))
 		au_nwt_flush(&au_sbi(sb)->si_nowait);
 	return si_noflush_write_trylock(sb);
 }
-
-/* to debug easier, do not make them inlined functions */
-#define SiMustReadLock(sb)	AuRwMustReadLock(&au_sbi(sb)->si_rwsem)
-#define SiMustWriteLock(sb)	AuRwMustWriteLock(&au_sbi(sb)->si_rwsem)
-#define SiMustAnyLock(sb)	AuRwMustAnyLock(&au_sbi(sb)->si_rwsem)
 
 /* ---------------------------------------------------------------------- */
 
 static inline aufs_bindex_t au_sbend(struct super_block *sb)
 {
-	SiMustAnyLock(sb);
 	return au_sbi(sb)->si_bend;
 }
 
 static inline unsigned int au_mntflags(struct super_block *sb)
 {
-	SiMustAnyLock(sb);
 	return au_sbi(sb)->si_mntflags;
 }
 
-static inline au_gen_t au_sigen(struct super_block *sb)
+static inline unsigned int au_sigen(struct super_block *sb)
 {
-	SiMustAnyLock(sb);
 	return au_sbi(sb)->si_generation;
+}
+
+static inline struct au_branch *au_sbr(struct super_block *sb,
+				       aufs_bindex_t bindex)
+{
+	return au_sbi(sb)->si_branch[0 + bindex];
+}
+
+static inline void au_xino_brid_set(struct super_block *sb, aufs_bindex_t brid)
+{
+	au_sbi(sb)->si_xino_brid = brid;
+}
+
+static inline aufs_bindex_t au_xino_brid(struct super_block *sb)
+{
+	return au_sbi(sb)->si_xino_brid;
 }
 
 #endif /* __KERNEL__ */

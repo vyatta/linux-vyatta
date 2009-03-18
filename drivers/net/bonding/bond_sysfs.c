@@ -36,22 +36,12 @@
 #include <linux/rtnetlink.h>
 #include <net/net_namespace.h>
 
-/* #define BONDING_DEBUG 1 */
 #include "bonding.h"
+
 #define to_dev(obj)	container_of(obj,struct device,kobj)
-#define to_bond(cd)	((struct bonding *)(to_net_dev(cd)->priv))
+#define to_bond(cd)	((struct bonding *)(netdev_priv(to_net_dev(cd))))
 
 /*---------------------------- Declarations -------------------------------*/
-
-
-extern struct list_head bond_dev_list;
-extern struct bond_params bonding_defaults;
-extern struct bond_parm_tbl bond_mode_tbl[];
-extern struct bond_parm_tbl bond_lacp_tbl[];
-extern struct bond_parm_tbl ad_select_tbl[];
-extern struct bond_parm_tbl xmit_hashtype_tbl[];
-extern struct bond_parm_tbl arp_validate_tbl[];
-extern struct bond_parm_tbl fail_over_mac_tbl[];
 
 static int expected_refcount = -1;
 /*--------------------------- Data Structures -----------------------------*/
@@ -317,18 +307,12 @@ static ssize_t bonding_store_slaves(struct device *d,
 
 		/* Set the slave's MTU to match the bond */
 		original_mtu = dev->mtu;
-		if (dev->mtu != bond->dev->mtu) {
-			if (dev->change_mtu) {
-				res = dev->change_mtu(dev,
-						      bond->dev->mtu);
-				if (res) {
-					ret = res;
-					goto out;
-				}
-			} else {
-				dev->mtu = bond->dev->mtu;
-			}
+		res = dev_set_mtu(dev, bond->dev->mtu);
+		if (res) {
+			ret = res;
+			goto out;
 		}
+
 		res = bond_enslave(bond->dev, dev);
 		bond_for_each_slave(bond, slave, i)
 			if (strnicmp(slave->dev->name, ifname, IFNAMSIZ) == 0)
@@ -357,11 +341,7 @@ static ssize_t bonding_store_slaves(struct device *d,
 				goto out;
 			}
 			/* set the slave MTU to the default */
-			if (dev->change_mtu) {
-				dev->change_mtu(dev, original_mtu);
-			} else {
-				dev->mtu = original_mtu;
-			}
+			dev_set_mtu(dev, original_mtu);
 		}
 		else {
 			printk(KERN_ERR DRV_NAME ": unable to remove non-existent slave %s for bond %s.\n",
@@ -621,6 +601,8 @@ static ssize_t bonding_store_arp_interval(struct device *d,
 	       ": %s: Setting ARP monitoring interval to %d.\n",
 	       bond->dev->name, new_value);
 	bond->params.arp_interval = new_value;
+	if (bond->params.arp_interval)
+		bond->dev->priv_flags |= IFF_MASTER_ARPMON;
 	if (bond->params.miimon) {
 		printk(KERN_INFO DRV_NAME
 		       ": %s: ARP monitoring cannot be used with MII monitoring. "
@@ -673,8 +655,8 @@ static ssize_t bonding_show_arp_targets(struct device *d,
 
 	for (i = 0; i < BOND_MAX_ARP_TARGETS; i++) {
 		if (bond->params.arp_targets[i])
-			res += sprintf(buf + res, "%u.%u.%u.%u ",
-			       NIPQUAD(bond->params.arp_targets[i]));
+			res += sprintf(buf + res, "%pI4 ",
+				       &bond->params.arp_targets[i]);
 	}
 	if (res)
 		buf[res-1] = '\n'; /* eat the leftover space */
@@ -696,8 +678,8 @@ static ssize_t bonding_store_arp_targets(struct device *d,
 	if (buf[0] == '+') {
 		if ((newtarget == 0) || (newtarget == htonl(INADDR_BROADCAST))) {
 			printk(KERN_ERR DRV_NAME
-			       ": %s: invalid ARP target %u.%u.%u.%u specified for addition\n",
- 			       bond->dev->name, NIPQUAD(newtarget));
+			       ": %s: invalid ARP target %pI4 specified for addition\n",
+			       bond->dev->name, &newtarget);
 			ret = -EINVAL;
 			goto out;
 		}
@@ -705,8 +687,8 @@ static ssize_t bonding_store_arp_targets(struct device *d,
 		for (i = 0; (i < BOND_MAX_ARP_TARGETS); i++) {
 			if (targets[i] == newtarget) { /* duplicate */
 				printk(KERN_ERR DRV_NAME
-				       ": %s: ARP target %u.%u.%u.%u is already present\n",
-				       bond->dev->name, NIPQUAD(newtarget));
+				       ": %s: ARP target %pI4 is already present\n",
+				       bond->dev->name, &newtarget);
 				if (done)
 					targets[i] = 0;
 				ret = -EINVAL;
@@ -714,8 +696,8 @@ static ssize_t bonding_store_arp_targets(struct device *d,
 			}
 			if (targets[i] == 0 && !done) {
 				printk(KERN_INFO DRV_NAME
-				       ": %s: adding ARP target %d.%d.%d.%d.\n",
-				       bond->dev->name, NIPQUAD(newtarget));
+				       ": %s: adding ARP target %pI4.\n",
+				       bond->dev->name, &newtarget);
 				done = 1;
 				targets[i] = newtarget;
 			}
@@ -732,8 +714,8 @@ static ssize_t bonding_store_arp_targets(struct device *d,
 	else if (buf[0] == '-')	{
 		if ((newtarget == 0) || (newtarget == htonl(INADDR_BROADCAST))) {
 			printk(KERN_ERR DRV_NAME
-			       ": %s: invalid ARP target %d.%d.%d.%d specified for removal\n",
-			       bond->dev->name, NIPQUAD(newtarget));
+			       ": %s: invalid ARP target %pI4 specified for removal\n",
+			       bond->dev->name, &newtarget);
 			ret = -EINVAL;
 			goto out;
 		}
@@ -741,16 +723,16 @@ static ssize_t bonding_store_arp_targets(struct device *d,
 		for (i = 0; (i < BOND_MAX_ARP_TARGETS); i++) {
 			if (targets[i] == newtarget) {
 				printk(KERN_INFO DRV_NAME
-				       ": %s: removing ARP target %d.%d.%d.%d.\n",
-				       bond->dev->name, NIPQUAD(newtarget));
+				       ": %s: removing ARP target %pI4.\n",
+				       bond->dev->name, &newtarget);
 				targets[i] = 0;
 				done = 1;
 			}
 		}
 		if (!done) {
 			printk(KERN_INFO DRV_NAME
-			       ": %s: unable to remove nonexistent ARP target %d.%d.%d.%d.\n",
-			       bond->dev->name, NIPQUAD(newtarget));
+			       ": %s: unable to remove nonexistent ARP target %pI4.\n",
+			       bond->dev->name, &newtarget);
 			ret = -EINVAL;
 			goto out;
 		}
@@ -1029,6 +1011,47 @@ out:
 	return ret;
 }
 static DEVICE_ATTR(num_grat_arp, S_IRUGO | S_IWUSR, bonding_show_n_grat_arp, bonding_store_n_grat_arp);
+
+/*
+ * Show and set the number of unsolicted NA's to send after a failover event.
+ */
+static ssize_t bonding_show_n_unsol_na(struct device *d,
+				       struct device_attribute *attr,
+				       char *buf)
+{
+	struct bonding *bond = to_bond(d);
+
+	return sprintf(buf, "%d\n", bond->params.num_unsol_na);
+}
+
+static ssize_t bonding_store_n_unsol_na(struct device *d,
+					struct device_attribute *attr,
+					const char *buf, size_t count)
+{
+	int new_value, ret = count;
+	struct bonding *bond = to_bond(d);
+
+	if (sscanf(buf, "%d", &new_value) != 1) {
+		printk(KERN_ERR DRV_NAME
+		       ": %s: no num_unsol_na value specified.\n",
+		       bond->dev->name);
+		ret = -EINVAL;
+		goto out;
+	}
+	if (new_value < 0 || new_value > 255) {
+		printk(KERN_ERR DRV_NAME
+		       ": %s: Invalid num_unsol_na value %d not in range 0-255; rejected.\n",
+		       bond->dev->name, new_value);
+		ret = -EINVAL;
+		goto out;
+	} else {
+		bond->params.num_unsol_na = new_value;
+	}
+out:
+	return ret;
+}
+static DEVICE_ATTR(num_unsol_na, S_IRUGO | S_IWUSR, bonding_show_n_unsol_na, bonding_store_n_unsol_na);
+
 /*
  * Show and set the MII monitor interval.  There are two tricky bits
  * here.  First, if MII monitoring is activated, then we must disable
@@ -1087,6 +1110,7 @@ static ssize_t bonding_store_miimon(struct device *d,
 			       "ARP monitoring. Disabling ARP monitoring...\n",
 			       bond->dev->name);
 			bond->params.arp_interval = 0;
+			bond->dev->priv_flags &= ~IFF_MASTER_ARPMON;
 			if (bond->params.arp_validate) {
 				bond_unregister_arp(bond);
 				bond->params.arp_validate =
@@ -1439,13 +1463,11 @@ static ssize_t bonding_show_ad_partner_mac(struct device *d,
 {
 	int count = 0;
 	struct bonding *bond = to_bond(d);
-	DECLARE_MAC_BUF(mac);
 
 	if (bond->params.mode == BOND_MODE_8023AD) {
 		struct ad_info ad_info;
 		if (!bond_3ad_get_active_agg_info(bond, &ad_info)) {
-			count = sprintf(buf,"%s\n",
-					print_mac(mac, ad_info.partner_system));
+			count = sprintf(buf, "%pM\n", ad_info.partner_system);
 		}
 	}
 
@@ -1468,6 +1490,7 @@ static struct attribute *per_bond_attrs[] = {
 	&dev_attr_ad_select.attr,
 	&dev_attr_xmit_hash_policy.attr,
 	&dev_attr_num_grat_arp.attr,
+	&dev_attr_num_unsol_na.attr,
 	&dev_attr_miimon.attr,
 	&dev_attr_primary.attr,
 	&dev_attr_use_carrier.attr,

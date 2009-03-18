@@ -1,198 +1,40 @@
 /*
- * Copyright (C) 2005-2009 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*
  * sysfs interface
- *
- * $Id: sysfs.c,v 1.19 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include <linux/fs.h>
-#include <linux/module.h>
 #include <linux/seq_file.h>
 #include <linux/sysfs.h>
 #include "aufs.h"
 
-
-#ifdef CONFIG_AUFS_LOCAL
-static ssize_t config_show(struct kobject *kobj, struct kobj_attribute *attr,
-			   char *buf)
-{
-#define conf_bool(name)	"CONFIG_AUFS_" #name "=y\n"
-	static const char opt[] =
-#ifdef CONFIG_AUFS
-		"CONFIG_AUFS=y\n"
-#else
-		"CONFIG_AUFS=m\n"
-#endif
-#ifdef CONFIG_AUFS_BRANCH_MAX_127
-		conf_bool(BRANCH_MAX_127)
-#elif defined(CONFIG_AUFS_BRANCH_MAX_511)
-		conf_bool(BRANCH_MAX_511)
-#elif defined(CONFIG_AUFS_BRANCH_MAX_1023)
-		conf_bool(BRANCH_MAX_1023)
-#elif defined(CONFIG_AUFS_BRANCH_MAX_32767)
-		conf_bool(BRANCH_MAX_32767)
-#endif
-#ifdef CONFIG_AUFS_STAT
-		conf_bool(STAT)
-#endif
-#ifdef CONFIG_AUFS_HINOTIFY
-		conf_bool(HINOTIFY)
-#endif
-#ifdef CONFIG_AUFS_EXPORT
-		conf_bool(EXPORT)
-#endif
-#ifdef CONFIG_AUFS_INO_T_64
-		conf_bool(INO_T_64)
-#endif
-#ifdef CONFIG_AUFS_ROBR
-		conf_bool(ROBR)
-#endif
-#ifdef CONFIG_AUFS_DLGT
-		conf_bool(DLGT)
-#endif
-#ifdef CONFIG_AUFS_HIN_OR_DLGT
-		conf_bool(HIN_OR_DLGT)
-#endif
-#ifdef CONFIG_AUFS_SHWH
-		conf_bool(SHWH)
-#endif
-#ifdef CONFIG_AUFS_RR_SQUASHFS
-		conf_bool(RR_SQUASHFS)
-#endif
-#ifdef CONFIG_AUFS_SEC_PERM_PATCH
-		conf_bool(SEC_PERM_PATCH)
-#endif
-#ifdef CONFIG_AUFS_SPLICE_PATCH
-		conf_bool(SPLICE_PATCH)
-#endif
-#ifdef CONFIG_AUFS_LHASH_PATCH
-		conf_bool(LHASH_PATCH)
-#endif
-#ifdef CONFIG_AUFS_PUT_FILP_PATCH
-		conf_bool(PUT_FILP_PATCH)
-#endif
-#ifdef CONFIG_AUFS_BR_NFS
-		conf_bool(BR_NFS)
-#endif
-#ifdef CONFIG_AUFS_BR_NFS_V4
-		conf_bool(BR_NFS_V4)
-#endif
-#ifdef CONFIG_AUFS_BR_XFS
-		conf_bool(BR_XFS)
-#endif
-#ifdef CONFIG_AUFS_FSYNC_SUPER_PATCH
-		conf_bool(FSYNC_SUPER_PATCH)
-#endif
-#ifdef CONFIG_AUFS_DENY_WRITE_ACCESS_PATCH
-		conf_bool(DENY_WRITE_ACCESS_PATCH)
-#endif
-#ifdef CONFIG_AUFS_KSIZE_PATCH
-		conf_bool(KSIZE_PATCH)
-#endif
-#ifdef CONFIG_AUFS_WORKAROUND_FUSE
-		conf_bool(WORKAROUND_FUSE)
-#endif
-#ifdef CONFIG_AUFS_GETATTR
-		conf_bool(GETATTR)
-#endif
 #ifdef CONFIG_AUFS_DEBUG
-		conf_bool(DEBUG)
-#endif
-#ifdef CONFIG_AUFS_MAGIC_SYSRQ
-		conf_bool(MAGIC_SYSRQ)
-#endif
-#ifdef CONFIG_AUFS_DEBUG_LOCK
-		conf_bool(DEBUG_LOCK)
-#endif
-#ifdef CONFIG_AUFS_COMPAT
-		conf_bool(COMPAT)
-#endif
-#ifdef CONFIG_AUFS_UNIONFS22_PATCH
-		conf_bool(UNIONFS22_PATCH)
-#endif
-#ifdef CONFIG_AUFS_UNIONFS23_PATCH
-		conf_bool(UNIONFS23_PATCH)
-#endif
-		;
-#undef conf_bool
-
-	char *p = buf;
-	const char *end = buf + PAGE_SIZE;
-
-	p += snprintf(p, end - p, "%s", opt);
-#ifdef DbgUdbaRace
-	if (p < end)
-		p += snprintf(p, end - p, "DbgUdbaRace=%d\n", DbgUdbaRace);
-#endif
-	if (p < end)
-		return p - buf;
-	else
-		return -EFBIG;
-}
-
-static struct kobj_attribute au_config_attr = __ATTR_RO(config);
-#endif
-
-#ifdef CONFIG_AUFS_STAT
-static ssize_t stat_show(struct kobject *kobj, struct kobj_attribute *attr,
-			 char *buf)
-{
-	char *p = buf;
-	const char *end = buf + PAGE_SIZE;
-	int i;
-
-	p += snprintf(p, end - p, "wkq max_busy:");
-	for (i = 0; p < end && i < aufs_nwkq; i++)
-		p += snprintf(p, end - p, " %u", au_wkq[i].max_busy);
-	if (p < end)
-		p += snprintf(p, end - p, ", %u(generic)\n",
-			      au_wkq[aufs_nwkq].max_busy);
-
-	if (p < end)
-		return p - buf;
-	else
-		return -EFBIG;
-}
-
-static struct kobj_attribute au_stat_attr = __ATTR_RO(stat);
-#endif
-
-#ifdef CONFIG_AUFS_DEBUG
-static ssize_t debug_show(struct kobject *kobj, struct kobj_attribute *attr,
+static ssize_t debug_show(struct kobject *kobj __maybe_unused,
+			  struct kobj_attribute *attr __maybe_unused,
 			  char *buf)
 {
 	return sprintf(buf, "%d\n", au_debug_test());
 }
 
-static ssize_t debug_store(struct kobject *kobj, struct kobj_attribute *attr,
+static ssize_t debug_store(struct kobject *kobj __maybe_unused,
+			   struct kobj_attribute *attr __maybe_unused,
 			   const char *buf, size_t sz)
 {
-	LKTRTrace("%.*s\n", (unsigned int)sz, buf);
-
 	if (unlikely(!sz || (*buf != '0' && *buf != '1')))
 		return -EOPNOTSUPP;
 
 	if (*buf == '0')
-		au_debug_off();
+		au_debug(0);
 	else if (*buf == '1')
-		au_debug_on();
+		au_debug(1);
 	return sz;
 }
 
@@ -201,23 +43,17 @@ static struct kobj_attribute au_debug_attr = __ATTR(debug, S_IRUGO | S_IWUSR,
 #endif
 
 static struct attribute *au_attr[] = {
-#ifdef CONFIG_AUFS_LOCAL
-	&au_config_attr.attr,
-#endif
-#ifdef CONFIG_AUFS_STAT
-	&au_stat_attr.attr,
-#endif
 #ifdef CONFIG_AUFS_DEBUG
 	&au_debug_attr.attr,
 #endif
 	NULL,	/* need to NULL terminate the list of attributes */
 };
 
-static struct attribute_group au_attr_group_body = {
+static struct attribute_group sysaufs_attr_group_body = {
 	.attrs = au_attr
 };
 
-struct attribute_group *au_attr_group = &au_attr_group_body;
+struct attribute_group *sysaufs_attr_group = &sysaufs_attr_group_body;
 
 /* ---------------------------------------------------------------------- */
 
@@ -258,117 +94,68 @@ static struct sysfs_ops sysaufs_ops = {
 #endif
 };
 
-static struct kobj_type au_ktype_body = {
+static struct kobj_type sysaufs_ktype_body = {
 	.sysfs_ops = &sysaufs_ops
 };
-struct kobj_type *au_ktype = &au_ktype_body;
+struct kobj_type *sysaufs_ktype = &sysaufs_ktype_body;
 
 /* ---------------------------------------------------------------------- */
 
-static noinline_for_stack
-int sysaufs_sbi_xi(struct seq_file *seq, struct file *xf, int dlgt,
-		   int print_path)
+static int sysaufs_sbi_xi(struct seq_file *seq, struct file *xf,
+			  struct kstat *st)
 {
 	int err;
-	struct kstat st;
-	struct path path;
 
-	err = vfsub_getattr(xf->f_vfsmnt, xf->f_dentry, &st, dlgt);
+	err = vfs_getattr(xf->f_vfsmnt, xf->f_dentry, st);
 	if (!err) {
 		seq_printf(seq, "%llux%lu %lld",
-			   st.blocks, st.blksize, (long long)st.size);
-		if (print_path) {
-			path.dentry = xf->f_dentry;
-			path.mnt = xf->f_vfsmnt;
-			seq_putc(seq, ' ');
-			seq_path(seq, &path, au_esc_chars);
-		}
+			   st->blocks, st->blksize, (long long)st->size);
 		seq_putc(seq, '\n');
 	} else
 		seq_printf(seq, "err %d\n", err);
 
-	AuTraceErr(err);
 	return err;
 }
 
-int sysaufs_sbi_xino(struct seq_file *seq, struct super_block *sb)
+int sysaufs_si_xino(struct seq_file *seq, struct super_block *sb)
 {
 	int err;
-	unsigned int mnt_flags;
 	aufs_bindex_t bend, bindex;
-	unsigned char dlgt, xinodir;
 	struct kstat st;
-	struct path path;
 	struct au_sbinfo *sbinfo;
 	struct file *xf;
 
-	AuTraceEnter();
-
+	err = 0;
 	sbinfo = au_sbi(sb);
-	mnt_flags = au_mntflags(sb);
-	xinodir = !!au_opt_test(mnt_flags, XINODIR);
-	if (!au_opt_test_xino(mnt_flags)) {
-#ifdef CONFIG_AUFS_DEBUG
-		AuDebugOn(sbinfo->si_xib);
-		bend = au_sbend(sb);
-		for (bindex = 0; bindex <= bend; bindex++)
-			AuDebugOn(au_sbr(sb, bindex)->br_xino.xi_file);
-#endif
-		err = 0;
+	if (!au_opt_test(au_mntflags(sb), XINO))
 		goto out; /* success */
-	}
 
-	dlgt = !!au_test_dlgt(mnt_flags);
-	err = sysaufs_sbi_xi(seq, sbinfo->si_xib, dlgt, xinodir);
+	xf = sbinfo->si_xib;
+	err = au_xino_path(seq, xf);
+	seq_putc(seq, '\n');
+	if (!err)
+		err = sysaufs_sbi_xi(seq, xf, &st);
 
 	bend = au_sbend(sb);
 	for (bindex = 0; !err && bindex <= bend; bindex++) {
 		xf = au_sbr(sb, bindex)->br_xino.xi_file;
 		if (!xf)
 			continue;
+
 		seq_printf(seq, "%d: ", bindex);
-		err = vfsub_getattr(xf->f_vfsmnt, xf->f_dentry, &st, dlgt);
+		err = vfs_getattr(xf->f_vfsmnt, xf->f_dentry, &st);
 		if (!err) {
 			seq_printf(seq, "%ld, %llux%lu %lld",
 				   (long)file_count(xf), st.blocks, st.blksize,
 				   (long long)st.size);
-			if (xinodir) {
-				path.dentry = xf->f_dentry;
-				path.mnt = xf->f_vfsmnt;
-				seq_putc(seq, ' ');
-				seq_path(seq, &path, au_esc_chars);
-			}
 			seq_putc(seq, '\n');
 		} else
 			seq_printf(seq, "err %d\n", err);
 	}
 
  out:
-	AuTraceErr(err);
 	return err;
 }
-
-#ifdef CONFIG_AUFS_EXPORT
-int sysaufs_sbi_xigen(struct seq_file *seq, struct super_block *sb)
-{
-	int err;
-	unsigned int mnt_flags;
-	struct au_sbinfo *sbinfo;
-
-	AuTraceEnter();
-
-	err = 0;
-	sbinfo = au_sbi(sb);
-	mnt_flags = au_mntflags(sb);
-	if (au_opt_test_xino(mnt_flags))
-		err = sysaufs_sbi_xi(seq, sbinfo->si_xigen,
-				     !!au_opt_test(mnt_flags, DLGT),
-				     !!au_opt_test(mnt_flags, XINODIR));
-
-	AuTraceErr(err);
-	return err;
-}
-#endif
 
 /*
  * the lifetime of branch is independent from the entry under sysfs.
@@ -380,11 +167,9 @@ static int sysaufs_sbi_br(struct seq_file *seq, struct super_block *sb,
 			  aufs_bindex_t bindex)
 {
 	int err;
+	struct path path;
 	struct dentry *root;
 	struct au_branch *br;
-	struct path path;
-
-	LKTRTrace("b%d\n", bindex);
 
 	err = -ENOENT;
 	if (unlikely(au_sbend(sb) < bindex))
@@ -396,12 +181,11 @@ static int sysaufs_sbi_br(struct seq_file *seq, struct super_block *sb,
 	br = au_sbr(sb, bindex);
 	path.mnt = br->br_mnt;
 	path.dentry = au_h_dptr(root, bindex);
-	seq_path(seq, &path, au_esc_chars);
+	au_seq_path(seq, &path);
 	di_read_unlock(root, !AuLock_IR);
 	seq_printf(seq, "=%s\n", au_optstr_br_perm(br->br_perm));
 
  out:
-	AuTraceErr(err);
 	return err;
 }
 
@@ -413,7 +197,6 @@ static struct seq_file *au_seq(char *p, ssize_t len)
 
 	seq = kzalloc(sizeof(*seq), GFP_NOFS);
 	if (seq) {
-		/* todo: necessary? */
 		/* mutex_init(&seq.lock); */
 		seq->buf = p;
 		seq->size = len;
@@ -421,12 +204,11 @@ static struct seq_file *au_seq(char *p, ssize_t len)
 	}
 
 	seq = ERR_PTR(-ENOMEM);
-	AuTraceErrPtr(seq);
 	return seq;
 }
 
 /* todo: file size may exceed PAGE_SIZE */
-ssize_t sysaufs_sbi_show(struct kobject *kobj, struct attribute *attr,
+ssize_t sysaufs_si_show(struct kobject *kobj, struct attribute *attr,
 			 char *buf)
 {
 	ssize_t err;
@@ -436,8 +218,6 @@ ssize_t sysaufs_sbi_show(struct kobject *kobj, struct attribute *attr,
 	struct seq_file *seq;
 	char *name;
 	struct attribute **cattr;
-
-	LKTRTrace("%s/%s\n", kobject_name(kobj), attr->name);
 
 	sbinfo = container_of(kobj, struct au_sbinfo, si_kobj);
 	sb = sbinfo->si_sb;
@@ -449,10 +229,10 @@ ssize_t sysaufs_sbi_show(struct kobject *kobj, struct attribute *attr,
 		goto out;
 
 	name = (void *)attr->name;
-	cattr = au_sbi_attrs;
+	cattr = sysaufs_si_attrs;
 	while (*cattr) {
 		if (!strcmp(name, (*cattr)->name)) {
-			err = container_of(*cattr, struct au_sbi_attr, attr)
+			err = container_of(*cattr, struct sysaufs_si_attr, attr)
 				->show(seq, sb);
 			goto out_seq;
 		}
@@ -478,7 +258,6 @@ ssize_t sysaufs_sbi_show(struct kobject *kobj, struct attribute *attr,
 	kfree(seq);
  out:
 	si_read_unlock(sb);
-	AuTraceErr(err);
 	return err;
 }
 
@@ -496,8 +275,6 @@ void sysaufs_brs_del(struct super_block *sb, aufs_bindex_t bindex)
 	struct au_sbinfo *sbinfo;
 	aufs_bindex_t bend;
 
-	LKTRTrace("b%d\n", bindex);
-
 	if (!sysaufs_brs)
 		return;
 
@@ -511,11 +288,9 @@ void sysaufs_brs_del(struct super_block *sb, aufs_bindex_t bindex)
 void sysaufs_brs_add(struct super_block *sb, aufs_bindex_t bindex)
 {
 	int err;
-	struct kobject *kobj;
 	aufs_bindex_t bend;
+	struct kobject *kobj;
 	struct au_branch *br;
-
-	LKTRTrace("b%d\n", bindex);
 
 	if (!sysaufs_brs)
 		return;

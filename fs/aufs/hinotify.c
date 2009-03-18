@@ -1,40 +1,22 @@
 /*
- * Copyright (C) 2005-2009 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*
- * internal/hidden inotify handler
- *
- * $Id: hinotify.c,v 1.23 2009/01/26 06:24:45 sfjro Exp $
+ * inotify for the lower directories
  */
 
 #include "aufs.h"
 
-/*
-#ifdef DbgInotify
-#define AuDbgHin(args...)	AuDbg(##args)
-#else
-#define AuDbgHin(args...)	do {} while ()
-#endif
-*/
+static const __u32 AuHinMask = (IN_MOVE | IN_DELETE | IN_CREATE);
+static struct inotify_handle *au_hin_handle;
 
-static struct inotify_handle *in_handle;
-
-AuCacheFuncs(hinotify, AuCache_HINOTIFY);
+AuCacheFuncs(hinotify, HINOTIFY);
 
 int au_hin_alloc(struct au_hinode *hinode, struct inode *inode,
 		 struct inode *h_inode)
@@ -43,19 +25,16 @@ int au_hin_alloc(struct au_hinode *hinode, struct inode *inode,
 	struct au_hinotify *hin;
 	s32 wd;
 
-	LKTRTrace("i%lu, hi%lu\n", inode->i_ino, h_inode->i_ino);
-
 	err = -ENOMEM;
 	hin = au_cache_alloc_hinotify();
 	if (hin) {
 		AuDebugOn(hinode->hi_notify);
 		hinode->hi_notify = hin;
-		au_spl_init(&hin->hin_ignore);
 		hin->hin_aufs_inode = inode;
 
 		inotify_init_watch(&hin->hin_watch);
-		wd = inotify_add_watch(in_handle, &hin->hin_watch, h_inode,
-				       AuInMask);
+		wd = inotify_add_watch(au_hin_handle, &hin->hin_watch, h_inode,
+				       AuHinMask);
 		if (wd >= 0)
 			return 0; /* success */
 
@@ -65,7 +44,6 @@ int au_hin_alloc(struct au_hinode *hinode, struct inode *inode,
 		hinode->hi_notify = NULL;
 	}
 
-	AuTraceErr(err);
 	return err;
 }
 
@@ -74,16 +52,14 @@ void au_hin_free(struct au_hinode *hinode)
 	int err;
 	struct au_hinotify *hin;
 
-	AuTraceEnter();
-
 	hin = hinode->hi_notify;
 	if (hin) {
 		err = 0;
 		if (atomic_read(&hin->hin_watch.count))
-			err = inotify_rm_watch(in_handle, &hin->hin_watch);
+			err = inotify_rm_watch(au_hin_handle, &hin->hin_watch);
 		if (unlikely(err))
 			/* it means the watch is already removed */
-			LKTRTrace("failed inotify_rm_watch() %d\n", err);
+			AuWarn("failed inotify_rm_watch() %d\n", err);
 		au_cache_free_hinotify(hin);
 		hinode->hi_notify = NULL;
 	}
@@ -91,34 +67,30 @@ void au_hin_free(struct au_hinode *hinode)
 
 /* ---------------------------------------------------------------------- */
 
-void au_hin_ctl(struct au_hinode *hinode, const __u32 mask)
+void au_hin_ctl(struct au_hinode *hinode, int do_set)
 {
 	struct inode *h_inode;
 	struct inotify_watch *watch;
 
-	h_inode = hinode->hi_inode;
-	LKTRTrace("hi%lu, sb %p, 0x%x\n", h_inode->i_ino, h_inode->i_sb, mask);
-	IMustLock(h_inode);
 	if (!hinode->hi_notify)
 		return;
 
+	h_inode = hinode->hi_inode;
+	IMustLock(h_inode);
+
+	/* todo: try inotify_find_update_watch()? */
 	watch = &hinode->hi_notify->hin_watch;
-#if 0 /* reserved for future use */
-	{
-		u32 wd;
-		wd = inotify_find_update_watch(in_handle, h_inode, mask);
-		AuTraceErr(wd);
-		/* ignore an err; */
-	}
-#else
-	/* struct inotify_handle is hidden */
 	mutex_lock(&h_inode->inotify_mutex);
 	/* mutex_lock(&watch->ih->mutex); */
-	watch->mask = mask;
+	if (do_set) {
+		AuDebugOn(watch->mask & AuHinMask);
+		watch->mask |= AuHinMask;
+	} else {
+		AuDebugOn(!(watch->mask & AuHinMask));
+		watch->mask &= ~AuHinMask;
+	}
 	/* mutex_unlock(&watch->ih->mutex); */
 	mutex_unlock(&h_inode->inotify_mutex);
-#endif
-	LKTRTrace("watch %p, mask %u\n", watch, watch->mask);
 }
 
 void au_reset_hinotify(struct inode *inode, unsigned int flags)
@@ -127,386 +99,33 @@ void au_reset_hinotify(struct inode *inode, unsigned int flags)
 	struct inode *hi;
 	struct dentry *iwhdentry;
 
-	LKTRTrace("i%lu, 0x%x\n", inode->i_ino, flags);
-
 	bend = au_ibend(inode);
 	for (bindex = au_ibstart(inode); bindex <= bend; bindex++) {
 		hi = au_h_iptr(inode, bindex);
-		if (hi) {
-			/* mutex_lock_nested(&hi->i_mutex, AuLsc_I_CHILD); */
-			iwhdentry = au_hi_wh(inode, bindex);
-			if (iwhdentry)
-				dget(iwhdentry);
-			au_igrab(hi);
-			au_set_h_iptr(inode, bindex, NULL, 0);
-			au_set_h_iptr(inode, bindex, au_igrab(hi),
-				      flags & ~AuHi_XINO);
-			iput(hi);
-			dput(iwhdentry);
-			/* mutex_unlock(&hi->i_mutex); */
-		}
-	}
-}
-
-/* ---------------------------------------------------------------------- */
-
-void au_unpin_gp(struct au_pin *args)
-{
-	struct au_pin1 *gp;
-
-	gp = au_pin_gp(args);
-	AuDebugOn(!gp);
-	if (gp->dentry)
-		LKTRTrace("%.*s\n", AuDLNPair(gp->dentry));
-	else
-		AuTraceEnter();
-
-	au_do_unpin(gp, NULL);
-}
-
-int au_hin_verify_gen(struct dentry *dentry)
-{
-	struct super_block *sb = dentry->d_sb;
-	au_gen_t sigen;
-	struct inode *inode;
-
-	if (!au_opt_test(au_mntflags(sb), UDBA_INOTIFY))
-		return 0;
-
-	sigen = au_sigen(dentry->d_sb);
-	inode = dentry->d_inode;
-	return au_digen(dentry) != sigen
-		|| (inode && au_iigen(inode) != sigen);
-}
-
-/* ---------------------------------------------------------------------- */
-
-/* cf. fsnotify_change() */
-__u32 vfsub_events_notify_change(struct iattr *ia)
-{
-	__u32 events;
-	const unsigned int amtime = (ATTR_ATIME | ATTR_MTIME);
-
-	events = 0;
-	if ((ia->ia_valid & (ATTR_UID | ATTR_GID | ATTR_MODE))
-	    || (ia->ia_valid & amtime) == amtime)
-		events |= IN_ATTRIB;
-	if ((ia->ia_valid & ATTR_SIZE)
-	    || (ia->ia_valid & amtime) == ATTR_MTIME)
-		events |= IN_MODIFY;
-	return events;
-}
-
-void vfsub_ign_hinode(struct vfsub_args *vargs, __u32 events,
-		      struct au_hinode *hinode)
-{
-	struct au_hinotify *hin;
-	struct super_block *sb;
-	struct au_hin_ignore *ign;
-
-	if (!hinode)
-		return;
-
-	hin = hinode->hi_notify;
-	if (!hin || !hin->hin_watch.mask)
-		return;
-
-	sb = hin->hin_aufs_inode->i_sb;
-	AuDebugOn(!au_opt_test(au_mntflags(sb), UDBA_INOTIFY));
-
-	ign = vargs->ignore + vargs->nignore++;
-	ign->ign_events = events;
-	ign->ign_handled = 0;
-	ign->ign_hinode = hinode;
-
-	{
-		struct inode *h_inode;
-		h_inode = hinode->hi_inode;
-		if (!mutex_is_locked(&h_inode->i_mutex))
-			au_dbg_blocked();
-		IMustLock(h_inode);
-	}
-}
-
-static void au_hin_ignore(struct au_hin_ignore *ign)
-{
-	struct au_hinode *hinode;
-	__u32 events;
-	struct au_hinotify *hin;
-	struct inode *h_inode;
-
-	hinode = ign->ign_hinode;
-	events = ign->ign_events;
-	LKTRTrace("0x%x\n", events);
-	AuDebugOn(!hinode || !events);
-
-	hin = hinode->hi_notify;
-	h_inode = hinode->hi_inode;
-	if (h_inode && hin) {
-		LKTRTrace("hi%lu\n", h_inode->i_ino);
-#ifdef DbgInotify
-		AuDbg("hi%lu, 0x%x\n", h_inode->i_ino, events);
-#endif
-
-		au_spl_add(&ign->ign_list, &hin->hin_ignore);
-		/* AuDbg("list_add %p, 0x%x\n", ign, events); */
-	}
-#if 1 /* todo: test dlgt */
-	else
-		/*
-		 * it may happen by this scenario.
-		 * - a file and its parent dir exist on two branches
-		 * - a file on the upper branch is opened
-		 * - the parent dir and the file are removed by udba
-		 * - the parent is re-accessed, and new dentry/inode in
-		 *   aufs is generated for it, based upon the one on the lower
-		 *   branch
-		 * - the opened file is re-accessed, re-validated, and it may be
-		 *   re-connected to the new parent dentry
-		 * it means the file in aufs cannot get the actual removed
-		 * parent dir on the branch.
-		 */
-		INIT_LIST_HEAD(&ign->ign_list);
-#endif
-}
-
-static void au_hin_unignore(struct au_hin_ignore *ign)
-{
-	struct au_hinode *hinode;
-	__u32 events;
-	struct au_hinotify *hin;
-	struct inode *h_inode;
-
-	hinode = ign->ign_hinode;
-	events = ign->ign_events;
-	LKTRTrace("0x%x\n", events);
-	/* AuDbg("0x%x\n", events); */
-	AuDebugOn(!hinode || !events);
-
-	hin = hinode->hi_notify;
-	h_inode = hinode->hi_inode;
-	if (!h_inode || !hin)
-		return;
-	LKTRTrace("hi%lu\n", h_inode->i_ino);
-#ifdef DbgInotify
-	AuDbg("hi%lu, 0x%x\n", h_inode->i_ino, events);
-#endif
-
-	spin_lock(&hin->hin_ignore.spin);
-	au_hin_list_del(&ign->ign_list);
-	spin_unlock(&hin->hin_ignore.spin);
-	/* AuDbg("list_del %p, 0x%x\n", ign, events); */
-}
-
-static int au_hin_test_ignore(u32 mask, struct au_hinotify *hin)
-{
-	int do_ignore;
-	u32 events;
-	struct au_hin_ignore *ign, *tmp;
-	struct list_head *head;
-
-	do_ignore = 0;
-	head = &hin->hin_ignore.head;
-	spin_lock(&hin->hin_ignore.spin);
-	list_for_each_entry_safe(ign, tmp, head, ign_list) {
-		/* AuDbg("ign %p\n", ign); */
-		if (ign->ign_pid == current->pid) {
-			events = (mask & ign->ign_events);
-			if (events) {
-				do_ignore = 1;
-				ign->ign_handled |= events;
-				if (ign->ign_events == ign->ign_handled) {
-					list_del_init(&ign->ign_list);
-					/*
-					AuDbg("list_del %p, 0x%x\n",
-					      ign, events);
-					*/
-				}
-				break;
-			}
-		}
-	}
-	spin_unlock(&hin->hin_ignore.spin);
-
-	return do_ignore;
-}
-
-void vfsub_ignore(struct vfsub_args *vargs)
-{
-	int n;
-	struct au_hin_ignore *ign;
-	struct super_block *sb;
-	struct au_hinode *hinode;
-	struct inode *h_inode;
-
-	n = vargs->nignore;
-	if (!n)
-		return;
-
-	ign = vargs->ignore;
-	hinode = ign->ign_hinode;
-	sb = hinode->hi_notify->hin_aufs_inode->i_sb;
-	h_inode = hinode->hi_inode;
-	if (au_opt_test(au_mntflags(sb), UDBA_INOTIFY)) {
-		if (!mutex_is_locked(&h_inode->i_mutex))
-			au_dbg_blocked();
-		IMustLock(h_inode);
-	}
-	while (n-- > 0) {
-		ign->ign_pid = current->pid;
-		au_hin_ignore(ign++);
-	}
-}
-
-void vfsub_unignore(struct vfsub_args *vargs)
-{
-	int n;
-	struct au_hin_ignore *ign;
-
-	n = vargs->nignore;
-	if (!n)
-		return;
-
-	ign = vargs->ignore;
-	while (n-- > 0)
-		au_hin_unignore(ign++);
-}
-
-#ifdef CONFIG_AUFS_DEBUG
-void au_dbg_hin_list(struct vfsub_args *vargs)
-{
-	int n;
-	struct au_hin_ignore *ign;
-
-	n = vargs->nignore;
-	if (!n)
-		return;
-
-	ign = vargs->ignore;
-	while (n-- > 0) {
-		/* AuDebugOn(!list_empty(&ign++->ign_list)); */
-		if (list_empty(&ign++->ign_list))
+		if (!hi)
 			continue;
-		ign--;
-		AuDbg("%d: pid %d, 0x%x\n",
-		      n + 1, ign->ign_pid, ign->ign_events);
-		au_hin_unignore(ign);
-		ign++;
-		au_dbg_blocked();
+
+		/* mutex_lock_nested(&hi->i_mutex, AuLsc_I_CHILD); */
+		iwhdentry = au_hi_wh(inode, bindex);
+		if (iwhdentry)
+			dget(iwhdentry);
+		au_igrab(hi);
+		au_set_h_iptr(inode, bindex, NULL, 0);
+		au_set_h_iptr(inode, bindex, au_igrab(hi),
+			      flags & ~AuHi_XINO);
+		iput(hi);
+		dput(iwhdentry);
+		/* mutex_unlock(&hi->i_mutex); */
 	}
-}
-#endif
-
-/* ---------------------------------------------------------------------- */
-
-static char *in_name(u32 mask)
-{
-#ifdef CONFIG_AUFS_DEBUG
-#define test_ret(flag)	if (mask & flag) \
-				return #flag;
-	test_ret(IN_ACCESS);
-	test_ret(IN_MODIFY);
-	test_ret(IN_ATTRIB);
-	test_ret(IN_CLOSE_WRITE);
-	test_ret(IN_CLOSE_NOWRITE);
-	test_ret(IN_OPEN);
-	test_ret(IN_MOVED_FROM);
-	test_ret(IN_MOVED_TO);
-	test_ret(IN_CREATE);
-	test_ret(IN_DELETE);
-	test_ret(IN_DELETE_SELF);
-	test_ret(IN_MOVE_SELF);
-	test_ret(IN_UNMOUNT);
-	test_ret(IN_Q_OVERFLOW);
-	test_ret(IN_IGNORED);
-	return "";
-#undef test_ret
-#else
-	return "??";
-#endif
 }
 
 /* ---------------------------------------------------------------------- */
-
-static struct dentry *lookup_wlock_by_name(char *name, unsigned int nlen,
-					   struct inode *dir)
-{
-	struct dentry *dentry, *d, *parent;
-	struct qstr *dname;
-
-	LKTRTrace("%.*s, dir%lu\n", nlen, name, dir->i_ino);
-
-	parent = d_find_alias(dir);
-	if (!parent)
-		return NULL;
-
-	dentry = NULL;
-	spin_lock(&dcache_lock);
-	list_for_each_entry(d, &parent->d_subdirs, d_u.d_child) {
-		LKTRTrace("%.*s\n", AuDLNPair(d));
-		dname = &d->d_name;
-		if (dname->len != nlen || memcmp(dname->name, name, nlen))
-			continue;
-		if (!atomic_read(&d->d_count) || !d->d_fsdata) {
-			spin_lock(&d->d_lock);
-			__d_drop(d);
-			spin_unlock(&d->d_lock);
-			continue;
-		}
-
-		dentry = dget(d);
-		break;
-	}
-	spin_unlock(&dcache_lock);
-	dput(parent);
-
-	if (dentry) {
-#if 0
-	lktr_set_pid(current->pid, LktrArrayPid);
-	AuDbgDentry(dentry);
-	lktr_clear_pid(current->pid, LktrArrayPid);
-#endif
-		di_write_lock_child(dentry);
-	}
-	return dentry;
-}
-
-static struct inode *lookup_wlock_by_ino(struct super_block *sb,
-					 aufs_bindex_t bindex, ino_t h_ino)
-{
-	struct inode *inode;
-	struct au_xino_entry xinoe;
-	int err;
-
-	LKTRTrace("b%d, hi%lu\n", bindex, (unsigned long)h_ino);
-	AuDebugOn(!au_opt_test_xino(au_mntflags(sb)));
-
-	inode = NULL;
-	err = au_xino_read(sb, bindex, h_ino, &xinoe);
-	if (!err && xinoe.ino)
-		inode = ilookup(sb, xinoe.ino);
-	if (!inode)
-		goto out;
-	if (unlikely(inode->i_ino == AUFS_ROOT_INO)) {
-		AuWarn("wrong root branch\n");
-		iput(inode);
-		inode = NULL;
-		goto out;
-	}
-
-	ii_write_lock_child(inode);
-
- out:
-	return inode;
-}
 
 static int hin_xino(struct inode *inode, struct inode *h_inode)
 {
 	int err;
 	aufs_bindex_t bindex, bend, bfound, bstart;
 	struct inode *h_i;
-
-	LKTRTrace("i%lu, hi%lu\n", inode->i_ino, h_inode->i_ino);
 
 	err = 0;
 	if (unlikely(inode->i_ino == AUFS_ROOT_INO)) {
@@ -534,9 +153,10 @@ static int hin_xino(struct inode *inode, struct inode *h_inode)
 
 	for (bindex = bstart; bindex <= bend; bindex++) {
 		h_i = au_h_iptr(inode, bindex);
-		if (h_i)
-			err = au_xino_write0(inode->i_sb, bindex, h_i->i_ino,
-					     0);
+		if (!h_i)
+			continue;
+
+		err = au_xino_write0(inode->i_sb, bindex, h_i->i_ino, 0);
 		/* ignore this error */
 		/* bad action? */
 	}
@@ -555,8 +175,6 @@ static int hin_gen_tree(struct dentry *dentry)
 	struct au_dpage *dpage;
 	struct dentry **dentries;
 
-	LKTRTrace("%.*s\n", AuDLNPair(dentry));
-
 	err = au_dpages_init(&dpages, GFP_NOFS);
 	if (unlikely(err))
 		goto out;
@@ -570,8 +188,8 @@ static int hin_gen_tree(struct dentry *dentry)
 		ndentry = dpage->ndentry;
 		for (j = 0; j < ndentry; j++) {
 			struct dentry *d;
+
 			d = dentries[j];
-			LKTRTrace("%.*s\n", AuDLNPair(d));
 			if (IS_ROOT(d))
 				continue;
 
@@ -591,7 +209,6 @@ static int hin_gen_tree(struct dentry *dentry)
 	dentry_unhash(dentry);
 	dput(dentry);
  out:
-	AuTraceErr(err);
 	return err;
 }
 
@@ -604,8 +221,6 @@ static int hin_gen_by_inode(char *name, unsigned int nlen, struct inode *inode,
 	int err;
 	struct dentry *d;
 	struct qstr *dname;
-
-	LKTRTrace("%.*s, i%lu\n", nlen, name, inode->i_ino);
 
 	err = 1;
 	if (unlikely(inode->i_ino == AUFS_ROOT_INO)) {
@@ -655,8 +270,6 @@ static int hin_gen_by_name(struct dentry *dentry, const unsigned int isdir)
 	int err;
 	struct inode *inode;
 
-	LKTRTrace("%.*s\n", AuDLNPair(dentry));
-
 	inode = dentry->d_inode;
 	if (IS_ROOT(dentry)
 	    /* || (inode && inode->i_ino == AUFS_ROOT_INO) */
@@ -681,35 +294,15 @@ static int hin_gen_by_name(struct dentry *dentry, const unsigned int isdir)
 	return err;
 }
 
-static void hin_attr(struct inode *inode, struct inode *h_inode)
-{
-	struct dentry *h_dentry;
-
-	LKTRTrace("i%lu, hi%lu\n", inode->i_ino, h_inode->i_ino);
-
-	if (au_h_iptr(inode, au_ibstart(inode)) != h_inode)
-		return;
-
-	h_dentry = d_find_alias(h_inode);
-	if (h_dentry) {
-		au_update_fuse_h_inode(NULL, h_dentry);
-		/* ignore an error*/
-		dput(h_dentry);
-	}
-
-	au_cpup_attr_all(inode, /*force*/1);
-}
-
 /* ---------------------------------------------------------------------- */
 
 /* hinotify job flags */
-#define AuHinJob_XINO0	1
-#define AuHinJob_GEN	(1 << 1)
-#define AuHinJob_DIRENT	(1 << 2)
-#define AuHinJob_ATTR	(1 << 3)
-#define AuHinJob_ISDIR	(1 << 4)
-#define AuHinJob_TRYXINO0 (1 << 5)
-#define AuHinJob_MNTPNT	(1 << 6)
+#define AuHinJob_XINO0		1
+#define AuHinJob_GEN		(1 << 1)
+#define AuHinJob_DIRENT		(1 << 2)
+#define AuHinJob_ISDIR		(1 << 3)
+#define AuHinJob_TRYXINO0	(1 << 4)
+#define AuHinJob_MNTPNT		(1 << 5)
 #define au_ftest_hinjob(flags, name)	((flags) & AuHinJob_##name)
 #define au_fset_hinjob(flags, name)	{ (flags) |= AuHinJob_##name; }
 #define au_fclr_hinjob(flags, name)	{ (flags) &= ~AuHinJob_##name; }
@@ -728,16 +321,14 @@ static int hin_job(struct hin_job_args *a)
 
 	/* reset xino */
 	if (au_ftest_hinjob(a->flags, XINO0) && a->inode)
-		hin_xino(a->inode, a->h_inode);
-	/* ignore this error */
+		hin_xino(a->inode, a->h_inode); /* ignore this error */
 
 	if (au_ftest_hinjob(a->flags, TRYXINO0)
 	    && a->inode
 	    && a->h_inode) {
 		mutex_lock_nested(&a->h_inode->i_mutex, AuLsc_I_CHILD);
 		if (!a->h_inode->i_nlink)
-			hin_xino(a->inode, a->h_inode);
-		/* ignore this error */
+			hin_xino(a->inode, a->h_inode); /* ignore this error */
 		mutex_unlock(&a->h_inode->i_mutex);
 	}
 
@@ -755,19 +346,12 @@ static int hin_job(struct hin_job_args *a)
 	/* make dir entries obsolete */
 	if (au_ftest_hinjob(a->flags, DIRENT) && a->inode) {
 		struct au_vdir *vdir;
-		IiMustWriteLock(a->inode);
+
 		vdir = au_ivdir(a->inode);
 		if (vdir)
 			vdir->vd_jiffy = 0;
 		/* IMustLock(a->inode); */
 		/* a->inode->i_version++; */
-	}
-
-	/* update the attr */
-	if (au_ftest_hinjob(a->flags, ATTR) && a->inode && a->h_inode) {
-		mutex_lock_nested(&a->h_inode->i_mutex, AuLsc_I_CHILD);
-		hin_attr(a->inode, a->h_inode);
-		mutex_unlock(&a->h_inode->i_mutex);
 	}
 
 	/* can do nothing but warn */
@@ -781,6 +365,96 @@ static int hin_job(struct hin_job_args *a)
 }
 
 /* ---------------------------------------------------------------------- */
+
+static char *in_name(u32 mask)
+{
+#ifdef CONFIG_AUFS_DEBUG
+#define test_ret(flag)	if (mask & flag) \
+				return #flag;
+	test_ret(IN_ACCESS);
+	test_ret(IN_MODIFY);
+	test_ret(IN_ATTRIB);
+	test_ret(IN_CLOSE_WRITE);
+	test_ret(IN_CLOSE_NOWRITE);
+	test_ret(IN_OPEN);
+	test_ret(IN_MOVED_FROM);
+	test_ret(IN_MOVED_TO);
+	test_ret(IN_CREATE);
+	test_ret(IN_DELETE);
+	test_ret(IN_DELETE_SELF);
+	test_ret(IN_MOVE_SELF);
+	test_ret(IN_UNMOUNT);
+	test_ret(IN_Q_OVERFLOW);
+	test_ret(IN_IGNORED);
+	return "";
+#undef test_ret
+#else
+	return "??";
+#endif
+}
+
+static struct dentry *lookup_wlock_by_name(char *name, unsigned int nlen,
+					   struct inode *dir)
+{
+	struct dentry *dentry, *d, *parent;
+	struct qstr *dname;
+
+	parent = d_find_alias(dir);
+	if (!parent)
+		return NULL;
+
+	dentry = NULL;
+	spin_lock(&dcache_lock);
+	list_for_each_entry(d, &parent->d_subdirs, d_u.d_child) {
+		/* AuDbg("%.*s\n", AuDLNPair(d)); */
+		dname = &d->d_name;
+		if (dname->len != nlen || memcmp(dname->name, name, nlen))
+			continue;
+		if (!atomic_read(&d->d_count) || !d->d_fsdata) {
+			spin_lock(&d->d_lock);
+			__d_drop(d);
+			spin_unlock(&d->d_lock);
+			continue;
+		}
+
+		dentry = dget(d);
+		break;
+	}
+	spin_unlock(&dcache_lock);
+	dput(parent);
+
+	if (dentry)
+		di_write_lock_child(dentry);
+
+	return dentry;
+}
+
+static struct inode *lookup_wlock_by_ino(struct super_block *sb,
+					 aufs_bindex_t bindex, ino_t h_ino)
+{
+	struct inode *inode;
+	ino_t ino;
+	int err;
+
+	inode = NULL;
+	err = au_xino_read(sb, bindex, h_ino, &ino);
+	if (!err && ino)
+		inode = ilookup(sb, ino);
+	if (!inode)
+		goto out;
+
+	if (unlikely(inode->i_ino == AUFS_ROOT_INO)) {
+		AuWarn("wrong root branch\n");
+		iput(inode);
+		inode = NULL;
+		goto out;
+	}
+
+	ii_write_lock_child(inode);
+
+ out:
+	return inode;
+}
 
 enum { CHILD, PARENT };
 struct postproc_args {
@@ -808,9 +482,9 @@ static void postproc(void *_args)
 	AuDebugOn(!a->h_dir);
 	AuDebugOn(!a->dir);
 	AuDebugOn(!a->mask);
-	LKTRTrace("mask 0x%x %s, i%lu, hi%lu, hci%lu\n",
-		  a->mask, in_name(a->mask), a->dir->i_ino, a->h_dir->i_ino,
-		  a->h_child_inode ? a->h_child_inode->i_ino : 0);
+	AuDbg("mask 0x%x %s, i%lu, hi%lu, hci%lu\n",
+	      a->mask, in_name(a->mask), a->dir->i_ino, a->h_dir->i_ino,
+	      a->h_child_inode ? a->h_child_inode->i_ino : 0);
 
 	inode = NULL;
 	dentry = NULL;
@@ -818,16 +492,6 @@ static void postproc(void *_args)
 	 * do not lock a->dir->i_mutex here
 	 * because of d_revalidate() may cause a deadlock.
 	 */
-#if 0
-	/*
-	 * just wait for the dir becoming non-busy.
-	 * for instance, prevent NFSD lookup from "nlink == 0" message.
-	 * but it is not guranteed.
-	 */
-	mutex_lock(&a->dir->i_mutex);
-	mutex_unlock(&a->dir->i_mutex);
-#endif
-
 	sb = a->dir->i_sb;
 	AuDebugOn(!sb);
 	sbinfo = au_sbi(sb);
@@ -847,7 +511,7 @@ static void postproc(void *_args)
 	if (unlikely(bfound < 0))
 		goto out;
 
-	xino = !!au_opt_test_xino(au_mntflags(sb));
+	xino = !!au_opt_test(au_mntflags(sb), XINO);
 	h_ino = 0;
 	if (a->h_child_inode)
 		h_ino = a->h_child_inode->i_ino;
@@ -863,8 +527,7 @@ static void postproc(void *_args)
 	if (xino && !inode && h_ino
 	    && (au_ftest_hinjob(a->flags[CHILD], XINO0)
 		|| au_ftest_hinjob(a->flags[CHILD], TRYXINO0)
-		|| au_ftest_hinjob(a->flags[CHILD], GEN)
-		|| au_ftest_hinjob(a->flags[CHILD], ATTR))) {
+		|| au_ftest_hinjob(a->flags[CHILD], GEN))) {
 		inode = lookup_wlock_by_ino(sb, bfound, h_ino);
 		try_iput = 1;
 	    }
@@ -910,9 +573,11 @@ static void postproc(void *_args)
 	kfree(a);
 }
 
-static void aufs_inotify(struct inotify_watch *watch, u32 wd, u32 mask,
-			 u32 cookie, const char *h_child_name,
-			 struct inode *h_child_inode)
+/* ---------------------------------------------------------------------- */
+
+static void aufs_inotify(struct inotify_watch *watch, u32 wd __maybe_unused,
+			 u32 mask, u32 cookie __maybe_unused,
+			 const char *h_child_name, struct inode *h_child_inode)
 {
 	struct au_hinotify *hinotify;
 	struct postproc_args *args;
@@ -922,47 +587,31 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd, u32 mask,
 	struct inode *dir;
 	unsigned int flags[2];
 
-	LKTRTrace("i%lu, wd %d, mask 0x%x %s, cookie 0x%x, hcname %s, hi%lu\n",
-		  watch->inode->i_ino, wd, mask, in_name(mask), cookie,
-		  h_child_name ? h_child_name : "",
-		  h_child_inode ? h_child_inode->i_ino : 0);
-
 	/* if IN_UNMOUNT happens, there must be another bug */
+	AuDebugOn(mask & IN_UNMOUNT);
 	if (mask & (IN_IGNORED | IN_UNMOUNT)) {
 		put_inotify_watch(watch);
 		return;
 	}
-
-#ifdef DbgInotify
-	if (!h_child_name || strcmp(h_child_name, AUFS_XINO_FNAME))
+#ifdef AuDbgHinotify
+	au_debug(1);
+	if (1 || !h_child_name || strcmp(h_child_name, AUFS_XINO_FNAME)) {
 		AuDbg("i%lu, wd %d, mask 0x%x %s, cookie 0x%x, hcname %s,"
 		      " hi%lu\n",
 		      watch->inode->i_ino, wd, mask, in_name(mask), cookie,
 		      h_child_name ? h_child_name : "",
 		      h_child_inode ? h_child_inode->i_ino : 0);
+		WARN_ON(1);
+	}
+	au_debug(0);
 #endif
 
 	hinotify = container_of(watch, struct au_hinotify, hin_watch);
 	AuDebugOn(!hinotify || !hinotify->hin_aufs_inode);
-	if (au_hin_test_ignore(mask, hinotify)) {
-#ifdef DbgInotify
-		AuDbg("ignored\n");
-#endif
-		return;
-	}
-#if 0 /* tmp debug */
-	if (h_child_name && !strcmp(h_child_name, AUFS_XINO_FNAME)) {
-	AuDbg("i%lu, wd %d, mask 0x%x %s, cookie 0x%x, hcname %s, hi%lu\n",
-		  watch->inode->i_ino, wd, mask, in_name(mask), cookie,
-		  h_child_name ? h_child_name : "",
-		  h_child_inode ? h_child_inode->i_ino : 0);
-	//au_dbg_blocked();
-	}
-#endif
-
 	dir = igrab(hinotify->hin_aufs_inode);
 	if (!dir)
 		return;
+
 	isroot = (dir->i_ino == AUFS_ROOT_INO);
 	len = 0;
 	wh = 0;
@@ -983,38 +632,19 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd, u32 mask,
 	if (isdir)
 		flags[CHILD] = AuHinJob_ISDIR;
 	switch (mask & IN_ALL_EVENTS) {
-	case IN_MODIFY:
-		/*FALLTHROUGH*/
-	case IN_ATTRIB:
-		if (h_child_inode) {
-			if (!wh)
-				au_fset_hinjob(flags[CHILD], ATTR);
-		} else
-			au_fset_hinjob(flags[PARENT], ATTR);
-		break;
-
-		/* IN_MOVED_FROM is the first event in rename(2) */
 	case IN_MOVED_FROM:
 	case IN_MOVED_TO:
 		AuDebugOn(!h_child_name || !h_child_inode);
 		au_fset_hinjob(flags[CHILD], GEN);
-		au_fset_hinjob(flags[CHILD], ATTR);
-		if (1 || isdir)
-			au_fset_hinjob(flags[CHILD], XINO0);
+		au_fset_hinjob(flags[CHILD], XINO0);
 		au_fset_hinjob(flags[CHILD], MNTPNT);
-
-		au_fset_hinjob(flags[PARENT], ATTR);
 		au_fset_hinjob(flags[PARENT], DIRENT);
 		break;
 
 	case IN_CREATE:
 		AuDebugOn(!h_child_name || !h_child_inode);
-		au_fset_hinjob(flags[PARENT], ATTR);
 		au_fset_hinjob(flags[PARENT], DIRENT);
 		au_fset_hinjob(flags[CHILD], GEN);
-		/* hard link */
-		if (!isdir && h_child_inode->i_nlink > 1)
-			au_fset_hinjob(flags[CHILD], ATTR);
 		break;
 
 	case IN_DELETE:
@@ -1024,42 +654,12 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd, u32 mask,
 		 * by checking i_nlink, i_generation or d_unhashed().
 		 */
 		AuDebugOn(!h_child_name);
-		au_fset_hinjob(flags[PARENT], ATTR);
 		au_fset_hinjob(flags[PARENT], DIRENT);
 		au_fset_hinjob(flags[CHILD], GEN);
 		au_fset_hinjob(flags[CHILD], TRYXINO0);
 		au_fset_hinjob(flags[CHILD], MNTPNT);
 		break;
 
-	case IN_DELETE_SELF:
-#if 0
-		if (!isroot)
-			au_fset_hinjob(flags[PARENT], GEN);
-		/*FALLTHROUGH*/
-#endif
-
-	case IN_MOVE_SELF:
-#if 0
-		/*
-		 * when an inotify is set to an aufs inode,
-		 * such inode can be isolated and this event can be fired
-		 * solely.
-		 */
-		AuDebugOn(h_child_name || h_child_inode);
-		if (unlikely(isroot)) {
-			AuWarn("root branch was moved\n");
-			iput(dir);
-			return;
-		}
-		au_fset_hinjob(flags[PARENT], XINO0);
-		au_fset_hinjob(flags[PARENT], GEN);
-		au_fset_hinjob(flags[PARENT], ATTR);
-		au_fset_hinjob(flags[PARENT], DIRENT);
-		/* au_fset_hinjob(flags[PARENT], MNTPNT); */
-		break;
-#endif
-
-	case IN_ACCESS:
 	default:
 		AuDebugOn(1);
 	}
@@ -1096,13 +696,13 @@ static void aufs_inotify(struct inotify_watch *watch, u32 wd, u32 mask,
 	}
 
 	lockdep_off();
-	wkq_err = au_wkq_nowait(postproc, args, dir->i_sb, /*dlgt*/0);
+	wkq_err = au_wkq_nowait(postproc, args, dir->i_sb);
 	lockdep_on();
 	if (unlikely(wkq_err))
 		AuErr("wkq %d\n", wkq_err);
 }
 
-static void aufs_inotify_destroy(struct inotify_watch *watch)
+static void aufs_inotify_destroy(struct inotify_watch *watch __maybe_unused)
 {
 	return;
 }
@@ -1120,7 +720,7 @@ static void au_hin_destroy_cache(void)
 	au_cachep[AuCache_HINOTIFY] = NULL;
 }
 
-int __init au_inotify_init(void)
+int __init au_hinotify_init(void)
 {
 	int err;
 
@@ -1128,9 +728,9 @@ int __init au_inotify_init(void)
 	au_cachep[AuCache_HINOTIFY] = AuCache(au_hinotify);
 	if (au_cachep[AuCache_HINOTIFY]) {
 		err = 0;
-		in_handle = inotify_init(&aufs_inotify_ops);
-		if (IS_ERR(in_handle)) {
-			err = PTR_ERR(in_handle);
+		au_hin_handle = inotify_init(&aufs_inotify_ops);
+		if (IS_ERR(au_hin_handle)) {
+			err = PTR_ERR(au_hin_handle);
 			au_hin_destroy_cache();
 		}
 	}
@@ -1138,9 +738,9 @@ int __init au_inotify_init(void)
 	return err;
 }
 
-void au_inotify_fin(void)
+void au_hinotify_fin(void)
 {
-	inotify_destroy(in_handle);
+	inotify_destroy(au_hin_handle);
 	if (au_cachep[AuCache_HINOTIFY])
 		au_hin_destroy_cache();
 }

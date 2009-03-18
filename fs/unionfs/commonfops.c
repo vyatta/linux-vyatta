@@ -178,7 +178,7 @@ static int open_all_files(struct file *file)
 		lower_file =
 			dentry_open(lower_dentry,
 				    unionfs_lower_mnt_idx(dentry, bindex),
-				    file->f_flags);
+				    file->f_flags, current_cred());
 		if (IS_ERR(lower_file)) {
 			branchput(sb, bindex);
 			err = PTR_ERR(lower_file);
@@ -223,7 +223,7 @@ static int open_highest_file(struct file *file, bool willwrite)
 	unionfs_mntget(dentry, bstart);
 	lower_file = dentry_open(lower_dentry,
 				 unionfs_lower_mnt_idx(dentry, bstart),
-				 file->f_flags);
+				 file->f_flags, current_cred());
 	if (IS_ERR(lower_file)) {
 		err = PTR_ERR(lower_file);
 		goto out;
@@ -457,7 +457,8 @@ static int __open_dir(struct inode *inode, struct file *file)
 		dget(lower_dentry);
 		unionfs_mntget(file->f_path.dentry, bindex);
 		mnt = unionfs_lower_mnt_idx(file->f_path.dentry, bindex);
-		lower_file = dentry_open(lower_dentry, mnt, file->f_flags);
+		lower_file = dentry_open(lower_dentry, mnt, file->f_flags,
+					 current_cred());
 		if (IS_ERR(lower_file))
 			return PTR_ERR(lower_file);
 
@@ -528,7 +529,7 @@ static int __open_file(struct inode *inode, struct file *file,
 	lower_file =
 		dentry_open(lower_dentry,
 			    unionfs_lower_mnt_idx(file->f_path.dentry, bstart),
-			    lower_flags);
+			    lower_flags, current_cred());
 	if (IS_ERR(lower_file))
 		return PTR_ERR(lower_file);
 

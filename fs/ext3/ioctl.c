@@ -53,8 +53,7 @@ int ext3_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 			goto flags_out;
 		}
 
-		if (!S_ISDIR(inode->i_mode))
-			flags &= ~EXT3_DIRSYNC_FL;
+		flags = ext3_mask_flags(inode->i_mode, flags);
 
 		mutex_lock(&inode->i_mutex);
 		/* Is it quota file? Do not allow user to mess with it */
@@ -290,8 +289,8 @@ group_add_out:
 		mnt_drop_write(filp->f_path.mnt);
 		return err;
 	}
-	case EXT3_IOC_INODE_JIFFIES:
-		return inode->created_when;
+
+
 	default:
 		return -ENOTTY;
 	}

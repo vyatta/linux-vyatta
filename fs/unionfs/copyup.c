@@ -92,10 +92,19 @@ static int copyup_xattrs(struct dentry *old_lower_dentry,
 		 * XXX: move entire copyup code to SIOQ.
 		 */
 		if (err == -EPERM && !capable(CAP_FOWNER)) {
-			cap_raise(current->cap_effective, CAP_FOWNER);
+			const struct cred *old_creds;
+			struct cred *new_creds;
+
+			new_creds = prepare_creds();
+			if (unlikely(!new_creds)) {
+				err = -ENOMEM;
+				goto out;
+			}
+			cap_raise(new_creds->cap_effective, CAP_FOWNER);
+			old_creds = override_creds(new_creds);
 			err = vfs_setxattr(new_lower_dentry, name_list,
 					   attr_value, size, 0);
-			cap_lower(current->cap_effective, CAP_FOWNER);
+			revert_creds(old_creds);
 		}
 		if (err < 0)
 			goto out;
@@ -240,7 +249,7 @@ static int __copyup_reg_data(struct dentry *dentry,
 	/* dentry_open calls dput and mntput if it returns an error */
 	input_file = dentry_open(old_lower_dentry,
 				 unionfs_lower_mnt_idx(dentry, old_bindex),
-				 O_RDONLY | O_LARGEFILE);
+				 O_RDONLY | O_LARGEFILE, current_cred());
 	if (IS_ERR(input_file)) {
 		dput(old_lower_dentry);
 		err = PTR_ERR(input_file);
@@ -256,7 +265,7 @@ static int __copyup_reg_data(struct dentry *dentry,
 	output_mnt = unionfs_mntget(sb->s_root, new_bindex);
 	branchget(sb, new_bindex);
 	output_file = dentry_open(new_lower_dentry, output_mnt,
-				  O_RDWR | O_LARGEFILE);
+				  O_RDWR | O_LARGEFILE, current_cred());
 	if (IS_ERR(output_file)) {
 		err = PTR_ERR(output_file);
 		goto out_close_in2;

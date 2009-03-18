@@ -100,6 +100,21 @@ static int unionfs_mmap(struct file *file, struct vm_area_struct *vma)
 	struct dentry *parent;
 	struct vm_operations_struct *saved_vm_ops = NULL;
 
+	/*
+	 * Since mm/memory.c:might_fault() (under PROVE_LOCKING) was
+	 * modified in 2.6.29-rc1 to call might_lock_read on mmap_sem, this
+	 * has been causing false positives in file system stacking layers.
+	 * In particular, our ->mmap is called after sys_mmap2 already holds
+	 * mmap_sem, then we lock our own mutexes; but earlier, it's
+	 * possible for lockdep to have locked our mutexes first, and then
+	 * we call a lower ->readdir which could call might_fault.  The
+	 * different ordering of the locks is what lockdep complains about
+	 * -- unnecessarily.  Therefore, we have no choice but to tell
+	 * lockdep to temporarily turn off lockdep here.  Note: the comments
+	 * inside might_sleep also suggest that it would have been
+	 * nicer to only annotate paths that needs that might_lock_read.
+	 */
+	lockdep_off();
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_PARENT);
 	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
 	unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
@@ -169,6 +184,7 @@ out:
 	unionfs_unlock_dentry(dentry);
 	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
+	lockdep_on();
 	return err;
 }
 

@@ -1,25 +1,14 @@
 /*
- * Copyright (C) 2005-2009 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*
  * sub-routines for dentry cache
- *
- * $Id: dcsub.c,v 1.9 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
@@ -27,12 +16,11 @@
 static void au_dpage_free(struct au_dpage *dpage)
 {
 	int i;
+	struct dentry **p;
 
-	AuTraceEnter();
-	AuDebugOn(!dpage);
-
+	p = dpage->dentries;
 	for (i = 0; i < dpage->ndentry; i++)
-		dput(dpage->dentries[i]);
+		dput(*p++);
 	free_page((unsigned long)dpage->dentries);
 }
 
@@ -41,15 +29,15 @@ int au_dpages_init(struct au_dcsub_pages *dpages, gfp_t gfp)
 	int err;
 	void *p;
 
-	AuTraceEnter();
-
 	err = -ENOMEM;
 	dpages->dpages = kmalloc(sizeof(*dpages->dpages), gfp);
 	if (unlikely(!dpages->dpages))
 		goto out;
+
 	p = (void *)__get_free_page(gfp);
 	if (unlikely(!p))
 		goto out_dpages;
+
 	dpages->dpages[0].ndentry = 0;
 	dpages->dpages[0].dentries = p;
 	dpages->ndpage = 1;
@@ -58,18 +46,17 @@ int au_dpages_init(struct au_dcsub_pages *dpages, gfp_t gfp)
  out_dpages:
 	kfree(dpages->dpages);
  out:
-	AuTraceErr(err);
 	return err;
 }
 
 void au_dpages_free(struct au_dcsub_pages *dpages)
 {
 	int i;
+	struct au_dpage *p;
 
-	AuTraceEnter();
-
+	p = dpages->dpages;
 	for (i = 0; i < dpages->ndpage; i++)
-		au_dpage_free(dpages->dpages + i);
+		au_dpage_free(p++);
 	kfree(dpages->dpages);
 }
 
@@ -80,24 +67,23 @@ static int au_dpages_append(struct au_dcsub_pages *dpages,
 	struct au_dpage *dpage;
 	void *p;
 
-	/* AuTraceEnter(); */
-
 	dpage = dpages->dpages + dpages->ndpage - 1;
-	AuDebugOn(!dpage);
 	sz = PAGE_SIZE / sizeof(dentry);
 	if (unlikely(dpage->ndentry >= sz)) {
-		LKTRLabel(new dpage);
+		AuLabel(new dpage);
 		err = -ENOMEM;
 		sz = dpages->ndpage * sizeof(*dpages->dpages);
 		p = au_kzrealloc(dpages->dpages, sz,
 				 sz + sizeof(*dpages->dpages), gfp);
 		if (unlikely(!p))
 			goto out;
+
 		dpages->dpages = p;
 		dpage = dpages->dpages + dpages->ndpage;
 		p = (void *)__get_free_page(gfp);
 		if (unlikely(!p))
 			goto out;
+
 		dpage->ndentry = 0;
 		dpage->dentries = p;
 		dpages->ndpage++;
@@ -107,7 +93,6 @@ static int au_dpages_append(struct au_dcsub_pages *dpages,
 	return 0; /* success */
 
  out:
-	/* AuTraceErr(err); */
 	return err;
 }
 
@@ -118,8 +103,6 @@ int au_dcsub_pages(struct au_dcsub_pages *dpages, struct dentry *root,
 	struct dentry *this_parent = root;
 	struct list_head *next;
 	struct super_block *sb = root->d_sb;
-
-	AuTraceEnter();
 
 	err = 0;
 	spin_lock(&dcache_lock);
@@ -163,21 +146,6 @@ int au_dcsub_pages(struct au_dcsub_pages *dpages, struct dentry *root,
 	}
  out:
 	spin_unlock(&dcache_lock);
-#if 0 /* debug */
-	if (!err) {
-		int i, j;
-		j = 0;
-		for (i = 0; i < dpages->ndpage; i++) {
-			if ((dpages->dpages + i)->ndentry)
-				AuDbg("%d: %d\n",
-				      i, (dpages->dpages + i)->ndentry);
-			j += (dpages->dpages + i)->ndentry;
-		}
-		if (j)
-			AuDbg("ndpage %d, %d\n", dpages->ndpage, j);
-	}
-#endif
-	AuTraceErr(err);
 	return err;
 }
 
@@ -185,8 +153,6 @@ int au_dcsub_pages_rev(struct au_dcsub_pages *dpages, struct dentry *dentry,
 		       int do_include, au_dpages_test test, void *arg)
 {
 	int err;
-
-	AuTraceEnter();
 
 	err = 0;
 	spin_lock(&dcache_lock);
@@ -207,7 +173,6 @@ int au_dcsub_pages_rev(struct au_dcsub_pages *dpages, struct dentry *dentry,
  out:
 	spin_unlock(&dcache_lock);
 
-	AuTraceErr(err);
 	return err;
 }
 
@@ -217,8 +182,6 @@ struct dentry *au_test_subdir(struct dentry *d1, struct dentry *d2)
 	int err, i, j;
 	struct au_dcsub_pages dpages;
 	struct au_dpage *dpage;
-
-	LKTRTrace("%.*s, %.*s\n", AuDLNPair(d1), AuDLNPair(d2));
 
 	trap = ERR_PTR(-ENOMEM);
 	err = au_dpages_init(&dpages, GFP_NOFS);
@@ -234,6 +197,7 @@ struct dentry *au_test_subdir(struct dentry *d1, struct dentry *d2)
 		dentries = dpage->dentries;
 		for (j = 0; !err && j < dpage->ndentry; j++) {
 			struct dentry *d;
+
 			d = dentries[j];
 			err = (d == d2);
 			if (!err)
@@ -246,6 +210,5 @@ struct dentry *au_test_subdir(struct dentry *d1, struct dentry *d2)
  out_dpages:
 	au_dpages_free(&dpages);
  out:
-	AuTraceErrPtr(trap);
 	return trap;
 }

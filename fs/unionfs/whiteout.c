@@ -532,7 +532,8 @@ int make_dir_opaque(struct dentry *dentry, int bindex)
 	struct dentry *lower_dentry, *diropq;
 	struct inode *lower_dir;
 	struct nameidata nd;
-	kernel_cap_t orig_cap;
+	const struct cred *old_creds;
+	struct cred *new_creds;
 
 	/*
 	 * Opaque directory whiteout markers are special files (like regular
@@ -542,9 +543,14 @@ int make_dir_opaque(struct dentry *dentry, int bindex)
 	 * creation of the .wh.__dir_opaque: file.  Note, this does not
 	 * circumvent normal ->permission).
 	 */
-	orig_cap = current->cap_effective;
-	cap_raise(current->cap_effective, CAP_DAC_READ_SEARCH);
-	cap_raise(current->cap_effective, CAP_DAC_OVERRIDE);
+	new_creds = prepare_creds();
+	if (unlikely(!new_creds)) {
+		err = -ENOMEM;
+		goto out_err;
+	}
+	cap_raise(new_creds->cap_effective, CAP_DAC_READ_SEARCH);
+	cap_raise(new_creds->cap_effective, CAP_DAC_OVERRIDE);
+	old_creds = override_creds(new_creds);
 
 	lower_dentry = unionfs_lower_dentry_idx(dentry, bindex);
 	lower_dir = lower_dentry->d_inode;
@@ -572,6 +578,7 @@ int make_dir_opaque(struct dentry *dentry, int bindex)
 
 out:
 	mutex_unlock(&lower_dir->i_mutex);
-	current->cap_effective = orig_cap;
+	revert_creds(old_creds);
+out_err:
 	return err;
 }

@@ -21,6 +21,7 @@
 #include <linux/file.h>
 #include <linux/pagemap.h>
 #include <linux/splice.h>
+#include <linux/memcontrol.h>
 #include <linux/mm_inline.h>
 #include <linux/swap.h>
 #include <linux/writeback.h>
@@ -881,13 +882,14 @@ ssize_t generic_splice_sendpage(struct pipe_inode_info *pipe, struct file *out,
 {
 	return splice_from_pipe(pipe, out, ppos, len, flags, pipe_to_sendpage);
 }
+
 EXPORT_SYMBOL(generic_splice_sendpage);
 
 /*
  * Attempt to initiate a splice from pipe to file.
  */
 long vfs_splice_from(struct pipe_inode_info *pipe, struct file *out,
-		    loff_t *ppos, size_t len, unsigned int flags)
+		     loff_t *ppos, size_t len, unsigned int flags)
 {
 	int ret;
 
@@ -906,14 +908,14 @@ long vfs_splice_from(struct pipe_inode_info *pipe, struct file *out,
 
 	return out->f_op->splice_write(pipe, out, ppos, len, flags);
 }
-EXPORT_SYMBOL(vfs_splice_from);
+EXPORT_SYMBOL_GPL(vfs_splice_from);
 
 /*
  * Attempt to initiate a splice from a file to a pipe.
  */
 long vfs_splice_to(struct file *in, loff_t *ppos,
-		  struct pipe_inode_info *pipe, size_t len,
-		  unsigned int flags)
+		   struct pipe_inode_info *pipe, size_t len,
+		   unsigned int flags)
 {
 	int ret;
 
@@ -929,7 +931,7 @@ long vfs_splice_to(struct file *in, loff_t *ppos,
 
 	return in->f_op->splice_read(in, ppos, pipe, len, flags);
 }
-EXPORT_SYMBOL(vfs_splice_to);
+EXPORT_SYMBOL_GPL(vfs_splice_to);
 
 /**
  * splice_direct_to_actor - splices data directly between two non-pipes

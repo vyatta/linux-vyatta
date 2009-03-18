@@ -1,30 +1,24 @@
 /*
- * Copyright (C) 2005-2009 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*
  * inode operations (del entry)
- *
- * $Id: i_op_del.c,v 1.17 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #include "aufs.h"
 
-/* returns,
+/*
+ * decide if a new whiteout for @dentry is necessary or not.
+ * when it is necessary, prepare the parent dir for the upper branch whose
+ * branch index is @bcpup for creation. the actual creation of the whiteout will
+ * be done by caller.
+ * return value:
  * 0: wh is unnecessary
  * plus: wh is necessary
  * minus: error
@@ -33,16 +27,10 @@ int au_wr_dir_need_wh(struct dentry *dentry, int isdir, aufs_bindex_t *bcpup)
 {
 	int need_wh, err;
 	aufs_bindex_t bstart;
-	struct dentry *h_dentry;
 	struct super_block *sb;
 
-	LKTRTrace("%.*s, isdir %d, *bcpup %d\n",
-		  AuDLNPair(dentry), isdir, *bcpup);
 	sb = dentry->d_sb;
-
 	bstart = au_dbstart(dentry);
-	LKTRTrace("bcpup %d, bstart %d\n", *bcpup, bstart);
-	h_dentry = au_h_dptr(dentry, bstart);
 	if (*bcpup < 0) {
 		*bcpup = bstart;
 		if (au_test_ro(sb, bstart, dentry->d_inode)) {
@@ -54,7 +42,7 @@ int au_wr_dir_need_wh(struct dentry *dentry, int isdir, aufs_bindex_t *bcpup)
 	} else
 		AuDebugOn(bstart < *bcpup
 			  || au_test_ro(sb, *bcpup, dentry->d_inode));
-	LKTRTrace("bcpup %d, bstart %d\n", *bcpup, bstart);
+	AuDbg("bcpup %d, bstart %d\n", *bcpup, bstart);
 
 	if (*bcpup != bstart) {
 		err = au_cpup_dirs(dentry, *bcpup);
@@ -63,6 +51,7 @@ int au_wr_dir_need_wh(struct dentry *dentry, int isdir, aufs_bindex_t *bcpup)
 		need_wh = 1;
 	} else {
 		aufs_bindex_t old_bend, new_bend, bdiropq = -1;
+
 		old_bend = au_dbend(dentry);
 		if (isdir) {
 			bdiropq = au_dbdiropq(dentry);
@@ -79,44 +68,30 @@ int au_wr_dir_need_wh(struct dentry *dentry, int isdir, aufs_bindex_t *bcpup)
 		if (!need_wh && old_bend != new_bend) {
 			au_set_h_dptr(dentry, new_bend, NULL);
 			au_set_dbend(dentry, old_bend);
-#if 0 /* todo: remove this? */
-		} else if (!au_h_dptr(dentry, new_bend)->d_inode) {
-			LKTRTrace("negative\n");
-			au_set_h_dptr(dentry, new_bend, NULL);
-			au_set_dbend(dentry, old_bend);
-			need_wh = 0;
-#endif
 		}
 	}
-	LKTRTrace("need_wh %d\n", need_wh);
+	AuDbg("need_wh %d\n", need_wh);
 	err = need_wh;
 
  out:
-	AuTraceErr(err);
 	return err;
 }
 
 /*
- * simple tests for the removal inode operations.
+ * simple tests for the del-entry operations.
  * following the checks in vfs, plus the parent-child relationship.
  */
 int au_may_del(struct dentry *dentry, aufs_bindex_t bindex,
-	       struct dentry *h_parent, int isdir, struct au_ndx *ndx)
+	       struct dentry *h_parent, int isdir)
 {
-	int err, exist;
-	struct super_block *sb;
-	struct dentry *h_dentry;
-	struct inode *h_inode;
+	int err;
 	umode_t h_mode;
+	struct dentry *h_dentry, *h_latest;
+	struct inode *h_inode;
 
-	LKTRTrace("%.*s/%.*s, b%d, dir %d\n",
-		  AuDLNPair(h_parent), AuDLNPair(dentry), bindex, isdir);
-
-	sb = dentry->d_sb;
-	exist = !!dentry->d_inode;
 	h_dentry = au_h_dptr(dentry, bindex);
 	h_inode = h_dentry->d_inode;
-	if (exist) {
+	if (dentry->d_inode) {
 		err = -ENOENT;
 		if (unlikely(!h_inode || !h_inode->i_nlink))
 			goto out;
@@ -144,134 +119,110 @@ int au_may_del(struct dentry *dentry, aufs_bindex_t bindex,
 	err = 0;
 
 	/*
-	 * some filesystem may unlink a dir and corrupt its consistency.
-	 * so let's try heavy test.
+	 * rmdir a dir may break the consistency on some filesystem.
+	 * let's try heavy test.
 	 */
-	if (1 /*au_opt_test(au_mntflags(sb), UDBA_INOTIFY)*/) {
-		struct dentry *h_latest;
-		struct qstr *qstr = &dentry->d_name;
+	err = -EACCES;
+	if (unlikely(au_test_h_perm(h_parent->d_inode, MAY_EXEC | MAY_WRITE)))
+		goto out;
 
-		err = -EACCES;
-		if (unlikely(au_test_h_perm(h_parent->d_inode,
-					    MAY_EXEC | MAY_WRITE,
-					    au_ftest_ndx(ndx->flags, DLGT))))
-			goto out;
-
-		h_latest = au_sio_lkup_one(qstr->name, h_parent, qstr->len,
-					   ndx);
-		err = -EIO;
-		if (IS_ERR(h_latest))
-			goto out;
-		dput(h_latest);
-		if (h_latest == h_dentry)
-			err = 0;
-	}
+	h_latest = au_sio_lkup_one(&dentry->d_name, h_parent,
+				   au_sbr(dentry->d_sb, bindex));
+	err = -EIO;
+	if (IS_ERR(h_latest))
+		goto out;
+	if (h_latest == h_dentry)
+		err = 0;
+	dput(h_latest);
 
  out:
-	AuTraceErr(err);
 	return err;
 }
 
-static struct dentry *
+/*
+ * decide the branch where we operate for @dentry. the branch index will be set
+ * @rbcpup. after diciding it, 'pin' it and store the timestamps of the parent
+ * dir for reverting.
+ * when a new whiteout is necessary, create it.
+ */
+static struct dentry*
 lock_hdir_create_wh(struct dentry *dentry, int isdir, aufs_bindex_t *rbcpup,
 		    struct au_dtime *dt, struct au_pin *pin)
 {
-	struct dentry *wh_dentry, *h_parent;
+	struct dentry *wh_dentry;
 	struct super_block *sb;
+	struct path h_path;
 	int err, need_wh;
-	unsigned int mnt_flags;
-	unsigned char pin_flags;
+	unsigned int udba;
 	aufs_bindex_t bcpup;
-	struct au_ndx ndx;
-
-	LKTRTrace("%.*s, isdir %d\n", AuDLNPair(dentry), isdir);
 
 	need_wh = au_wr_dir_need_wh(dentry, isdir, rbcpup);
-	err = need_wh;
-	wh_dentry = ERR_PTR(err);
-	if (unlikely(err < 0))
+	wh_dentry = ERR_PTR(need_wh);
+	if (unlikely(need_wh < 0))
 		goto out;
 
 	sb = dentry->d_sb;
-	mnt_flags = au_mntflags(sb);
+	udba = au_opt_udba(sb);
 	bcpup = *rbcpup;
-	pin_flags = AuPin_DI_LOCKED | AuPin_MNT_WRITE;
-	if (au_opt_test(mnt_flags, UDBA_INOTIFY))
-		au_fset_pin(pin_flags, DO_GPARENT);
-	err = au_pin(pin, dentry, bcpup, pin_flags);
+	err = au_pin(pin, dentry, bcpup, udba,
+		     AuPin_DI_LOCKED | AuPin_MNT_WRITE);
 	wh_dentry = ERR_PTR(err);
 	if (unlikely(err))
 		goto out;
-	h_parent = au_pinned_h_parent(pin);
-	if (!au_opt_test(mnt_flags, UDBA_NONE) && au_dbstart(dentry) == bcpup) {
-		ndx.nfsmnt = au_nfsmnt(sb, bcpup);
-		ndx.flags = 0;
-		if (au_test_dlgt(mnt_flags))
-			au_fset_ndx(ndx.flags, DLGT);
-		ndx.nd = NULL;
-		/* ndx.br = au_sbr(sb, bcpup); */
-		/* ndx.nd_file = NULL; */
-		err = au_may_del(dentry, bcpup, h_parent, isdir, &ndx);
+
+	h_path.dentry = au_pinned_h_parent(pin);
+	if (udba != AuOpt_UDBA_NONE
+	    && au_dbstart(dentry) == bcpup) {
+		err = au_may_del(dentry, bcpup, h_path.dentry, isdir);
 		wh_dentry = ERR_PTR(err);
 		if (unlikely(err))
 			goto out_unpin;
 	}
 
-	au_dtime_store(dt, au_pinned_parent(pin), h_parent, au_pinned_hdir(pin),
-		       au_pinned_hgdir(pin));
+	h_path.mnt = au_sbr_mnt(sb, bcpup);
+	au_dtime_store(dt, au_pinned_parent(pin), &h_path);
 	wh_dentry = NULL;
 	if (!need_wh)
 		goto out; /* success, no need to create whiteout */
 
-	ndx.nfsmnt = au_nfsmnt(sb, bcpup);
-	ndx.flags = 0;
-	if (au_test_dlgt(mnt_flags))
-		au_fset_ndx(ndx.flags, DLGT);
-	ndx.nd = NULL;
-	/* ndx.br = NULL; */
-	wh_dentry = au_wh_create(dentry, bcpup, h_parent, &ndx);
+	wh_dentry = au_wh_create(dentry, bcpup, h_path.dentry);
 	if (!IS_ERR(wh_dentry))
 		goto out; /* success */
-	/* returns with the parent is locked and wh_dentry is DGETed */
+	/* returns with the parent is locked and wh_dentry is dget-ed */
 
  out_unpin:
 	au_unpin(pin);
  out:
-	AuTraceErrPtr(wh_dentry);
 	return wh_dentry;
 }
 
+/*
+ * when removing a dir, rename it to a unique temporary whiteout-ed name first
+ * in order to be revertible and save time for removing many child whiteouts
+ * under the dir.
+ * returns 1 when there are too many child whiteout and caller should remove
+ * them asynchronously. returns 0 when the number of children is enough small to
+ * remove now or the branch fs is a remote fs.
+ * otherwise return an error.
+ */
 static int renwh_and_rmdir(struct dentry *dentry, aufs_bindex_t bindex,
 			   struct au_nhash *whlist, struct inode *dir)
 {
-	int rmdir_later, err;
+	int rmdir_later, err, dirwh;
 	struct dentry *h_dentry;
-	struct inode *inode, *h_inode;
 	struct super_block *sb;
 
-	LKTRTrace("%.*s, b%d\n", AuDLNPair(dentry), bindex);
-
-	inode = NULL;
-	h_inode = NULL;
 	sb = dentry->d_sb;
-	if (au_opt_test(au_mntflags(sb), UDBA_INOTIFY)) {
-		inode = dentry->d_inode;
-		h_inode = au_h_iptr(inode, bindex);
-		mutex_lock_nested(&h_inode->i_mutex, AuLsc_I_CHILD);
-	}
 	h_dentry = au_h_dptr(dentry, bindex);
-	err = au_whtmp_ren(dir, bindex, h_dentry);
-	if (inode) {
-		/* todo: bad approach? */
-		if (!err)
-			au_hin_suspend(au_hi(inode, bindex));
-		mutex_unlock(&h_inode->i_mutex);
-	}
+	err = au_whtmp_ren(h_dentry, au_sbr(sb, bindex));
 	if (unlikely(err))
 		goto out;
 
-	if (!au_test_nfs(h_dentry->d_sb)) {
-		const int dirwh = au_sbi(sb)->si_dirwh;
+	/* stop monitoring */
+	au_hin_free(au_hi(dentry->d_inode, bindex));
+
+	if (!au_test_fs_remote(h_dentry->d_sb)) {
+		dirwh = au_sbi(sb)->si_dirwh;
 		rmdir_later = (dirwh <= 1);
 		if (!rmdir_later)
 			rmdir_later = au_nhash_test_longer_wh(whlist, bindex,
@@ -284,21 +235,31 @@ static int renwh_and_rmdir(struct dentry *dentry, aufs_bindex_t bindex,
 	if (unlikely(err)) {
 		AuIOErr("rmdir %.*s, b%d failed, %d. ignored\n",
 			AuDLNPair(h_dentry), bindex, err);
-		/* we do not revert the inotify watch */
 		err = 0;
 	}
 
  out:
-	AuTraceErr(err);
 	return err;
 }
 
+/*
+ * final procedure for deleting a entry.
+ * maintain dentry and iattr.
+ */
 static void epilog(struct inode *dir, struct dentry *dentry,
 		   aufs_bindex_t bindex)
 {
-	/* todo: unnecessary? */
+	struct inode *inode;
+
+	/*
+	 * even if this is not a dir,
+	 * set S_DEAD here since we need to detect the dead inode.
+	 */
+	inode = dentry->d_inode;
+	if (!inode->i_nlink)
+		inode->i_flags |= S_DEAD;
 	d_drop(dentry);
-	dentry->d_inode->i_ctime = dir->i_ctime;
+	inode->i_ctime = dir->i_ctime;
 
 	if (atomic_read(&dentry->d_count) == 1) {
 		au_set_h_dptr(dentry, au_dbstart(dentry), NULL);
@@ -309,24 +270,20 @@ static void epilog(struct inode *dir, struct dentry *dentry,
 	dir->i_version++;
 }
 
-/* revert flags */
-#define AuRev_DLGT	1
-#define au_ftest_rev(flags, name)	((flags) & AuRev_##name)
-#define au_fset_rev(flags, name)	{ (flags) |= AuRev_##name; }
-#define au_fclr_rev(flags, name)	{ (flags) &= ~AuRev_##name; }
-#ifndef CONFIG_AUFS_DLGT
-#undef AuRev_DLGT
-#define AuRev_DLGT	0
-#endif
-
+/*
+ * when an error happened, remove the created whiteout and revert everything.
+ */
 static int do_revert(int err, struct inode *dir, aufs_bindex_t bwh,
 		     struct dentry *wh_dentry, struct dentry *dentry,
-		     struct au_dtime *dt, unsigned int flags)
+		     struct au_dtime *dt)
 {
 	int rerr;
+	struct path h_path = {
+		.dentry	= wh_dentry,
+		.mnt	= au_sbr_mnt(dir->i_sb, bwh)
+	};
 
-	rerr = au_wh_unlink_dentry(au_hi(dir, bwh), wh_dentry, dentry,
-				   au_ftest_rev(flags, DLGT));
+	rerr = au_wh_unlink_dentry(au_h_iptr(dir, bwh), &h_path, dentry);
 	if (!rerr) {
 		au_set_dbwh(dentry, bwh);
 		au_dtime_revert(dt);
@@ -343,17 +300,13 @@ static int do_revert(int err, struct inode *dir, aufs_bindex_t bwh,
 int aufs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	int err;
-	struct inode *inode, *h_dir;
-	struct dentry *parent, *wh_dentry, *h_dentry;
-	struct au_dtime dt;
 	aufs_bindex_t bwh, bindex, bstart;
-	unsigned char dlgt;
-	struct super_block *sb;
-	struct au_hin_ignore ign;
-	struct vfsub_args vargs;
+	struct au_dtime dt;
 	struct au_pin pin;
+	struct path h_path;
+	struct inode *inode, *h_dir;
+	struct dentry *parent, *wh_dentry;
 
-	LKTRTrace("i%lu, %.*s\n", dir->i_ino, AuDLNPair(dentry));
 	IMustLock(dir);
 	inode = dentry->d_inode;
 	if (unlikely(!inode))
@@ -372,21 +325,14 @@ int aufs_unlink(struct inode *dir, struct dentry *dentry)
 	if (IS_ERR(wh_dentry))
 		goto out;
 
-	sb = dir->i_sb;
-	dlgt = !!au_test_dlgt(au_mntflags(sb));
-	AuDebugOn(au_dbstart(dentry) != bstart);
-	h_dentry = au_h_dptr(dentry, bstart);
-	dget(h_dentry);
-
+	h_path.mnt = au_sbr_mnt(dentry->d_sb, bstart);
+	h_path.dentry = au_h_dptr(dentry, bstart);
+	dget(h_path.dentry);
 	if (bindex == bstart) {
-		vfsub_args_init(&vargs, &ign, dlgt, 0);
-		vfsub_ign_hinode(&vargs, IN_DELETE, au_pinned_hdir(&pin));
 		h_dir = au_pinned_h_dir(&pin);
-		err = vfsub_unlink(h_dir, h_dentry, &vargs);
+		err = vfsub_unlink(h_dir, &h_path, /*force*/0);
 	} else {
 		/* dir inode is locked */
-		AuDebugOn(!wh_dentry
-			  || wh_dentry->d_parent != au_h_dptr(parent, bindex));
 		h_dir = wh_dentry->d_parent->d_inode;
 		IMustLock(h_dir);
 		err = 0;
@@ -394,28 +340,12 @@ int aufs_unlink(struct inode *dir, struct dentry *dentry)
 
 	if (!err) {
 		drop_nlink(inode);
-#if 0 /* todo: update plink? */
-		if (!inode->i_nlink
-		    && au_opt_test(p->a.mnt_flags, PLINK)
-		    && au_plink_test(sb, inode)
-		    /* && atomic_read(&inode->i_count) == 2) */) {
-			au_debug_on();
-			DbgInode(inode);
-			au_debug_off();
-		}
-#endif
-		/*
-		 * although this is not a dir,
-		 * set it here since we need to detect the dead inode.
-		 */
-		if (!inode->i_nlink)
-			inode->i_flags |= S_DEAD;
 		epilog(dir, dentry, bindex);
 
 		/* update target timestamps */
 		if (bindex == bstart) {
-			au_update_fuse_h_inode(NULL, h_dentry); /*ignore*/
-			inode->i_ctime = h_dentry->d_inode->i_ctime;
+			vfsub_update_h_iattr(&h_path, /*did*/NULL); /*ignore*/
+			inode->i_ctime = h_path.dentry->d_inode->i_ctime;
 		} else
 			/* todo: this timestamp may be reverted later */
 			inode->i_ctime = h_dir->i_ctime;
@@ -425,13 +355,8 @@ int aufs_unlink(struct inode *dir, struct dentry *dentry)
 	/* revert */
 	if (wh_dentry) {
 		int rerr;
-		unsigned int rev_flags;
 
-		rev_flags = 0;
-		if (dlgt)
-			au_fset_rev(rev_flags, DLGT);
-		rerr = do_revert(err, dir, bwh, wh_dentry, dentry, &dt,
-				 rev_flags);
+		rerr = do_revert(err, dir, bwh, wh_dentry, dentry, &dt);
 		if (rerr)
 			err = rerr;
 	}
@@ -439,30 +364,24 @@ int aufs_unlink(struct inode *dir, struct dentry *dentry)
  out_unlock:
 	au_unpin(&pin);
 	dput(wh_dentry);
-	dput(h_dentry);
+	dput(h_path.dentry);
  out:
 	di_write_unlock(parent);
 	aufs_read_unlock(dentry, AuLock_DW);
-	AuTraceErr(err);
-	if (unlikely(err == -EBUSY && au_test_nfsd(current)))
-		err = -ESTALE;
 	return err;
 }
 
 int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 {
 	int err, rmdir_later;
+	aufs_bindex_t bwh, bindex, bstart;
+	struct au_dtime dt;
+	struct au_pin pin;
 	struct inode *inode;
 	struct dentry *parent, *wh_dentry, *h_dentry;
-	struct au_dtime dt;
-	aufs_bindex_t bwh, bindex, bstart;
 	struct au_whtmp_rmdir_args *args;
 	struct au_nhash *whlist;
-	struct super_block *sb;
-	unsigned int mnt_flags;
-	struct au_pin pin;
 
-	LKTRTrace("i%lu, %.*s\n", dir->i_ino, AuDLNPair(dentry));
 	IMustLock(dir);
 	inode = dentry->d_inode;
 	err = -ENOENT; /* possible? */
@@ -480,7 +399,7 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 	if (unlikely(!args))
 		goto out_whlist;
 
-	aufs_read_lock(dentry, AuLock_DW);
+	aufs_read_lock(dentry, AuLock_DW | AuLock_FLUSH);
 	parent = dentry->d_parent; /* dir inode is locked */
 	di_write_lock_parent(parent);
 	err = au_test_empty(dentry, whlist);
@@ -495,10 +414,8 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 	if (IS_ERR(wh_dentry))
 		goto out_args;
 
-	AuDebugOn(au_dbstart(dentry) != bstart);
 	h_dentry = au_h_dptr(dentry, bstart);
 	dget(h_dentry);
-
 	rmdir_later = 0;
 	if (bindex == bstart) {
 		err = renwh_and_rmdir(dentry, bstart, whlist, dir);
@@ -507,20 +424,16 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 			err = 0;
 		}
 	} else {
+		/* stop monitoring */
+		au_hin_free(au_hi(inode, bstart));
+
 		/* dir inode is locked */
-		AuDebugOn(!wh_dentry
-			  || wh_dentry->d_parent != au_h_dptr(parent, bindex));
 		IMustLock(wh_dentry->d_parent->d_inode);
 		err = 0;
 	}
 
-	sb = dentry->d_sb;
-	mnt_flags = au_mntflags(sb);
 	if (!err) {
-		if (au_opt_test(mnt_flags, UDBA_INOTIFY) && rmdir_later)
-			au_reset_hinotify(inode, /*flags*/0);
 		clear_nlink(inode);
-		inode->i_flags |= S_DEAD;
 		au_set_dbdiropq(dentry, -1);
 		epilog(dir, dentry, bindex);
 
@@ -534,16 +447,11 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
 	}
 
 	/* revert */
-	LKTRLabel(revert);
+	AuLabel(revert);
 	if (wh_dentry) {
 		int rerr;
-		unsigned int rev_flags;
 
-		rev_flags = 0;
-		if (au_test_dlgt(mnt_flags))
-			au_fset_rev(rev_flags, DLGT);
-		rerr = do_revert(err, dir, bwh, wh_dentry, dentry, &dt,
-				 rev_flags);
+		rerr = do_revert(err, dir, bwh, wh_dentry, dentry, &dt);
 		if (rerr)
 			err = rerr;
 	}
@@ -559,8 +467,5 @@ int aufs_rmdir(struct inode *dir, struct dentry *dentry)
  out_whlist:
 	au_nhash_del(whlist);
  out:
-	AuTraceErr(err);
-	if (unlikely(err == -EBUSY && au_test_nfsd(current)))
-		err = -ESTALE;
 	return err;
 }

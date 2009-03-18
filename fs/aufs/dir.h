@@ -1,25 +1,14 @@
 /*
- * Copyright (C) 2005-2009 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*
  * directory operations
- *
- * $Id: dir.h,v 1.7 2009/01/26 06:24:45 sfjro Exp $
  */
 
 #ifndef __AUFS_DIR_H__
@@ -34,12 +23,8 @@
 
 /* need to be faster and smaller */
 
-/* todo: changeable? */
 #define AuSize_DEBLK	512
 #define AuSize_NHASH	32
-#if AuSize_DEBLK < NAME_MAX || PAGE_SIZE < AuSize_DEBLK
-#error invalid size AuSize_DEBLK
-#endif
 
 typedef char au_vdir_deblk_t[AuSize_DEBLK];
 
@@ -67,11 +52,6 @@ struct au_vdir_de {
 struct au_vdir_wh {
 	struct hlist_node	wh_hash;
 	aufs_bindex_t		wh_bindex;
-#ifdef CONFIG_AUFS_SHWH
-	ino_t			wh_ino;
-	unsigned char		wh_type;
-	/* caution: packed */
-#endif
 	struct au_vdir_destr	wh_str;
 } __packed;
 
@@ -97,6 +77,8 @@ struct au_vdir {
 
 /* dir.c */
 extern struct file_operations aufs_dir_fop;
+void au_add_nlink(struct inode *dir, struct inode *h_dir);
+void au_sub_nlink(struct inode *dir, struct inode *h_dir);
 int au_test_empty_lower(struct dentry *dentry);
 int au_test_empty(struct dentry *dentry, struct au_nhash *whlist);
 
@@ -110,38 +92,13 @@ int au_nhash_test_longer_wh(struct au_nhash *whlist, aufs_bindex_t btgt,
 			    int limit);
 int au_nhash_test_known_wh(struct au_nhash *whlist, char *name, int namelen);
 int au_nhash_append_wh(struct au_nhash *whlist, char *name, int namelen,
-		       ino_t ino, unsigned int d_type, aufs_bindex_t bindex,
-		       unsigned char shwh);
+		       aufs_bindex_t bindex);
 void au_vdir_free(struct au_vdir *vdir);
 int au_vdir_init(struct file *file);
 int au_vdir_fill_de(struct file *file, void *dirent, filldir_t filldir);
 
-/* ---------------------------------------------------------------------- */
-
-static inline
-void au_shwh_init_wh(struct au_vdir_wh *wh, ino_t ino, unsigned char d_type)
-{
-#ifdef CONFIG_AUFS_SHWH
-	wh->wh_ino = ino;
-	wh->wh_type = d_type;
-#endif
-}
-
-static inline void au_add_nlink(struct inode *dir, struct inode *h_dir)
-{
-	AuDebugOn(!S_ISDIR(dir->i_mode) || !S_ISDIR(h_dir->i_mode));
-	dir->i_nlink += h_dir->i_nlink - 2;
-	if (h_dir->i_nlink < 2)
-		dir->i_nlink += 2;
-}
-
-static inline void au_sub_nlink(struct inode *dir, struct inode *h_dir)
-{
-	AuDebugOn(!S_ISDIR(dir->i_mode) || !S_ISDIR(h_dir->i_mode));
-	dir->i_nlink -= h_dir->i_nlink - 2;
-	if (h_dir->i_nlink < 2)
-		dir->i_nlink -= 2;
-}
+/* ioctl.c */
+long aufs_ioctl_dir(struct file *file, unsigned int cmd, unsigned long arg);
 
 #endif /* __KERNEL__ */
 #endif /* __AUFS_DIR_H__ */

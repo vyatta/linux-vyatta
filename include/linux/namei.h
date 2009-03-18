@@ -75,7 +75,6 @@ extern struct file *lookup_instantiate_filp(struct nameidata *nd, struct dentry 
 extern struct file *nameidata_to_filp(struct nameidata *nd, int flags);
 extern void release_open_intent(struct nameidata *);
 
-extern struct dentry * __lookup_hash(struct qstr *name, struct dentry * base, struct nameidata *nd);
 extern struct dentry *lookup_one_len(const char *, struct dentry *, int);
 extern struct dentry *lookup_one_noperm(const char *, struct dentry *);
 
@@ -93,6 +92,11 @@ static inline void nd_set_link(struct nameidata *nd, char *path)
 static inline char *nd_get_link(struct nameidata *nd)
 {
 	return nd->saved_names[nd->depth];
+}
+
+static inline void nd_terminate_link(void *name, size_t len, size_t maxlen)
+{
+	((char *) name)[min(len, maxlen)] = '\0';
 }
 
 #endif /* _LINUX_NAMEI_H */

@@ -1,25 +1,14 @@
 /*
- * Copyright (C) 2005-2009 Junjiro Okajima
+ * Copyright (C) 2005-2009 Junjiro R. Okajima
  *
  * This program, aufs is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*
  * mount options/flags
- *
- * $Id: opts.c,v 1.20 2009/01/26 06:24:05 sfjro Exp $
  */
 
 #include <linux/types.h> /* a distribution requires */
@@ -36,19 +25,14 @@ enum {
 	Opt_xino, Opt_zxino, Opt_noxino,
 	Opt_trunc_xino, Opt_trunc_xino_v, Opt_notrunc_xino,
 	Opt_trunc_xino_path, Opt_itrunc_xino,
-	Opt_xinodir,
 	Opt_trunc_xib, Opt_notrunc_xib,
-	Opt_dirperm1, Opt_nodirperm1,
-	Opt_shwh, Opt_noshwh,
-	Opt_plink, Opt_noplink, Opt_list_plink, Opt_clean_plink,
+	Opt_plink, Opt_noplink, Opt_list_plink,
 	Opt_udba,
 	/* Opt_lock, Opt_unlock, */
 	Opt_cmd, Opt_cmd_args,
 	Opt_diropq_a, Opt_diropq_w,
 	Opt_warn_perm, Opt_nowarn_perm,
 	Opt_wbr_copyup, Opt_wbr_create,
-	Opt_coo,
-	Opt_dlgt, Opt_nodlgt,
 	Opt_refrof, Opt_norefrof,
 	Opt_verbose, Opt_noverbose,
 	Opt_sum, Opt_nosum, Opt_wsum,
@@ -73,25 +57,17 @@ static match_table_t options = {
 	/* {Opt_idel, "idel:%d"}, */
 	{Opt_mod, "mod=%s"},
 	{Opt_mod, "mod:%s"},
-	{Opt_imod, "imod:%d:%s"},
+	/* {Opt_imod, "imod:%d:%s"}, */
 
 	{Opt_dirwh, "dirwh=%d"},
-	{Opt_dirwh, "dirwh:%d"},
 
 	{Opt_xino, "xino=%s"},
-	{Opt_xino, "xino:%s"},
-#if 0 /* def CONFIG_AUFS_EXPORT */ /* reserved for futur use */
-	{Opt_xinodir, "xinodir=%s"},
-	{Opt_xinodir, "xinodir:%s"},
-#endif
 	{Opt_noxino, "noxino"},
 	{Opt_trunc_xino, "trunc_xino"},
 	{Opt_trunc_xino_v, "trunc_xino_v=%d:%d"},
 	{Opt_notrunc_xino, "notrunc_xino"},
 	{Opt_trunc_xino_path, "trunc_xino=%s"},
-	{Opt_trunc_xino_path, "trunc_xino:%s"},
 	{Opt_itrunc_xino, "itrunc_xino=%d"},
-	{Opt_itrunc_xino, "itrunc_xino:%d"},
 	/* {Opt_zxino, "zxino=%s"}, */
 	{Opt_trunc_xib, "trunc_xib"},
 	{Opt_notrunc_xib, "notrunc_xib"},
@@ -101,7 +77,6 @@ static match_table_t options = {
 #ifdef CONFIG_AUFS_DEBUG
 	{Opt_list_plink, "list_plink"},
 #endif
-	{Opt_clean_plink, "clean_plink"},
 
 	{Opt_udba, "udba=%s"},
 
@@ -113,20 +88,15 @@ static match_table_t options = {
 	{Opt_warn_perm, "warn_perm"},
 	{Opt_nowarn_perm, "nowarn_perm"},
 
-#ifdef CONFIG_AUFS_DLGT
-	{Opt_dlgt, "dlgt"},
-	{Opt_dirperm1, "dirperm1"},
-#endif
-	{Opt_nodlgt, "nodlgt"},
-	{Opt_nodirperm1, "nodirperm1"},
-
-#ifdef CONFIG_AUFS_SHWH
-	{Opt_shwh, "shwh"},
-#endif
-	{Opt_noshwh, "noshwh"},
+	/* keep them temporary */
+	{Opt_ignore_silent, "coo=%s"},
+	{Opt_ignore_silent, "nodlgt"},
+	{Opt_ignore_silent, "nodirperm1"},
+	{Opt_ignore_silent, "noshwh"},
+	{Opt_ignore_silent, "noshwh"},
+	{Opt_ignore_silent, "clean_plink"},
 
 	{Opt_rendir, "rendir=%d"},
-	{Opt_rendir, "rendir:%d"},
 
 	{Opt_refrof, "refrof"},
 	{Opt_norefrof, "norefrof"},
@@ -145,28 +115,14 @@ static match_table_t options = {
 	{Opt_rdcache, "rdcache=%d"},
 	{Opt_rdcache, "rdcache:%d"},
 
-	{Opt_coo, "coo=%s"},
-
 	{Opt_wbr_create, "create=%s"},
-	{Opt_wbr_create, "create:%s"},
 	{Opt_wbr_create, "create_policy=%s"},
-	{Opt_wbr_create, "create_policy:%s"},
 	{Opt_wbr_copyup, "cpup=%s"},
-	{Opt_wbr_copyup, "cpup:%s"},
 	{Opt_wbr_copyup, "copyup=%s"},
-	{Opt_wbr_copyup, "copyup:%s"},
 	{Opt_wbr_copyup, "copyup_policy=%s"},
-	{Opt_wbr_copyup, "copyup_policy:%s"},
 
 	/* internal use for the scripts */
 	{Opt_ignore_silent, "si=%s"},
-
-#if 0 /* reserved for future use */
-	{Opt_deblk, "deblk=%d"},
-	{Opt_deblk, "deblk:%d"},
-	{Opt_nhash, "nhash=%d"},
-	{Opt_nhash, "nhash:%d"},
-#endif
 
 	{Opt_br, "dirs=%s"},
 	{Opt_ignore, "debug=%d"},
@@ -192,34 +148,25 @@ static const char *au_parser_pattern(int val, struct match_token *token)
 
 /* ---------------------------------------------------------------------- */
 
-#define RW		"rw"
-#define RO		"ro"
-#define WH		"wh"
-#define RR		"rr"
-#define NoLinkWH	"nolwh"
-
 static match_table_t brperms = {
-	{AuBrPerm_RR, RR},
-	{AuBrPerm_RO, RO},
-	{AuBrPerm_RW, RW},
+	{AuBrPerm_RO, AUFS_BRPERM_RO},
+	{AuBrPerm_RR, AUFS_BRPERM_RR},
+	{AuBrPerm_RW, AUFS_BRPERM_RW},
 
-	{AuBrPerm_RRWH, RR "+" WH},
-	{AuBrPerm_ROWH, RO "+" WH},
-	{AuBrPerm_RWNoLinkWH, RW "+" NoLinkWH},
+	{AuBrPerm_ROWH, AUFS_BRPERM_ROWH},
+	{AuBrPerm_RRWH, AUFS_BRPERM_RRWH},
+	{AuBrPerm_RWNoLinkWH, AUFS_BRPERM_RWNLWH},
 
 	{AuBrPerm_ROWH, "nfsro"},
 	{AuBrPerm_RO, NULL}
 };
 
-static noinline_for_stack int br_perm_val(char *perm)
+static int br_perm_val(char *perm)
 {
 	int val;
 	substring_t args[MAX_OPT_ARGS];
 
-	AuDebugOn(!perm || !*perm);
-	LKTRTrace("perm %s\n", perm);
 	val = match_token(perm, brperms, args);
-	AuTraceErr(val);
 	return val;
 }
 
@@ -232,42 +179,23 @@ const char *au_optstr_br_perm(int brperm)
 
 static match_table_t udbalevel = {
 	{AuOpt_UDBA_REVAL, "reval"},
-#ifdef CONFIG_AUFS_HINOTIFY
-	{AuOpt_UDBA_INOTIFY, "inotify"},
-#endif
 	{AuOpt_UDBA_NONE, "none"},
+#ifdef CONFIG_AUFS_HINOTIFY
+	{AuOpt_UDBA_HINOTIFY, "inotify"},
+#endif
 	{-1, NULL}
 };
 
-static noinline_for_stack int udba_val(char *str)
+static int udba_val(char *str)
 {
 	substring_t args[MAX_OPT_ARGS];
+
 	return match_token(str, udbalevel, args);
 }
 
 const char *au_optstr_udba(int udba)
 {
 	return au_parser_pattern(udba, (void *)udbalevel);
-}
-
-/* ---------------------------------------------------------------------- */
-
-static match_table_t coolevel = {
-	{AuOpt_COO_NONE, "none"},
-	{AuOpt_COO_LEAF, "leaf"},
-	{AuOpt_COO_ALL, "all"},
-	{-1, NULL}
-};
-
-static noinline_for_stack int coo_val(char *str)
-{
-	substring_t args[MAX_OPT_ARGS];
-	return match_token(str, coolevel, args);
-}
-
-const char *au_optstr_coo(int coo)
-{
-	return au_parser_pattern(coo, (void *)coolevel);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -302,15 +230,7 @@ static int au_match_ull(substring_t *s, unsigned long long *result)
 	if (len + 1 <= sizeof(a)) {
 		memcpy(a, s->from, len);
 		a[len] = '\0';
-#if 1
 		err = strict_strtoull(a, 0, result);
-#else
-		char *next;
-		*result = memparse(a, &next);
-		err = *result;
-		if (!IS_ERR((void *)err))
-			err = 0;
-#endif
 	}
 	return err;
 }
@@ -329,7 +249,6 @@ static int au_wbr_mfs_wmark(substring_t *arg, char *str,
 		err = -EINVAL;
 	}
 
-	AuTraceErr(err);
 	return err;
 }
 
@@ -346,12 +265,10 @@ static int au_wbr_mfs_sec(substring_t *arg, char *str,
 		err = -EINVAL;
 	}
 
-	AuTraceErr(err);
 	return err;
 }
 
-static noinline_for_stack
-int au_wbr_create_val(char *str, struct au_opt_wbr_create *create)
+static int au_wbr_create_val(char *str, struct au_opt_wbr_create *create)
 {
 	int err, e;
 	substring_t args[MAX_OPT_ARGS];
@@ -403,9 +320,10 @@ static match_table_t au_wbr_copyup_policy = {
 	{-1, NULL}
 };
 
-static noinline_for_stack int au_wbr_copyup_val(char *str)
+static int au_wbr_copyup_val(char *str)
 {
 	substring_t args[MAX_OPT_ARGS];
+
 	return match_token(str, au_wbr_copyup_policy, args);
 }
 
@@ -427,178 +345,145 @@ static void dump_opts(struct au_opts *opts)
 		struct au_opt_del *del;
 		struct au_opt_mod *mod;
 		struct au_opt_xino *xino;
-		struct au_opt_xinodir *xinodir;
 		struct au_opt_xino_itrunc *xino_itrunc;
 		struct au_opt_wbr_create *create;
 	} u;
 	struct au_opt *opt;
 
-	AuTraceEnter();
-
 	opt = opts->opt;
-	while (/* opt < opts_tail && */ opt->type != Opt_tail) {
+	while (opt->type != Opt_tail) {
 		switch (opt->type) {
 		case Opt_add:
 			u.add = &opt->add;
-			LKTRTrace("add {b%d, %s, 0x%x, %p}\n",
-				  u.add->bindex, u.add->path, u.add->perm,
-				  u.add->nd.path.dentry);
+			AuDbg("add {b%d, %s, 0x%x, %p}\n",
+				  u.add->bindex, u.add->pathname, u.add->perm,
+				  u.add->path.dentry);
 			break;
 		case Opt_del:
 		case Opt_idel:
 			u.del = &opt->del;
-			LKTRTrace("del {%s, %p}\n", u.del->path, u.del->h_root);
+			AuDbg("del {%s, %p}\n",
+			      u.del->pathname, u.del->h_path.dentry);
 			break;
 		case Opt_mod:
 		case Opt_imod:
 			u.mod = &opt->mod;
-			LKTRTrace("mod {%s, 0x%x, %p}\n",
+			AuDbg("mod {%s, 0x%x, %p}\n",
 				  u.mod->path, u.mod->perm, u.mod->h_root);
 			break;
 		case Opt_append:
 			u.add = &opt->add;
-			LKTRTrace("append {b%d, %s, 0x%x, %p}\n",
-				  u.add->bindex, u.add->path, u.add->perm,
-				  u.add->nd.path.dentry);
+			AuDbg("append {b%d, %s, 0x%x, %p}\n",
+				  u.add->bindex, u.add->pathname, u.add->perm,
+				  u.add->path.dentry);
 			break;
 		case Opt_prepend:
 			u.add = &opt->add;
-			LKTRTrace("prepend {b%d, %s, 0x%x, %p}\n",
-				  u.add->bindex, u.add->path, u.add->perm,
-				  u.add->nd.path.dentry);
+			AuDbg("prepend {b%d, %s, 0x%x, %p}\n",
+				  u.add->bindex, u.add->pathname, u.add->perm,
+				  u.add->path.dentry);
 			break;
 		case Opt_dirwh:
-			LKTRTrace("dirwh %d\n", opt->dirwh);
+			AuDbg("dirwh %d\n", opt->dirwh);
 			break;
 		case Opt_rdcache:
-			LKTRTrace("rdcache %d\n", opt->rdcache);
+			AuDbg("rdcache %d\n", opt->rdcache);
 			break;
 		case Opt_xino:
 			u.xino = &opt->xino;
-			LKTRTrace("xino {%s %.*s}\n",
+			AuDbg("xino {%s %.*s}\n",
 				  u.xino->path,
 				  AuDLNPair(u.xino->file->f_dentry));
 			break;
-		case Opt_xinodir:
-			u.xinodir = &opt->xinodir;
-			LKTRTrace("xinodir {%s %.*s}\n",
-				  u.xinodir->name,
-				  AuDLNPair(u.xinodir->path.dentry));
-			break;
 		case Opt_trunc_xino:
-			LKTRLabel(trunc_xino);
+			AuLabel(trunc_xino);
 			break;
 		case Opt_notrunc_xino:
-			LKTRLabel(notrunc_xino);
+			AuLabel(notrunc_xino);
 			break;
 		case Opt_trunc_xino_path:
 		case Opt_itrunc_xino:
 			u.xino_itrunc = &opt->xino_itrunc;
-			LKTRTrace("trunc_xino %d\n", u.xino_itrunc->bindex);
+			AuDbg("trunc_xino %d\n", u.xino_itrunc->bindex);
 			break;
 
 		case Opt_noxino:
-			LKTRLabel(noxino);
+			AuLabel(noxino);
 			break;
 		case Opt_trunc_xib:
-			LKTRLabel(trunc_xib);
+			AuLabel(trunc_xib);
 			break;
 		case Opt_notrunc_xib:
-			LKTRLabel(notrunc_xib);
-			break;
-		case Opt_dirperm1:
-			LKTRLabel(dirperm1);
-			break;
-		case Opt_nodirperm1:
-			LKTRLabel(nodirperm1);
-			break;
-		case Opt_shwh:
-			LKTRLabel(shwh);
-			break;
-		case Opt_noshwh:
-			LKTRLabel(noshwh);
+			AuLabel(notrunc_xib);
 			break;
 		case Opt_plink:
-			LKTRLabel(plink);
+			AuLabel(plink);
 			break;
 		case Opt_noplink:
-			LKTRLabel(noplink);
+			AuLabel(noplink);
 			break;
 		case Opt_list_plink:
-			LKTRLabel(list_plink);
-			break;
-		case Opt_clean_plink:
-			LKTRLabel(clean_plink);
+			AuLabel(list_plink);
 			break;
 		case Opt_udba:
-			LKTRTrace("udba %d, %s\n",
+			AuDbg("udba %d, %s\n",
 				  opt->udba, au_optstr_udba(opt->udba));
 			break;
 		case Opt_diropq_a:
-			LKTRLabel(diropq_a);
+			AuLabel(diropq_a);
 			break;
 		case Opt_diropq_w:
-			LKTRLabel(diropq_w);
+			AuLabel(diropq_w);
 			break;
 		case Opt_warn_perm:
-			LKTRLabel(warn_perm);
+			AuLabel(warn_perm);
 			break;
 		case Opt_nowarn_perm:
-			LKTRLabel(nowarn_perm);
-			break;
-		case Opt_dlgt:
-			LKTRLabel(dlgt);
-			break;
-		case Opt_nodlgt:
-			LKTRLabel(nodlgt);
+			AuLabel(nowarn_perm);
 			break;
 		case Opt_refrof:
-			LKTRLabel(refrof);
+			AuLabel(refrof);
 			break;
 		case Opt_norefrof:
-			LKTRLabel(norefrof);
+			AuLabel(norefrof);
 			break;
 		case Opt_verbose:
-			LKTRLabel(verbose);
+			AuLabel(verbose);
 			break;
 		case Opt_noverbose:
-			LKTRLabel(noverbose);
+			AuLabel(noverbose);
 			break;
 		case Opt_sum:
-			LKTRLabel(sum);
+			AuLabel(sum);
 			break;
 		case Opt_nosum:
-			LKTRLabel(nosum);
+			AuLabel(nosum);
 			break;
 		case Opt_wsum:
-			LKTRLabel(wsum);
-			break;
-		case Opt_coo:
-			LKTRTrace("coo %d, %s\n",
-				  opt->coo, au_optstr_coo(opt->coo));
+			AuLabel(wsum);
 			break;
 		case Opt_wbr_create:
 			u.create = &opt->wbr_create;
-			LKTRTrace("create %d, %s\n", u.create->wbr_create,
+			AuDbg("create %d, %s\n", u.create->wbr_create,
 				  au_optstr_wbr_create(u.create->wbr_create));
 			switch (u.create->wbr_create) {
 			case AuWbrCreate_MFSV:
 			case AuWbrCreate_PMFSV:
-				LKTRTrace("%d sec\n", u.create->mfs_second);
+				AuDbg("%d sec\n", u.create->mfs_second);
 				break;
 			case AuWbrCreate_MFSRR:
-				LKTRTrace("%llu watermark\n",
+				AuDbg("%llu watermark\n",
 					  u.create->mfsrr_watermark);
 				break;
 			case AuWbrCreate_MFSRRV:
-				LKTRTrace("%llu watermark, %d sec\n",
+				AuDbg("%llu watermark, %d sec\n",
 					  u.create->mfsrr_watermark,
 					  u.create->mfs_second);
 				break;
 			}
 			break;
 		case Opt_wbr_copyup:
-			LKTRTrace("copyup %d, %s\n", opt->wbr_copyup,
+			AuDbg("copyup %d, %s\n", opt->wbr_copyup,
 				  au_optstr_wbr_copyup(opt->wbr_copyup));
 			break;
 		default:
@@ -613,19 +498,17 @@ void au_opts_free(struct au_opts *opts)
 {
 	struct au_opt *opt;
 
-	AuTraceEnter();
-
 	opt = opts->opt;
 	while (opt->type != Opt_tail) {
 		switch (opt->type) {
 		case Opt_add:
 		case Opt_append:
 		case Opt_prepend:
-			path_put(&opt->add.nd.path);
+			path_put(&opt->add.path);
 			break;
 		case Opt_del:
 		case Opt_idel:
-			dput(opt->del.h_root);
+			path_put(&opt->del.h_path);
 			break;
 		case Opt_mod:
 		case Opt_imod:
@@ -634,26 +517,21 @@ void au_opts_free(struct au_opts *opts)
 		case Opt_xino:
 			fput(opt->xino.file);
 			break;
-		case Opt_xinodir:
-			path_put(&opt->xinodir.path);
-			break;
 		}
 		opt++;
 	}
 }
 
 static int opt_add(struct au_opt *opt, char *opt_str, unsigned long sb_flags,
-		   struct super_block *sb, aufs_bindex_t bindex)
+		   aufs_bindex_t bindex)
 {
 	int err;
 	struct au_opt_add *add = &opt->add;
 	char *p;
 
-	LKTRTrace("%s, b%d\n", opt_str, bindex);
-
 	add->bindex = bindex;
 	add->perm = AuBrPerm_Last;
-	add->path = opt_str;
+	add->pathname = opt_str;
 	p = strchr(opt_str, '=');
 	if (p) {
 		*p++ = 0;
@@ -661,28 +539,182 @@ static int opt_add(struct au_opt *opt, char *opt_str, unsigned long sb_flags,
 			add->perm = br_perm_val(p);
 	}
 
-	/* LSM may detect it */
-	/* do not superio. */
-	err = vfsub_path_lookup(add->path, lkup_dirflags, &add->nd);
+	err = vfsub_kern_path(add->pathname, lkup_dirflags, &add->path);
 	if (!err) {
-		if (!p /* && add->perm == AuBrPerm_Last */) {
+		if (!p) {
 			add->perm = AuBrPerm_RO;
-			if (au_test_def_rr(add->nd.path.dentry->d_sb))
+			if (au_test_fs_rr(add->path.dentry->d_sb))
 				add->perm = AuBrPerm_RR;
-			if (!bindex && !(sb_flags & MS_RDONLY))
+			else if (!bindex && !(sb_flags & MS_RDONLY))
 				add->perm = AuBrPerm_RW;
-#ifdef CONFIG_AUFS_COMPAT
-			add->perm = AuBrPerm_RW;
-#endif
 		}
 		opt->type = Opt_add;
 		goto out;
 	}
-	AuErr("lookup failed %s (%d)\n", add->path, err);
+	AuErr("lookup failed %s (%d)\n", add->pathname, err);
 	err = -EINVAL;
 
  out:
-	AuTraceErr(err);
+	return err;
+}
+
+static int au_opts_parse_del(struct au_opt_del *del, substring_t args[])
+{
+	int err;
+
+	del->pathname = args[0].from;
+	AuDbg("del path %s\n", del->pathname);
+
+	err = vfsub_kern_path(del->pathname, lkup_dirflags, &del->h_path);
+	if (unlikely(err))
+		AuErr("lookup failed %s (%d)\n", del->pathname, err);
+
+	return err;
+}
+
+#if 0 /* reserved for future use */
+static int au_opts_parse_idel(struct super_block *sb, aufs_bindex_t bindex,
+			      struct au_opt_del *del, substring_t args[])
+{
+	int err;
+	struct dentry *root;
+
+	err = -EINVAL;
+	root = sb->s_root;
+	aufs_read_lock(root, AuLock_FLUSH);
+	if (bindex < 0 || au_sbend(sb) < bindex) {
+		AuErr("out of bounds, %d\n", bindex);
+		goto out;
+	}
+
+	err = 0;
+	del->h_path.dentry = dget(au_h_dptr(root, bindex));
+	del->h_path.mnt = mntget(au_sbr_mnt(sb, bindex));
+
+ out:
+	aufs_read_unlock(root, !AuLock_IR);
+	return err;
+}
+#endif
+
+static int au_opts_parse_mod(struct au_opt_mod *mod, substring_t args[])
+{
+	int err;
+	struct path path;
+	char *p;
+
+	err = -EINVAL;
+	mod->path = args[0].from;
+	p = strchr(mod->path, '=');
+	if (unlikely(!p)) {
+		AuErr("no permssion %s\n", args[0].from);
+		goto out;
+	}
+
+	*p++ = 0;
+	err = vfsub_kern_path(mod->path, lkup_dirflags, &path);
+	if (unlikely(err)) {
+		AuErr("lookup failed %s (%d)\n", mod->path, err);
+		goto out;
+	}
+
+	mod->perm = br_perm_val(p);
+	AuDbg("mod path %s, perm 0x%x, %s\n", mod->path, mod->perm, p);
+	mod->h_root = dget(path.dentry);
+	path_put(&path);
+
+ out:
+	return err;
+}
+
+#if 0 /* reserved for future use */
+static int au_opts_parse_imod(struct super_block *sb, aufs_bindex_t bindex,
+			      struct au_opt_mod *mod, substring_t args[])
+{
+	int err;
+	struct dentry *root;
+
+	err = -EINVAL;
+	root = sb->s_root;
+	aufs_read_lock(root, AuLock_FLUSH);
+	if (bindex < 0 || au_sbend(sb) < bindex) {
+		AuErr("out of bounds, %d\n", bindex);
+		goto out;
+	}
+
+	err = 0;
+	mod->perm = br_perm_val(args[1].from);
+	AuDbg("mod path %s, perm 0x%x, %s\n",
+	      mod->path, mod->perm, args[1].from);
+	mod->h_root = dget(au_h_dptr(root, bindex));
+
+ out:
+	aufs_read_unlock(root, !AuLock_IR);
+	return err;
+}
+#endif
+
+static int au_opts_parse_xino(struct super_block *sb, struct au_opt_xino *xino,
+			      substring_t args[])
+{
+	int err;
+	struct file *file;
+
+	file = au_xino_create(sb, args[0].from, /*silent*/0);
+	err = PTR_ERR(file);
+	if (IS_ERR(file))
+		goto out;
+
+	err = -EINVAL;
+	if (unlikely(file->f_dentry->d_sb == sb)) {
+		fput(file);
+		AuErr("%s must be outside\n", args[0].from);
+		goto out;
+	}
+
+	err = 0;
+	xino->file = file;
+	xino->path = args[0].from;
+
+ out:
+	return err;
+}
+
+static
+int au_opts_parse_xino_itrunc_path(struct super_block *sb,
+				   struct au_opt_xino_itrunc *xino_itrunc,
+				   substring_t args[])
+{
+	int err;
+	aufs_bindex_t bend, bindex;
+	struct path path;
+	struct dentry *root;
+
+	err = vfsub_kern_path(args[0].from, lkup_dirflags, &path);
+	if (unlikely(err)) {
+		AuErr("lookup failed %s (%d)\n", args[0].from, err);
+		goto out;
+	}
+
+	xino_itrunc->bindex = -1;
+	root = sb->s_root;
+	aufs_read_lock(root, AuLock_FLUSH);
+	bend = au_sbend(sb);
+	for (bindex = 0; bindex <= bend; bindex++) {
+		if (au_h_dptr(root, bindex) == path.dentry) {
+			xino_itrunc->bindex = bindex;
+			break;
+		}
+	}
+	aufs_read_unlock(root, !AuLock_IR);
+	path_put(&path);
+
+	if (unlikely(xino_itrunc->bindex < 0)) {
+		AuErr("no such branch %s\n", args[0].from);
+		err = -EINVAL;
+	}
+
+ out:
 	return err;
 }
 
@@ -690,27 +722,19 @@ static int opt_add(struct au_opt *opt, char *opt_str, unsigned long sb_flags,
 int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 {
 	int err, n, token;
+	aufs_bindex_t bindex;
+	unsigned char skipped;
 	struct dentry *root;
 	struct au_opt *opt, *opt_tail;
-	char *opt_str, *p;
-	aufs_bindex_t bindex, bend;
-	unsigned char skipped;
+	char *opt_str;
+	/* reduce the stack space */
 	union {
-		struct au_opt_del *del;
-		struct au_opt_mod *mod;
-		struct au_opt_xino *xino;
-		struct au_opt_xinodir *xinodir;
 		struct au_opt_xino_itrunc *xino_itrunc;
 		struct au_opt_wbr_create *create;
 	} u;
-	struct file *file;
-	/* reduce the stack space */
 	struct {
 		substring_t args[MAX_OPT_ARGS];
-		struct nameidata nd;
 	} *a;
-
-	LKTRTrace("%s, nopts %d\n", str, opts->max_opt);
 
 	err = -ENOMEM;
 	a = kmalloc(sizeof(*a), GFP_NOFS);
@@ -725,17 +749,14 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 	opt->type = Opt_tail;
 	while (!err && (opt_str = strsep(&str, ",")) && *opt_str) {
 		err = -EINVAL;
-		token = match_token(opt_str, options, a->args);
-		LKTRTrace("%s, token %d, a->args[0]{%p, %p}\n",
-			  opt_str, token, a->args[0].from, a->args[0].to);
-
 		skipped = 0;
+		token = match_token(opt_str, options, a->args);
 		switch (token) {
 		case Opt_br:
 			err = 0;
 			while (!err && (opt_str = strsep(&a->args[0].from, ":"))
 			       && *opt_str) {
-				err = opt_add(opt, opt_str, opts->sb_flags, sb,
+				err = opt_add(opt, opt_str, opts->sb_flags,
 					      bindex++);
 				if (unlikely(!err && ++opt > opt_tail)) {
 					err = -E2BIG;
@@ -751,172 +772,68 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 				break;
 			}
 			bindex = n;
-			err = opt_add(opt, a->args[1].from, opts->sb_flags, sb,
+			err = opt_add(opt, a->args[1].from, opts->sb_flags,
 				      bindex);
+			if (!err)
+				opt->type = token;
 			break;
 		case Opt_append:
-			err = opt_add(opt, a->args[0].from, opts->sb_flags, sb,
+			err = opt_add(opt, a->args[0].from, opts->sb_flags,
 				      /*dummy bindex*/1);
 			if (!err)
 				opt->type = token;
 			break;
 		case Opt_prepend:
-			err = opt_add(opt, a->args[0].from, opts->sb_flags, sb,
+			err = opt_add(opt, a->args[0].from, opts->sb_flags,
 				      /*bindex*/0);
 			if (!err)
 				opt->type = token;
 			break;
 		case Opt_del:
-			u.del = &opt->del;
-			u.del->path = a->args[0].from;
-			LKTRTrace("del path %s\n", u.del->path);
-			/* LSM may detect it */
-			/* do not superio. */
-			err = vfsub_path_lookup(u.del->path, lkup_dirflags,
-						&a->nd);
-			if (unlikely(err)) {
-				AuErr("lookup failed %s (%d)\n",
-				      u.del->path, err);
-				break;
-			}
-			u.del->h_root = dget(a->nd.path.dentry);
-			path_put(&a->nd.path);
-			opt->type = token;
+			err = au_opts_parse_del(&opt->del, a->args);
+			if (!err)
+				opt->type = token;
 			break;
 #if 0 /* reserved for future use */
 		case Opt_idel:
-			u.del = &opt->del;
-			u.del->path = "(indexed)";
-			if (unlikely(match_int(&a->args[0], &n))) {
+			del->pathname = "(indexed)";
+			if (unlikely(match_int(&args[0], &n))) {
 				AuErr("bad integer in %s\n", opt_str);
 				break;
 			}
-			bindex = n;
-			aufs_read_lock(root, AuLock_FLUSH);
-			if (bindex < 0 || au_sbend(sb) < bindex) {
-				AuErr("out of bounds, %d\n", bindex);
-				aufs_read_unlock(root, !AuLock_IR);
-				break;
-			}
-			err = 0;
-			u.del->h_root = dget(au_h_dptr(root, bindex));
-			opt->type = token;
-			aufs_read_unlock(root, !AuLock_IR);
+			err = au_opts_parse_idel(sb, n, &opt->del, a->args);
+			if (!err)
+				opt->type = token;
 			break;
 #endif
 		case Opt_mod:
-			u.mod = &opt->mod;
-			u.mod->path = a->args[0].from;
-			p = strchr(u.mod->path, '=');
-			if (unlikely(!p)) {
-				AuErr("no permssion %s\n", opt_str);
-				break;
-			}
-			*p++ = 0;
-			u.mod->perm = br_perm_val(p);
-			LKTRTrace("mod path %s, perm 0x%x, %s\n",
-				  u.mod->path, u.mod->perm, p);
-			/* LSM may detect it */
-			/* do not superio. */
-			err = vfsub_path_lookup(u.mod->path, lkup_dirflags,
-						&a->nd);
-			if (unlikely(err)) {
-				AuErr("lookup failed %s (%d)\n",
-				      u.mod->path, err);
-				break;
-			}
-			u.mod->h_root = dget(a->nd.path.dentry);
-			path_put(&a->nd.path);
-			opt->type = token;
+			err = au_opts_parse_mod(&opt->mod, a->args);
+			if (!err)
+				opt->type = token;
 			break;
 #ifdef IMOD /* reserved for future use */
 		case Opt_imod:
-			u.mod = &opt->mod;
 			u.mod->path = "(indexed)";
 			if (unlikely(match_int(&a->args[0], &n))) {
 				AuErr("bad integer in %s\n", opt_str);
 				break;
 			}
-			bindex = n;
-			aufs_read_lock(root, AuLock_FLUSH);
-			if (bindex < 0 || au_sbend(sb) < bindex) {
-				AuErr("out of bounds, %d\n", bindex);
-				aufs_read_unlock(root, !AuLock_IR);
-				break;
-			}
-			u.mod->perm = br_perm_val(a->args[1].from);
-			LKTRTrace("mod path %s, perm 0x%x, %s\n",
-				  u.mod->path, u.mod->perm, a->args[1].from);
-			err = 0;
-			u.mod->h_root = dget(au_h_dptr(root, bindex));
-			opt->type = token;
-			aufs_read_unlock(root, !AuLock_IR);
+			err = au_opts_parse_imod(sb, n, &opt->mod, a->args);
+			if (!err)
+				opt->type = token;
 			break;
 #endif
 		case Opt_xino:
-			u.xino = &opt->xino;
-			file = au_xino_create(sb, a->args[0].from, /*silent*/0);
-			err = PTR_ERR(file);
-			if (IS_ERR(file))
-				break;
-			err = -EINVAL;
-			if (unlikely(file->f_dentry->d_sb == sb)) {
-				fput(file);
-				AuErr("%s must be outside\n", a->args[0].from);
-				break;
-			}
-			err = 0;
-			u.xino->file = file;
-			u.xino->path = a->args[0].from;
-			opt->type = token;
+			err = au_opts_parse_xino(sb, &opt->xino, a->args);
+			if (!err)
+				opt->type = token;
 			break;
-
-#if 0 /* def CONFIG_AUFS_EXPORT */ /* reserved for futur use */
-		case Opt_xinodir:
-			u.xinodir = &opt->xinodir;
-			u.xinodir->name = a->args[0].from;
-			err = vfsub_path_lookup(u.xinodir->name, lkup_dirflags,
-						&a->nd);
-			if (unlikely(err)) {
-				AuErr("lookup failed %s (%d)\n",
-				      u.xinodir->name, err);
-				break;
-			}
-			u.xinodir->path = a->nd.path;
-			/* do not path_put() */
-			opt->type = token;
-			break;
-#endif
 
 		case Opt_trunc_xino_path:
-			u.xino_itrunc = &opt->xino_itrunc;
-			p = a->args[0].from;
-			LKTRTrace("trunc_xino path %s\n", p);
-			/* LSM may detect it */
-			/* do not superio. */
-			err = vfsub_path_lookup(p, lkup_dirflags, &a->nd);
-			if (unlikely(err)) {
-				AuErr("lookup failed %s (%d)\n", p , err);
-				break;
-			}
-			u.xino_itrunc->bindex = -1;
-			aufs_read_lock(root, AuLock_FLUSH);
-			bend = au_sbend(sb);
-			for (bindex = 0; bindex <= bend; bindex++) {
-				if (au_h_dptr(root, bindex)
-				    == a->nd.path.dentry) {
-					u.xino_itrunc->bindex = bindex;
-					break;
-				}
-			}
-			aufs_read_unlock(root, !AuLock_IR);
-			path_put(&a->nd.path);
-			if (unlikely(u.xino_itrunc->bindex < 0)) {
-				AuErr("no such branch %s\n", p);
-				err = -EINVAL;
-				break;
-			}
-			opt->type = token;
+			err = au_opts_parse_xino_itrunc_path
+				(sb, &opt->xino_itrunc, a->args);
+			if (!err)
+				opt->type = token;
 			break;
 
 		case Opt_itrunc_xino:
@@ -951,32 +868,18 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 			opt->type = token;
 			break;
 
-		case Opt_shwh:
-			if (opts->sb_flags & MS_RDONLY) {
-				err = 0;
-				opt->type = token;
-			} else
-				AuErr("shwh requires ro\n");
-			break;
-
 		case Opt_trunc_xino:
 		case Opt_notrunc_xino:
 		case Opt_noxino:
 		case Opt_trunc_xib:
 		case Opt_notrunc_xib:
-		case Opt_dirperm1:
-		case Opt_nodirperm1:
-		case Opt_noshwh:
 		case Opt_plink:
 		case Opt_noplink:
 		case Opt_list_plink:
-		case Opt_clean_plink:
 		case Opt_diropq_a:
 		case Opt_diropq_w:
 		case Opt_warn_perm:
 		case Opt_nowarn_perm:
-		case Opt_dlgt:
-		case Opt_nodlgt:
 		case Opt_refrof:
 		case Opt_norefrof:
 		case Opt_verbose:
@@ -1016,24 +919,9 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 				AuErr("wrong value, %s\n", opt_str);
 			break;
 
-		case Opt_coo:
-			opt->coo = coo_val(a->args[0].from);
-			if (opt->coo >= 0) {
-				if (opt->coo == AuOpt_COO_NONE
-				    || !(opts->sb_flags & MS_RDONLY)) {
-					err = 0;
-					opt->type = token;
-				} else
-					AuErr("bad %s for readonly mount\n",
-					      opt_str);
-			} else
-				AuErr("wrong value, %s\n", opt_str);
-			break;
-
 		case Opt_ignore:
-#ifndef CONFIG_AUFS_COMPAT
 			AuWarn("ignored %s\n", opt_str);
-#endif
+			/*FALLTHROUGH*/
 		case Opt_ignore_silent:
 			skipped = 1;
 			err = 0;
@@ -1060,7 +948,41 @@ int au_opts_parse(struct super_block *sb, char *str, struct au_opts *opts)
 		au_opts_free(opts);
 
  out:
-	AuTraceErr(err);
+	return err;
+}
+
+static int au_opt_wbr_create(struct super_block *sb,
+			     struct au_opt_wbr_create *create)
+{
+	int err;
+	struct au_sbinfo *sbinfo;
+
+	err = 1; /* handled */
+	sbinfo = au_sbi(sb);
+	if (sbinfo->si_wbr_create_ops->fin) {
+		err = sbinfo->si_wbr_create_ops->fin(sb);
+		if (!err)
+			err = 1;
+	}
+
+	sbinfo->si_wbr_create = create->wbr_create;
+	sbinfo->si_wbr_create_ops = au_wbr_create_ops + create->wbr_create;
+	switch (create->wbr_create) {
+	case AuWbrCreate_MFSRRV:
+	case AuWbrCreate_MFSRR:
+		sbinfo->si_wbr_mfs.mfsrr_watermark = create->mfsrr_watermark;
+		/*FALLTHROUGH*/
+	case AuWbrCreate_MFS:
+	case AuWbrCreate_MFSV:
+	case AuWbrCreate_PMFS:
+	case AuWbrCreate_PMFSV:
+		sbinfo->si_wbr_mfs.mfs_expire = create->mfs_second * HZ;
+		break;
+	}
+
+	if (sbinfo->si_wbr_create_ops->init)
+		sbinfo->si_wbr_create_ops->init(sb); /* ignore */
+
 	return err;
 }
 
@@ -1074,9 +996,6 @@ static int au_opt_simple(struct super_block *sb, struct au_opt *opt,
 {
 	int err;
 	struct au_sbinfo *sbinfo;
-	struct au_opt_wbr_create *create;
-
-	AuTraceEnter();
 
 	err = 1; /* handled */
 	sbinfo = au_sbi(sb);
@@ -1099,23 +1018,12 @@ static int au_opt_simple(struct super_block *sb, struct au_opt *opt,
 		if (au_opt_test(sbinfo->si_mntflags, PLINK))
 			au_plink_list(sb);
 		break;
-	case Opt_clean_plink:
-		if (au_opt_test(sbinfo->si_mntflags, PLINK))
-			au_plink_put(sb);
-		break;
 
 	case Opt_diropq_a:
 		au_opt_set(sbinfo->si_mntflags, ALWAYS_DIROPQ);
 		break;
 	case Opt_diropq_w:
 		au_opt_clr(sbinfo->si_mntflags, ALWAYS_DIROPQ);
-		break;
-
-	case Opt_dlgt:
-		au_opt_set(sbinfo->si_mntflags, DLGT);
-		break;
-	case Opt_nodlgt:
-		au_opt_clr(sbinfo->si_mntflags, DLGT);
 		break;
 
 	case Opt_warn_perm:
@@ -1129,7 +1037,6 @@ static int au_opt_simple(struct super_block *sb, struct au_opt *opt,
 		au_opt_set(sbinfo->si_mntflags, REFROF);
 		break;
 	case Opt_norefrof:
-		/* au_opt_set(sbinfo->si_mntflags, COO_LEAF); */
 		au_opt_clr(sbinfo->si_mntflags, REFROF);
 		break;
 
@@ -1152,39 +1059,11 @@ static int au_opt_simple(struct super_block *sb, struct au_opt *opt,
 		break;
 
 	case Opt_wbr_create:
-		create = &opt->wbr_create;
-		if (sbinfo->si_wbr_create_ops->fin) {
-			err = sbinfo->si_wbr_create_ops->fin(sb);
-			if (!err)
-				err = 1;
-		}
-		sbinfo->si_wbr_create = create->wbr_create;
-		sbinfo->si_wbr_create_ops
-			= au_wbr_create_ops + create->wbr_create;
-		switch (create->wbr_create) {
-		case AuWbrCreate_MFSRRV:
-		case AuWbrCreate_MFSRR:
-			sbinfo->si_wbr_mfs.mfsrr_watermark
-				= create->mfsrr_watermark;
-			/*FALLTHROUGH*/
-		case AuWbrCreate_MFS:
-		case AuWbrCreate_MFSV:
-		case AuWbrCreate_PMFS:
-		case AuWbrCreate_PMFSV:
-			sbinfo->si_wbr_mfs.mfs_expire = create->mfs_second * HZ;
-			break;
-		}
-		if (sbinfo->si_wbr_create_ops->init)
-			sbinfo->si_wbr_create_ops->init(sb); /* ignore */
+		err = au_opt_wbr_create(sb, &opt->wbr_create);
 		break;
 	case Opt_wbr_copyup:
 		sbinfo->si_wbr_copyup = opt->wbr_copyup;
 		sbinfo->si_wbr_copyup_ops = au_wbr_copyup_ops + opt->wbr_copyup;
-		break;
-
-	case Opt_coo:
-		sbinfo->si_mntflags &= ~AuOptMask_COO;
-		sbinfo->si_mntflags |= opt->coo;
 		break;
 
 	case Opt_dirwh:
@@ -1200,20 +1079,6 @@ static int au_opt_simple(struct super_block *sb, struct au_opt *opt,
 		break;
 	case Opt_notrunc_xino:
 		au_opt_clr(sbinfo->si_mntflags, TRUNC_XINO);
-		break;
-
-	case Opt_dirperm1:
-		au_opt_set(sbinfo->si_mntflags, DIRPERM1);
-		break;
-	case Opt_nodirperm1:
-		au_opt_clr(sbinfo->si_mntflags, DIRPERM1);
-		break;
-
-	case Opt_shwh:
-		au_opt_set(sbinfo->si_mntflags, SHWH);
-		break;
-	case Opt_noshwh:
-		au_opt_clr(sbinfo->si_mntflags, SHWH);
 		break;
 
 	case Opt_trunc_xino_path:
@@ -1235,7 +1100,6 @@ static int au_opt_simple(struct super_block *sb, struct au_opt *opt,
 		break;
 	}
 
-	AuTraceErr(err);
 	return err;
 }
 
@@ -1249,8 +1113,6 @@ static int au_opt_br(struct super_block *sb, struct au_opt *opt,
 		     struct au_opts *opts)
 {
 	int err, do_refresh;
-
-	AuTraceEnter();
 
 	err = 0;
 	switch (opt->type) {
@@ -1300,46 +1162,53 @@ static int au_opt_br(struct super_block *sb, struct au_opt *opt,
 		break;
 	}
 
-	AuTraceErr(err);
 	return err;
 }
 
 static int au_opt_xino(struct super_block *sb, struct au_opt *opt,
 		       struct au_opt_xino **opt_xino,
-		       struct au_opt_xinodir **opt_xinodir,
 		       struct au_opts *opts)
 {
 	int err;
-	const int remount = !!au_ftest_opts(opts->flags, REMOUNT);
-
-	AuTraceEnter();
+	aufs_bindex_t bend, bindex;
+	struct dentry *root, *parent, *h_root;
 
 	err = 0;
 	switch (opt->type) {
 	case Opt_xino:
-		err = au_xino_set(sb, &opt->xino, remount);
-		if (!err)
-			*opt_xino = &opt->xino;
+		err = au_xino_set(sb, &opt->xino,
+				  !!au_ftest_opts(opts->flags, REMOUNT));
+		if (unlikely(err))
+			break;
+
+		*opt_xino = &opt->xino;
+		au_xino_brid_set(sb, -1);
+
+		/* safe d_parent access */
+		parent = opt->xino.file->f_dentry->d_parent;
+		root = sb->s_root;
+		bend = au_sbend(sb);
+		for (bindex = 0; bindex <= bend; bindex++) {
+			h_root = au_h_dptr(root, bindex);
+			if (h_root == parent) {
+				au_xino_brid_set(sb, au_sbr_id(sb, bindex));
+				break;
+			}
+		}
 		break;
-#if 0 /* def CONFIG_AUFS_EXPORT */ /* reserved for futur use */
-	case Opt_xinodir:
-		err = au_xinodir_set(sb, &opt->xinodir, remount);
-		if (!err)
-			*opt_xinodir = &opt->xinodir;
-		break;
-#endif
+
 	case Opt_noxino:
 		au_xino_clr(sb);
+		au_xino_brid_set(sb, -1);
 		*opt_xino = (void *)-1;
 		break;
 	}
 
-	AuTraceErr(err);
 	return err;
 }
 
-int verify_opts(struct super_block *sb, unsigned long sb_flags,
-		unsigned int pending, int remount)
+int au_opts_verify(struct super_block *sb, unsigned long sb_flags,
+		   unsigned int pending)
 {
 	int err;
 	aufs_bindex_t bindex, bend;
@@ -1348,54 +1217,49 @@ int verify_opts(struct super_block *sb, unsigned long sb_flags,
 	struct au_wbr *wbr;
 	struct dentry *root;
 	struct inode *dir, *h_dir;
-	unsigned int mnt_flags;
+	struct au_sbinfo *sbinfo;
+	struct au_hinode *hdir;
 
-	AuTraceEnter();
-	mnt_flags = au_mntflags(sb);
-	AuDebugOn(!(mnt_flags & AuOptMask_COO));
-	AuDebugOn(!(mnt_flags & AuOptMask_UDBA));
+	sbinfo = au_sbi(sb);
+	AuDebugOn(!(sbinfo->si_mntflags & AuOptMask_UDBA));
 
-	if (!(sb_flags & MS_RDONLY)) {
-		if (unlikely(!au_br_writable(au_sbr_perm(sb, 0))))
-			AuWarn("first branch should be rw\n");
-		if (unlikely(au_opt_test(mnt_flags, SHWH)))
-			AuWarn("shwh should be used with ro\n");
-	} else if (unlikely(!au_opt_test(mnt_flags, COO_NONE))) {
-		AuWarn("resetting coo for readonly mount\n");
-		au_opt_set_coo(au_sbi(sb)->si_mntflags, COO_NONE);
-	}
+	if (unlikely(!(sb_flags & MS_RDONLY)
+		     && !au_br_writable(au_sbr_perm(sb, 0))))
+		AuWarn("first branch should be rw\n");
 
-	if (unlikely(au_opt_test((mnt_flags | pending), UDBA_INOTIFY)
-		     && !au_opt_test_xino(mnt_flags)))
+	if (au_opt_test((sbinfo->si_mntflags | pending), UDBA_HINOTIFY)
+	    && !au_opt_test(sbinfo->si_mntflags, XINO))
 		AuWarn("udba=inotify requires xino\n");
 
 	err = 0;
 	root = sb->s_root;
 	dir = sb->s_root->d_inode;
-	do_plink = !!au_opt_test(mnt_flags, PLINK);
+	do_plink = !!au_opt_test(sbinfo->si_mntflags, PLINK);
 	bend = au_sbend(sb);
 	for (bindex = 0; !err && bindex <= bend; bindex++) {
 		skip = 0;
 		h_dir = au_h_iptr(dir, bindex);
 		br = au_sbr(sb, bindex);
 		do_free = 0;
+
 		wbr = br->br_wbr;
 		if (wbr)
 			wbr_wh_read_lock(wbr);
+
 		switch (br->br_perm) {
-		case AuBrPerm_RR:
 		case AuBrPerm_RO:
-		case AuBrPerm_RRWH:
 		case AuBrPerm_ROWH:
+		case AuBrPerm_RR:
+		case AuBrPerm_RRWH:
 			do_free = !!wbr;
 			skip = (!wbr
 				|| (!wbr->wbr_whbase
 				    && !wbr->wbr_plink
-				    && !wbr->wbr_tmp));
+				    && !wbr->wbr_orph));
 			break;
 
 		case AuBrPerm_RWNoLinkWH:
-			/* skip = (!br->br_whbase && !br->br_tmp); */
+			/* skip = (!br->br_whbase && !br->br_orph); */
 			skip = (!wbr || !wbr->wbr_whbase);
 			if (skip && wbr) {
 				if (do_plink)
@@ -1406,7 +1270,7 @@ int verify_opts(struct super_block *sb, unsigned long sb_flags,
 			break;
 
 		case AuBrPerm_RW:
-			/* skip = (br->br_whbase && br->br_tmp); */
+			/* skip = (br->br_whbase && br->br_ohph); */
 			skip = (wbr && wbr->wbr_whbase);
 			if (skip) {
 				if (do_plink)
@@ -1425,14 +1289,14 @@ int verify_opts(struct super_block *sb, unsigned long sb_flags,
 		if (skip)
 			continue;
 
-		mutex_lock_nested(&h_dir->i_mutex, AuLsc_I_PARENT);
+		hdir = au_hi(dir, bindex);
+		au_hin_imtx_lock_nested(hdir, AuLsc_I_PARENT);
 		if (wbr)
 			wbr_wh_write_lock(wbr);
-		err = au_wh_init(au_h_dptr(root, bindex), br, br->br_mnt, sb,
-				 bindex);
+		err = au_wh_init(au_h_dptr(root, bindex), br, sb);
 		if (wbr)
 			wbr_wh_write_unlock(wbr);
-		mutex_unlock(&h_dir->i_mutex);
+		au_hin_imtx_unlock(hdir);
 
 		if (!err && do_free) {
 			kfree(wbr);
@@ -1440,31 +1304,20 @@ int verify_opts(struct super_block *sb, unsigned long sb_flags,
 		}
 	}
 
-	AuTraceErr(err);
 	return err;
 }
 
 int au_opts_mount(struct super_block *sb, struct au_opts *opts)
 {
 	int err;
-	struct inode *dir;
+	unsigned int tmp;
+	aufs_bindex_t bend;
 	struct au_opt *opt;
 	struct au_opt_xino *opt_xino, xino;
-	struct au_opt_xinodir *opt_xinodir;
-	aufs_bindex_t bend;
 	struct au_sbinfo *sbinfo;
-	unsigned int tmp;
-	struct au_branch *br;
-
-	AuTraceEnter();
-	SiMustWriteLock(sb);
-	DiMustWriteLock(sb->s_root);
-	dir = sb->s_root->d_inode;
-	IiMustWriteLock(dir);
 
 	err = 0;
 	opt_xino = NULL;
-	opt_xinodir = NULL;
 	opt = opts->opt;
 	while (err >= 0 && opt->type != Opt_tail)
 		err = au_opt_simple(sb, opt++, opts);
@@ -1473,12 +1326,10 @@ int au_opts_mount(struct super_block *sb, struct au_opts *opts)
 	else if (unlikely(err < 0))
 		goto out;
 
-	/* disable xino, xinodir, hinotify, dlgt temporary */
+	/* disable xino and udba temporary */
 	sbinfo = au_sbi(sb);
 	tmp = sbinfo->si_mntflags;
 	au_opt_clr(sbinfo->si_mntflags, XINO);
-	au_opt_clr(sbinfo->si_mntflags, XINODIR);
-	au_opt_clr(sbinfo->si_mntflags, DLGT);
 	au_opt_set_udba(sbinfo->si_mntflags, UDBA_REVAL);
 
 	opt = opts->opt;
@@ -1498,46 +1349,39 @@ int au_opts_mount(struct super_block *sb, struct au_opts *opts)
 
 	if (au_opt_test(tmp, XINO))
 		au_opt_set(sbinfo->si_mntflags, XINO);
-	else if (au_opt_test(tmp, XINODIR))
-		au_opt_set(sbinfo->si_mntflags, XINODIR);
 	opt = opts->opt;
 	while (!err && opt->type != Opt_tail)
-		err = au_opt_xino(sb, opt++, &opt_xino, &opt_xinodir, opts);
+		err = au_opt_xino(sb, opt++, &opt_xino, opts);
 	if (unlikely(err))
 		goto out;
 
-	/* todo: test this error case? */
-	err = verify_opts(sb, sb->s_flags, tmp, /*remount*/0);
+	err = au_opts_verify(sb, sb->s_flags, tmp);
 	if (unlikely(err))
 		goto out;
 
-	/* enable xino */
+	/* restore xino */
 	if (au_opt_test(tmp, XINO) && !opt_xino) {
 		xino.file = au_xino_def(sb);
 		err = PTR_ERR(xino.file);
 		if (IS_ERR(xino.file))
 			goto out;
 
-		br = au_xino_def_br(sbinfo);
 		err = au_xino_set(sb, &xino, /*remount*/0);
 		fput(xino.file);
 		if (unlikely(err))
 			goto out;
-		au_xino_def_br_set(br, sbinfo);
 	}
 
-	/* restore hinotify */
+	/* restore udba */
 	sbinfo->si_mntflags &= ~AuOptMask_UDBA;
 	sbinfo->si_mntflags |= (tmp & AuOptMask_UDBA);
-	if (au_opt_test(tmp, UDBA_INOTIFY))
-		au_reset_hinotify(dir, au_hi_flags(dir, 1) & ~AuHi_XINO);
-
-	/* restore dlgt */
-	if (au_opt_test(tmp, DLGT))
-		au_opt_set(sbinfo->si_mntflags, DLGT);
+	if (au_opt_test(tmp, UDBA_HINOTIFY)) {
+		struct inode *dir = sb->s_root->d_inode;
+		au_reset_hinotify(dir,
+				  au_hi_flags(dir, /*isdir*/1) & ~AuHi_XINO);
+	}
 
  out:
-	AuTraceErr(err);
 	return err;
 }
 
@@ -1546,53 +1390,28 @@ int au_opts_remount(struct super_block *sb, struct au_opts *opts)
 	int err, rerr;
 	struct inode *dir;
 	struct au_opt_xino *opt_xino;
-	struct au_opt_xinodir *opt_xinodir;
 	struct au_opt *opt;
-	unsigned char dlgt;
 	struct au_sbinfo *sbinfo;
 
-	AuTraceEnter();
-	SiMustWriteLock(sb);
-	DiMustWriteLock(sb->s_root);
 	dir = sb->s_root->d_inode;
-	IiMustWriteLock(dir);
 	sbinfo = au_sbi(sb);
-
 	err = 0;
-	dlgt = !!au_opt_test(sbinfo->si_mntflags, DLGT);
 	opt_xino = NULL;
-	opt_xinodir = NULL;
 	opt = opts->opt;
 	while (err >= 0 && opt->type != Opt_tail) {
 		err = au_opt_simple(sb, opt, opts);
-
-		/* disable it temporary */
-		dlgt = !!au_opt_test(sbinfo->si_mntflags, DLGT);
-		au_opt_clr(sbinfo->si_mntflags, DLGT);
-
 		if (!err)
 			err = au_opt_br(sb, opt, opts);
 		if (!err)
-			err = au_opt_xino(sb, opt, &opt_xino, &opt_xinodir,
-					  opts);
-
-		/* restore it */
-		if (dlgt)
-			au_opt_set(sbinfo->si_mntflags, DLGT);
+			err = au_opt_xino(sb, opt, &opt_xino, opts);
 		opt++;
 	}
 	if (err > 0)
 		err = 0;
 	AuTraceErr(err);
-
 	/* go on even err */
 
-	/* todo: test this error case? */
-	au_opt_clr(sbinfo->si_mntflags, DLGT);
-	rerr = verify_opts(sb, opts->sb_flags, sbinfo->si_mntflags,
-			   /*remount*/1);
-	if (unlikely(dlgt))
-		au_opt_set(sbinfo->si_mntflags, DLGT);
+	rerr = au_opts_verify(sb, opts->sb_flags, /*pending*/0);
 	if (unlikely(rerr && !err))
 		err = rerr;
 
@@ -1602,12 +1421,18 @@ int au_opts_remount(struct super_block *sb, struct au_opts *opts)
 			err = rerr;
 	}
 
-	/* they are handled by the caller */
+	/* will be handled by the caller */
 	if (!au_ftest_opts(opts->flags, REFRESH_DIR)
-	    && (opts->given_udba || au_opt_test_xino(sbinfo->si_mntflags)))
+	    && (opts->given_udba || au_opt_test(sbinfo->si_mntflags, XINO)))
 		au_fset_opts(opts->flags, REFRESH_DIR);
 
-	LKTRTrace("status 0x%x\n", opts->flags);
-	AuTraceErr(err);
+	AuDbg("status 0x%x\n", opts->flags);
 	return err;
+}
+
+/* ---------------------------------------------------------------------- */
+
+unsigned int au_opt_udba(struct super_block *sb)
+{
+	return au_mntflags(sb) & AuOptMask_UDBA;
 }
