@@ -1,3 +1,10 @@
+linux-2.6 (2.6.29-1+vyatta+1) unstable; urgency=low
+
+  * Merge in 2.6.29
+  * Update kernel config to 2.6.29 and 586
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 25 Mar 2009 13:22:04 -0700
+
 linux-2.6 (2.6.28-1+vyatta+15) unstable; urgency=low
 
   * Revert "Handle modifying transmit queue length on active devices"
