@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.29
-# Wed Mar 25 13:18:37 2009
+# Fri Mar 27 14:36:45 2009
 #
 # CONFIG_64BIT is not set
 CONFIG_X86_32=y
@@ -179,7 +179,7 @@ CONFIG_NO_HZ=y
 CONFIG_HIGH_RES_TIMERS=y
 CONFIG_GENERIC_CLOCKEVENTS_BUILD=y
 CONFIG_SMP=y
-# CONFIG_SPARSE_IRQ is not set
+CONFIG_SPARSE_IRQ=y
 CONFIG_X86_FIND_SMP_CONFIG=y
 CONFIG_X86_MPPARSE=y
 CONFIG_X86_PC=y
