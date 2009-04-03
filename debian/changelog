@@ -1,3 +1,9 @@
+linux-2.6 (2.6.29-1+vyatta+4) unstable; urgency=low
+
+  * make vyatta-virt config work with xen
+
+ -- An-Cheng Huang <ancheng@vyatta.com>  Fri, 03 Apr 2009 14:12:03 -0700
+
 linux-2.6 (2.6.29-1+vyatta+3) unstable; urgency=low
 
   * Merge in 2.6.29.1
