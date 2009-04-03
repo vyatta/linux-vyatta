@@ -200,9 +200,6 @@ static atomic_t channel_count = ATOMIC_INIT(0);
 /* We limit the length of ppp->file.rq to this (arbitrary) value */
 #define PPP_MAX_RQLEN	32
 
-static int ppp_generic_init_sysctl(void);
-static void ppp_generic_fini_sysctl(void);
-
 /*
  * Maximum number of multilink fragments queued up.
  * This has to be large enough to cope with the maximum latency of
@@ -840,6 +837,52 @@ static const struct file_operations ppp_device_fops = {
 
 #define PPP_MAJOR	108
 
+static int ppp_multilink_do_pcomp = 1;
+
+#if defined(CONFIG_SYSCTL) && defined(CONFIG_PPP_MULTILINK)
+static struct ctl_table_header *ppp_generic_cth;
+
+static ctl_table ppp_generic_sysctl_table[] = {
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "mlppp_do_pcomp",
+		.data		= &ppp_multilink_do_pcomp,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= 0,
+	}
+};
+
+static struct ctl_path pg_path[] = {
+	{ .procname = "net", .ctl_name = CTL_NET, },
+	{ }
+};
+
+static int ppp_generic_init_sysctl(void)
+{
+	ppp_generic_cth =
+		register_sysctl_paths(pg_path, ppp_generic_sysctl_table);
+	if (!ppp_generic_cth) {
+		printk(KERN_ERR "ppp_generic: can't register to sysctl.\n");
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+static void ppp_generic_fini_sysctl(void)
+{
+	unregister_sysctl_table(ppp_generic_cth);
+}
+
+#else
+#define ppp_generic_init_sysctl()	(0)
+#define ppp_generic_fini_sysctl()	do { } while(0)
+
+#endif	/* CONFIG_SYSCTL && CONFIG_PPP_MULTILINK */
+
 /* Called at boot time if ppp is compiled into the kernel,
    or at module load time (from init_module) if compiled as a module. */
 static int __init ppp_init(void)
@@ -1226,7 +1269,6 @@ ppp_push(struct ppp *ppp)
 }
 
 #ifdef CONFIG_PPP_MULTILINK
-int ppp_multilink_do_pcomp = 1;
 /*
  * Divide a packet to be transmitted into fragments and
  * send them out the individual links.
@@ -2748,56 +2790,6 @@ static void *unit_find(struct idr *p, int n)
 {
 	return idr_find(p, n);
 }
-
-#if defined(CONFIG_SYSCTL) && defined(CONFIG_PPP_MULTILINK)
-static struct ctl_table_header *ppp_generic_cth;
-
-static ctl_table ppp_generic_sysctl_table[] = {
-	{
-		.ctl_name	= CTL_UNNUMBERED,
-		.procname	= "mlppp_do_pcomp",
-		.data		= &ppp_multilink_do_pcomp,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= 0,
-	}
-};
-
-static struct ctl_path pg_path[] = {
-	{ .procname = "net", .ctl_name = CTL_NET, },
-	{ }
-};
-
-static int ppp_generic_init_sysctl()
-{
-	ppp_generic_cth =
-		register_sysctl_paths(pg_path, ppp_generic_sysctl_table);
-	if (!ppp_generic_cth) {
-		printk(KERN_ERR "ppp_generic: can't register to sysctl.\n");
-		return -ENOMEM;
-	}
-	return 0;
-}
-
-static void ppp_generic_fini_sysctl()
-{
-	unregister_sysctl_table(ppp_generic_cth);
-}
-
-#else
-
-static int ppp_generic_init_sysctl()
-{
-	return 0;
-}
-
-static void ppp_generic_fini_sysctl()
-{
-}
-#endif	/* CONFIG_SYSCTL && CONFIG_PPP_MULTILINK */
 
 /* Module/initialization stuff */
 
