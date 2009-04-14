@@ -1,3 +1,15 @@
+linux-2.6 (2.6.29-1+vyatta+5) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Allow meta match on vlan tag on receive
+
+  [ Michal Schmidt ]
+  * skge: fix occasional BUG during MTU change
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 13 Apr 2009 17:24:28 -0700
+
 linux-2.6 (2.6.29-1+vyatta+4) unstable; urgency=low
 
   * make vyatta-virt config work with xen
