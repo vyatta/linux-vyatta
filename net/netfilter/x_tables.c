@@ -679,11 +679,8 @@ xt_replace_table(struct xt_table *table,
 		*error = -EAGAIN;
 		return NULL;
 	}
-	oldinfo = private;
-	table->private = newinfo;
-	newinfo->initial_entries = oldinfo->initial_entries;
-
-	return oldinfo;
+	newinfo->initial_entries = private->initial_entries;
+	return xchg(&table->private, newinfo);
 }
 EXPORT_SYMBOL_GPL(xt_replace_table);
 
