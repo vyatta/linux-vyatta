@@ -339,6 +339,8 @@ static void trace_packet(struct sk_buff *skb,
 }
 #endif
 
+static DEFINE_PER_CPU(spinlock_t, ip6_tables_lock);
+
 /* Returns one of the generic firewall policies, like NF_ACCEPT. */
 unsigned int
 ip6t_do_table(struct sk_buff *skb,
@@ -373,10 +375,13 @@ ip6t_do_table(struct sk_buff *skb,
 	mtpar.family  = tgpar.family = NFPROTO_IPV6;
 	tgpar.hooknum = hook;
 
-	read_lock_bh(&table->lock);
 	IP_NF_ASSERT(table->valid_hooks & (1 << hook));
+
+	local_bh_disable();
+	spin_lock(&__get_cpu_var(ip6_tables_lock));
 	private = table->private;
-	table_base = (void *)private->entries[smp_processor_id()];
+	table_base = private->entries[smp_processor_id()];
+
 	e = get_entry(table_base, private->hook_entry[hook]);
 
 	/* For return from builtin chain */
@@ -474,7 +479,8 @@ ip6t_do_table(struct sk_buff *skb,
 #ifdef CONFIG_NETFILTER_DEBUG
 	((struct ip6t_entry *)table_base)->comefrom = NETFILTER_LINK_POISON;
 #endif
-	read_unlock_bh(&table->lock);
+	spin_unlock(&__get_cpu_var(ip6_tables_lock));
+	local_bh_enable();
 
 #ifdef DEBUG_ALLOW_ALL
 	return NF_ACCEPT;
@@ -926,32 +932,33 @@ get_counters(const struct xt_table_info *t,
 	     struct xt_counters counters[])
 {
 	unsigned int cpu;
-	unsigned int i;
-	unsigned int curcpu;
+	unsigned int i = 0;
+	unsigned int curcpu = raw_smp_processor_id();
 
 	/* Instead of clearing (by a previous call to memset())
 	 * the counters and using adds, we set the counters
 	 * with data used by 'current' CPU
 	 * We dont care about preemption here.
 	 */
-	curcpu = raw_smp_processor_id();
-
-	i = 0;
+	spin_lock_bh(&per_cpu(ip6_tables_lock, curcpu));
 	IP6T_ENTRY_ITERATE(t->entries[curcpu],
 			   t->size,
 			   set_entry_to_counter,
 			   counters,
 			   &i);
+	spin_unlock_bh(&per_cpu(ip6_tables_lock, curcpu));
 
 	for_each_possible_cpu(cpu) {
 		if (cpu == curcpu)
 			continue;
 		i = 0;
+		spin_lock_bh(&per_cpu(ip6_tables_lock, cpu));
 		IP6T_ENTRY_ITERATE(t->entries[cpu],
 				  t->size,
 				  add_entry_to_counter,
 				  counters,
 				  &i);
+		spin_unlock_bh(&per_cpu(ip6_tables_lock, cpu));
 	}
 }
 
@@ -959,7 +966,7 @@ static struct xt_counters *alloc_counters(struct xt_table *table)
 {
 	unsigned int countersize;
 	struct xt_counters *counters;
-	const struct xt_table_info *private = table->private;
+	struct xt_table_info *private = table->private;
 
 	/* We need atomic snapshot of counters: rest doesn't change
 	   (other than comefrom, which userspace doesn't care
@@ -968,14 +975,13 @@ static struct xt_counters *alloc_counters(struct xt_table *table)
 	counters = vmalloc_node(countersize, numa_node_id());
 
 	if (counters == NULL)
-		return ERR_PTR(-ENOMEM);
+		goto nomem;
 
-	/* First, sum counters... */
-	write_lock_bh(&table->lock);
 	get_counters(private, counters);
-	write_unlock_bh(&table->lock);
-
 	return counters;
+
+ nomem:
+	return ERR_PTR(-ENOMEM);
 }
 
 static int
@@ -1344,20 +1350,11 @@ do_replace(struct net *net, void __user *user, unsigned int len)
 
 /* We're lazy, and add to the first CPU; overflow works its fey magic
  * and everything is OK. */
-static inline int
+static int
 add_counter_to_entry(struct ip6t_entry *e,
 		     const struct xt_counters addme[],
 		     unsigned int *i)
 {
-#if 0
-	duprintf("add_counter: Entry %u %lu/%lu + %lu/%lu\n",
-		 *i,
-		 (long unsigned int)e->counters.pcnt,
-		 (long unsigned int)e->counters.bcnt,
-		 (long unsigned int)addme[*i].pcnt,
-		 (long unsigned int)addme[*i].bcnt);
-#endif
-
 	ADD_COUNTER(e->counters, addme[*i].bcnt, addme[*i].pcnt);
 
 	(*i)++;
@@ -1373,7 +1370,7 @@ do_add_counters(struct net *net, void __user *user, unsigned int len,
 	struct xt_counters *paddc;
 	unsigned int num_counters;
 	char *name;
-	int size;
+	int curcpu, size;
 	void *ptmp;
 	struct xt_table *t;
 	const struct xt_table_info *private;
@@ -1424,7 +1421,6 @@ do_add_counters(struct net *net, void __user *user, unsigned int len,
 		goto free;
 	}
 
-	write_lock_bh(&t->lock);
 	private = t->private;
 	if (private->number != num_counters) {
 		ret = -EINVAL;
@@ -1432,15 +1428,20 @@ do_add_counters(struct net *net, void __user *user, unsigned int len,
 	}
 
 	i = 0;
+	local_bh_disable();
 	/* Choose the copy that is on our node */
-	loc_cpu_entry = private->entries[raw_smp_processor_id()];
+	curcpu = smp_processor_id();
+	spin_lock(&__get_cpu_var(ip6_tables_lock));
+	loc_cpu_entry = private->entries[curcpu];
 	IP6T_ENTRY_ITERATE(loc_cpu_entry,
 			  private->size,
 			  add_counter_to_entry,
 			  paddc,
 			  &i);
+	spin_unlock(&__get_cpu_var(ip6_tables_lock));
+	local_bh_enable();
+
  unlock_up_free:
-	write_unlock_bh(&t->lock);
 	xt_table_unlock(t);
 	module_put(t->me);
  free:
@@ -2255,7 +2256,10 @@ static struct pernet_operations ip6_tables_net_ops = {
 
 static int __init ip6_tables_init(void)
 {
-	int ret;
+	int cpu, ret;
+
+	for_each_possible_cpu(cpu)
+		spin_lock_init(&per_cpu(ip6_tables_lock, cpu));
 
 	ret = register_pernet_subsys(&ip6_tables_net_ops);
 	if (ret < 0)
