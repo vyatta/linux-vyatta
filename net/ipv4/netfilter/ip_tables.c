@@ -1349,7 +1349,7 @@ do_add_counters(struct net *net, void __user *user, unsigned int len, int compat
 	struct xt_counters *paddc;
 	unsigned int num_counters;
 	const char *name;
-	int size;
+	int curcpu, size;
 	void *ptmp;
 	struct xt_table *t;
 	const struct xt_table_info *private;
