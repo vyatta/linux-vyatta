@@ -355,6 +355,9 @@ struct xt_table
 	/* What hooks you will enter on */
 	unsigned int valid_hooks;
 
+	/* Lock for the curtain */
+	rwlock_t lock;
+
 	/* Man behind the curtain... */
 	//struct ip6t_table_info *private;
 	void *private;
@@ -383,7 +386,7 @@ struct xt_table_info
 
 	/* ipt_entry tables: one per CPU */
 	/* Note : this field MUST be the last one, see XT_TABLE_INFO_SZ */
-	void *entries[1];
+	char *entries[1];
 };
 
 #define XT_TABLE_INFO_SZ (offsetof(struct xt_table_info, entries) \

@@ -215,15 +215,13 @@ static inline struct arpt_entry *get_entry(void *base, unsigned int offset)
 	return (struct arpt_entry *)(base + offset);
 }
 
-static DEFINE_PER_CPU(spinlock_t, arp_tables_lock);
-
 unsigned int arpt_do_table(struct sk_buff *skb,
 			   unsigned int hook,
 			   const struct net_device *in,
 			   const struct net_device *out,
 			   struct xt_table *table)
 {
-	static const char nulldevname[IFNAMSIZ] __attribute__((aligned(sizeof(long))));
+	static const char nulldevname[IFNAMSIZ];
 	unsigned int verdict = NF_DROP;
 	const struct arphdr *arp;
 	bool hotdrop = false;
@@ -239,11 +237,9 @@ unsigned int arpt_do_table(struct sk_buff *skb,
 	indev = in ? in->name : nulldevname;
 	outdev = out ? out->name : nulldevname;
 
-	local_bh_disable();
-	spin_lock(&__get_cpu_var(arp_tables_lock));
+	read_lock_bh(&table->lock);
 	private = table->private;
-	table_base = private->entries[smp_processor_id()];
-
+	table_base = (void *)private->entries[smp_processor_id()];
 	e = get_entry(table_base, private->hook_entry[hook]);
 	back = get_entry(table_base, private->underflow[hook]);
 
@@ -315,8 +311,7 @@ unsigned int arpt_do_table(struct sk_buff *skb,
 			e = (void *)e + e->next_offset;
 		}
 	} while (!hotdrop);
-	spin_unlock(&__get_cpu_var(arp_tables_lock));
-	local_bh_enable();
+	read_unlock_bh(&table->lock);
 
 	if (hotdrop)
 		return NF_DROP;
@@ -690,41 +685,40 @@ static void get_counters(const struct xt_table_info *t,
 			 struct xt_counters counters[])
 {
 	unsigned int cpu;
-	unsigned int i = 0;
-	unsigned int curcpu = raw_smp_processor_id();
+	unsigned int i;
+	unsigned int curcpu;
 
 	/* Instead of clearing (by a previous call to memset())
 	 * the counters and using adds, we set the counters
 	 * with data used by 'current' CPU
 	 * We dont care about preemption here.
 	 */
-	spin_lock_bh(&per_cpu(arp_tables_lock, curcpu));
+	curcpu = raw_smp_processor_id();
+
+	i = 0;
 	ARPT_ENTRY_ITERATE(t->entries[curcpu],
 			   t->size,
 			   set_entry_to_counter,
 			   counters,
 			   &i);
-	spin_unlock_bh(&per_cpu(arp_tables_lock, curcpu));
 
 	for_each_possible_cpu(cpu) {
 		if (cpu == curcpu)
 			continue;
 		i = 0;
-		spin_lock_bh(&per_cpu(arp_tables_lock, cpu));
 		ARPT_ENTRY_ITERATE(t->entries[cpu],
 				   t->size,
 				   add_entry_to_counter,
 				   counters,
 				   &i);
-		spin_unlock_bh(&per_cpu(arp_tables_lock, cpu));
 	}
 }
 
-static struct xt_counters *alloc_counters(struct xt_table *table)
+static inline struct xt_counters *alloc_counters(struct xt_table *table)
 {
 	unsigned int countersize;
 	struct xt_counters *counters;
-	struct xt_table_info *private = table->private;
+	const struct xt_table_info *private = table->private;
 
 	/* We need atomic snapshot of counters: rest doesn't change
 	 * (other than comefrom, which userspace doesn't care
@@ -734,14 +728,14 @@ static struct xt_counters *alloc_counters(struct xt_table *table)
 	counters = vmalloc_node(countersize, numa_node_id());
 
 	if (counters == NULL)
-		goto nomem;
+		return ERR_PTR(-ENOMEM);
 
+	/* First, sum counters... */
+	write_lock_bh(&table->lock);
 	get_counters(private, counters);
+	write_unlock_bh(&table->lock);
 
 	return counters;
-
- nomem:
-	return ERR_PTR(-ENOMEM);
 }
 
 static int copy_entries_to_user(unsigned int total_size,
@@ -1082,12 +1076,13 @@ static int do_replace(struct net *net, void __user *user, unsigned int len)
 }
 
 /* We're lazy, and add to the first CPU; overflow works its fey magic
- * and everything is OK. */
-static int
-add_counter_to_entry(struct arpt_entry *e,
-		     const struct xt_counters addme[],
-		     unsigned int *i)
+ * and everything is OK.
+ */
+static inline int add_counter_to_entry(struct arpt_entry *e,
+				       const struct xt_counters addme[],
+				       unsigned int *i)
 {
+
 	ADD_COUNTER(e->counters, addme[*i].bcnt, addme[*i].pcnt);
 
 	(*i)++;
@@ -1102,7 +1097,7 @@ static int do_add_counters(struct net *net, void __user *user, unsigned int len,
 	struct xt_counters *paddc;
 	unsigned int num_counters;
 	const char *name;
-	int curcpu, size;
+	int size;
 	void *ptmp;
 	struct xt_table *t;
 	const struct xt_table_info *private;
@@ -1153,6 +1148,7 @@ static int do_add_counters(struct net *net, void __user *user, unsigned int len,
 		goto free;
 	}
 
+	write_lock_bh(&t->lock);
 	private = t->private;
 	if (private->number != num_counters) {
 		ret = -EINVAL;
@@ -1161,19 +1157,14 @@ static int do_add_counters(struct net *net, void __user *user, unsigned int len,
 
 	i = 0;
 	/* Choose the copy that is on our node */
-	local_bh_disable();
-	curcpu = smp_processor_id();
-	spin_lock(&__get_cpu_var(arp_tables_lock));
-	loc_cpu_entry = private->entries[curcpu];
+	loc_cpu_entry = private->entries[smp_processor_id()];
 	ARPT_ENTRY_ITERATE(loc_cpu_entry,
 			   private->size,
 			   add_counter_to_entry,
 			   paddc,
 			   &i);
-	spin_unlock(&__get_cpu_var(arp_tables_lock));
-	local_bh_enable();
  unlock_up_free:
-
+	write_unlock_bh(&t->lock);
 	xt_table_unlock(t);
 	module_put(t->me);
  free:

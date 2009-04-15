@@ -307,8 +307,6 @@ static void trace_packet(struct sk_buff *skb,
 }
 #endif
 
-static DEFINE_PER_CPU(spinlock_t, ip_tables_lock);
-
 /* Returns one of the generic firewall policies, like NF_ACCEPT. */
 unsigned int
 ipt_do_table(struct sk_buff *skb,
@@ -349,13 +347,10 @@ ipt_do_table(struct sk_buff *skb,
 	mtpar.family  = tgpar.family = NFPROTO_IPV4;
 	tgpar.hooknum = hook;
 
+	read_lock_bh(&table->lock);
 	IP_NF_ASSERT(table->valid_hooks & (1 << hook));
-
-	local_bh_disable();
-	spin_lock(&__get_cpu_var(ip_tables_lock));
 	private = table->private;
-	table_base = private->entries[smp_processor_id()];
-
+	table_base = (void *)private->entries[smp_processor_id()];
 	e = get_entry(table_base, private->hook_entry[hook]);
 
 	/* For return from builtin chain */
@@ -449,8 +444,8 @@ ipt_do_table(struct sk_buff *skb,
 			e = (void *)e + e->next_offset;
 		}
 	} while (!hotdrop);
-	spin_unlock(&__get_cpu_var(ip_tables_lock));
-	local_bh_enable();
+
+	read_unlock_bh(&table->lock);
 
 #ifdef DEBUG_ALLOW_ALL
 	return NF_ACCEPT;
@@ -913,25 +908,21 @@ get_counters(const struct xt_table_info *t,
 	curcpu = raw_smp_processor_id();
 
 	i = 0;
-	spin_lock_bh(&per_cpu(ip_tables_lock, curcpu));
 	IPT_ENTRY_ITERATE(t->entries[curcpu],
 			  t->size,
 			  set_entry_to_counter,
 			  counters,
 			  &i);
-	spin_unlock_bh(&per_cpu(ip_tables_lock, curcpu));
 
 	for_each_possible_cpu(cpu) {
 		if (cpu == curcpu)
 			continue;
 		i = 0;
-		spin_lock_bh(&per_cpu(ip_tables_lock, cpu));
 		IPT_ENTRY_ITERATE(t->entries[cpu],
 				  t->size,
 				  add_entry_to_counter,
 				  counters,
 				  &i);
-		spin_unlock_bh(&per_cpu(ip_tables_lock, cpu));
 	}
 }
 
@@ -951,7 +942,9 @@ static struct xt_counters * alloc_counters(struct xt_table *table)
 		return ERR_PTR(-ENOMEM);
 
 	/* First, sum counters... */
+	write_lock_bh(&table->lock);
 	get_counters(private, counters);
+	write_unlock_bh(&table->lock);
 
 	return counters;
 }
@@ -1349,7 +1342,7 @@ do_add_counters(struct net *net, void __user *user, unsigned int len, int compat
 	struct xt_counters *paddc;
 	unsigned int num_counters;
 	const char *name;
-	int curcpu, size;
+	int size;
 	void *ptmp;
 	struct xt_table *t;
 	const struct xt_table_info *private;
@@ -1400,7 +1393,7 @@ do_add_counters(struct net *net, void __user *user, unsigned int len, int compat
 		goto free;
 	}
 
-
+	write_lock_bh(&t->lock);
 	private = t->private;
 	if (private->number != num_counters) {
 		ret = -EINVAL;
@@ -1408,20 +1401,15 @@ do_add_counters(struct net *net, void __user *user, unsigned int len, int compat
 	}
 
 	i = 0;
-	local_bh_disable();
 	/* Choose the copy that is on our node */
-	curcpu = smp_processor_id();
-	spin_lock(&__get_cpu_var(ip_tables_lock));
-	loc_cpu_entry = private->entries[curcpu];
+	loc_cpu_entry = private->entries[raw_smp_processor_id()];
 	IPT_ENTRY_ITERATE(loc_cpu_entry,
 			  private->size,
 			  add_counter_to_entry,
 			  paddc,
 			  &i);
-	spin_unlock(&__get_cpu_var(ip_tables_lock));
-	local_bh_enable();
-
  unlock_up_free:
+	write_unlock_bh(&t->lock);
 	xt_table_unlock(t);
 	module_put(t->me);
  free:
@@ -2238,10 +2226,7 @@ static struct pernet_operations ip_tables_net_ops = {
 
 static int __init ip_tables_init(void)
 {
-	int cpu, ret;
-
-	for_each_possible_cpu(cpu)
-		spin_lock_init(&per_cpu(ip_tables_lock, cpu));
+	int ret;
 
 	ret = register_pernet_subsys(&ip_tables_net_ops);
 	if (ret < 0)
