@@ -1,3 +1,9 @@
+linux-2.6 (2.6.29-1+vyatta+9) unstable; urgency=low
+
+  * Enable more ATA devices
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 27 Apr 2009 11:42:29 -0700
+
 linux-2.6 (2.6.29-1+vyatta+8) unstable; urgency=low
 
   * Fix race in xt_replace_table
