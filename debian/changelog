@@ -1,3 +1,284 @@
+linux-2.6 (2.6.29-2+vyatta+1) unstable; urgency=low
+
+  [ Etienne Basset ]
+  * security/smack: fix oops when setting a size 0 SMACK64 xattr
+
+  [ Andrea Righi ]
+  * fbmem: fix fb_info->lock and mm->mmap_sem circular locking
+    dependency
+  * fbdev: fix info->lock deadlock in fbcon_event_notify()
+
+  [ Elias Oltmanns ]
+  * ide: Fix code dealing with sleeping devices in do_ide_request()
+
+  [ Yinghai Lu ]
+  * PCI/x86: detect host bridge config space size w/o using quirks
+
+  [ Ralf Baechle ]
+  * MIPS: Compat: Zero upper 32-bit of offset_high and offset_low.
+
+  [ Dan Carpenter ]
+  * ext4: fix typo which causes a memory leak on error path
+
+  [ Theodore Ts'o ]
+  * ext4: fix locking typo in mballoc which could cause soft lockup
+    hangs
+
+  [ Gertjan van Wingerde ]
+  * rt2x00: Fix SLAB corruption during rmmod
+
+  [ Frederic Weisbecker ]
+  * tracing/core: fix early free of cpumasks
+
+  [ Michael K. Johnson ]
+  * x86, setup: mark %esi as clobbered in E820 BIOS call
+
+  [ Pallipadi, Venkatesh ]
+  * ACPI: cap off P-state transition latency from buggy BIOSes
+
+  [ Dan Carpenter ]
+  * dock: fix dereference after kfree()
+
+  [ Eric Anholt ]
+  * drm/i915: Change DCC tiling detection case to cover only mobile
+    parts.
+
+  [ Kristian Høgsberg ]
+  * drm/i915: Read the right SDVO register when detecting SVDO/HDMI.
+
+  [ Zhao Yakui ]
+  * drm/i915: Sync crt hotplug detection with intel video driver
+
+  [ Chris Wilson ]
+  * drm/i915: Check for dev->primary->master before dereference.
+
+  [ Jesse Barnes ]
+  * drm/i915: check for -EINVAL from vm_insert_pfn
+  * drm: Use pgprot_writecombine in GEM GTT mapping to get the right
+    bits for !PAT.
+
+  [ Zhenyu Wang ]
+  * drm/i915: only set TV mode when any property changed
+  * drm/i915: fix TV mode setting in property change
+
+  [ FUJITA Tomonori ]
+  * SCSI: sg: fix iovec bugs introduced by the block layer conversion
+
+  [ NeilBrown ]
+  * md/raid1 - don't assume newly allocated bvecs are initialised.
+
+  [ Francois Romieu ]
+  * r8169: Reset IntrStatus after chip reset
+
+  [ Jean Delvare ]
+  * V4L/DVB (10943): cx88: Prevent general protection fault on rmmod
+
+  [ Geert Uytterhoeven ]
+  * ide: drivers/ide/ide-atapi.c needs <linux/scatterlist.h>
+
+  [ Borislav Petkov ]
+  * ide-atapi: start DMA after issuing a packet command
+
+  [ Jack Steiner ]
+  * cpumask: fix slab corruption caused by alloc_cpumask_var_node()
+
+  [ Matthew Wilcox ]
+  * sysctl: fix suid_dumpable and lease-break-time sysctls
+
+  [ Lee Schermerhorn ]
+  * mm: define a UNIQUE value for AS_UNEVICTABLE flag
+
+  [ Martin Schwidefsky ]
+  * mm: do_xip_mapping_read: fix length calculation
+
+  [ Mallikarjuna R Chilakala ]
+  * ixgbe: Fix potential memory leak/driver panic issue while setting up
+    Tx & Rx ring parameters
+
+  [ Mikulas Patocka ]
+  * dm: preserve bi_io_vec when resubmitting bios
+
+  [ Wu Fengguang ]
+  * vfs: skip I_CLEAR state inodes
+
+  [ Mikulas Patocka ]
+  * dm raid1: switch read_record from kmalloc to slab to save memory
+  * dm io: make sync_io uninterruptible
+  * dm snapshot: refactor __find_pending_exception
+  * dm snapshot: avoid dropping lock in __find_pending_exception
+  * dm snapshot: avoid having two exceptions for the same chunk
+
+  [ Cheng Renquan ]
+  * dm target: use module refcount directly
+
+  [ Jun'ichi Nomura ]
+  * dm: path selector use module refcount directly
+
+  [ Alasdair G Kergon ]
+  * dm table: fix upgrade mode race
+
+  [ Alan Cox ]
+  * af_rose/x25: Sanity check the maximum user frame size
+
+  [ Jean Delvare ]
+  * net/netrom: Fix socket locking
+
+  [ Yehuda Sadeh ]
+  * crypto: shash - Fix unaligned calculation with short length
+
+  [ Carlos Corbacho ]
+  * acer-wmi: Blacklist Acer Aspire One
+
+  [ Ananth N Mavinakayanahalli ]
+  * kprobes: Fix locking imbalance in kretprobes
+
+  [ Patrick McHardy ]
+  * netfilter: {ip, ip6, arp}_tables: fix incorrect loop detection
+
+  [ Miklos Szeredi ]
+  * splice: fix deadlock in splicing to file
+
+  [ Akinobu Mita ]
+  * ALSA: hda - add missing comma in ad1884_slave_vols
+
+  [ David Miller ]
+  * sparc64: Fix bug in ("sparc64: Flush TLB before releasing pages.")
+
+  [ Jean Delvare ]
+  * SCSI: libiscsi: fix iscsi pool error path
+  * SCSI: libiscsi: fix iscsi pool error path
+
+  [ Serge E. Hallyn ]
+  * cap_prctl: don't set error to 0 at 'no_change'
+
+  [ Hidetoshi Seto ]
+  * posixtimers, sched: Fix posix clock monotonicity
+
+  [ Oleg Nesterov ]
+  * posix-timers: fix RLIMIT_CPU && fork()
+  * posix-timers: fix RLIMIT_CPU && setitimer(CPUCLOCK_PROF)
+
+  [ Mikulas Patocka ]
+  * dm kcopyd: prepare for callback race fix
+  * dm kcopyd: fix callback race
+
+  [ Nathan Lynch ]
+  * sched: do not count frozen tasks toward load
+
+  [ Suresh Siddha ]
+  * x86: fix broken irq migration logic while cleaning up multiple
+    vectors
+
+  [ Peter Zijlstra ]
+  * hrtimer: fix rq->lock inversion (again)
+
+  [ Serge E. Hallyn ]
+  * add some long-missing capabilities to fs_mask
+
+  [ David Brownell ]
+  * spi: spi_write_then_read() bugfixes
+
+  [ Alan Cox ]
+  * tty: Fix leak in ti-usb
+
+  [ Ben Hutchings ]
+  * sfc: Match calls to netif_napi_add() and netif_napi_del()
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Fix the cmd cache keys for amp verbs
+
+  [ Paul Mackerras ]
+  * powerpc: Fix data-corrupting bug in __futex_atomic_op
+
+  [ Sergei Shtylyov ]
+  * hpt366: fix HPT370 DMA timeouts
+  * pata_hpt37x: fix HPT370 DMA timeouts
+
+  [ Hugh Dickins ]
+  * mm: pass correct mm when growing stack
+
+  [ Tony Battersby ]
+  * SCSI: sg: fix races during device removal
+  * SCSI: sg: fix races with ioctl(SG_IO)
+
+  [ FUJITA Tomonori ]
+  * SCSI: sg: avoid blk_put_request/blk_rq_unmap_user in interrupt
+  * SCSI: sg: fix q->queue_lock on scsi_error_handler path
+
+  [ Ingo Molnar ]
+  * x86: disable X86_PTRACE_BTS for now
+
+  [ Jonathan McDowell ]
+  * usb gadget: fix ethernet link reports to ethtool
+
+  [ Peter Korsgaard ]
+  * USB: ftdi_sio: add vendor/project id for JETI specbos 1201
+    spectrometer
+
+  [ Oliver Neukum ]
+  * USB: fix oops in cdc-wdm in case of malformed descriptors
+
+  [ Alan Stern ]
+  * USB: usb-storage: augment unusual_devs entry for Simple Tech/Datafab
+
+  [ Andrea Arcangeli ]
+  * KVM: Fix missing smp tlb flush in invlpg
+
+  [ Avi Kivity ]
+  * KVM: Add CONFIG_HAVE_KVM_IRQCHIP
+  * KVM: Interrupt mask notifiers for ioapic
+  * KVM: Reset PIT irq injection logic when the PIT IRQ is unmasked
+
+  [ Joerg Roedel ]
+  * KVM: MMU: handle compound pages in kvm_is_mmio_pfn
+
+  [ Weidong Han ]
+  * KVM: fix kvm_vm_ioctl_deassign_device
+
+  [ Amit Shah ]
+  * KVM: VMX: Update necessary state when guest enters long mode
+  * KVM: is_long_mode() should check for EFER.LMA
+
+  [ Pallipadi, Venkatesh ]
+  * x86, PAT: Remove page granularity tracking for vm_insert_pfn maps
+
+  [ Dmitry Torokhov ]
+  * Input: gameport - fix attach driver code
+
+  [ Samuel Thibault ]
+  * Revert "console ASCII glyph 1:1 mapping"
+
+  [ Marcelo Tosatti ]
+  * virtio: fix suspend when using virtio_balloon
+
+  [ Shaohua Li ]
+  * agp: zero pages before sending to userspace
+
+  [ Herbert Xu ]
+  * gso: Fix support for linear packets
+
+  [ Trond Myklebust ]
+  * NFS: Fix the XDR iovec calculation in nfs3_xdr_setaclargs
+
+  [ Akinobu Mita ]
+  * hugetlbfs: return negative error code for bad mount option
+
+  [ Eric Paris ]
+  * scsi: mpt: suppress debugobjects warning
+
+  [ Michal Schmidt ]
+  * skge: fix occasional BUG during MTU change
+
+  [ Brian Haley ]
+  * Bonding: fix zero address hole bug in arp_ip_target list
+
+  [ Chris Wright ]
+  * Linux 2.6.29.2
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 28 Apr 2009 10:45:11 -0700
+
 linux-2.6 (2.6.29-1+vyatta+9) unstable; urgency=low
 
   * Enable more ATA devices
