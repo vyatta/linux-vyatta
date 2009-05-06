@@ -699,7 +699,7 @@ static struct clocksource clocksource_tsc;
  * code, which is necessary to support wrapping clocksources like pm
  * timer.
  */
-static cycle_t read_tsc(void)
+static cycle_t read_tsc(struct clocksource *cs)
 {
 	cycle_t ret = (cycle_t)get_cycles();
 
@@ -791,7 +791,7 @@ __cpuinit int unsynchronized_tsc(void)
 	if (!cpu_has_tsc || tsc_unstable)
 		return 1;
 
-#ifdef CONFIG_X86_SMP
+#ifdef CONFIG_SMP
 	if (apic_is_clustered_box())
 		return 1;
 #endif

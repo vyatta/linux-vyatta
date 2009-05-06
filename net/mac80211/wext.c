@@ -129,14 +129,12 @@ static int ieee80211_ioctl_siwgenie(struct net_device *dev,
 
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
-	if (sdata->flags & IEEE80211_SDATA_USERSPACE_MLME)
-		return -EOPNOTSUPP;
-
 	if (sdata->vif.type == NL80211_IFTYPE_STATION) {
 		int ret = ieee80211_sta_set_extra_ie(sdata, extra, data->length);
 		if (ret)
 			return ret;
 		sdata->u.mgd.flags &= ~IEEE80211_STA_AUTO_BSSID_SEL;
+		sdata->u.mgd.flags &= ~IEEE80211_STA_EXT_SME;
 		ieee80211_sta_req_auth(sdata);
 		return 0;
 	}
@@ -207,14 +205,6 @@ static int ieee80211_ioctl_siwessid(struct net_device *dev,
 
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 	if (sdata->vif.type == NL80211_IFTYPE_STATION) {
-		if (sdata->flags & IEEE80211_SDATA_USERSPACE_MLME) {
-			if (len > IEEE80211_MAX_SSID_LEN)
-				return -EINVAL;
-			memcpy(sdata->u.mgd.ssid, ssid, len);
-			sdata->u.mgd.ssid_len = len;
-			return 0;
-		}
-
 		if (data->flags)
 			sdata->u.mgd.flags &= ~IEEE80211_STA_AUTO_SSID_SEL;
 		else
@@ -224,6 +214,7 @@ static int ieee80211_ioctl_siwessid(struct net_device *dev,
 		if (ret)
 			return ret;
 
+		sdata->u.mgd.flags &= ~IEEE80211_STA_EXT_SME;
 		ieee80211_sta_req_auth(sdata);
 		return 0;
 	} else if (sdata->vif.type == NL80211_IFTYPE_ADHOC)
@@ -272,11 +263,7 @@ static int ieee80211_ioctl_siwap(struct net_device *dev,
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 	if (sdata->vif.type == NL80211_IFTYPE_STATION) {
 		int ret;
-		if (sdata->flags & IEEE80211_SDATA_USERSPACE_MLME) {
-			memcpy(sdata->u.mgd.bssid, (u8 *) &ap_addr->sa_data,
-			       ETH_ALEN);
-			return 0;
-		}
+
 		if (is_zero_ether_addr((u8 *) &ap_addr->sa_data))
 			sdata->u.mgd.flags |= IEEE80211_STA_AUTO_BSSID_SEL |
 				IEEE80211_STA_AUTO_CHANNEL_SEL;
@@ -287,6 +274,7 @@ static int ieee80211_ioctl_siwap(struct net_device *dev,
 		ret = ieee80211_sta_set_bssid(sdata, (u8 *) &ap_addr->sa_data);
 		if (ret)
 			return ret;
+		sdata->u.mgd.flags &= ~IEEE80211_STA_EXT_SME;
 		ieee80211_sta_req_auth(sdata);
 		return 0;
 	} else if (sdata->vif.type == NL80211_IFTYPE_ADHOC) {
@@ -429,6 +417,7 @@ static int ieee80211_ioctl_siwtxpower(struct net_device *dev,
 {
 	struct ieee80211_local *local = wdev_priv(dev->ieee80211_ptr);
 	struct ieee80211_channel* chan = local->hw.conf.channel;
+	bool reconf = false;
 	u32 reconf_flags = 0;
 	int new_power_level;
 
@@ -439,14 +428,38 @@ static int ieee80211_ioctl_siwtxpower(struct net_device *dev,
 	if (!chan)
 		return -EINVAL;
 
-	if (data->txpower.fixed)
-		new_power_level = min(data->txpower.value, chan->max_power);
-	else /* Automatic power level setting */
-		new_power_level = chan->max_power;
+	/* only change when not disabling */
+	if (!data->txpower.disabled) {
+		if (data->txpower.fixed) {
+			if (data->txpower.value < 0)
+				return -EINVAL;
+			new_power_level = data->txpower.value;
+			/*
+			 * Debatable, but we cannot do a fixed power
+			 * level above the regulatory constraint.
+			 * Use "iwconfig wlan0 txpower 15dBm" instead.
+			 */
+			if (new_power_level > chan->max_power)
+				return -EINVAL;
+		} else {
+			/*
+			 * Automatic power level setting, max being the value
+			 * passed in from userland.
+			 */
+			if (data->txpower.value < 0)
+				new_power_level = -1;
+			else
+				new_power_level = data->txpower.value;
+		}
 
-	local->user_power_level = new_power_level;
-	if (local->hw.conf.power_level != new_power_level)
-		reconf_flags |= IEEE80211_CONF_CHANGE_POWER;
+		reconf = true;
+
+		/*
+		 * ieee80211_hw_config() will limit to the channel's
+		 * max power and possibly power constraint from AP.
+		 */
+		local->user_power_level = new_power_level;
+	}
 
 	if (local->hw.conf.radio_enabled != !(data->txpower.disabled)) {
 		local->hw.conf.radio_enabled = !(data->txpower.disabled);
@@ -454,7 +467,7 @@ static int ieee80211_ioctl_siwtxpower(struct net_device *dev,
 		ieee80211_led_radio(local, local->hw.conf.radio_enabled);
 	}
 
-	if (reconf_flags)
+	if (reconf || reconf_flags)
 		ieee80211_hw_config(local, reconf_flags);
 
 	return 0;
@@ -542,7 +555,7 @@ static int ieee80211_ioctl_giwfrag(struct net_device *dev,
 	struct ieee80211_local *local = wdev_priv(dev->ieee80211_ptr);
 
 	frag->value = local->fragmentation_threshold;
-	frag->disabled = (frag->value >= IEEE80211_MAX_RTS_THRESHOLD);
+	frag->disabled = (frag->value >= IEEE80211_MAX_FRAG_THRESHOLD);
 	frag->fixed = 1;
 
 	return 0;
@@ -630,7 +643,7 @@ static int ieee80211_ioctl_siwencode(struct net_device *dev,
 	struct ieee80211_sub_if_data *sdata;
 	int idx, i, alg = ALG_WEP;
 	u8 bcaddr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-	int remove = 0;
+	int remove = 0, ret;
 
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
@@ -656,11 +669,20 @@ static int ieee80211_ioctl_siwencode(struct net_device *dev,
 		return 0;
 	}
 
-	return ieee80211_set_encryption(
+	ret = ieee80211_set_encryption(
 		sdata, bcaddr,
 		idx, alg, remove,
 		!sdata->default_key,
 		keybuf, erq->length);
+
+	if (!ret) {
+		if (remove)
+			sdata->u.mgd.flags &= ~IEEE80211_STA_TKIP_WEP_USED;
+		else
+			sdata->u.mgd.flags |= IEEE80211_STA_TKIP_WEP_USED;
+	}
+
+	return ret;
 }
 
 

@@ -168,6 +168,7 @@ struct skb_shared_hwtstamps {
  * @software:		generate software time stamp
  * @in_progress:	device driver is going to provide
  *			hardware time stamp
+ * @flags:		all shared_tx flags
  *
  * These flags are attached to packets as part of the
  * &skb_shared_info. Use skb_tx() to get a pointer.
@@ -236,6 +237,8 @@ enum {
 	SKB_GSO_TCP_ECN = 1 << 3,
 
 	SKB_GSO_TCPV6 = 1 << 4,
+
+	SKB_GSO_FCOE = 1 << 5,
 };
 
 #if BITS_PER_LONG > 32

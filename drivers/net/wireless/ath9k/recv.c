@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008 Atheros Communications Inc.
+ * Copyright (c) 2008-2009 Atheros Communications Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -344,8 +344,13 @@ void ath_rx_cleanup(struct ath_softc *sc)
 
 	list_for_each_entry(bf, &sc->rx.rxbuf, list) {
 		skb = bf->bf_mpdu;
-		if (skb)
+		if (skb) {
+			dma_unmap_single(sc->dev,
+					 bf->bf_buf_addr,
+					 sc->rx.bufsize,
+					 DMA_FROM_DEVICE);
 			dev_kfree_skb(skb);
+		}
 	}
 
 	if (sc->rx.rxdma.dd_desc_len != 0)
@@ -488,6 +493,7 @@ int ath_rx_tasklet(struct ath_softc *sc, int flush)
 	int hdrlen, padsize, retval;
 	bool decrypt_error = false;
 	u8 keyix;
+	__le16 fc;
 
 	spin_lock_bh(&sc->rx.rxbuflock);
 
@@ -601,6 +607,7 @@ int ath_rx_tasklet(struct ath_softc *sc, int flush)
 		/* see if any padding is done by the hw and remove it */
 		hdr = (struct ieee80211_hdr *)skb->data;
 		hdrlen = ieee80211_get_hdrlen_from_skb(skb);
+		fc = hdr->frame_control;
 
 		/* The MAC header is padded to have 32-bit boundary if the
 		 * packet payload is non-zero. The general calculation for
@@ -685,7 +692,7 @@ int ath_rx_tasklet(struct ath_softc *sc, int flush)
 			sc->rx.rxotherant = 0;
 		}
 
-		if (ieee80211_is_beacon(hdr->frame_control) &&
+		if (ieee80211_is_beacon(fc) &&
 				(sc->sc_flags & SC_OP_WAIT_FOR_BEACON)) {
 			sc->sc_flags &= ~SC_OP_WAIT_FOR_BEACON;
 			ath9k_hw_setpower(sc->sc_ah, ATH9K_PM_NETWORK_SLEEP);

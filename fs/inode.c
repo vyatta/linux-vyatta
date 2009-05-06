@@ -294,7 +294,7 @@ void clear_inode(struct inode *inode)
 	BUG_ON(!(inode->i_state & I_FREEING));
 	BUG_ON(inode->i_state & I_CLEAR);
 	inode_sync_wait(inode);
-	DQUOT_DROP(inode);
+	vfs_dq_drop(inode);
 	if (inode->i_sb->s_op->clear_inode)
 		inode->i_sb->s_op->clear_inode(inode);
 	if (S_ISBLK(inode->i_mode) && inode->i_bdev)
@@ -366,6 +366,8 @@ static int invalidate_list(struct list_head *head, struct list_head *dispose)
 		if (tmp == head)
 			break;
 		inode = list_entry(tmp, struct inode, i_sb_list);
+		if (inode->i_state & I_NEW)
+			continue;
 		invalidate_inode_buffers(inode);
 		if (!atomic_read(&inode->i_count)) {
 			list_move(&inode->i_list, dispose);
@@ -1168,7 +1170,7 @@ void generic_delete_inode(struct inode *inode)
 	if (op->delete_inode) {
 		void (*delete)(struct inode *) = op->delete_inode;
 		if (!is_bad_inode(inode))
-			DQUOT_INIT(inode);
+			vfs_dq_init(inode);
 		/* Filesystems implementing their own
 		 * s_op->delete_inode are required to call
 		 * truncate_inode_pages and clear_inode()
@@ -1467,42 +1469,6 @@ static void __wait_on_freeing_inode(struct inode *inode)
 	finish_wait(wq, &wait.wait);
 	spin_lock(&inode_lock);
 }
-
-/*
- * We rarely want to lock two inodes that do not have a parent/child
- * relationship (such as directory, child inode) simultaneously. The
- * vast majority of file systems should be able to get along fine
- * without this. Do not use these functions except as a last resort.
- */
-void inode_double_lock(struct inode *inode1, struct inode *inode2)
-{
-	if (inode1 == NULL || inode2 == NULL || inode1 == inode2) {
-		if (inode1)
-			mutex_lock(&inode1->i_mutex);
-		else if (inode2)
-			mutex_lock(&inode2->i_mutex);
-		return;
-	}
-
-	if (inode1 < inode2) {
-		mutex_lock_nested(&inode1->i_mutex, I_MUTEX_PARENT);
-		mutex_lock_nested(&inode2->i_mutex, I_MUTEX_CHILD);
-	} else {
-		mutex_lock_nested(&inode2->i_mutex, I_MUTEX_PARENT);
-		mutex_lock_nested(&inode1->i_mutex, I_MUTEX_CHILD);
-	}
-}
-EXPORT_SYMBOL(inode_double_lock);
-
-void inode_double_unlock(struct inode *inode1, struct inode *inode2)
-{
-	if (inode1)
-		mutex_unlock(&inode1->i_mutex);
-
-	if (inode2 && inode2 != inode1)
-		mutex_unlock(&inode2->i_mutex);
-}
-EXPORT_SYMBOL(inode_double_unlock);
 
 static __initdata unsigned long ihash_entries;
 static int __init set_ihash_entries(char *str)
