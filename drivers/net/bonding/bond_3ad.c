@@ -1323,16 +1323,20 @@ static void ad_port_selection_logic(struct port *port)
 			}
 			continue;
 		}
-		// check if current aggregator suits us
-		if (((aggregator->actor_oper_aggregator_key == port->actor_oper_port_key) && // if all parameters match AND
+		/*
+		 * check if current aggregator suits us
+		 *  if all parameters match AND
+		 *   slave link is UP AND
+		 *   partner answers but is not individual
+		 */
+		if (((aggregator->actor_oper_aggregator_key == port->actor_oper_port_key) &&
 		     !MAC_ADDRESS_COMPARE(&(aggregator->partner_system), &(port->partner_oper.system)) &&
 		     (aggregator->partner_system_priority == port->partner_oper.system_priority) &&
 		     (aggregator->partner_oper_aggregator_key == port->partner_oper.key)
 		    ) &&
-		    ((MAC_ADDRESS_COMPARE(&(port->partner_oper.system), &(null_mac_addr)) && // partner answers
-		      !aggregator->is_individual)  // but is not individual OR
-		    )
-		   ) {
+		    (netif_running(port->slave->dev) && netif_carrier_ok(port->slave->dev)) &&
+		    ((MAC_ADDRESS_COMPARE(&(port->partner_oper.system), &(null_mac_addr)) &&
+		      !aggregator->is_individual) )) {
 			// attach to the founded aggregator
 			port->aggregator = aggregator;
 			port->actor_port_aggregator_identifier=port->aggregator->aggregator_identifier;
