@@ -1,3 +1,170 @@
+linux-2.6 (2.6.29-3+vyatta+1) unstable; urgency=low
+
+  [ Jesse Brandeburg ]
+  * e1000: fix virtualization bug
+
+  [ Ed Swierk ]
+  * forcedeth: Fix resume from hibernation regression.
+
+  [ Vasanthakumar Thiagarajan ]
+  * mac80211: Fix bug in getting rx status for frames pending in reorder
+    buffer
+
+  [ Michael Buesch ]
+  * b43: Poison RX buffers
+  * b43: Refresh RX poison on buffer recycling
+
+  [ Henrique de Moraes Holschuh ]
+  * thinkpad-acpi: fix LED blinking through timer trigger
+
+  [ Karsten Wiese ]
+  * ALSA: us122l: add snd_us122l_free()
+
+  [ Johannes Berg ]
+  * mac80211: fix basic rate bitmap calculation
+
+  [ Avi Kivity ]
+  * KVM: MMU: Fix off-by-one calculating large page count
+
+  [ Marcelo Tosatti ]
+  * KVM: MMU: disable global page optimization
+
+  [ Jan Kiszka ]
+  * KVM: Fix overlapping check for memory slots
+
+  [ Joerg Roedel ]
+  * KVM: x86: release time_page on vcpu destruction
+
+  [ Chuck Short ]
+  * USB: Unusual Device support for Gold MP3 Player Energy
+
+  [ Christian Borntraeger ]
+  * virtio-rng: Remove false BUG for spurious callbacks
+
+  [ Michael Buesch ]
+  * b44: Use kernel DMA addresses for the kernel DMA API
+
+  [ Tejun Heo ]
+  * block: include empty disks in /proc/diskstats
+
+  [ Christian Hohnstaedt ]
+  * crypto: ixp4xx - Fix handling of chained sg buffers
+
+  [ Oleg Nesterov ]
+  * exit_notify: kill the wrong capable(CAP_KILL) check (CVE-2009-1337)
+
+  [ Yu Zhao ]
+  * PCI: fix incorrect mask of PM No_Soft_Reset bit
+
+  [ Eugene Teo ]
+  * unreached code in selinux_ip_postroute_iptables_compat() (CVE-2009-
+    1184)
+
+  [ Zhenyu Wang ]
+  * drm/i915: add support for G41 chipset
+
+  [ Suresh Siddha ]
+  * x86-64: fix FPU corruption with signals and preemption
+
+  [ Yinghai Lu ]
+  * x86/PCI: don't call e820_all_mapped with -1 in the mmconfig case
+
+  [ Mark Brown ]
+  * ASoC: Fix offset of freqmode in WM8580 PLL configuration
+
+  [ Thomas Renninger ]
+  * PCI quirk: disable MSI on VIA VT3364 chipsets
+
+  [ FUJITA Tomonori ]
+  * bio: fix memcpy corruption in bio_copy_user_iov()
+
+  [ Jesse Barnes ]
+  * drm/i915: allow tiled front buffers on 965+
+
+  [ Vitaly Mayatskikh ]
+  * pagemap: require aligned-length, non-null reads of /proc/pid/pagemap
+
+  [ Cedric Hombourger ]
+  * kbuild: fix Module.markers permission error under cygwin
+
+  [ Oleg Nesterov ]
+  * ptrace: ptrace_attach: fix the usage of ->cred_exec_mutex
+
+  [ Alan Stern ]
+  * USB: serial: fix lifetime and locking problems
+
+  [ Zhang Rui ]
+  * ACPI: Revert conflicting workaround for BIOS w/ mangled PRT entries
+
+  [ Josh Boyer ]
+  * powerpc: Sanitize stack pointer in signal handling code
+
+  [ Hugh Dickins ]
+  * compat_do_execve should unshare_files
+  * fix setuid sometimes doesn't
+  * fix setuid sometimes wouldn't
+
+  [ David Howells ]
+  * Annotate struct fs_struct's usage count restriction
+
+  [ Al Viro ]
+  * Kill unsharing fs_struct in __set_personality()
+  * Get rid of bumping fs_struct refcount in pivot_root(2)
+  * Take fs_struct handling to new file (fs/fs_struct.c)
+  * New locking/refcounting for fs_struct
+  * check_unsafe_exec() doesn't care about signal handlers sharing
+
+  [ Oleg Nesterov ]
+  * do_execve() must not clear fs->in_exec if it was set by another
+    thread
+  * check_unsafe_exec: s/lock_task_sighand/rcu_read_lock/
+
+  [ Lennert Buytenhek ]
+  * mv643xx_eth: 64bit mib counter read fix
+  * mv643xx_eth: OOM handling fixes
+
+  [ Bob Copeland ]
+  * ath5k: fix buffer overrun in rate debug code
+
+  [ Jake Edge ]
+  * proc: avoid information leaks to non-privileged processes
+
+  [ Sergei Shtylyov ]
+  * cs5536: define dma_sff_read_status() method
+
+  [ David Woodhouse ]
+  * intel-iommu: Fix device-to-iommu mapping for PCI-PCI bridges.
+  * intel-iommu: Fix oops in device_to_iommu() when devices not found.
+  * intel-iommu: Avoid panic() for DRHD at address zero.
+
+  [ john stultz ]
+  * clockevents: prevent endless loop in tick_handle_periodic()
+
+  [ Mel Gorman ]
+  * Ignore madvise(MADV_WILLNEED) for hugetlbfs-backed regions
+
+  [ KOSAKI Motohiro ]
+  * mm: fix Committed_AS underflow on large NR_CPUS environment
+
+  [ Jussi Kivilinna ]
+  * rndis_wlan: fix initialization order for workqueue&workers
+
+  [ Eric Dumazet ]
+  * sched: account system time properly
+
+  [ Stuart Bennett ]
+  * tracing: x86, mmiotrace: fix range test
+
+  [ Luis R. Rodriguez ]
+  * ath9k: Fix FIF_BCN_PRBRESP_PROMISC handling
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.29.3
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Sat, 09 May 2009 16:06:07 -0700
+
 linux-2.6 (2.6.29-2+vyatta+1) unstable; urgency=low
 
   [ Etienne Basset ]
