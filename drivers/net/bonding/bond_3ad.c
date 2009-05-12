@@ -1398,6 +1398,11 @@ static void ad_port_selection_logic(struct port *port)
 static struct aggregator *ad_agg_selection_test(struct aggregator *best,
 						struct aggregator *curr)
 {
+	/* Don't use this one if link is down */
+	if (!(netif_running(curr->slave->dev)
+	      && netif_carrier_ok(curr->slave->dev)))
+		return best;
+
 	/*
 	 * 0. If no best, select current.
 	 *
@@ -1496,9 +1501,8 @@ static void ad_agg_selection_logic(struct aggregator *agg)
 	struct port *port;
 
 	origin = agg;
-
 	active = __get_active_agg(agg);
-	best = active;
+	best = ad_agg_selection_test(NULL, active);
 
 	do {
 		agg->is_active = 0;
