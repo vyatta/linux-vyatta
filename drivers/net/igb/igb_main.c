@@ -3158,6 +3158,9 @@ void igb_update_stats(struct igb_adapter *adapter)
 	struct e1000_hw *hw = &adapter->hw;
 	struct pci_dev *pdev = adapter->pdev;
 	u16 phy_tmp;
+	u32 rqdpc_tmp;
+	u64 rqdpc_total = 0;
+	int i;
 
 #define PHY_IDLE_ERROR_COUNT_MASK 0x00FF
 
@@ -3248,6 +3251,26 @@ void igb_update_stats(struct igb_adapter *adapter)
 	adapter->net_stats.collisions = adapter->stats.colc;
 
 	/* Rx Errors */
+
+	/* Read out drops stats per RX queue. Notice RQDPC (Receive
+	 * Queue Drop Packet Count) stats only gets incremented, if
+	 * the DROP_EN bit it set (in the SRRCTL register for that
+	 * queue). If DROP_EN bit is NOT set, then the some what
+	 * equivalent count is stored in RNBC (not per queue basis).
+	 * Also note the drop count is due to lack of available descriptors.
+	 */
+	for (i = 0; i < adapter->num_rx_queues; i++) {
+		rqdpc_tmp = rd32(E1000_RQDPC(i)) & 0xFFF;
+		adapter->rx_ring[i].rx_stats.drops += rqdpc_tmp;
+		rqdpc_total += adapter->rx_ring[i].rx_stats.drops;
+	}
+	adapter->net_stats.rx_fifo_errors = rqdpc_total;
+
+	/* Note RNBC (Receive No Buffers Count) is an not an exact
+	 * drop count as the hardware FIFO might save the day.  Thats
+	 * one of the reason for saving it in rx_fifo_errors, as its
+	 * potentically not a true drop. */
+	adapter->net_stats.rx_fifo_errors += adapter->stats.rnbc;
 
 	/* RLEC on some newer hardware can be incorrect so build
 	* our own version based on RUC and ROC */
