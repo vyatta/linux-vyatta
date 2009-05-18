@@ -1,3 +1,9 @@
+linux-2.6 (2.6.29-3+vyatta+6) unstable; urgency=low
+
+  * Go back to standard 2.6.29.y version
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 18 May 2009 13:52:29 -0700
+
 linux-2.6 (2.6.29-3+vyatta+5) unstable; urgency=low
 
   [ Stephen Hemminger ]
