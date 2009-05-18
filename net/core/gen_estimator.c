@@ -127,7 +127,11 @@ static void est_timer(unsigned long arg)
 		npackets = e->bstats->packets;
 		rate = (nbytes - e->last_bytes)<<(7 - idx);
 		e->last_bytes = nbytes;
-		e->avbps += ((long)rate - (long)e->avbps) >> e->ewma_log;
+		if (rate > e->avbps)
+			e->avbps += (rate - e->avbps) >> e->ewma_log;
+		else
+			e->avbps -= (e->avbps - rate) >> e->ewma_log;
+
 		e->rate_est->bps = (e->avbps+0xF)>>5;
 
 		rate = (npackets - e->last_packets)<<(12 - idx);
