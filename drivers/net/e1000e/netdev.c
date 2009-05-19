@@ -1292,9 +1292,16 @@ static irqreturn_t e1000_intr_msix_tx(int irq, void *data)
 {
 	struct net_device *netdev = data;
 	struct e1000_adapter *adapter = netdev_priv(netdev);
+
+	tasklet_schedule(&adapter->tx_task);
+	return IRQ_HANDLED;
+}
+
+static void e1000_tx_task(unsigned long arg)
+{
+	struct e1000_adapter *adapter = (void *) arg;
 	struct e1000_hw *hw = &adapter->hw;
 	struct e1000_ring *tx_ring = adapter->tx_ring;
-
 
 	adapter->total_tx_bytes = 0;
 	adapter->total_tx_packets = 0;
@@ -1303,7 +1310,6 @@ static irqreturn_t e1000_intr_msix_tx(int irq, void *data)
 		/* Ring was not completely cleaned, so fire another interrupt */
 		ew32(ICS, tx_ring->ims_val);
 
-	return IRQ_HANDLED;
 }
 
 static irqreturn_t e1000_intr_msix_rx(int irq, void *data)
@@ -1560,6 +1566,8 @@ static void e1000_free_irq(struct e1000_adapter *adapter)
 	if (adapter->msix_entries) {
 		int vector = 0;
 
+		tasklet_kill(&adapter->tx_task);
+
 		free_irq(adapter->msix_entries[vector].vector, netdev);
 		vector++;
 
@@ -1581,6 +1589,7 @@ static void e1000_irq_disable(struct e1000_adapter *adapter)
 {
 	struct e1000_hw *hw = &adapter->hw;
 
+	tasklet_disable(&adapter->tx_task);
 	ew32(IMC, ~0);
 	if (adapter->msix_entries)
 		ew32(EIAC_82574, 0);
@@ -1601,6 +1610,7 @@ static void e1000_irq_enable(struct e1000_adapter *adapter)
 	} else {
 		ew32(IMS, IMS_ENABLE_MASK);
 	}
+	tasklet_enable(&adapter->tx_task);
 	e1e_flush();
 }
 
@@ -1699,7 +1709,9 @@ int e1000e_setup_tx_resources(struct e1000_adapter *adapter)
 	tx_ring->next_to_use = 0;
 	tx_ring->next_to_clean = 0;
 	spin_lock_init(&adapter->tx_queue_lock);
-
+	tasklet_init(&adapter->tx_task, e1000_tx_task, 
+		     (unsigned long) adapter);
+		     
 	return 0;
 err:
 	vfree(tx_ring->buffer_info);

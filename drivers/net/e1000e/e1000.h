@@ -196,6 +196,7 @@ struct e1000_adapter {
 	u16 eeprom_vers;
 
 	spinlock_t tx_queue_lock; /* prevent concurrent tail updates */
+	struct tasklet_struct tx_task;
 
 	/* track device up/down/testing state */
 	unsigned long state;
