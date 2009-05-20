@@ -1,3 +1,16 @@
+linux-2.6 (2.6.29-4+vyatta+2) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Allow creating vlan when real device is down
+  * Revert "Fix overflow in generic rate estimator"
+
+  [ Eric Dumazet ]
+  * pkt_sched: gen_estimator: use 64 bit intermediate counters for bps
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 20 May 2009 13:14:11 -0700
+
 linux-2.6 (2.6.29-4+vyatta+1) unstable; urgency=low
 
   [ Josef Bacik ]
