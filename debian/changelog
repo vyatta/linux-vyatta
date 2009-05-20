@@ -1,3 +1,130 @@
+linux-2.6 (2.6.29-4+vyatta+1) unstable; urgency=low
+
+  [ Josef Bacik ]
+  * fiemap: fix problem with setting FIEMAP_EXTENT_LAST
+
+  [ NeilBrown ]
+  * md: remove ability to explicit set an inactive array to 'clean'.
+  * md: fix some (more) errors with bitmaps on devices larger than 2TB.
+  * md/raid10: don't clear bitmap during recovery if array will still be
+    degraded.
+  * md: fix loading of out-of-date bitmap.
+
+  [ Alan Stern ]
+  * usb-serial: ftdi_sio: fix reference counting of ftdi_private
+  * USB: Gadget: fix UTF conversion in the usbstring library
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Fix line-in on Mac Mini Core2 Duo
+
+  [ Jinyoung Park ]
+  * ASoC: Fix errors in WM8990
+
+  [ Jesse Brandeburg ]
+  * e1000: fix virtualization bug
+
+  [ Jean Delvare ]
+  * hwmon: (w83781d) Fix W83782D support (NULL pointer dereference)
+
+  [ Bart Van Assche ]
+  * Fix for enabling branch profiling makes sparse unusable
+
+  [ Dave Airlie ]
+  * i2c-algo-bit: Fix timeout test
+
+  [ Enrik Berkhan ]
+  * i2c-algo-pca: Let PCA9564 recover from unacked data byte (state
+    0x30)
+
+  [ Jeff Mahoney ]
+  * dup2: Fix return value with oldfd == newfd and invalid fd
+
+  [ Lubomir Rintel ]
+  * ne2k-pci: Do not register device until initialized.
+
+  [ Paul Moore ]
+  * lsm: Relocate the IPv4 security_inet_conn_request() hooks
+  * netlabel: Add CIPSO {set, del}attr request_sock functions
+  * netlabel: Add new NetLabel KAPI interfaces for request_sock security
+    attributes
+  * selinux: Add new NetLabel glue code to handle labeling of connection
+    requests
+  * selinux: Set the proper NetLabel security attributes for connection
+    requests
+  * selinux: Remove dead code labeled networking code
+  * smack: Set the proper NetLabel security attributes for connection
+    requests
+
+  [ Jeff Layton ]
+  * cifs: Fix buffer size for tcon->nativeFileSystem field
+
+  [ Suresh Jayaraman ]
+  * cifs: Increase size of tmp_buf in cifs_readdir to avoid potential
+    overflows
+  * cifs: Fix incorrect destination buffer size in cifs_strncpy_to_host
+  * cifs: Fix buffer size in cifs_convertUCSpath
+
+  [ Jeff Layton ]
+  * cifs: Fix unicode string area word alignment in session setup
+
+  [ Nick Piggin ]
+  * mm: page_mkwrite change prototype to match fault
+  * fs: fix page_mkwrite error cases in core code and btrfs
+  * mm: close page_mkwrite races
+
+  [ Steven Whitehouse ]
+  * GFS2: Fix page_mkwrite() return code
+
+  [ Trond Myklebust ]
+  * NFS: Fix the return value in nfs_page_mkwrite()
+  * NFS: Close page_mkwrite() races
+
+  [ Steve French ]
+  * CIFS: Fix endian conversion of vcnum field
+
+  [ Davide Libenzi ]
+  * epoll: fix size check in epoll_create()
+
+  [ J. Bruce Fields ]
+  * nfsd4: check for negative dentry before use in nfsv4 readdir
+
+  [ Trond Myklebust ]
+  * NFS: Fix the notifications when renaming onto an existing file
+
+  [ J. Bruce Fields ]
+  * lockd: fix list corruption on lockd restart
+
+  [ Dan Williams ]
+  * dmatest: fix max channels handling
+
+  [ Alan Stern ]
+  * HID: add NOGET quirk for devices from CH Products
+
+  [ Avi Kivity ]
+  * KVM: SVM: Remove port 80 passthrough
+  * KVM: Make EFER reads safe when EFER does not exist
+
+  [ Miklos Szeredi ]
+  * fuse: destroy bdi on error
+  * splice: split up __splice_from_pipe()
+  * splice: remove i_mutex locking in splice_from_pipe()
+  * splice: fix i_mutex locking in generic_splice_write()
+  * ocfs2: fix i_mutex locking in ocfs2_splice_to_file()
+
+  [ Hannes Hering ]
+  * ehea: fix invalid pointer access
+
+  [ Grant Likely ]
+  * powerpc/5200: Don't specify IRQF_SHARED in PSC UART driver
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.29.4
+
+  [ Stephen Hemminger ]
+  * E1000e: handle msi-x tx complete in tasklet
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 20 May 2009 09:33:53 -0700
+
 linux-2.6 (2.6.29-3+vyatta+6) unstable; urgency=low
 
   * Go back to standard 2.6.29.y version
