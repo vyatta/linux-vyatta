@@ -289,7 +289,6 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 	int ret;
 
 	BUG_ON(inode->i_state & I_SYNC);
-	WARN_ON(inode->i_state & I_NEW);
 
 	/* Set I_SYNC, reset I_DIRTY */
 	dirty = inode->i_state & I_DIRTY;
