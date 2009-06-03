@@ -1,3 +1,10 @@
+linux-2.6 (2.6.29-4+vyatta+6+jenner2) unstable; urgency=low
+
+  [ Nick Piggin ]
+  * fs: remove incorrect I_NEW warnings
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 02 Jun 2009 15:10:49 -0700
+
 linux-2.6 (2.6.29-4+vyatta+6+jenner1) unstable; urgency=low
 
   * UNRELEASED
