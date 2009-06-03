@@ -1,3 +1,10 @@
+linux-2.6 (2.6.29-4+vyatta+8) unstable; urgency=low
+
+  * Bugfix 4476: Enable X86_BIGSMP and set NR_CPUs to 32 to support
+    larger MPs.
+
+ -- Bob Gilligan <gilligan@vyatta.com>  Wed, 03 Jun 2009 15:46:51 -0700
+
 linux-2.6 (2.6.29-4+vyatta+7) unstable; urgency=low
 
   * UNRELEASED
