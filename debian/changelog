@@ -1,3 +1,18 @@
+linux-2.6 (2.6.29-4+vyatta+6+jenner4) unstable; urgency=low
+
+  [ Eric Dumazet ]
+  * bonding: bond_slave_info_query() fix
+
+  [ Jiri Pirko ]
+  * bonding: correct the cleanup in bond_create()
+
+  [ Florian Westphal ]
+  * bonding: fix panic if initialization fails
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 08 Jun 2009 15:12:11 -0700
+
 linux-2.6 (2.6.29-4+vyatta+6+jenner3) unstable; urgency=low
 
   * Bugfix 4476: Enable X86_BIGSMP and set NR_CPUs to 32 to support
