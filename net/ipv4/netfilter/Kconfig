@@ -31,7 +31,7 @@ config NF_CONNTRACK_PROC_COMPAT
 	default y
 	help
 	  This option enables /proc and sysctl compatibility with the old
-	  layer 3 dependant connection tracking. This is needed to keep
+	  layer 3 dependent connection tracking. This is needed to keep
 	  old programs that have not been adapted to the new names working.
 
 	  If unsure, say Y.
@@ -95,11 +95,11 @@ config IP_NF_MATCH_ECN
 config IP_NF_MATCH_TTL
 	tristate '"ttl" match support'
 	depends on NETFILTER_ADVANCED
-	help
-	  This adds CONFIG_IP_NF_MATCH_TTL option, which enabled the user
-	  to match packets by their TTL value.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
+	select NETFILTER_XT_MATCH_HL
+	---help---
+	This is a backwards-compat option for the user's convenience
+	(e.g. when running oldconfig). It selects
+	CONFIG_NETFILTER_XT_MATCH_HL.
 
 # `filter', generic and specific targets
 config IP_NF_FILTER
@@ -323,19 +323,13 @@ config IP_NF_TARGET_ECN
 	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_TARGET_TTL
-	tristate  'TTL target support'
-	depends on IP_NF_MANGLE
+	tristate '"TTL" target support'
 	depends on NETFILTER_ADVANCED
-	help
-	  This option adds a `TTL' target, which enables the user to modify
-	  the TTL value of the IP header.
-
-	  While it is safe to decrement/lower the TTL, this target also enables
-	  functionality to increment and set the TTL value of the IP header to
-	  arbitrary values.  This is EXTREMELY DANGEROUS since you can easily
-	  create immortal packets that loop forever on the network.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
+	select NETFILTER_XT_TARGET_HL
+	---help---
+	This is a backwards-compat option for the user's convenience
+	(e.g. when running oldconfig). It selects
+	CONFIG_NETFILTER_XT_TARGET_HL.
 
 # raw + specific targets
 config IP_NF_RAW
@@ -348,16 +342,6 @@ config IP_NF_RAW
 	
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/kbuild/modules.txt>.  If unsure, say `N'.
-
-config IP_NF_MATCH_IPP2P
-	tristate  "IPP2P match support"
-	depends on NETFILTER_ADVANCED
-	help
-	  This option makes possible to match some P2P packets
-	  therefore helps controlling such traffic.
-	
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
 # security table for MAC policy
 config IP_NF_SECURITY
@@ -404,144 +388,5 @@ config IP_NF_ARP_MANGLE
 
 endif # IP_NF_ARPTABLES
 
-config IP_NF_SET
-	tristate "IP set support"
-	depends on INET && NETFILTER
-	help
-	  This option adds IP set support to the kernel.
-	  In order to define and use sets, you need the userspace utility
-	  ipset(8).
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_SET_MAX
-	int "Maximum number of IP sets"
-	default 256
-	range 2 65534
-	depends on IP_NF_SET
-	help
-	  You can define here default value of the maximum number 
-	  of IP sets for the kernel.
-
-	  The value can be overriden by the 'max_sets' module
-	  parameter of the 'ip_set' module.
-
-config IP_NF_SET_HASHSIZE
-	int "Hash size for bindings of IP sets"
-	default 1024
-	depends on IP_NF_SET
-	help
-	  You can define here default value of the hash size for
-	  bindings of IP sets.
-
-	  The value can be overriden by the 'hash_size' module
-	  parameter of the 'ip_set' module.
-
-config IP_NF_SET_IPMAP
-	tristate "ipmap set support"
-	depends on IP_NF_SET
-	help
-	  This option adds the ipmap set type support.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_SET_MACIPMAP
-	tristate "macipmap set support"
-	depends on IP_NF_SET
-	help
-	  This option adds the macipmap set type support.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_SET_PORTMAP
-	tristate "portmap set support"
-	depends on IP_NF_SET
-	help
-	  This option adds the portmap set type support.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_SET_IPHASH
-	tristate "iphash set support"
-	depends on IP_NF_SET
-	help
-	  This option adds the iphash set type support.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_SET_NETHASH
-	tristate "nethash set support"
-	depends on IP_NF_SET
-	help
-	  This option adds the nethash set type support.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_SET_IPPORTHASH
-	tristate "ipporthash set support"
-	depends on IP_NF_SET
-	help
-	  This option adds the ipporthash set type support.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_SET_IPPORTIPHASH
-	tristate "ipportiphash set support"
-	depends on IP_NF_SET
-	help
-	  This option adds the ipportiphash set type support.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_SET_IPPORTNETHASH
-	tristate "ipportnethash set support"
-	depends on IP_NF_SET
-	help
-	  This option adds the ipportnethash set type support.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_SET_IPTREE
-	tristate "iptree set support"
-	depends on IP_NF_SET
-	help
-	  This option adds the iptree set type support.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_SET_IPTREEMAP
-	tristate "iptreemap set support"
-	depends on IP_NF_SET
-	help
-	  This option adds the iptreemap set type support.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_SET_SETLIST
-	tristate "setlist set support"
-	depends on IP_NF_SET
-	help
-	  This option adds the setlist set type support.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_MATCH_SET
-	tristate "set match support"
-	depends on IP_NF_SET
-	help
-	  Set matching matches against given IP sets.
-	  You need the ipset utility to create and set up the sets.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_TARGET_SET
-	tristate "SET target support"
-	depends on IP_NF_SET
-	help
-	  The SET target makes possible to add/delete entries
-	  in IP sets.
-	  You need the ipset utility to create and set up the sets.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
 endmenu
+

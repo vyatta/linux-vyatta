@@ -334,7 +334,7 @@ int create_whiteout(struct dentry *dentry, int start)
 		if (!err)
 			err = vfs_create(lower_dir_dentry->d_inode,
 					 lower_wh_dentry,
-					 ~current->fs->umask & S_IRUGO,
+					 ~current_umask() & S_IRUGO,
 					 &nd);
 		unlock_dir(lower_dir_dentry);
 		dput(lower_wh_dentry);

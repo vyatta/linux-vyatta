@@ -151,7 +151,7 @@ static void rt_emergency_hash_rebuild(struct net *net);
 
 static struct dst_ops ipv4_dst_ops = {
 	.family =		AF_INET,
-	.protocol =		__constant_htons(ETH_P_IP),
+	.protocol =		cpu_to_be16(ETH_P_IP),
 	.gc =			rt_garbage_collect,
 	.check =		ipv4_dst_check,
 	.destroy =		ipv4_dst_destroy,
@@ -2097,13 +2097,6 @@ static int ip_route_input_slow(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 
 	if (res.type == RTN_LOCAL) {
 		int result;
-		int linkf = IN_DEV_LINKFILTER(in_dev);
-
-		if (linkf && !netif_running(res.fi->fib_dev))
-			goto no_route;
-		if (linkf > 1 && !netif_carrier_ok(res.fi->fib_dev))
-			goto no_route;
-
 		result = fib_validate_source(saddr, daddr, tos,
 					     net->loopback_dev->ifindex,
 					     dev, &spec_dst, &itag);
@@ -2528,11 +2521,6 @@ static int ip_route_output_slow(struct net *net, struct rtable **rp,
 			dev_put(dev_out);
 			goto out;	/* Wrong error code */
 		}
-		err = -ENETDOWN;
-		if (!(dev_out->flags&IFF_UP)) {
-			dev_put(dev_out);
-			goto out;
-		}
 
 		if (ipv4_is_local_multicast(oldflp->fl4_dst) ||
 		    oldflp->fl4_dst == htonl(0xFFFFFFFF)) {
@@ -2600,41 +2588,10 @@ static int ip_route_output_slow(struct net *net, struct rtable **rp,
 	free_res = 1;
 
 	if (res.type == RTN_LOCAL) {
-		struct in_device *in_dev;
-		__be32 src;
-
-		if (dev_out)
-			dev_put(dev_out);
-		dev_out = FIB_RES_DEV(res);
-		in_dev = in_dev_get(dev_out);
-		src = fl.fl4_src ? : FIB_RES_PREFSRC(res);
-		if (in_dev && IN_DEV_LOOP(in_dev) && src) {
-			struct net_device *dev_src;
-
-			in_dev_put(in_dev);
-			in_dev = NULL;
-			dev_src = ip_dev_find(net, src);
-			if (dev_src && dev_src != dev_out &&
-			    (in_dev = in_dev_get(dev_src)) &&
-			    IN_DEV_LOOP(in_dev)) {
-				in_dev_put(in_dev);
-				dev_out = dev_src;
-				fl.fl4_src = src;
-				fl.oif = dev_out->ifindex;
-				res.type = RTN_UNICAST;
-				if (res.fi) {
-					fib_info_put(res.fi);
-					res.fi = NULL;
-				}
-				goto make_route;
-			}
-			if (dev_src)
-				dev_put(dev_src);
-		}
-		if (in_dev)
-			in_dev_put(in_dev);
 		if (!fl.fl4_src)
 			fl.fl4_src = fl.fl4_dst;
+		if (dev_out)
+			dev_put(dev_out);
 		dev_out = net->loopback_dev;
 		dev_hold(dev_out);
 		fl.oif = dev_out->ifindex;
@@ -2719,7 +2676,7 @@ static void ipv4_rt_blackhole_update_pmtu(struct dst_entry *dst, u32 mtu)
 
 static struct dst_ops ipv4_dst_blackhole_ops = {
 	.family			=	AF_INET,
-	.protocol		=	__constant_htons(ETH_P_IP),
+	.protocol		=	cpu_to_be16(ETH_P_IP),
 	.destroy		=	ipv4_dst_destroy,
 	.check			=	ipv4_dst_check,
 	.update_pmtu		=	ipv4_rt_blackhole_update_pmtu,
@@ -2802,7 +2759,8 @@ int ip_route_output_key(struct net *net, struct rtable **rp, struct flowi *flp)
 	return ip_route_output_flow(net, rp, flp, NULL, 0);
 }
 
-static int rt_fill_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
+static int rt_fill_info(struct net *net,
+			struct sk_buff *skb, u32 pid, u32 seq, int event,
 			int nowait, unsigned int flags)
 {
 	struct rtable *rt = skb->rtable;
@@ -2867,8 +2825,8 @@ static int rt_fill_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
 		__be32 dst = rt->rt_dst;
 
 		if (ipv4_is_multicast(dst) && !ipv4_is_local_multicast(dst) &&
-		    IPV4_DEVCONF_ALL(&init_net, MC_FORWARDING)) {
-			int err = ipmr_get_route(skb, r, nowait);
+		    IPV4_DEVCONF_ALL(net, MC_FORWARDING)) {
+			int err = ipmr_get_route(net, skb, r, nowait);
 			if (err <= 0) {
 				if (!nowait) {
 					if (err == 0)
@@ -2973,7 +2931,7 @@ static int inet_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr* nlh, void 
 	if (rtm->rtm_flags & RTM_F_NOTIFY)
 		rt->rt_flags |= RTCF_NOTIFY;
 
-	err = rt_fill_info(skb, NETLINK_CB(in_skb).pid, nlh->nlmsg_seq,
+	err = rt_fill_info(net, skb, NETLINK_CB(in_skb).pid, nlh->nlmsg_seq,
 			   RTM_NEWROUTE, 0, 0);
 	if (err <= 0)
 		goto errout_free;
@@ -3011,7 +2969,7 @@ int ip_rt_dump(struct sk_buff *skb,  struct netlink_callback *cb)
 			if (rt_is_expired(rt))
 				continue;
 			skb->dst = dst_clone(&rt->u.dst);
-			if (rt_fill_info(skb, NETLINK_CB(cb->skb).pid,
+			if (rt_fill_info(net, skb, NETLINK_CB(cb->skb).pid,
 					 cb->nlh->nlmsg_seq, RTM_NEWROUTE,
 					 1, NLM_F_MULTI) <= 0) {
 				dst_release(xchg(&skb->dst, NULL));
@@ -3399,7 +3357,7 @@ int __init ip_rt_init(void)
 	int rc = 0;
 
 #ifdef CONFIG_NET_CLS_ROUTE
-	ip_rt_acct = __alloc_percpu(256 * sizeof(struct ip_rt_acct));
+	ip_rt_acct = __alloc_percpu(256 * sizeof(struct ip_rt_acct), __alignof__(struct ip_rt_acct));
 	if (!ip_rt_acct)
 		panic("IP: failed to allocate ip_rt_acct\n");
 #endif

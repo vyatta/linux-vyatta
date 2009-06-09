@@ -239,17 +239,16 @@ int fib_validate_source(__be32 src, __be32 dst, u8 tos, int oif,
 					.tos = tos } },
 			    .iif = oif };
 	struct fib_result res;
-	int no_addr, rpf, loop;
+	int no_addr, rpf;
 	int ret;
 	struct net *net;
 
-	no_addr = rpf = loop = 0;
+	no_addr = rpf = 0;
 	rcu_read_lock();
 	in_dev = __in_dev_get_rcu(dev);
 	if (in_dev) {
 		no_addr = in_dev->ifa_list == NULL;
 		rpf = IN_DEV_RPFILTER(in_dev);
-		loop = IN_DEV_LOOP(in_dev);
 	}
 	rcu_read_unlock();
 
@@ -259,8 +258,6 @@ int fib_validate_source(__be32 src, __be32 dst, u8 tos, int oif,
 	net = dev_net(dev);
 	if (fib_lookup(net, &fl, &res))
 		goto last_resort;
-	if (loop && res.type == RTN_LOCAL)
-		goto loop;
 	if (res.type != RTN_UNICAST)
 		goto e_inval_res;
 	*spec_dst = FIB_RES_PREFSRC(res);
@@ -303,11 +300,6 @@ e_inval_res:
 	fib_res_put(&res);
 e_inval:
 	return -EINVAL;
-loop:
-	/* loopback over wire - send to self */
-	*spec_dst = FIB_RES_PREFSRC(res);
-	fib_res_put(&res);
-	return 0;
 }
 
 static inline __be32 sk_extract_addr(struct sockaddr *addr)
@@ -921,13 +913,6 @@ static int fib_inetaddr_event(struct notifier_block *this, unsigned long event, 
 		fib_sync_up(dev);
 #endif
 		rt_cache_flush(dev_net(dev), -1);
-		break;
-	case NETDEV_CHANGE:
-		if (!netif_carrier_ok(dev)) {
-			struct in_device *in_dev = __in_dev_get_rtnl(dev);
-			if (in_dev && IN_DEV_LINKFILTER(in_dev) > 1)
-				rt_cache_flush(dev_net(dev), -1);
-		}
 		break;
 	case NETDEV_DOWN:
 		fib_del_ifaddr(ifa);
