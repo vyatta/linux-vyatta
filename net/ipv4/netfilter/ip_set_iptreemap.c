@@ -338,7 +338,7 @@ KADT(iptreemap, add, ipaddr, ip)
 
 static inline int
 __delip_single(struct ip_set *set, ip_set_ip_t *hash_ip,
-	       ip_set_ip_t ip, gfp_t flags)
+	       ip_set_ip_t ip, unsigned int __nocast flags)
 {
 	struct ip_set_iptreemap *map = set->data;
 	struct ip_set_iptreemap_b *btree;
@@ -364,7 +364,7 @@ __delip_single(struct ip_set *set, ip_set_ip_t *hash_ip,
 
 static inline int
 iptreemap_del(struct ip_set *set, ip_set_ip_t *hash_ip,
-	      ip_set_ip_t start, ip_set_ip_t end, gfp_t flags)
+	      ip_set_ip_t start, ip_set_ip_t end, unsigned int __nocast flags)
 {
 	struct ip_set_iptreemap *map = set->data;
 	struct ip_set_iptreemap_b *btree;
@@ -470,7 +470,7 @@ init_gc_timer(struct ip_set *set)
 }
 
 static int
-iptreemap_create(struct ip_set *set, const void *data, size_t size)
+iptreemap_create(struct ip_set *set, const void *data, u_int32_t size)
 {
 	const struct ip_set_req_iptreemap_create *req = data;
 	struct ip_set_iptreemap *map;
@@ -567,7 +567,7 @@ iptreemap_list_members_size(const struct ip_set *set)
 	return (count * sizeof(struct ip_set_req_iptreemap));
 }
 
-static inline size_t
+static inline u_int32_t
 add_member(void *data, size_t offset, ip_set_ip_t start, ip_set_ip_t end)
 {
 	struct ip_set_req_iptreemap *entry = data + offset;
