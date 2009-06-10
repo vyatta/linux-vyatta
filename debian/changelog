@@ -1,3 +1,10 @@
+linux-2.6 (2.6.30-1+vyatta+3) unstable; urgency=low
+
+  * Merge branch 'kenwood' of 192.168.100.1:vyatta/kenwood/linux-vyatta
+    into kenwood
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 09 Jun 2009 23:00:36 -0700
+
 linux-2.6 (2.6.30-1+vyatta+2) unstable; urgency=low
 
   * UNRELEASED
