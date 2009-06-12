@@ -1,3 +1,13 @@
+linux-2.6 (2.6.30-1+vyatta+4) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Update to ipset 3.0
+
+  [ An-Cheng Huang ]
+  * disable BIGSMP for virt-flavored kernel
+
+ -- An-Cheng Huang <ancheng@vyatta.com>  Thu, 11 Jun 2009 17:31:56 -0700
+
 linux-2.6 (2.6.30-1+vyatta+3) unstable; urgency=low
 
   * Merge branch 'kenwood' of 192.168.100.1:vyatta/kenwood/linux-vyatta
