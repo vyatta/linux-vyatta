@@ -1,3 +1,10 @@
+linux-2.6 (2.6.29-4+vyatta+6+jenner7) unstable; urgency=low
+
+  * Fix link_filter to work for carrier
+  * ipv4: fix loose reverse path filter
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 12 Jun 2009 15:28:48 -0700
+
 linux-2.6 (2.6.29-4+vyatta+6+jenner6) unstable; urgency=low
 
   * macvlan: fix typo from last change
