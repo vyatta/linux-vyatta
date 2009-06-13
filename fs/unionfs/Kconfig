@@ -22,4 +22,3 @@ config UNION_FS_DEBUG
 	depends on UNION_FS
 	help
 	  If you say Y here, you can turn on debugging output from Unionfs.
-

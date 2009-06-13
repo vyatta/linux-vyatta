@@ -778,7 +778,7 @@ begin:
 
 	if (child_dentry != dentry) {
 		/* lookup child in the underlying file system */
-		lower_dentry = lookup_one_len(childname, lower_parent_dentry,
+		lower_dentry = lookup_lck_len(childname, lower_parent_dentry,
 					      childnamelen);
 		if (IS_ERR(lower_dentry))
 			goto out;
@@ -787,7 +787,7 @@ begin:
 		 * Is the name a whiteout of the child name ?  lookup the
 		 * whiteout child in the underlying file system
 		 */
-		lower_dentry = lookup_one_len(name, lower_parent_dentry,
+		lower_dentry = lookup_lck_len(name, lower_parent_dentry,
 					      strlen(name));
 		if (IS_ERR(lower_dentry))
 			goto out;

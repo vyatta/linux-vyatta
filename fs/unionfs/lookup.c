@@ -50,7 +50,7 @@ struct dentry *__lookup_one(struct dentry *base, struct vfsmount *mnt,
 		  * it's safe to call lookup_one_len (which doesn't take a
 		  * vfsmount).
 		  */
-		dentry = lookup_one_len(name, base, strlen(name));
+		dentry = lookup_lck_len(name, base, strlen(name));
 		if (new_mnt)
 			*new_mnt = mntget(lower_nd.path.mnt);
 		break;
@@ -469,7 +469,7 @@ struct dentry *unionfs_lookup_full(struct dentry *dentry,
 		if (!S_ISDIR(lower_dir_dentry->d_inode->i_mode))
 			goto out; /* XXX: should be BUG_ON */
 		/* XXX: do we need to cross bind mounts here? */
-		lower_dentry = lookup_one_len(name, lower_dir_dentry, namelen);
+		lower_dentry = lookup_lck_len(name, lower_dir_dentry, namelen);
 		if (IS_ERR(lower_dentry)) {
 			err = PTR_ERR(lower_dentry);
 			goto out;

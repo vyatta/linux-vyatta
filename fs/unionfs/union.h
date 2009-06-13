@@ -553,6 +553,17 @@ static inline void unlock_dir(struct dentry *dir)
 	dput(dir);
 }
 
+/* lock base inode mutex before calling lookup_one_len */
+static inline struct dentry *lookup_lck_len(const char *name,
+					    struct dentry *base, int len)
+{
+	struct dentry *d;
+	mutex_lock(&base->d_inode->i_mutex);
+	d = lookup_one_len(name, base, len);
+	mutex_unlock(&base->d_inode->i_mutex);
+	return d;
+}
+
 static inline struct vfsmount *unionfs_mntget(struct dentry *dentry,
 					      int bindex)
 {
