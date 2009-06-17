@@ -1,3 +1,238 @@
+linux-2.6 (2.6.29-5+vyatta+6+jenner1) unstable; urgency=low
+
+  [ Nicolas Dichtel ]
+  * xfrm: wrong hash value for temporary SA
+
+  [ Ilpo Jarvinen ]
+  * tcp: fix MSG_PEEK race check
+  * tcp: fix >2 iw selection
+
+  [ Thomas Chenault ]
+  * net: fix skb_seq_read returning wrong offset/length for page frag
+    data
+
+  [ Eric Dumazet ]
+  * sch_teql: should not dereference skb after ndo_start_xmit()
+  * net: fix length computation in rt_check_expire()
+  * net: fix rtable leak in net/ipv4/route.c
+
+  [ David S. Miller ]
+  * Revert "rose: zero length frame filtering in af_rose.c"
+
+  [ Florian Westphal ]
+  * pktgen: do not access flows[] beyond its length
+
+  [ Stanislaw Gruszka ]
+  * myr10ge: again fix lro_gen_skb() alignment
+
+  [ Patrick McHardy ]
+  * vlan/macvlan: fix NULL pointer dereferences in ethtool handlers
+
+  [ Finn Thain ]
+  * mac8390: fix regression caused during net_device_ops conversion
+
+  [ Jay Vosburgh ]
+  * bonding: fix alb mode locking regression
+  * bonding: Remove debug printk
+
+  [ Michael Buesch ]
+  * r8169: avoid losing MSI interrupts
+
+  [ David S. Miller ]
+  * sparc: Fix bus type probing for ESP and LE devices.
+  * sparc64: Fix smp_callin() locking.
+
+  [ Nick Piggin ]
+  * mm: SLUB fix reclaim_state
+
+  [ David Woodhouse ]
+  * Fix oops on close of hot-unplugged FTDI serial converter
+
+  [ Inaky Perez-Gonzalez ]
+  * wimax: fix oops if netlink fails to add attribute
+
+  [ Frank Filz ]
+  * nfs: Fix NFS v4 client handling of MAY_EXEC in nfs_permission.
+
+  [ Thomas Gleixner ]
+  * futex: setup writeable mapping for futex ops which modify user space
+    data
+
+  [ Ian Campbell ]
+  * xen/blkfront: allow xenbus state transition to Closing->Closed when
+    not Connected
+
+  [ Eric Paris ]
+  * TPM: get_event_name stack corruption
+
+  [ Breno Leitao ]
+  * icom: fix rmmod crash
+
+  [ Avi Kivity ]
+  * KVM: Make paravirt tlb flush also reload the PAE PDPTRs
+  * KVM: Fix PDPTR reloading on CR4 writes
+
+  [ Luis R. Rodriguez ]
+  * cfg80211: fix race between core hint and driver's custom apply
+
+  [ Dave Airlie ]
+  * drm/r128: fix r128 ioremaps to use ioremap_wc.
+
+  [ Roel Kluin ]
+  * drivers/serial/mpc52xx_uart.c: fix array overindexing check
+
+  [ Mel Gorman ]
+  * x86: ignore VM_LOCKED when determining if hugetlb-backed page tables
+    can be shared or not
+  * mm: account for MAP_SHARED mappings using VM_MAYSHARE and not
+    VM_SHARED in hugetlbfs
+
+  [ Warren Free ]
+  * USB: isp1760: urb_dequeue doesn't always find the urbs
+
+  [ Clemens Ladisch ]
+  * sound: usb-audio: make the MotU Fastlane work again
+
+  [ Alan Stern ]
+  * usb-serial: fix crash when sub-driver updates firmware
+
+  [ Yinghai Lu ]
+  * x86/pci: fix mmconfig detection with 32bit near 4g
+
+  [ Peter Korsgaard ]
+  * mtd_dataflash: unbreak erase support
+
+  [ Mike Frysinger ]
+  * hwmon: (lm78) Add missing __devexit_p()
+
+  [ Shaohua Li ]
+  * cpuidle: make AMC C1E work in processor_idle
+  * cpuidle: fix AMD C1E suspend hang
+
+  [ Bartlomiej Zolnierkiewicz ]
+  * ide: fix 40-wire cable detection for TSST SH-S202* ATAPI devices
+    (v2)
+
+  [ Avi Kivity ]
+  * KVM: Explicity initialize cpus_hardware_enabled
+
+  [ Bartlomiej Zolnierkiewicz ]
+  * ide_pci_generic: add quirk for Netcell ATA RAID
+  * ide: fix OOPS during ide-cd error recovery
+
+  [ Eric Paris ]
+  * SELinux: BUG in SELinux compat_net code
+
+  [ Neil Horman ]
+  * e1000: add missing length check to e1000 receive routine
+
+  [ Jeff Kirsher ]
+  * igb: fix LRO warning
+
+  [ Reinette Chatre ]
+  * iwlwifi: update key flags at time key is set
+
+  [ Jiri Slaby ]
+  * mac80211: minstrel, fix memory corruption
+  * mac80211: pid, fix memory corruption
+
+  [ John W. Linville ]
+  * mac80211: avoid NULL ptr deref when finding max_rates in PID and
+    minstrel
+
+  [ Michael Chan ]
+  * bnx2: Fix panic in bnx2_poll_work().
+
+  [ Linus Torvalds ]
+  * random: make get_random_int() more random
+  * Avoid ICE in get_random_int() with gcc-3.4.5
+
+  [ Zoltan Karcagi ]
+  * HID: fix dropped device-specific quirks
+
+  [ adam radford ]
+  * 3w-xxxx: scsi_dma_unmap fix
+
+  [ Stephen Rothwell ]
+  * powerpc: fix for long standing bug noticed by gcc 4.4.0
+
+  [ Tejun Heo ]
+  * ide-tape: remove back-to-back REQUEST_SENSE detection
+
+  [ Adam Williamson ]
+  * ALSA: hda - fix audio on HP TX25xx series notebooks
+
+  [ Alan Cox ]
+  * cdc-acm: Fix long standing abuse of tty->low_latency
+
+  [ David Howells ]
+  * keys: Handle there being no fallback destination keyring for
+    request_key()
+
+  [ Herbert Xu ]
+  * crypto: padlock - Revert aes-all alias to aes
+  * crypto: api - Fix algorithm module auto-loading
+
+  [ Oleg Nesterov ]
+  * ptrace: kill __ptrace_detach(), fix ->exit_state check
+  * ptrace: simplify ptrace_exit()->ignoring_children() path
+  * ptrace: reintroduce __ptrace_detach() as a callee of ptrace_exit()
+  * ptrace: fix possible zombie leak on PTRACE_DETACH
+
+  [ Andreas Herrmann ]
+  * x86: hpet: provide separate functions to stop and start the counter
+  * x86: hpet: stop HPET_COUNTER when programming periodic mode
+  * x86: hpet: fix periodic mode programming on AMD 81xx
+
+  [ Duane Griffin ]
+  * ext4: don't inherit inappropriate inode flags from parent
+  * ext4: tighten restrictions on inode flags
+
+  [ Bryan Donlan ]
+  * ext4: return -EIO not -ESTALE on directory traversal through deleted
+    inode
+
+  [ Theodore Ts'o ]
+  * ext4: Add fine print for the 32000 subdirectory limit
+  * ext4: add EXT4_IOC_ALLOC_DA_BLKS ioctl
+  * ext4: Automatically allocate delay allocated blocks on close
+  * ext4: Automatically allocate delay allocated blocks on rename
+
+  [ Aneesh Kumar K.V ]
+  * ext4: Fix discard of inode prealloc space with delayed allocation.
+
+  [ Theodore Ts'o ]
+  * ext4: Add auto_da_alloc mount option
+  * ext4: Check for an valid i_mode when reading the inode from disk
+
+  [ Jan Kara ]
+  * jbd2: Update locking coments
+
+  [ Chuck Ebbert ]
+  * ext4: really print the find_group_flex fallback warning only once
+
+  [ Theodore Ts'o ]
+  * ext4: Fix softlockup caused by illegal i_file_acl value in on-disk
+    inode
+  * ext4: Ignore i_file_acl_high unless EXT4_FEATURE_INCOMPAT_64BIT is
+    present
+
+  [ Aneesh Kumar K.V ]
+  * ext4: Fix sub-block zeroing for writes into preallocated extents
+  * ext4: Use a fake block number for delayed new buffer_head
+  * ext4: Clear the unwritten buffer_head flag after the extent is
+    initialized
+
+  [ Theodore Ts'o ]
+  * ext4: Fix race in ext4_inode_info.i_cached_extent
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.29.5
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 16 Jun 2009 17:16:01 -0700
+
 linux-2.6 (2.6.29-4+vyatta+6+jenner7) unstable; urgency=low
 
   * Fix link_filter to work for carrier
