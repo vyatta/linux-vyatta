@@ -1,3 +1,10 @@
+linux-2.6 (2.6.29-5+vyatta+6+jenner2) unstable; urgency=low
+
+  * skbuff: skb_mac_header_was_set is always true on >32 bit
+  * skbuff: don't corrupt mac_header on skb expansion
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 17 Jun 2009 18:24:25 -0700
+
 linux-2.6 (2.6.29-5+vyatta+6+jenner1) unstable; urgency=low
 
   [ Nicolas Dichtel ]
