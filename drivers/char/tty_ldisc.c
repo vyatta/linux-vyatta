@@ -148,8 +148,10 @@ static struct tty_ldisc *tty_ldisc_try_get(int disc)
 		}
 	}
 	spin_unlock_irqrestore(&tty_ldisc_lock, flags);
-	if (err)
+	if (err) {
+		kfree(ld);
 		return ERR_PTR(err);
+	}
 	return ld;
 }
 
@@ -205,6 +207,7 @@ static void tty_ldisc_put(struct tty_ldisc *ld)
 	ldo->refcount--;
 	module_put(ldo->owner);
 	spin_unlock_irqrestore(&tty_ldisc_lock, flags);
+	WARN_ON(ld->refcount);
 	kfree(ld);
 }
 
@@ -262,7 +265,7 @@ const struct file_operations tty_ldiscs_proc_fops = {
  *	@ld: line discipline
  *
  *	Install an instance of a line discipline into a tty structure. The
- *	ldisc must have a reference count above zero to ensure it remains/
+ *	ldisc must have a reference count above zero to ensure it remains.
  *	The tty instance refcount starts at zero.
  *
  *	Locking:
@@ -791,6 +794,8 @@ void tty_ldisc_hangup(struct tty_struct *tty)
 		/* Avoid racing set_ldisc */
 		mutex_lock(&tty->ldisc_mutex);
 		/* Switch back to N_TTY */
+		tty_ldisc_halt(tty);
+		tty_ldisc_wait_idle(tty);
 		tty_ldisc_reinit(tty);
 		/* At this point we have a closed ldisc and we want to
 		   reopen it. We could defer this to the next open but
@@ -862,15 +867,22 @@ void tty_ldisc_release(struct tty_struct *tty, struct tty_struct *o_tty)
 	tty_ldisc_wait_idle(tty);
 
 	/*
-	 * Shutdown the current line discipline, and reset it to N_TTY.
-	 *
-	 * FIXME: this MUST get fixed for the new reflocking
+	 * Now kill off the ldisc
 	 */
+	tty_ldisc_close(tty, tty->ldisc);
+	tty_ldisc_put(tty->ldisc);
+	/* Force an oops if we mess this up */
+	tty->ldisc = NULL;
 
-	tty_ldisc_reinit(tty);
+	/* Ensure the next open requests the N_TTY ldisc */
+	tty_set_termios_ldisc(tty, N_TTY);
+
 	/* This will need doing differently if we need to lock */
 	if (o_tty)
 		tty_ldisc_release(o_tty, NULL);
+
+	/* And the memory resources remaining (buffers, termios) will be
+	   disposed of when the kref hits zero */
 }
 
 /**
