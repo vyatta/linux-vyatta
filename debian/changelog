@@ -1,3 +1,340 @@
+linux-2.6 (2.6.30-1+vyatta+6) unstable; urgency=low
+
+  [ NeilBrown ]
+  * md/raid5: use conf->raid_disks in preference to mddev->raid_disk
+  * md/raid5 - avoid deadlocks in get_active_stripe during reshape
+  * md/raid5: fix bug in reshape code when chunk_size decreases.
+
+  [ Eric Dumazet ]
+  * r8169: fix crash when large packets are received
+
+  [ Minoru Usui ]
+  * cls_cgroup: Fix oops when user send improperly 'tc filter add'
+    request
+
+  [ Yinghai Lu ]
+  * cpumask: introduce zalloc_cpumask_var
+  * cpumask: alloc zeroed cpumask for static cpumask_var_ts
+
+  [ Avi Kivity ]
+  * kvm: fix kvm reboot crash when MAXSMP is used
+
+  [ FUJITA Tomonori ]
+  * bsg: setting rq->bio to NULL
+
+  [ Mike Frysinger ]
+  * shm: fix unused warnings on nommu
+
+  [ Ian Kent ]
+  * autofs4: remove hashed check in validate_wait()
+
+  [ Jan Kara ]
+  * jbd: fix race in buffer processing in commit code
+
+  [ Peter Botha ]
+  * char: mxser, fix ISA board lookup
+
+  [ Linus Torvalds ]
+  * Linux 2.6.30
+
+  [ Yinghai Lu ]
+  * firmware_map: fix hang with x86/32bit
+
+  [ Nick Piggin ]
+  * fs: remove incorrect I_NEW warnings
+
+  [ Shaohua Li ]
+  * PCI: disable ASPM on VIA root-port-under-bridge configurations
+
+  [ Andi Kleen ]
+  * KVM: Add VT-x machine check support v4
+
+  [ Avi Kivity ]
+  * KVM: Disable large pages on misaligned memory slots
+  * KVM: Prevent overflow in largepages calculation
+
+  [ Marcelo Tosatti ]
+  * KVM: x86: check for cr3 validity in ioctl_set_sregs
+
+  [ Avi Kivity ]
+  * KVM: VMX: Handle vmx instruction vmexits
+
+  [ Marcelo Tosatti ]
+  * KVM: protect concurrent make_all_cpus_request
+
+  [ Izik Eidus ]
+  * KVM: Fix dirty bit tracking for slots with large pages
+
+  [ Eric Paris ]
+  * IMA: use current_cred() instead of current->cred
+  * IMA: Handle dentry_open failures
+  * IMA: open all files O_LARGEFILE
+
+  [ Andy Gospodarek ]
+  * e1000e: stop unnecessary polling when using msi-x
+
+  [ Michael Buesch ]
+  * pegasus usb-net: Fix endianness bugs
+
+  [ Neil Horman ]
+  * ipv4: fix NULL pointer + success return in route lookup path
+  * ipv4 routing: Ensure that route cache entries are usable and
+    reclaimable with caching is off
+
+  [ Stephen Hemminger ]
+  * sky2: don't look for VPD size
+
+  [ Eric W. Biederman ]
+  * tun: Fix unregister race
+
+  [ Dave Jones ]
+  * via-velocity: Fix velocity driver unmapping incorrect size.
+
+  [ David S. Miller ]
+  * x25: Fix sleep from timer on socket destroy.
+
+  [ Stephen Hemminger ]
+  * bonding: fix multiple module load problem
+
+  [ Joerg Roedel ]
+  * dma-debug: change hash_bucket_find from first-fit to best-fit
+
+  [ Dirk Eibach ]
+  * char: moxa, prevent opening unavailable ports
+
+  [ Jiri Slaby ]
+  * serial: refactor ASYNC_ flags
+  * rocket: fix test_bit parameters
+  * epca: fix test_bit parameters
+
+  [ Andreas Herrmann ]
+  * x86: Detect use of extended APIC ID for AMD CPUs
+
+  [ Greg Kroah-Hartman ]
+  * USB: usbtmc: fix switch statment
+
+  [ Michael Krufky ]
+  * DVB: lgdt3305: fix 64bit division in function lgdt3305_set_if
+
+  [ Hans Verkuil ]
+  * V4L: ivtv/cx18: fix regression: class controls are no longer seen
+
+  [ Mike Isely ]
+  * V4L: pvrusb2: Fix hardware scaling when used with cx25840
+  * V4L: pvrusb2: Re-fix hardware scaling on video standard change
+
+  [ Hans Verkuil ]
+  * V4L: i2c modules must be linked before the v4l2 drivers
+
+  [ John Stoffel ]
+  * sym53c8xx: ratelimit parity errors
+
+  [ Karsten Keil ]
+  * ISDN: Fix DMA alloc for hfcpci
+
+  [ Dave Kleikamp ]
+  * jfs: fix regression preventing coalescing of extents
+
+  [ Roel Kluin ]
+  * spi: takes size of a pointer to determine the size of the pointed-to
+    type
+
+  [ Mike Frysinger ]
+  * serial: bfin_5xx: add missing spin_lock init
+
+  [ Andreas Herrmann ]
+  * x86: memtest: remove 64-bit division
+
+  [ Cliff Wickman ]
+  * x86: Fix UV BAU activation descriptor init
+
+  [ Jack Steiner ]
+  * x86, UV: Fix macros for multiple coherency domains
+
+  [ Mark Langsdorf ]
+  * x86: enable GART-IOMMU only after setting up protection methods
+
+  [ Petr Tesarik ]
+  * x86: move rdtsc_barrier() into the TSC vread method
+
+  [ Cliff Wickman ]
+  * x86: Fix uv bau sending buffer initialization
+
+  [ Jean Delvare ]
+  * x86: Add quirk for reboot stalls on a Dell Optiplex 360
+
+  [ Yinghai Lu ]
+  * x86: handle initrd that extends into unusable memory
+
+  [ Takashi Iwai ]
+  * ALSA: ca0106 - Add missing registrations of vmaster controls
+  * ALSA: intel8x0 - Fix PCM position craziness
+  * ALSA: hda - Get back Input Source for ALC262 toshiba-s06 model
+  * ALSA: hda - Add quirk for Sony VAIO Z21MN
+
+  [ Ondrej Zary ]
+  * ALSA: cmi8330: fix MPU-401 PnP init copy&paste bug
+
+  [ Thomas Gleixner ]
+  * x86: hpet: Mark per cpu interrupts IRQF_TIMER to prevent resume
+    failure
+
+  [ Nicolas Pitre ]
+  * ARM: 5545/2: add flush_kernel_dcache_page() for ARM
+
+  [ Jack Morgenstein ]
+  * IB/mlx4: Add strong ordering to local inval and fast reg work
+    requests
+
+  [ Davide Libenzi ]
+  * epoll: fix nested calls support
+
+  [ Peter Zijlstra ]
+  * lockdep: Select frame pointers on x86
+
+  [ Mark Brown ]
+  * ASoC: Remove odd bit clock ratios for WM8903
+
+  [ Mike Frysinger ]
+  * ramfs: ignore unknown mount options
+
+  [ Bob Copeland ]
+  * mac80211: fix minstrel single-rate memory corruption
+
+  [ Luis R. Rodriguez ]
+  * cfg80211: fix for duplicate userspace replies
+  * cfg80211: cleanup return calls on nl80211_set_reg()
+  * cfg80211: return immediately if num reg rules >
+    NL80211_MAX_SUPP_REG_RULES
+  * cfg80211: fix in nl80211_set_reg()
+  * ath9k: Fix bug when using a card with a busted EEPROM
+
+  [ Sujith ]
+  * ath9k: Fix bug in calibration initialization
+  * ath9k: Fix bug in determining calibration support
+  * ath9k: Fix bug in checking HT flag
+  * ath9k: Fix bug in scan termination
+  * ath9k: Fix memleak on TX DMA failure
+  * ath9k: Initialize ANI timers
+
+  [ Jouni Malinen ]
+  * ath9k: Fix PCI FATAL interrupts by restoring RETRY_TIMEOUT disabling
+
+  [ Huang Ying ]
+  * crypto: aes-ni - Fix cbc mode IV saving
+
+  [ Dan Williams ]
+  * md/raid5: add missing call to schedule() after prepare_to_wait()
+
+  [ Frederic Weisbecker ]
+  * tracing/urgent: fix unbalanced ftrace_start_up
+
+  [ Jeff Layton ]
+  * cifs: fix fh_mutex locking in cifs_reopen_file
+
+  [ Jiri Slaby ]
+  * vt_ioctl: fix lock imbalance
+
+  [ Lubomir Rintel ]
+  * x86: Fix non-lazy GS handling in sys_vm86()
+
+  [ Andreas Herrmann ]
+  * x86: Set cpu_llc_id on AMD CPUs
+
+  [ Alan Stern ]
+  * usb-serial: replace shutdown with disconnect, release
+
+  [ Jiri Slaby ]
+  * pcmcia/cm4000: fix lock imbalance
+  * n_r3964: fix lock imbalance
+
+  [ FUJITA Tomonori ]
+  * parport_pc: set properly the dma_mask for parport_pc device
+
+  [ Jens Rottmann ]
+  * parport_pc: after superio probing restore original register values
+
+  [ Prabhanjan Sarnaik ]
+  * mv643xx_eth: fix unicast filter programming in promiscuous mode
+
+  [ Jouni Malinen ]
+  * ath5k: avoid PCI FATAL interrupts by restoring RETRY_TIMEOUT
+    disabling
+
+  [ Clemens Ladisch ]
+  * sound: seq_midi_event: fix decoding of (N)RPN events
+
+  [ Rafael J. Wysocki ]
+  * PCI PM: Fix handling of devices without PM support by
+    pci_target_state()
+  * PCI PM: Follow PCI_PM_CTRL_NO_SOFT_RESET during transitions from D3
+
+  [ Andrew Vasquez ]
+  * qla2xxx: Correct (again) overflow during dump-processing on large-
+    memory ISP23xx parts.
+
+  [ Dimitri Sivanich ]
+  * mm: fix handling of pagesets for downed cpus
+
+  [ Mikulas Patocka ]
+  * dm mpath: validate hw_handler argument count
+  * dm mpath: validate table argument count
+
+  [ Milan Broz ]
+  * dm: sysfs skip output when device is being destroyed
+
+  [ Mikulas Patocka ]
+  * dm mpath: flush keventd queue in destructor
+
+  [ Jonathan Brassow ]
+  * dm exception store: fix exstore lookup to be case insensitive
+
+  [ Milan Broz ]
+  * dm exception store: really fix type lookup
+
+  [ Mikulas Patocka ]
+  * dm: use i_size_read
+
+  [ Mel Gorman ]
+  * vmscan: properly account for the number of page cache pages
+    zone_reclaim() can reclaim
+  * vmscan: count the number of times zone_reclaim() scans and fails
+
+  [ Zygo Blaxell ]
+  * lib/genalloc.c: remove unmatched write_lock() in gen_pool_destroy
+
+  [ Tomas Szepe ]
+  * CONFIG_FILE_LOCKING should not depend on CONFIG_BLOCK
+
+  [ Mike Frysinger ]
+  * serial: bfin_5xx: fix building as module when early printk is
+    enabled
+
+  [ Sunil Mushran ]
+  * ocfs2: Fix ocfs2_osb_dump()
+
+  [ Rainer Weikusat ]
+  * ide-cd: prevent null pointer deref via cdrom_newpc_intr
+
+  [ Jesse Barnes ]
+  * drm/i915: correct suspend/resume ordering
+
+  [ Matt T. Yourst ]
+  * KVM: x86: silence preempt warning on kvm_write_guest_time
+
+  [ Felix Blyakher ]
+  * xfs: fix freeing memory in xfs_getbmap()
+
+  [ Renaud Lottiaux ]
+  * bsdacct: fix access to invalid filp in acct_on()
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.30.1
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Thu, 09 Jul 2009 05:11:53 -0700
+
 linux-2.6 (2.6.30-1+vyatta+5) unstable; urgency=low
 
   * Update to unionfs 2.5.2
