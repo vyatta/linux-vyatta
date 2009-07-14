@@ -1,3 +1,10 @@
+linux-2.6 (2.6.30-1+vyatta+7) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Turn of kernel Integrity Management Architecture
+
+ -- Bob Gilligan <gilligan@vyatta.com>  Tue, 14 Jul 2009 14:27:52 -0700
+
 linux-2.6 (2.6.30-1+vyatta+6) unstable; urgency=low
 
   [ NeilBrown ]
