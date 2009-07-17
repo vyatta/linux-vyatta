@@ -40,7 +40,7 @@ struct harray {
 };
 
 static inline void * 
-__harray_malloc(size_t hashsize, size_t typesize, gfp_t flags)
+__harray_malloc(size_t hashsize, size_t typesize, int flags)
 {
 	struct harray *harray;
 	size_t max_elements, size, i, j;
@@ -88,7 +88,7 @@ __harray_malloc(size_t hashsize, size_t typesize, gfp_t flags)
 }
 
 static inline void *
-harray_malloc(size_t hashsize, size_t typesize, gfp_t flags)
+harray_malloc(size_t hashsize, size_t typesize, int flags)
 {
 	void *harray;
 	

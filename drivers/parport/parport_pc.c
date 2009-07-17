@@ -1413,10 +1413,12 @@ static void __devinit decode_smsc(int efer, int key, int devid, int devrev)
 
 static void __devinit winbond_check(int io, int key)
 {
-	int devid,devrev,oldid,x_devid,x_devrev,x_oldid;
+	int origval, devid, devrev, oldid, x_devid, x_devrev, x_oldid;
 
 	if (!request_region(io, 3, __func__))
 		return;
+
+	origval = inb(io); /* Save original value */
 
 	/* First probe without key */
 	outb(0x20,io);
@@ -1437,6 +1439,8 @@ static void __devinit winbond_check(int io, int key)
 	oldid=inb(io+1);
 	outb(0xaa,io);    /* Magic Seal */
 
+	outb(origval, io); /* in case we poked some entirely different hardware */
+
 	if ((x_devid == devid) && (x_devrev == devrev) && (x_oldid == oldid))
 		goto out; /* protection against false positives */
 
@@ -1447,10 +1451,14 @@ out:
 
 static void __devinit winbond_check2(int io,int key)
 {
-        int devid,devrev,oldid,x_devid,x_devrev,x_oldid;
+	int origval[3], devid, devrev, oldid, x_devid, x_devrev, x_oldid;
 
 	if (!request_region(io, 3, __func__))
 		return;
+
+	origval[0] = inb(io); /* Save original values */
+	origval[1] = inb(io + 1);
+	origval[2] = inb(io + 2);
 
 	/* First probe without the key */
 	outb(0x20,io+2);
@@ -1470,6 +1478,10 @@ static void __devinit winbond_check2(int io,int key)
         oldid=inb(io+2);
         outb(0xaa,io);    /* Magic Seal */
 
+	outb(origval[0], io); /* in case we poked some entirely different hardware */
+	outb(origval[1], io + 1);
+	outb(origval[2], io + 2);
+
 	if ((x_devid == devid) && (x_devrev == devrev) && (x_oldid == oldid))
 		goto out; /* protection against false positives */
 
@@ -1480,10 +1492,12 @@ out:
 
 static void __devinit smsc_check(int io, int key)
 {
-        int id,rev,oldid,oldrev,x_id,x_rev,x_oldid,x_oldrev;
+	int origval, id, rev, oldid, oldrev, x_id, x_rev, x_oldid, x_oldrev;
 
 	if (!request_region(io, 3, __func__))
 		return;
+
+	origval = inb(io); /* Save original value */
 
 	/* First probe without the key */
 	outb(0x0d,io);
@@ -1507,6 +1521,8 @@ static void __devinit smsc_check(int io, int key)
 	outb(0x21,io);
 	rev=inb(io+1);
         outb(0xaa,io);    /* Magic Seal */
+
+	outb(origval, io); /* in case we poked some entirely different hardware */
 
 	if ((x_id == id) && (x_oldrev == oldrev) &&
 	    (x_oldid == oldid) && (x_rev == rev))
@@ -1544,11 +1560,12 @@ static void __devinit detect_and_report_smsc (void)
 static void __devinit detect_and_report_it87(void)
 {
 	u16 dev;
-	u8 r;
+	u8 origval, r;
 	if (verbose_probing)
 		printk(KERN_DEBUG "IT8705 Super-IO detection, now testing port 2E ...\n");
-	if (!request_region(0x2e, 1, __func__))
+	if (!request_region(0x2e, 2, __func__))
 		return;
+	origval = inb(0x2e);		/* Save original value */
 	outb(0x87, 0x2e);
 	outb(0x01, 0x2e);
 	outb(0x55, 0x2e);
@@ -1568,8 +1585,10 @@ static void __devinit detect_and_report_it87(void)
 		outb(r | 8, 0x2F);
 		outb(0x02, 0x2E);	/* Lock */
 		outb(0x02, 0x2F);
+	} else {
+		outb(origval, 0x2e);	/* Oops, sorry to disturb */
 	}
-	release_region(0x2e, 1);
+	release_region(0x2e, 2);
 }
 #endif /* CONFIG_PARPORT_PC_SUPERIO */
 
@@ -2170,10 +2189,11 @@ static int parport_dma_probe (struct parport *p)
 static LIST_HEAD(ports_list);
 static DEFINE_SPINLOCK(ports_lock);
 
-struct parport *parport_pc_probe_port (unsigned long int base,
-				       unsigned long int base_hi,
-				       int irq, int dma,
-				       struct device *dev)
+struct parport *parport_pc_probe_port(unsigned long int base,
+				      unsigned long int base_hi,
+				      int irq, int dma,
+				      struct device *dev,
+				      int irqflags)
 {
 	struct parport_pc_private *priv;
 	struct parport_operations *ops;
@@ -2192,13 +2212,16 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 		if (IS_ERR(pdev))
 			return NULL;
 		dev = &pdev->dev;
+
+		dev->coherent_dma_mask = DMA_BIT_MASK(24);
+		dev->dma_mask = &dev->coherent_dma_mask;
 	}
 
-	ops = kmalloc(sizeof (struct parport_operations), GFP_KERNEL);
+	ops = kmalloc(sizeof(struct parport_operations), GFP_KERNEL);
 	if (!ops)
 		goto out1;
 
-	priv = kmalloc (sizeof (struct parport_pc_private), GFP_KERNEL);
+	priv = kmalloc(sizeof(struct parport_pc_private), GFP_KERNEL);
 	if (!priv)
 		goto out2;
 
@@ -2325,8 +2348,8 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 		EPP_res = NULL;
 	}
 	if (p->irq != PARPORT_IRQ_NONE) {
-		if (request_irq (p->irq, parport_irq_handler,
-				 0, p->name, p)) {
+		if (request_irq(p->irq, parport_irq_handler,
+				 irqflags, p->name, p)) {
 			printk (KERN_WARNING "%s: irq %d in use, "
 				"resorting to polled operation\n",
 				p->name, p->irq);
@@ -2530,7 +2553,7 @@ static int __devinit sio_ite_8872_probe (struct pci_dev *pdev, int autoirq,
 	 */
 	release_resource(base_res);
 	if (parport_pc_probe_port (ite8872_lpt, ite8872_lpthi,
-				   irq, PARPORT_DMA_NONE, &pdev->dev)) {
+				   irq, PARPORT_DMA_NONE, &pdev->dev, 0)) {
 		printk (KERN_INFO
 			"parport_pc: ITE 8872 parallel port: io=0x%X",
 			ite8872_lpt);
@@ -2713,7 +2736,7 @@ static int __devinit sio_via_probe (struct pci_dev *pdev, int autoirq,
 	}
 
 	/* finally, do the probe with values obtained */
-	if (parport_pc_probe_port (port1, port2, irq, dma, &pdev->dev)) {
+	if (parport_pc_probe_port (port1, port2, irq, dma, &pdev->dev, 0)) {
 		printk (KERN_INFO
 			"parport_pc: VIA parallel port: io=0x%X", port1);
 		if (irq != PARPORT_IRQ_NONE)
@@ -3018,6 +3041,7 @@ static int parport_pc_pci_probe (struct pci_dev *dev,
 	for (n = 0; n < cards[i].numports; n++) {
 		int lo = cards[i].addr[n].lo;
 		int hi = cards[i].addr[n].hi;
+		int irq;
 		unsigned long io_lo, io_hi;
 		io_lo = pci_resource_start (dev, lo);
 		io_hi = 0;
@@ -3028,13 +3052,25 @@ static int parport_pc_pci_probe (struct pci_dev *dev,
                                         "hi" as an offset (see SYBA
                                         def.) */
 		/* TODO: test if sharing interrupts works */
-		printk (KERN_DEBUG "PCI parallel port detected: %04x:%04x, "
-			"I/O at %#lx(%#lx)\n",
-			parport_pc_pci_tbl[i + last_sio].vendor,
-			parport_pc_pci_tbl[i + last_sio].device, io_lo, io_hi);
+		irq = dev->irq;
+		if (irq == IRQ_NONE) {
+			printk (KERN_DEBUG
+	"PCI parallel port detected: %04x:%04x, I/O at %#lx(%#lx)\n",
+				parport_pc_pci_tbl[i + last_sio].vendor,
+				parport_pc_pci_tbl[i + last_sio].device,
+				io_lo, io_hi);
+			irq = PARPORT_IRQ_NONE;
+		} else {
+			printk (KERN_DEBUG
+	"PCI parallel port detected: %04x:%04x, I/O at %#lx(%#lx), IRQ %d\n",
+				parport_pc_pci_tbl[i + last_sio].vendor,
+				parport_pc_pci_tbl[i + last_sio].device,
+				io_lo, io_hi, irq);
+		}
 		data->ports[count] =
-			parport_pc_probe_port (io_lo, io_hi, PARPORT_IRQ_NONE,
-					       PARPORT_DMA_NONE, &dev->dev);
+			parport_pc_probe_port(io_lo, io_hi, irq,
+					       PARPORT_DMA_NONE, &dev->dev,
+					       IRQF_SHARED);
 		if (data->ports[count])
 			count++;
 	}
@@ -3143,7 +3179,8 @@ static int parport_pc_pnp_probe(struct pnp_dev *dev, const struct pnp_device_id 
 		dma = PARPORT_DMA_NONE;
 
 	dev_info(&dev->dev, "reported by %s\n", dev->protocol->name);
-	if (!(pdata = parport_pc_probe_port (io_lo, io_hi, irq, dma, &dev->dev)))
+	if (!(pdata = parport_pc_probe_port(io_lo, io_hi,
+					irq, dma, &dev->dev, 0)))
 		return -ENODEV;
 
 	pnp_set_drvdata(dev,pdata);
@@ -3192,11 +3229,11 @@ parport_pc_find_isa_ports (int autoirq, int autodma)
 {
 	int count = 0;
 
-	if (parport_pc_probe_port(0x3bc, 0x7bc, autoirq, autodma, NULL))
+	if (parport_pc_probe_port(0x3bc, 0x7bc, autoirq, autodma, NULL, 0))
 		count++;
-	if (parport_pc_probe_port(0x378, 0x778, autoirq, autodma, NULL))
+	if (parport_pc_probe_port(0x378, 0x778, autoirq, autodma, NULL, 0))
 		count++;
-	if (parport_pc_probe_port(0x278, 0x678, autoirq, autodma, NULL))
+	if (parport_pc_probe_port(0x278, 0x678, autoirq, autodma, NULL, 0))
 		count++;
 
 	return count;
@@ -3481,7 +3518,7 @@ static int __init parport_pc_init(void)
 			if ((io_hi[i]) == PARPORT_IOHI_AUTO)
 			       io_hi[i] = 0x400 + io[i];
 			parport_pc_probe_port(io[i], io_hi[i],
-						  irqval[i], dmaval[i], NULL);
+					  irqval[i], dmaval[i], NULL, 0);
 		}
 	} else
 		parport_pc_find_ports (irqval[0], dmaval[0]);

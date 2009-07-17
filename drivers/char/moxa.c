@@ -1184,6 +1184,11 @@ static int moxa_open(struct tty_struct *tty, struct file *filp)
 		return -ENODEV;
 	}
 
+	if (port % MAX_PORTS_PER_BOARD >= brd->numPorts) {
+		retval = -ENODEV;
+		goto out_unlock;
+	}
+
 	ch = &brd->ports[port % MAX_PORTS_PER_BOARD];
 	ch->port.count++;
 	tty->driver_data = ch;
@@ -1208,8 +1213,8 @@ static int moxa_open(struct tty_struct *tty, struct file *filp)
 				moxa_close_port(tty);
 	} else
 		ch->port.flags |= ASYNC_NORMAL_ACTIVE;
+out_unlock:
 	mutex_unlock(&moxa_openlock);
-
 	return retval;
 }
 
@@ -1486,11 +1491,11 @@ static int moxa_poll_port(struct moxa_port *p, unsigned int handle,
 	}
 
 	if (!handle) /* nothing else to do */
-		return 0;
+		goto put;
 
 	intr = readw(ip); /* port irq status */
 	if (intr == 0)
-		return 0;
+		goto put;
 
 	writew(0, ip); /* ACK port */
 	ofsAddr = p->tableAddr;
@@ -1499,16 +1504,17 @@ static int moxa_poll_port(struct moxa_port *p, unsigned int handle,
 				ofsAddr + HostStat);
 
 	if (!inited)
-		return 0;
+		goto put;
 
 	if (tty && (intr & IntrBreak) && !I_IGNBRK(tty)) { /* BREAK */
 		tty_insert_flip_char(tty, 0, TTY_BREAK);
 		tty_schedule_flip(tty);
 	}
-	tty_kref_put(tty);
 
 	if (intr & IntrLine)
 		moxa_new_dcdstate(p, readb(ofsAddr + FlagStat) & DCD_state);
+put:
+	tty_kref_put(tty);
 
 	return 0;
 }

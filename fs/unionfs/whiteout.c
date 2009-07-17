@@ -101,7 +101,7 @@ struct dentry *lookup_whiteout(const char *name, struct dentry *lower_parent)
 	}
 
 	/* check if whiteout exists in this branch: lookup .wh.foo */
-	wh_dentry = lookup_one_len(whname, lower_parent, strlen(whname));
+	wh_dentry = lookup_lck_len(whname, lower_parent, strlen(whname));
 	if (IS_ERR(wh_dentry)) {
 		err = PTR_ERR(wh_dentry);
 		goto out;
@@ -311,7 +311,7 @@ int create_whiteout(struct dentry *dentry, int start)
 		}
 
 		lower_wh_dentry =
-			lookup_one_len(name, lower_dentry->d_parent,
+			lookup_lck_len(name, lower_dentry->d_parent,
 				       dentry->d_name.len + UNIONFS_WHLEN);
 		if (IS_ERR(lower_wh_dentry))
 			continue;
@@ -334,7 +334,7 @@ int create_whiteout(struct dentry *dentry, int start)
 		if (!err)
 			err = vfs_create(lower_dir_dentry->d_inode,
 					 lower_wh_dentry,
-					 ~current->fs->umask & S_IRUGO,
+					 current_umask() & S_IRUGO,
 					 &nd);
 		unlock_dir(lower_dir_dentry);
 		dput(lower_wh_dentry);
@@ -397,7 +397,7 @@ static int do_delete_whiteouts(struct dentry *dentry, int bindex,
 
 			strlcpy(p, cursor->name, PATH_MAX - UNIONFS_WHLEN);
 			lower_dentry =
-				lookup_one_len(name, lower_dir_dentry,
+				lookup_lck_len(name, lower_dir_dentry,
 					       cursor->namelen +
 					       UNIONFS_WHLEN);
 			if (IS_ERR(lower_dentry)) {

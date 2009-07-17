@@ -8,7 +8,6 @@
 #include <linux/device-mapper.h>
 
 #include "dm-path-selector.h"
-#include "dm-bio-list.h"
 #include "dm-bio-record.h"
 #include "dm-uevent.h"
 
@@ -554,6 +553,12 @@ static int parse_path_selector(struct arg_set *as, struct priority_group *pg,
 		return -EINVAL;
 	}
 
+	if (ps_argc > as->argc) {
+		dm_put_path_selector(pst);
+		ti->error = "not enough arguments for path selector";
+		return -EINVAL;
+	}
+
 	r = pst->create(&pg->ps, ps_argc, as->argv);
 	if (r) {
 		dm_put_path_selector(pst);
@@ -700,6 +705,11 @@ static int parse_hw_handler(struct arg_set *as, struct multipath *m)
 	if (!hw_argc)
 		return 0;
 
+	if (hw_argc > as->argc) {
+		ti->error = "not enough arguments for hardware handler";
+		return -EINVAL;
+	}
+
 	m->hw_handler_name = kstrdup(shift(as), GFP_KERNEL);
 	request_module("scsi_dh_%s", m->hw_handler_name);
 	if (scsi_dh_handler_exist(m->hw_handler_name) == 0) {
@@ -837,6 +847,7 @@ static void multipath_dtr(struct dm_target *ti)
 
 	flush_workqueue(kmpath_handlerd);
 	flush_workqueue(kmultipathd);
+	flush_scheduled_work();
 	free_multipath(m);
 }
 

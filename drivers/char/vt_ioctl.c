@@ -396,10 +396,14 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 	kbd = kbd_table + console;
 	switch (cmd) {
 	case TIOCLINUX:
-		return tioclinux(tty, arg);
+		ret = tioclinux(tty, arg);
+		break;
 	case KIOCSOUND:
 		if (!perm)
 			goto eperm;
+		/* FIXME: This is an old broken API but we need to keep it
+		   supported and somehow separate the historic advertised
+		   tick rate from any real one */
 		if (arg)
 			arg = CLOCK_TICK_RATE / arg;
 		kd_mksound(arg, 0);
@@ -417,6 +421,9 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		 */
 		ticks = HZ * ((arg >> 16) & 0xffff) / 1000;
 		count = ticks ? (arg & 0xffff) : 0;
+		/* FIXME: This is an old broken API but we need to keep it
+		   supported and somehow separate the historic advertised
+		   tick rate from any real one */
 		if (count)
 			count = CLOCK_TICK_RATE / count;
 		kd_mksound(count, ticks);

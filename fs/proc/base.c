@@ -80,6 +80,7 @@
 #include <linux/oom.h>
 #include <linux/elf.h>
 #include <linux/pid_namespace.h>
+#include <linux/fs_struct.h>
 #include "internal.h"
 
 /* NOTE:
@@ -650,14 +651,14 @@ static unsigned mounts_poll(struct file *file, poll_table *wait)
 {
 	struct proc_mounts *p = file->private_data;
 	struct mnt_namespace *ns = p->ns;
-	unsigned res = 0;
+	unsigned res = POLLIN | POLLRDNORM;
 
 	poll_wait(file, &ns->poll, wait);
 
 	spin_lock(&vfsmount_lock);
 	if (p->event != ns->event) {
 		p->event = ns->event;
-		res = POLLERR;
+		res |= POLLERR | POLLPRI;
 	}
 	spin_unlock(&vfsmount_lock);
 
@@ -1530,7 +1531,7 @@ static int pid_delete_dentry(struct dentry * dentry)
 	return !proc_pid(dentry->d_inode)->tasks[PIDTYPE_PID].first;
 }
 
-static struct dentry_operations pid_dentry_operations =
+static const struct dentry_operations pid_dentry_operations =
 {
 	.d_revalidate	= pid_revalidate,
 	.d_delete	= pid_delete_dentry,
@@ -1702,7 +1703,7 @@ static int tid_fd_revalidate(struct dentry *dentry, struct nameidata *nd)
 	return 0;
 }
 
-static struct dentry_operations tid_fd_dentry_operations =
+static const struct dentry_operations tid_fd_dentry_operations =
 {
 	.d_revalidate	= tid_fd_revalidate,
 	.d_delete	= pid_delete_dentry,
@@ -1955,7 +1956,7 @@ static struct dentry *proc_pident_instantiate(struct inode *dir,
 	const struct pid_entry *p = ptr;
 	struct inode *inode;
 	struct proc_inode *ei;
-	struct dentry *error = ERR_PTR(-EINVAL);
+	struct dentry *error = ERR_PTR(-ENOENT);
 
 	inode = proc_pid_make_inode(dir->i_sb, task);
 	if (!inode)
@@ -2324,7 +2325,7 @@ static int proc_base_revalidate(struct dentry *dentry, struct nameidata *nd)
 	return 0;
 }
 
-static struct dentry_operations proc_base_dentry_operations =
+static const struct dentry_operations proc_base_dentry_operations =
 {
 	.d_revalidate	= proc_base_revalidate,
 	.d_delete	= pid_delete_dentry,
