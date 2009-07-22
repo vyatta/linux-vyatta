@@ -637,13 +637,6 @@ accept_redirects - BOOLEAN
 forwarding - BOOLEAN
 	Enable IP forwarding on this interface.
 
-loop - BOOLEAN
-	By default (loop=0) the traffic between local IP addresses
-	is routed via interface "lo". Setting this flag for two
-	interfaces allows traffic between their IP addresses to
-	be looped externally. This is useful for setups where the
-	interfaces are attached to same broadcast medium.
-
 mc_forwarding - BOOLEAN
 	Do multicast routing. The kernel needs to be compiled with CONFIG_MROUTE
 	and a multicast routing daemon is required.
