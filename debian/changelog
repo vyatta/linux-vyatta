@@ -1,3 +1,9 @@
+linux-2.6 (2.6.30-1+vyatta+11+jenner3) unstable; urgency=low
+
+  * Align vyatta kernel with upstream
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 22 Jul 2009 12:30:57 -0700
+
 linux-2.6 (2.6.30-1+vyatta+11+jenner2) unstable; urgency=low
 
   * Ignore derived patch files in debian build
