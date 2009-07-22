@@ -13,3 +13,5 @@ pkg
 ruleset
 scripts
 templates.in
+bin/patch.apply
+bin/patch.unpatch
