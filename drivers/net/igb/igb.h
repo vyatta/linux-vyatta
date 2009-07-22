@@ -137,15 +137,9 @@ struct igb_buffer {
 	};
 };
 
-struct igb_tx_queue_stats {
+struct igb_queue_stats {
 	u64 packets;
 	u64 bytes;
-};
-
-struct igb_rx_queue_stats {
-	u64 packets;
-	u64 bytes;
-	u64 drops;
 };
 
 struct igb_ring {
@@ -173,13 +167,12 @@ struct igb_ring {
 	union {
 		/* TX */
 		struct {
-			struct igb_tx_queue_stats tx_stats;
+			struct igb_queue_stats tx_stats;
 			bool detect_tx_hung;
 		};
 		/* RX */
 		struct {
-			struct igb_rx_queue_stats rx_stats;
-			u64 rx_queue_drops;
+			struct igb_queue_stats rx_stats;
 			struct napi_struct napi;
 			int set_itr;
 			struct igb_ring *buddy;
