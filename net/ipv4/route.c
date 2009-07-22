@@ -2127,6 +2127,13 @@ static int ip_route_input_slow(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 
 	if (res.type == RTN_LOCAL) {
 		int result;
+		int linkf = IN_DEV_LINKFILTER(in_dev);
+
+		if (linkf && !netif_running(res.fi->fib_dev))
+			goto no_route;
+		if (linkf > 1 && !netif_carrier_ok(res.fi->fib_dev))
+			goto no_route;
+
 		result = fib_validate_source(saddr, daddr, tos,
 					     net->loopback_dev->ifindex,
 					     dev, &spec_dst, &itag);
@@ -2618,10 +2625,43 @@ static int ip_route_output_slow(struct net *net, struct rtable **rp,
 	free_res = 1;
 
 	if (res.type == RTN_LOCAL) {
-		if (!fl.fl4_src)
-			fl.fl4_src = fl.fl4_dst;
+		struct in_device *in_dev;
+		__be32 src;
+
 		if (dev_out)
 			dev_put(dev_out);
+
+		in_dev = in_dev_get(dev_out);
+		src = fl.fl4_src ? : FIB_RES_PREFSRC(res);
+		if (in_dev && IN_DEV_LOOP(in_dev) && src) {
+			struct net_device *dev_src;
+
+			in_dev_put(in_dev);
+			in_dev = NULL;
+			dev_src = ip_dev_find(net, src);
+			if (dev_src && dev_src != dev_out &&
+			    (in_dev = in_dev_get(dev_src)) &&
+			    IN_DEV_LOOP(in_dev)) {
+				in_dev_put(in_dev);
+				dev_out = dev_src;
+				fl.fl4_src = src;
+				fl.oif = dev_out->ifindex;
+				res.type = RTN_UNICAST;
+				if (res.fi) {
+					fib_info_put(res.fi);
+					res.fi = NULL;
+				}
+				goto make_route;
+			}
+			if (dev_src)
+				dev_put(dev_src);
+		}
+		if (in_dev)
+			in_dev_put(in_dev);
+
+		if (!fl.fl4_src)
+			fl.fl4_src = fl.fl4_dst;
+
 		dev_out = net->loopback_dev;
 		dev_hold(dev_out);
 		fl.oif = dev_out->ifindex;
