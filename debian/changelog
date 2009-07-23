@@ -1,3 +1,11 @@
+linux-2.6 (2.6.30-1+vyatta+11+jenner4) unstable; urgency=low
+
+  * Use upstream version of IGB driver
+  * Fix some reverse path filter and link filter config issues
+  * Remove unused send-to-self patch
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 22 Jul 2009 17:34:11 -0700
+
 linux-2.6 (2.6.30-1+vyatta+11+jenner3) unstable; urgency=low
 
   * Align vyatta kernel with upstream
