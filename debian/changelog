@@ -1,3 +1,24 @@
+linux-2.6 (2.6.30-1+vyatta+13) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Ignore derived patch files in debian build
+  * Add link_filter and loop functionality back
+
+  [ Linus Torvalds ]
+  * fbmon: work around compiler bug in gcc-4.2.4
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.30.3
+
+  [ Stephen Hemminger ]
+  * Align vyatta kernel with upstream
+  * Use upstream version of IGB driver
+  * Remove unused send-to-self patch
+  * skbuff: skb_mac_header_was_set is always true on >32 bit
+  * skbuff: don't corrupt mac_header on skb expansion
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 24 Jul 2009 17:00:55 -0700
+
 linux-2.6 (2.6.30-1+vyatta+12) unstable; urgency=low
 
   * update version string 
