@@ -1,3 +1,9 @@
+linux-2.6 (2.6.30-1+vyatta+11+jenner5) unstable; urgency=low
+
+  * Revert "Update to ipset 3.0"
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 27 Jul 2009 15:22:59 -0700
+
 linux-2.6 (2.6.30-1+vyatta+11+jenner4) unstable; urgency=low
 
   * Use upstream version of IGB driver
