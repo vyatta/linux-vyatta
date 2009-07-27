@@ -1,5 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 6
+SUBLEVEL = 30
 #EXTRAVERSION = .3
 NAME = Man-Eating Seals of Antiquity
 
