@@ -22,7 +22,7 @@
 #include <linux/netfilter_ipv4/ip_set_macipmap.h>
 
 static int
-macipmap_utest(struct ip_set *set, const void *data, u_int32_t size,
+macipmap_utest(struct ip_set *set, const void *data, size_t size,
 	       ip_set_ip_t *hash_ip)
 {
 	const struct ip_set_macipmap *map = set->data;
@@ -35,7 +35,8 @@ macipmap_utest(struct ip_set *set, const void *data, u_int32_t size,
 	*hash_ip = req->ip;
 	DP("set: %s, ip:%u.%u.%u.%u, %u.%u.%u.%u",
 	   set->name, HIPQUAD(req->ip), HIPQUAD(*hash_ip));		
-	if (table[req->ip - map->first_ip].match) {
+	if (test_bit(IPSET_MACIP_ISSET,
+		     (void *) &table[req->ip - map->first_ip].flags)) {
 		return (memcmp(req->ethernet,
 			       &table[req->ip - map->first_ip].ethernet,
 			       ETH_ALEN) == 0);
@@ -63,7 +64,8 @@ macipmap_ktest(struct ip_set *set,
 	*hash_ip = ip;	
 	DP("set: %s, ip:%u.%u.%u.%u, %u.%u.%u.%u",
 	   set->name, HIPQUAD(ip), HIPQUAD(*hash_ip));		
-	if (table[ip - map->first_ip].match) {
+	if (test_bit(IPSET_MACIP_ISSET,
+	    (void *) &table[ip - map->first_ip].flags)) {
 		/* Is mac pointer valid?
 		 * If so, compare... */
 		return (skb_mac_header(skb) >= skb->head
@@ -86,13 +88,13 @@ macipmap_add(struct ip_set *set, ip_set_ip_t *hash_ip,
 
 	if (ip < map->first_ip || ip > map->last_ip)
 		return -ERANGE;
-	if (table[ip - map->first_ip].match)
+	if (test_and_set_bit(IPSET_MACIP_ISSET,
+			     (void *) &table[ip - map->first_ip].flags))
 		return -EEXIST;
 
 	*hash_ip = ip;
 	DP("%u.%u.%u.%u, %u.%u.%u.%u", HIPQUAD(ip), HIPQUAD(*hash_ip));
 	memcpy(&table[ip - map->first_ip].ethernet, ethernet, ETH_ALEN);
-	table[ip - map->first_ip].match = IPSET_MACIP_ISSET;
 	return 0;
 }
 
@@ -112,11 +114,11 @@ macipmap_del(struct ip_set *set, ip_set_ip_t *hash_ip, ip_set_ip_t ip)
 
 	if (ip < map->first_ip || ip > map->last_ip)
 		return -ERANGE;
-	if (!table[ip - map->first_ip].match)
+	if (!test_and_clear_bit(IPSET_MACIP_ISSET,
+				(void *)&table[ip - map->first_ip].flags))
 		return -EEXIST;
 
 	*hash_ip = ip;
-	table[ip - map->first_ip].match = 0;
 	DP("%u.%u.%u.%u, %u.%u.%u.%u", HIPQUAD(ip), HIPQUAD(*hash_ip));
 	return 0;
 }
