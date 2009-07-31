@@ -1,3 +1,205 @@
+linux-2.6 (2.6.30-1+vyatta+15) unstable; urgency=low
+
+  [ James Bottomley ]
+  * SCSI: zalon: fix oops on attach failure
+
+  [ David Howells ]
+  * NFSD: Don't hold unrefcounted creds over call to nfsd_setuser()
+
+  [ Clemens Ladisch ]
+  * sound: virtuoso: fix Xonar D1/DX silence after resume
+  * sound: usb-audio: add workaround for Blue Microphones devices
+
+  [ Paul E. McKenney ]
+  * fix RCU-callback-after-kmem_cache_destroy problem in sl[aou]b
+
+  [ Stephane Contri ]
+  * dsa: fix 88e6xxx statistics counter snapshotting
+
+  [ Tilman Schmidt ]
+  * gigaset: accept connection establishment messages in any order
+
+  [ Johannes Berg ]
+  * cfg80211: fix refcount leak
+
+  [ Dan Aloni ]
+  * Staging: prevent rtl8187se from crashing dev_ioctl() in SIOCGIWNAME
+
+  [ Alan Stern ]
+  * USB: handle zero-length usbfs submissions correctly
+
+  [ Greg Kroah-Hartman ]
+  * USB: ti_usb_3410_5052: fix duplicate device ids.
+
+  [ Oliver Neukum ]
+  * USB: fix uninitialised variable in ti_do_download
+  * USB: fix memleak in usbfs
+
+  [ David Brownell ]
+  * USB: RNDIS gadget, fix issues talking from PXA
+
+  [ Daniel Mack ]
+  * USB: fix LANGID=0 regression
+
+  [ Alan Stern ]
+  * USB: EHCI: report actual_length for iso transfers
+
+  [ Jeff Layton ]
+  * cifs: fix regression with O_EXCL creates and optimize away lookup
+  * cifs: free nativeFileSystem field before allocating a new one
+
+  [ Takashi Iwai ]
+  * ALSA: ca0106 - Fix the max capture buffer size
+  * ALSA: hda - Fix pin-setup for Sony VAIO with STAC9872 codecs
+
+  [ Hao Song ]
+  * ALSA: hda - Add quirk for Gateway T6834c laptop
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Fix mute control with some ALC262 models
+
+  [ Jiri Slaby ]
+  * HID: hiddev, fix lock imbalance
+
+  [ Nicolas Pitre ]
+  * mvsdio: fix handling of partial word at the end of PIO transfer
+
+  [ Mark Brown ]
+  * ASoC: Fix register cache initialisation for WM8753
+
+  [ Heiko Carstens ]
+  * partitions: fix broken uevent_suppress conversion
+
+  [ Kay Sievers ]
+  * vc: create vcs(a) devices for consoles
+
+  [ Jan Beulich ]
+  * x86: Fix fixmap ordering
+
+  [ Mathieu Desnoyers ]
+  * x86: Fix fixmap page order for FIX_TEXT_POKE0,1
+
+  [ FUJITA Tomonori ]
+  * block: fix sg SG_DXFER_TO_FROM_DEV regression
+
+  [ Ryusuke Konishi ]
+  * nilfs2: remove unlikely directive causing mis-conversion of error
+    code
+  * nilfs2: fix hang problem of log writer which occurs after write
+    failures
+  * nilfs2: fix incorrect KERN_CRIT messages in case of write failures
+
+  [ Jiro SEKIBA ]
+  * nilfs2: fix disorder in cp count on error during deleting
+    checkpoints
+
+  [ Peter Zijlstra ]
+  * sched_rt: Fix overload bug on rt group scheduling
+
+  [ Xiao Guangrong ]
+  * tracing/function: Fix the return value of
+    ftrace_trace_onoff_callback()
+
+  [ Yinghai Lu ]
+  * x86/pci: insert ioapic resource before assigning unassigned
+    resources
+
+  [ Thomas Gleixner ]
+  * sched: fix nr_uninterruptible accounting of frozen tasks really
+
+  [ Mikulas Patocka ]
+  * dm raid1: wake kmirrord when requeueing delayed bios after remote
+    recovery
+
+  [ Thomas Gleixner ]
+  * x86: geode: Mark mfgpt irq IRQF_TIMER to prevent resume failure
+
+  [ Uros Bizjak ]
+  * x86: Fix movq immediate operand constraints in uaccess_64.h
+
+  [ H. Peter Anvin ]
+  * x86: Fix movq immediate operand constraints in uaccess.h
+
+  [ Alexey Fisher ]
+  * x86: Add quirk for Intel DG45ID board to avoid low memory corruption
+
+  [ Andi Kleen ]
+  * x86-64: Fix bad_srat() to clear all state
+
+  [ Helge Deller ]
+  * parisc: ensure broadcast tlb purge runs single threaded
+  * parisc: fix ldcw inline assembler
+
+  [ Marc Aurele La France ]
+  * x86, setup (2.6.30-stable) fix 80x34 and 80x60 console modes
+
+  [ Jorrit Schippers ]
+  * Staging: rt2870: Add USB ID for Sitecom WL-608
+
+  [ Mel Gorman ]
+  * vmscan: do not unconditionally treat zones that fail zone_reclaim()
+    as full
+
+  [ Linus Torvalds ]
+  * x86: don't use 'access_ok()' as a range check in
+    get_user_pages_fast()
+
+  [ Josef Bacik ]
+  * mm: mark page accessed before we write_end()
+
+  [ Amerigo Wang ]
+  * elf: fix one check-after-use
+
+  [ Jiri Slaby ]
+  * hwmon: (max6650) Fix lock imbalance
+
+  [ Benjamin Herrenschmidt ]
+  * powerpc/mpic: Fix mapping of "DCR" based MPIC variants
+
+  [ Patrick McHardy ]
+  * netfilter: nf_log: fix sleeping function called from invalid context
+  * netfilter: nf_conntrack: fix confirmation race condition
+  * netfilter: nf_conntrack: fix conntrack lookup race
+  * netfilter: nf_log: fix direct userspace memory access in proc
+    handler
+
+  [ Jan Engelhardt ]
+  * netfilter: xt_quota: fix incomplete initialization
+
+  [ Patrick McHardy ]
+  * netfilter: xt_rateest: fix comparison with self
+  * netfilter: tcp conntrack: fix unacknowledged data detection with NAT
+
+  [ Eric Dumazet ]
+  * nf_conntrack: nf_conntrack_alloc() fixes
+
+  [ Ben Hutchings ]
+  * netdev: restore MAC address set and validate operations
+  * netdev: restore MTU change operation
+
+  [ Giuseppe Mazzotta ]
+  * Input: wistron_btns - recognize Maxdata Pro 7000 notebooks
+
+  [ Tejun Heo ]
+  * libata: fix follow-up SRST failure path
+
+  [ Paul Mundt ]
+  * nommu: Provide mmap_min_addr definition.
+
+  [ Tyler Hicks ]
+  * eCryptfs: Check Tag 11 literal data buffer size (CVE-2009-2406)
+
+  [ Ramon de Carvalho Valle ]
+  * eCryptfs: parse_tag_3_packet check tag 3 packet encrypted key size
+    (CVE-2009-2407)
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.30.4
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 31 Jul 2009 08:53:37 -0700
+
 linux-2.6 (2.6.30-1+vyatta+14) unstable; urgency=low
 
   * add missing SUBVERSION
