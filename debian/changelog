@@ -1,3 +1,16 @@
+linux-2.6 (2.6.30-1+vyatta+11+jenner7) unstable; urgency=low
+
+  [ Linus Torvalds ]
+  * Make sock_sendpage() use kernel_sendpage()
+
+  [ Brian Haley ]
+  * IPv6: Add 'autoconf' and 'disable_ipv6' module parameters
+
+  [ Stephen Hemminger ]
+  * ipv6: backport for rtnl_lock restart
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 26 Aug 2009 22:37:22 -0700
+
 linux-2.6 (2.6.30-1+vyatta+11+jenner6) unstable; urgency=low
 
   [ Linus Torvalds ]
