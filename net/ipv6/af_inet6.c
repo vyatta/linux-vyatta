@@ -831,13 +831,20 @@ static struct sk_buff **ipv6_gro_receive(struct sk_buff **head,
 	struct sk_buff *p;
 	struct ipv6hdr *iph;
 	unsigned int nlen;
+	unsigned int hlen;
+	unsigned int off;
 	int flush = 1;
 	int proto;
 	__wsum csum;
 
-	iph = skb_gro_header(skb, sizeof(*iph));
-	if (unlikely(!iph))
-		goto out;
+	off = skb_gro_offset(skb);
+	hlen = off + sizeof(*iph);
+	iph = skb_gro_header_fast(skb, off);
+	if (skb_gro_header_hard(skb, hlen)) {
+		iph = skb_gro_header_slow(skb, hlen, off);
+		if (unlikely(!iph))
+			goto out;
+	}
 
 	skb_gro_pull(skb, sizeof(*iph));
 	skb_set_transport_header(skb, skb_gro_offset(skb));
@@ -1279,6 +1286,8 @@ static void __exit inet6_exit(void)
 	proto_unregister(&udplitev6_prot);
 	proto_unregister(&udpv6_prot);
 	proto_unregister(&tcpv6_prot);
+
+	rcu_barrier(); /* Wait for completion of call_rcu()'s */
 }
 module_exit(inet6_exit);
 

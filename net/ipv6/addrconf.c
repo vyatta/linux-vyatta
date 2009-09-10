@@ -503,7 +503,7 @@ static int addrconf_fixup_forwarding(struct ctl_table *table, int *p, int old)
 		return 0;
 
 	if (!rtnl_trylock())
-		return -ERESTARTSYS;
+		return restart_syscall();
 
 	if (p == &net->ipv6.devconf_all->forwarding) {
 		__s32 newf = net->ipv6.devconf_all->forwarding;
@@ -1519,6 +1519,8 @@ static int addrconf_ifid_infiniband(u8 *eui, struct net_device *dev)
 
 int __ipv6_isatap_ifid(u8 *eui, __be32 addr)
 {
+	if (addr == 0)
+		return -1;
 	eui[0] = (ipv4_is_zeronet(addr) || ipv4_is_private_10(addr) ||
 		  ipv4_is_loopback(addr) || ipv4_is_linklocal_169(addr) ||
 		  ipv4_is_private_172(addr) || ipv4_is_test_192(addr) ||
@@ -1914,8 +1916,32 @@ ok:
 					update_lft = 1;
 				else if (stored_lft <= MIN_VALID_LIFETIME) {
 					/* valid_lft <= stored_lft is always true */
-					/* XXX: IPsec */
-					update_lft = 0;
+					/*
+					 * RFC 4862 Section 5.5.3e:
+					 * "Note that the preferred lifetime of
+					 *  the corresponding address is always
+					 *  reset to the Preferred Lifetime in
+					 *  the received Prefix Information
+					 *  option, regardless of whether the
+					 *  valid lifetime is also reset or
+					 *  ignored."
+					 *
+					 *  So if the preferred lifetime in
+					 *  this advertisement is different
+					 *  than what we have stored, but the
+					 *  valid lifetime is invalid, just
+					 *  reset prefered_lft.
+					 *
+					 *  We must set the valid lifetime
+					 *  to the stored lifetime since we'll
+					 *  be updating the timestamp below,
+					 *  else we'll set it back to the
+					 *  minumum.
+					 */
+					if (prefered_lft != ifp->prefered_lft) {
+						valid_lft = stored_lft;
+						update_lft = 1;
+					}
 				} else {
 					valid_lft = MIN_VALID_LIFETIME;
 					if (valid_lft < prefered_lft)
@@ -2643,23 +2669,18 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 		write_lock_bh(&idev->lock);
 	}
 #endif
-	bifa = &idev->addr_list;
-	while ((ifa = *bifa) != NULL) {
-		if (how || !(ifa->flags & IFA_F_PERMANENT)) {
-			*bifa = ifa->if_next;
-			ifa->if_next = NULL;
-			ifa->dead = 1;
-			addrconf_del_timer(ifa);
-			write_unlock_bh(&idev->lock);
+	while ((ifa = idev->addr_list) != NULL) {
+		idev->addr_list = ifa->if_next;
+		ifa->if_next = NULL;
+		ifa->dead = 1;
+		addrconf_del_timer(ifa);
+		write_unlock_bh(&idev->lock);
 
-			__ipv6_ifa_notify(RTM_DELADDR, ifa);
-			atomic_notifier_call_chain(&inet6addr_chain, NETDEV_DOWN, ifa);
-			in6_ifa_put(ifa);
+		__ipv6_ifa_notify(RTM_DELADDR, ifa);
+		atomic_notifier_call_chain(&inet6addr_chain, NETDEV_DOWN, ifa);
+		in6_ifa_put(ifa);
 
-			write_lock_bh(&idev->lock);
-			continue;
-		}
-		bifa = &ifa->if_next;
+		write_lock_bh(&idev->lock);
 	}
 	write_unlock_bh(&idev->lock);
 
@@ -2769,7 +2790,7 @@ static void addrconf_dad_start(struct inet6_ifaddr *ifp, u32 flags)
 		spin_unlock_bh(&ifp->lock);
 		read_unlock_bh(&idev->lock);
 		/*
-		 * If the defice is not ready:
+		 * If the device is not ready:
 		 * - keep it tentative if it is a permanent address.
 		 * - otherwise, kill it.
 		 */
@@ -3088,7 +3109,7 @@ restart:
 				spin_unlock(&ifp->lock);
 				continue;
 			} else if (age >= ifp->prefered_lft) {
-				/* jiffies - ifp->tsamp > age >= ifp->prefered_lft */
+				/* jiffies - ifp->tstamp > age >= ifp->prefered_lft */
 				int deprecate = 0;
 
 				if (!(ifp->flags&IFA_F_DEPRECATED)) {
@@ -3365,7 +3386,10 @@ static int inet6_fill_ifaddr(struct sk_buff *skb, struct inet6_ifaddr *ifa,
 		valid = ifa->valid_lft;
 		if (preferred != INFINITY_LIFE_TIME) {
 			long tval = (jiffies - ifa->tstamp)/HZ;
-			preferred -= tval;
+			if (preferred > tval)
+				preferred -= tval;
+			else
+				preferred = 0;
 			if (valid != INFINITY_LIFE_TIME)
 				valid -= tval;
 		}
@@ -3663,7 +3687,6 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 #endif
 	array[DEVCONF_DISABLE_IPV6] = cnf->disable_ipv6;
 	array[DEVCONF_ACCEPT_DAD] = cnf->accept_dad;
-	array[DEVCONF_LINK_FILTER] = cnf->link_filter;
 }
 
 static inline size_t inet6_if_nlmsg_size(void)
@@ -4031,7 +4054,9 @@ static int addrconf_disable_ipv6(struct ctl_table *table, int *p, int old)
 	if (p == &net->ipv6.devconf_dflt->disable_ipv6)
 		return 0;
 
-	rtnl_lock();
+	if (!rtnl_trylock())
+		return restart_syscall();
+
 	if (p == &net->ipv6.devconf_all->disable_ipv6) {
 		__s32 newf = net->ipv6.devconf_all->disable_ipv6;
 		net->ipv6.devconf_dflt->disable_ipv6 = newf;
