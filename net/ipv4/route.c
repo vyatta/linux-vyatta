@@ -2637,10 +2637,8 @@ static int ip_route_output_slow(struct net *net, struct rtable **rp,
 	if (res.type == RTN_LOCAL) {
 		if (!fl.fl4_src)
 			fl.fl4_src = fl.fl4_dst;
-
 		if (dev_out)
 			dev_put(dev_out);
-
 		dev_out = net->loopback_dev;
 		dev_hold(dev_out);
 		fl.oif = dev_out->ifindex;
