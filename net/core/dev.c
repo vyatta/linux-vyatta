@@ -1009,9 +1009,9 @@ void netdev_state_change(struct net_device *dev)
 	}
 }
 
-void netdev_bonding_change(struct net_device *dev)
+void netdev_bonding_change(struct net_device *dev, unsigned long event)
 {
-	call_netdevice_notifiers(NETDEV_BONDING_FAILOVER, dev);
+	call_netdevice_notifiers(event, dev);
 }
 EXPORT_SYMBOL(netdev_bonding_change);
 
