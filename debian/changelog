@@ -1,3 +1,452 @@
+linux-2.6 (2.6.30-1+vyatta+16) unstable; urgency=low
+
+  [ Reinette Chatre ]
+  * iwlwifi: only show active power level via sysfs
+
+  [ Ajit Khaparde ]
+  * be2net: Fix to avoid a crash seen on PPC with LRO and Jumbo frames.
+
+  [ Krzysztof Halasa ]
+  * E100: work around the driver using streaming DMA mapping for RX
+    descriptors.
+
+  [ Herbert Xu ]
+  * ipsec: Fix name of CAST algorithm
+
+  [ Anton Vorontsov ]
+  * sky2: Fix checksum endianness
+
+  [ David Brownell ]
+  * usbnet cdc_subset: fix issues talking to PXA gadgets
+
+  [ Eric Dumazet ]
+  * net: sk_prot_alloc() should not blindly overwrite memory
+  * net: sock_copy() fixes
+
+  [ Herbert Xu ]
+  * gro: Flush GRO packets in napi_disable_pending path
+  * gso: Stop fraglists from escaping
+  * net: Move rx skb_orphan call to where needed
+  * inet: Call skb_orphan before tproxy activates
+
+  [ Eric Anholt ]
+  * drm/i915: Save/restore cursor state on suspend/resume.
+
+  [ Jarod Wilson ]
+  * drm/i915: add ignore lvds quirk info for AOpen Mini PC
+
+  [ Jesse Barnes ]
+  * drm/i915: apply G45 vblank count code to all G4x chips and fix
+    max_frame_count
+  * drm/i915: avoid non-atomic sysrq execution
+
+  [ Michael Cousin ]
+  * drm/i915: Skip lvds with Aopen i945GTt-VFA
+
+  [ Keith Packard ]
+  * drm/i915: Hook connector to encoder during load detection (fixes
+    tv/vga detect)
+
+  [ Grégoire Henry ]
+  * drm/i915: initialize fence registers to zero when loading GEM
+
+  [ Ma Ling ]
+  * drm/i915: Set SSC frequency for 8xx chips correctly
+
+  [ Peter Oberparleiter ]
+  * sysfs: fix hardlink count on device_move
+
+  [ Giacomo Lozito ]
+  * USB: storage: raise timeout in usb_stor_Bulk_max_lun
+
+  [ Lu Zhihe ]
+  * edac: x38 fix mchbar high register addr
+
+  [ John Stoffel ]
+  * Make SCSI SG v4 driver enabled by default and remove EXPERIMENTAL
+    dependency, since udev depends on BSG
+
+  [ Tom Peng ]
+  * SCSI: libsas: reuse the original port when hotplugging phys in wide
+    ports
+
+  [ Jeff Layton ]
+  * cifs: fix error handling in mount-time DFS referral chasing code
+
+  [ Henrique de Moraes Holschuh ]
+  * thinkpad-acpi: disable broken bay and dock subdrivers
+
+  [ Ryusuke Konishi ]
+  * nilfs2: fix oops due to inconsistent state in page with discrete b-
+    tree nodes
+
+  [ Lai Jiangshan ]
+  * tracing: Fix invalid function_graph entry
+  * tracing: Fix missing function_graph events when we splice_read from
+    trace_pipe
+
+  [ Michael Buesch ]
+  * parisc: isa-eeprom - Fix loff_t usage
+
+  [ Johannes Berg ]
+  * cfg80211: add two missing NULL pointer checks
+
+  [ Hiroshi Shimamoto ]
+  * posix-timers: Fix oops in clock_nanosleep() with CLOCK_MONOTONIC_RAW
+
+  [ Bartlomiej Zolnierkiewicz ]
+  * PM / ACPI: HP G7000 Notebook needs a SCI_EN resume quirk
+
+  [ Peter Korsgaard ]
+  * powerpc/mpc83xx: Fix usb mux setup for mpc834x
+
+  [ Eric Sandeen ]
+  * hugetlbfs: fix i_blocks accounting
+
+  [ Mel Gorman ]
+  * page-allocator: preserve PFN ordering when __GFP_COLD is set
+
+  [ Thomas Hellstrom ]
+  * x86: Fix CPA memtype reserving in the set_pages_array*() cases
+
+  [ H. Peter Anvin ]
+  * x86: fix assembly constraints in native_save_fl()
+
+  [ Pallipadi, Venkatesh ]
+  * x86, pat: Fix set_memory_wc related corruption
+
+  [ Dan Williams ]
+  * md/raid6: release spare page at ->stop()
+
+  [ NeilBrown ]
+  * md: when a level change reduces the number of devices, remove the
+    excess.
+
+  [ Bartlomiej Zolnierkiewicz ]
+  * ide: fix handling of unexpected IRQs vs request_irq()
+  * ide: relax DMA info validity checking
+
+  [ Luca Tettamanti ]
+  * hwmon: (asus_atk0110) Fix upper limit readings
+
+  [ Jean Delvare ]
+  * hwmon: (smsc47m1) Differentiate between LPC47M233 and LPC47M292
+
+  [ Michele Jr De Candia ]
+  * i2c/tsl2550: Fix lux value in dark environment
+
+  [ Stefan Richter ]
+  * firewire: sbp2: add support for disks >2 TB (and 16 bytes long CDBs)
+  * ieee1394: sbp2: add support for disks >2 TB (and 16 bytes long CDBs)
+
+  [ Roel Kluin ]
+  * atl1c: WAKE_MCAST tested twice, not WAKE_UCAST
+
+  [ roel kluin ]
+  * atl1c: add missing parentheses
+  * atl1c: misplaced parenthesis
+
+  [ Neil Brown ]
+  * md: Handle growth of v1.x metadata correctly.
+
+  [ Eric Dumazet ]
+  * execve: must clear current->clear_child_tid
+
+  [ Linus Torvalds ]
+  * flat: fix uninitialized ptr with shared libs
+
+  [ Eric Sandeen ]
+  * compat_ioctl: hook up compat handler for FIEMAP ioctl
+
+  [ Xiao Guangrong ]
+  * generic-ipi: fix hotplug_cfd()
+
+  [ Greg Kroah-Hartman ]
+  * Staging: rt2870: Revert d44ca7 Removal of kernel_thread() API
+
+  [ Marko Hänninen ]
+  * USB: ftdi_sio: add vendor and product id for Bayer glucose meter
+    serial converter cable
+
+  [ Dhaval Vasa ]
+  * USB: ftdi_sio: add product_id for Marvell OpenRD Base, Client
+
+  [ Rogerio Brito ]
+  * USB: storage: include Prolific Technology USB drive in unusual_devs
+    list
+
+  [ Alan Stern ]
+  * USB: usbfs: fix -ENOENT error code to be -ENODEV
+
+  [ Michael Buesch ]
+  * USB: devio: Properly do access_ok() checks
+
+  [ Eric Dumazet ]
+  * ring-buffer: Fix memleak in ring_buffer_free()
+
+  [ Alok Kataria ]
+  * x86: Fix VMI && stack protector
+
+  [ Oleg Nesterov ]
+  * mm_for_maps: simplify, use ptrace_may_access()
+  * mm_for_maps: shift down_read(mmap_sem) to the caller
+  * mm_for_maps: take ->cred_guard_mutex to fix the race with exec
+
+  [ Linus Torvalds ]
+  * Make sock_sendpage() use kernel_sendpage()
+
+  [ Robert Richter ]
+  * ring-buffer: Fix advance of reader in rb_buffer_peek()
+
+  [ Trond Myklebust ]
+  * NFS: Fix an O_DIRECT Oops...
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Add missing vmaster initialization for ALC269
+
+  [ Maxime Bizon ]
+  * ide: fix memory leak when flush command is issued
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.30.5
+
+  [ Hannes Hering ]
+  * ehea: Fix napi list corruption on ifconfig down
+
+  [ Guillaume Knispel ]
+  * poll/select: initialize triggered field of struct poll_wqueues
+
+  [ Linus Torvalds ]
+  * Make bitmask 'and' operators return a result code
+  * x86: don't send an IPI to the empty set of CPU's
+  * x86: don't call '->send_IPI_mask()' with an empty mask
+
+  [ Bo Liu ]
+  * mm: build_zonelists(): move clear node_load[] to
+    __build_all_zonelists()
+
+  [ Pavel Roskin ]
+  * rt2x00: fix memory corruption in rf cache, add a sanity check
+
+  [ Luis R. Rodriguez ]
+  * mac80211: fix panic when splicing unprepared TIDs
+
+  [ Linus Torvalds ]
+  * Re-introduce page mapping check in mark_buffer_dirty()
+
+  [ Hugh Dickins ]
+  * mm: fix hugetlb bug due to user_shm_unlock call
+
+  [ Mimi Zohar ]
+  * ima: hashing large files bug fix
+  * kernel_read: redefine offset type
+
+  [ Ingo Molnar ]
+  * tracing: Fix too large stack usage in do_one_initcall()
+
+  [ Clemens Ladisch ]
+  * sound: pcm_lib: fix unsorted list constraint handling
+
+  [ Oleg Nesterov ]
+  * clone(): fix race between copy_process() and de_thread()
+
+  [ Costantino Leandro ]
+  * wmi: fix kernel panic when stack protection enabled.
+
+  [ Trond Myklebust ]
+  * SUNRPC: Fix rpc_task_force_reencode
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Fix MacBookPro 3,1/4,1 quirk with ALC889A
+
+  [ Marcelo Tosatti ]
+  * KVM: take mmu_lock when updating a deleted slot
+  * KVM: x86: check for cr3 validity in mmu_alloc_roots
+  * KVM: MMU: protect kvm_mmu_change_mmu_pages with mmu_lock
+
+  [ Gleb Natapov ]
+  * KVM: MMU: do not free active mmu pages in free_mmu_pages()
+
+  [ Glauber Costa ]
+  * KVM: Introduce {set/get}_interrupt_shadow()
+  * KVM: Deal with interrupt shadow state for emulated instructions
+
+  [ Avi Kivity ]
+  * KVM: MMU: Use different shadows when EFER.NXE changes
+
+  [ Amit Shah ]
+  * KVM: x86: Ignore reads to EVNTSEL MSRs
+  * KVM: Ignore reads to K7 EVNTSEL MSRs
+
+  [ Avi Kivity ]
+  * KVM: Fix cpuid feature misreporting
+
+  [ Marcelo Tosatti ]
+  * KVM: x86: verify MTRR/PAT validity
+  * KVM: SVM: force new asid on vcpu migration
+  * KVM: MMU: handle n_free_mmu_pages > n_alloc_mmu_pages in
+    kvm_mmu_change_mmu_pages
+  * KVM: MMU: limit rmap chain length
+
+  [ Michael S. Tsirkin ]
+  * KVM: fix ack not being delivered when msi present
+
+  [ Jan Kiszka ]
+  * KVM: Fix KVM_GET_MSR_INDEX_LIST
+
+  [ Stanislaw Gruszka ]
+  * iwl3945: fix rfkill switch
+
+  [ Reinette Chatre ]
+  * iwlagn: do not send key clear commands when rfkill enabled
+
+  [ Tejun Heo ]
+  * libata: OCZ Vertex can't do HPA
+
+  [ Kashyap, Desai ]
+  * SCSI: mpt2sas: Introduced check for enclosure_handle to avoid crash
+  * SCSI: mpt2sas: Expander fix oops saying "Already part of another
+    port"
+  * SCSI: mpt2sas: Raid 10 Value is showing as Raid 1E in
+    /va/log/messages
+  * SCSI: mpt2sas: Excessive log info causes sas iounit page time out
+  * SCSI: mpt2sas: fix infinite loop inside config request
+  * SCSI: mpt2sas: fix crash due to Watchdog is active while OS in
+    standby mode
+  * SCSI: mpt2sas: fix oops because drv data points to NULL on resume
+    from hibernate
+  * mpt2sas: fix config request and diag reset deadlock
+
+  [ Linus Torvalds ]
+  * do_sigaltstack: avoid copying 'stack_t' as a structure to user space
+
+  [ Fenghua Yu ]
+  * Bug Fix arch/ia64/kernel/pci-dma.c: fix recursive dma_supported()
+    call in iommu_dma_supported()
+
+  [ Jeremy Fitzhardinge ]
+  * x86, amd: Don't probe for extended APIC ID if APICs are disabled
+
+  [ Sunil Mushran ]
+  * ocfs2: Initialize the cluster we're writing to in a non-sparse
+    extend
+
+  [ Frans Pop ]
+  * ACPI processor: force throttling state when BIOS returns incorrect
+    value
+
+  [ Christoph Hellwig ]
+  * vfs: fix inode_init_always calling convention
+  * vfs: add __destroy_inode
+  * xfs: fix freeing of inodes not yet added to the inode cache
+  * xfs: fix spin_is_locked assert on uni-processor builds
+
+  [ Jean-Francois Moine ]
+  * gspca - ov534: Fix ov772x
+
+  [ Oleg Nesterov ]
+  * kthreads: fix kthread_create() vs kthread_stop() race
+
+  [ Bruno Prémont ]
+  * ipv6: Fix commit 63d9950b08184e6531adceb65f64b429909cc101 (ipv6:
+    Make v4-mapped bindings consistent with IPv4)
+
+  [ Alan Stern ]
+  * USB: fix the clear_tt_buffer interface
+  * USB: EHCI: use the new clear_tt_buffer interface
+  * USB: EHCI: fix two new bugs related to Clear-TT-Buffer
+
+  [ Geert Uytterhoeven ]
+  * powerpc/ps3: Add missing check for PS3 to rtc-ps3 platform device
+    registration
+
+  [ Julien TINNES ]
+  * ipv4: make ip_append_data() handle NULL routing table
+
+  [ Dan Carpenter ]
+  * ar9170: fix read & write outside array bounds
+
+  [ Michal Schmidt ]
+  * xenfb: connect to backend before registering fb
+
+  [ Eric Dumazet ]
+  * can: Fix raw_getname() leak
+  * irda: Fix irda_getname() leak
+  * appletalk: fix atalk_getname() leak
+  * netrom: Fix nr_getname() leak
+  * econet: Fix econet_getname() leak
+  * rose: Fix rose_getname() leak
+
+  [ Jiri Slaby ]
+  * NET: llc, zero sockaddr_llc struct
+
+  [ Sunil Mushran ]
+  * ocfs2: ocfs2_write_begin_nolock() should handle len=0
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.30.6
+
+  [ Wei Yongjun ]
+  * dccp: missing destroy of percpu counter variable while unload module
+
+  [ Krzysztof Hałasa ]
+  * E100: fix interaction with swiotlb on X86.
+
+  [ Tom Goff ]
+  * gre: Fix MTU calculation for bound GRE tunnels
+
+  [ Ben McKeegan ]
+  * ppp: fix lost fragments in ppp_mp_explode() (resubmit)
+
+  [ Eric Dumazet ]
+  * pppol2tp: calls unregister_pernet_gen_device() at unload time
+  * net: net_assign_generic() fix
+
+  [ David S. Miller ]
+  * sparc64: Kill spurious NMI watchdog triggers by increasing limit to
+    30 seconds.
+  * sparc64: Validate linear D-TLB misses.
+  * sparc64: Fix bootup with mcount in some configs.
+
+  [ Mathieu Desnoyers ]
+  * sparc: sys32.S incorrect compat-layer splice() system call
+
+  [ Massimo Cirillo ]
+  * JFFS2: add missing verify buffer allocation/deallocation
+
+  [ Eric Dumazet ]
+  * slub: Fix kmem_cache_destroy() with SLAB_DESTROY_BY_RCU
+
+  [ Ryusuke Konishi ]
+  * nilfs2: fix preempt count underflow in
+    nilfs_btnode_prepare_change_key
+
+  [ Chris Wright ]
+  * PCI SR-IOV: correct broken resource alignment calculations
+
+  [ James Bottomley ]
+  * SCSI: sd: fix bug in SCSI async probing
+
+  [ Clemens Ladisch ]
+  * sound: oxygen: handle cards with missing EEPROM
+  * sound: oxygen: fix MCLK rate for 192 kHz playback
+
+  [ Jonathan Brassow ]
+  * dm raid1: do not allow log_failure variable to unset after being set
+
+  [ Mikulas Patocka ]
+  * dm snapshot: refactor zero_disk_area to use chunk_io
+  * dm snapshot: fix header corruption race on invalidation
+  * dm exception store: split set_chunk_size
+  * dm snapshot: fix on disk chunk size validation
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.30.7
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 16 Sep 2009 10:44:25 -0700
+
 linux-2.6 (2.6.30-1+vyatta+15) unstable; urgency=low
 
   [ James Bottomley ]
