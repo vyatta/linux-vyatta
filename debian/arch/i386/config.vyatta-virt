@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.31
-# Thu Sep 10 10:46:36 2009
+# Fri Oct  2 11:21:41 2009
 #
 # CONFIG_64BIT is not set
 CONFIG_X86_32=y
@@ -3365,7 +3365,6 @@ CONFIG_MISC_FILESYSTEMS=y
 # CONFIG_ADFS_FS is not set
 # CONFIG_AFFS_FS is not set
 CONFIG_ECRYPT_FS=m
-# CONFIG_AUFS_FS is not set
 CONFIG_UNION_FS=m
 CONFIG_UNION_FS_XATTR=y
 # CONFIG_UNION_FS_DEBUG is not set
