@@ -167,7 +167,6 @@ if MISC_FILESYSTEMS
 source "fs/adfs/Kconfig"
 source "fs/affs/Kconfig"
 source "fs/ecryptfs/Kconfig"
-source "fs/aufs/Kconfig"
 source "fs/unionfs/Kconfig"
 source "fs/hfs/Kconfig"
 source "fs/hfsplus/Kconfig"
