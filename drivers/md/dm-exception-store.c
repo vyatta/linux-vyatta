@@ -186,7 +186,7 @@ int dm_exception_store_set_chunk_size(struct dm_exception_store *store,
 	}
 
 	/* Validate the chunk size against the device block size */
-	if (chunk_size_ulong % (bdev_hardsect_size(store->cow->bdev) >> 9)) {
+	if (chunk_size_ulong % (bdev_logical_block_size(store->cow->bdev) >> 9)) {
 		*error = "Chunk size is not a multiple of device blocksize";
 		return -EINVAL;
 	}

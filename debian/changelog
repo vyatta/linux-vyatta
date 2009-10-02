@@ -1,10 +1,25 @@
-linux-2.6 (2.6.30-6+vyatta+16) unstable; urgency=low
+linux-2.6 (2.6.31-1+vyatta+3) unstable; urgency=low
 
-  * Change version number to force build
+  * merge in 2.6.31.1
+  * update to Unionfs 2.5.3
+  * remove aufs -- never used
 
- -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Sat, 19 Sep 2009 11:05:17 -0700
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 02 Oct 2009 10:47:01 -0700
 
-linux-2.6 (2.6.30-1+vyatta+16) unstable; urgency=low
+linux-2.6 (2.6.31-1+vyatta+2) unstable; urgency=low
+
+  * minimize differences between kenwood and upstream
+  * Add sysctl hook for link_filter
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 15 Sep 2009 16:01:53 -0700
+
+linux-2.6 (2.6.31-1+vyatta+1) UNRELEASED; urgency=low
+
+  * Merge in 2.6.31
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Thu, 10 Sep 2009 13:11:03 -0700
+
+linux-2.6 (2.6.30-6+vyatta+1) unstable; urgency=low
 
   [ Reinette Chatre ]
   * iwlwifi: only show active power level via sysfs
@@ -392,6 +407,7 @@ linux-2.6 (2.6.30-1+vyatta+16) unstable; urgency=low
   [ Greg Kroah-Hartman ]
   * Linux 2.6.30.6
 
+<<<<<<< HEAD:debian/changelog
   [ Wei Yongjun ]
   * dccp: missing destroy of percpu counter variable while unload module
 
@@ -452,6 +468,15 @@ linux-2.6 (2.6.30-1+vyatta+16) unstable; urgency=low
   [ Stephen Hemminger ]
 
  -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 16 Sep 2009 10:44:25 -0700
+=======
+  [ Brian Haley ]
+  * IPv6: Add 'autoconf' and 'disable_ipv6' module parameters
+
+  [ Stephen Hemminger ]
+  * ipv6: backport for rtnl_lock restart
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 09 Sep 2009 09:30:27 -0700
+>>>>>>> 151fb28e9816830cf3f6e4da461cb597f5db9934:debian/changelog
 
 linux-2.6 (2.6.30-1+vyatta+15) unstable; urgency=low
 
