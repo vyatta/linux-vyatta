@@ -1058,7 +1058,7 @@ EXPORT_SYMBOL(generic_splice_sendpage);
  * Attempt to initiate a splice from pipe to file.
  */
 long vfs_splice_from(struct pipe_inode_info *pipe, struct file *out,
-			   loff_t *ppos, size_t len, unsigned int flags)
+		     loff_t *ppos, size_t len, unsigned int flags)
 {
 	ssize_t (*splice_write)(struct pipe_inode_info *, struct file *,
 				loff_t *, size_t, unsigned int);
@@ -1086,8 +1086,8 @@ EXPORT_SYMBOL_GPL(vfs_splice_from);
  * Attempt to initiate a splice from a file to a pipe.
  */
 long vfs_splice_to(struct file *in, loff_t *ppos,
-			 struct pipe_inode_info *pipe, size_t len,
-			 unsigned int flags)
+		   struct pipe_inode_info *pipe, size_t len,
+		   unsigned int flags)
 {
 	ssize_t (*splice_read)(struct file *, loff_t *,
 			       struct pipe_inode_info *, size_t, unsigned int);
@@ -1107,7 +1107,6 @@ long vfs_splice_to(struct file *in, loff_t *ppos,
 	return splice_read(in, ppos, pipe, len, flags);
 }
 EXPORT_SYMBOL_GPL(vfs_splice_to);
-
 
 /**
  * splice_direct_to_actor - splices data directly between two non-pipes
@@ -1334,6 +1333,7 @@ static long do_splice(struct file *in, loff_t __user *off_in,
 			off = &out->f_pos;
 
 		ret = vfs_splice_from(ipipe, out, off, len, flags);
+
 		if (off_out && copy_to_user(off_out, off, sizeof(loff_t)))
 			ret = -EFAULT;
 
@@ -1353,6 +1353,7 @@ static long do_splice(struct file *in, loff_t __user *off_in,
 			off = &in->f_pos;
 
 		ret = vfs_splice_to(in, off, opipe, len, flags);
+
 		if (off_in && copy_to_user(off_in, off, sizeof(loff_t)))
 			ret = -EFAULT;
 
