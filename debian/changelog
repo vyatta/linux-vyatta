@@ -1,3 +1,339 @@
+linux-2.6 (2.6.31-1+vyatta+5) unstable; urgency=low
+
+  [ Sheng Yang ]
+  * KVM: VMX: Fix EPT with WP bit change during paging
+
+  [ Robert Hancock ]
+  * pata_amd: do not filter out valid modes in nv_mode_filter
+
+  [ Christian Lamparter ]
+  * p54usb: add Zcomax XG-705A usbid
+
+  [ Michal Hocko ]
+  * x86: Increase MIN_GAP to include randomized stack
+
+  [ Mike Frysinger ]
+  * serial: bfin_5xx: fix building as module when early printk is
+    enabled
+
+  [ Huzaifa Sidhpurwala ]
+  * USB: option.c Add support for ZTE AC2726 EVDO modem
+
+  [ Manuel Lauss ]
+  * USB: option: TELIT UC864G support
+
+  [ Peter Korsgaard ]
+  * video: s3c_fb.c: fix build with CONFIG_HOTPLUG=n
+
+  [ Jory A. Pratt ]
+  * kbuild: fix cc1 options check to ensure we do not use -fPIC when
+    compiling
+
+  [ Andrew Morton ]
+  * drivers/mfd/ab3100-core.c: fix powerpc build error
+
+  [ Henrique de Moraes Holschuh ]
+  * thinkpad-acpi: don't ask about brightness_mode for fw. 1V and 1R
+
+  [ Alex Chiang ]
+  * ACPI: pci_slot.ko wants a 64-bit _SUN
+
+  [ Ian Armstrong ]
+  * fbcon: only unbind from console if successfully registered
+
+  [ Paul Mundt ]
+  * kallsyms: fix segfault in prefix_underscores_count()
+
+  [ Aaro Koskinen ]
+  * sisfb: change SiS_DDC_Port type to SISIOADDRESS
+
+  [ Wolfgang Muees ]
+  * mmc_spi: fail gracefully if host or card do not support the switch
+    command
+
+  [ Ivan Kokshaysky ]
+  * alpha: AGP update (fixes compile failure)
+
+  [ Jan Kara ]
+  * fs: make sure data stored into inode is properly seen before
+    unlocking new inode
+
+  [ Tyler Hicks ]
+  * eCryptfs: Handle unrecognized tag 3 cipher codes
+  * eCryptfs: Check for O_RDONLY lower inodes when opening lower files
+  * eCryptfs: Filename encryption only supports password auth tokens
+  * eCryptfs: Validate global auth tok keys
+  * eCryptfs: Prevent lower dentry from going negative during unlink
+
+  [ Chuck Ebbert ]
+  * Re-enable Lanman security
+
+  [ Jeremy Fitzhardinge ]
+  * xen: make -fstack-protector work under Xen
+  * xen: only enable interrupts while actually blocking for spinlock
+
+  [ Yang Xiaowei ]
+  * xen: use stronger barrier after unlocking lock
+
+  [ Jeremy Fitzhardinge ]
+  * xen: check EFER for NX before setting up GDT mapping
+
+  [ Ian Schram ]
+  * perf_counter: Fix perf_copy_attr() pointer arithmetic
+
+  [ Eric Dumazet ]
+  * perf tools: Fix buffer allocation
+
+  [ Wolfram Sang ]
+  * tty: serial/pcmcia: add ID for Advantech card
+
+  [ Rafael J. Wysocki ]
+  * PM / PCMCIA: Drop second argument of pcmcia_socket_dev_suspend()
+  * PM / yenta: Fix cardbus suspend/resume regression
+
+  [ Alan Jenkins ]
+  * sony-laptop: check for rfkill hard block at load time
+
+  [ Ryusuke Konishi ]
+  * nilfs2: fix missing zero-fill initialization of btree node cache
+
+  [ Christian Lamparter ]
+  * ar9170usb: add usbid for TP-Link TL-WN821N v2
+
+  [ Feng Kan ]
+  * mtd: nand: fix ECC Correction bug for SMC ordering for NDFC driver
+
+  [ Benjamin Krill ]
+  * mtd: ofpart: Check availability of reg property instead of name
+    property
+
+  [ Massimo Cirillo ]
+  * mtd: cfi_cmdset_0002: add 0xFF intolerance for M29W128G
+
+  [ Pawel Ludwikow ]
+  * USB: serial: ftdi_sio: new hardware support - hameg power supply
+
+  [ mail@rainerkeller.de ]
+  * USB: add PIDs for FTDI based OpenDCC hardware
+
+  [ Michael Hennerich ]
+  * USB: serial: ftdi: handle gnICE+ JTAG adaptors
+
+  [ Oliver Neukum ]
+  * USB: CDC WDM driver doesn't support non-blocking reads
+  * USB: fix cdc-acm regression in open
+
+  [ Alan Cox ]
+  * cdc_acm: Fix to use modern speed interfaces
+  * tty: remove dtr/rts use from the driver open methods
+
+  [ Tilman Schmidt ]
+  * tty: gigaset: really fix chars_in_buffer
+
+  [ Kevin Cernekee ]
+  * kaweth: Fix memory leak in kaweth_control()
+
+  [ Jack Steiner ]
+  * x86: SGI UV: Fix IPI macros
+
+  [ Pawel Ludwikow ]
+  * USB: serial: pl2303: new hardware support - sanwa multimeter
+
+  [ Oliver Neukum ]
+  * USB: storage: fix a resume path GFP_NOIO must be used
+
+  [ fangxiaozhi ]
+  * USB: usb-storage fails to attach to Huawei Datacard cdrom device
+
+  [ Guus Sliepen ]
+  * USB: usbtmc: sanity checks for DEV_DEP_MSG_IN urbs
+
+  [ Hennerich, Michael ]
+  * USB: sl811-hcd: Fix device disconnect:
+
+  [ Zhenyu Wang ]
+  * drm/i915: remove restore in resume
+
+  [ Chris Wilson ]
+  * drm/i915: Only destroy a constructed mmap offset
+
+  [ Jesse Barnes ]
+  * drm/i915: prevent FIFO calculation overflows on 32 bits with high
+    dotclocks
+
+  [ Chris Wilson ]
+  * drm/i915: Add buffer to inactive list immediately during fault
+  * drm/i915: Check that the relocation points to within the target
+
+  [ Zhenyu Wang ]
+  * drm/i915: Fix typo for wrong LVDS clock setting on IGDNG
+  * drm/i915: Fix SSC frequence for IGDNG
+  * drm/i915: Remove DAC disable in CRT force detect on IGDNG
+  * drm/i915: Fix LVDS panel fitting on Arrandale
+
+  [ Keith Packard ]
+  * drm/I915: Use the CRT DDC to get the EDID for DVI-connector on Mac
+
+  [ Zhenyu Wang ]
+  * drm/i915: fix tiling on IGDNG
+
+  [ Eric Anholt ]
+  * agp/intel: Fix the pre-9xx chipset flush.
+
+  [ J. Bruce Fields ]
+  * nfsd4: fix null dereference creating nfsv4 callback client
+
+  [ Oliver Hartkopp ]
+  * can: fix NOHZ local_softirq_pending 08 warning
+
+  [ Tejun Heo ]
+  * ahci: restore pci_intx() handling
+
+  [ Pavel Machek ]
+  * pxa/sharpsl_pm: zaurus c3000 aka spitz: fix resume
+
+  [ Arjan van de Ven ]
+  * net ax25: Fix signed comparison in the sockopt handler
+  * net: Make the copy length in af_packet sockopt handler unsigned
+
+  [ Linus Torvalds ]
+  * pty_write: don't do a tty_wakeup() when the buffers are full
+
+  [ Mark McLoughlin ]
+  * KVM: fix cpuid E2BIG handling for extended request types
+
+  [ Marcelo Tosatti ]
+  * KVM: MMU: fix missing locking in alloc_mmu_pages
+  * KVM: MMU: fix bogus alloc_mmu_pages assignment
+
+  [ Avi Kivity ]
+  * KVM: Protect update_cr8_intercept() when running without an apic
+
+  [ Marcelo Tosatti ]
+  * Revert "KVM: x86: check for cr3 validity in ioctl_set_sregs"
+
+  [ Kurt Roeckx ]
+  * Fix NULL ptr regression in powernow-k8
+
+  [ Pierre Habouzit ]
+  * perf tools: do not complain if root is owning perf.data
+
+  [ Patrick McHardy ]
+  * netfilter: nf_nat: fix inverted logic for persistent NAT mappings
+  * netfilter: nf_conntrack: netns fix re reliable conntrack event
+    delivery
+  * netfilter: bridge: refcount fix
+  * netfilter: ebt_ulog: fix checkentry return value
+
+  [ Nick Kossifidis ]
+  * ath5k: Wakeup fixes
+
+  [ Bob Copeland ]
+  * ath5k: do not release irq across suspend/resume
+
+  [ Alan Stern ]
+  * Driver core: add new device to bus's list before probing
+
+  [ Alan Cox ]
+  * tty: Add a full port_close function
+  * tty: USB hangup is racy
+  * tty: USB can now use the shutdown method for kref based freeing of
+    ports
+
+  [ Luca Tettamanti ]
+  * hwmon: (asus_atk0110) Add maintainer information
+
+  [ Alan Cox ]
+  * tty: USB serial termios bits
+
+  [ Alan Stern ]
+  * usb-serial: change referencing of port and serial structures
+  * usb-serial: put subroutines in logical order
+  * usb-serial: change logic of serial lookups
+  * usb-serial: acquire references when a new tty is installed
+  * usb-serial: fix termios initialization logic
+  * usb-serial: rename subroutines
+  * usb-serial: add missing tests and debug lines
+  * usb-serial: straighten out serial_open
+  * USB serial: update the console driver
+
+  [ Sarah Sharp ]
+  * USB: xhci: Work around for chain bit in link TRBs.
+  * USB: xhci: Fix slot and endpoint context debugging.
+  * USB: xhci: Configure endpoint code refactoring.
+  * USB: xhci: Set correct max packet size for HS/FS control endpoints.
+  * USB: xhci: Support full speed devices.
+  * USB: xhci: Handle stalled control endpoints.
+  * USB: xhci: Add quirk for Fresco Logic xHCI hardware.
+  * USB: xhci: Make TRB completion code comparison readable.
+  * USB: xhci: Handle babbling endpoints correctly.
+  * USB: xhci: Don't touch xhci_td after it's freed.
+  * USB: xhci: Check URB's actual transfer buffer size.
+  * USB: xhci: Check URB_SHORT_NOT_OK before setting short packet
+    status.
+  * USB: xhci: Set -EREMOTEIO when xHC gives bad transfer length.
+  * USB: xhci: Support interrupt transfers.
+  * USB: Fix SS endpoint companion descriptor parsing.
+
+  [ KAMEZAWA Hiroyuki ]
+  * /proc/kcore: work around a BUG()
+
+  [ Lee Schermerhorn ]
+  * hugetlb: restore interleaving of bootmem huge pages (2.6.31)
+
+  [ Mel Gorman ]
+  * page-allocator: limit the number of MIGRATE_RESERVE pageblocks per
+    zone
+
+  [ Hugh Dickins ]
+  * mm: munlock use follow_page
+  * mm: fix anonymous dirtying
+
+  [ Lee Schermerhorn ]
+  * mmap: avoid unnecessary anon_vma lock acquisition in vma_adjust()
+
+  [ Michael Abbott ]
+  * Fix idle time field in /proc/uptime
+
+  [ Chris Wilson ]
+  * drm/i915: Handle ERESTARTSYS during page fault
+
+  [ Brian Rogers ]
+  * em28xx: ir-kbd-i2c init data needs a persistent object
+  * saa7134: ir-kbd-i2c init data needs a persistent object
+
+  [ Rex Feany ]
+  * powerpc/8xx: Fix regression introduced by cache coherency rewrite
+
+  [ Weirich, Bernhard ]
+  * powerpc: Fix incorrect setting of __HAVE_ARCH_PTE_SPECIAL
+
+  [ Jan Scholz ]
+  * HID: completely remove apple mightymouse from blacklist
+
+  [ Kashyap, Desai ]
+  * mptsas : PAE Kernel more than 4 GB kernel panic
+
+  [ David Howells ]
+  * NOMMU: Fix MAP_PRIVATE mmap() of objects where the data can be
+    mapped directly
+
+  [ Jay Sternberg ]
+  * iwlwifi: Handle new firmware file with ucode build number in header
+  * iwlwifi: update 1000 series API version to match firmware
+
+  [ Wey-Yi Guy ]
+  * iwlagn: modify digital SVR for 1000
+  * iwlwifi: traverse linklist to find the valid OTP block
+  * iwlwifi: fix unloading driver while scanning
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.31.2
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 05 Oct 2009 22:55:17 -0700
+
 linux-2.6 (2.6.31-1+vyatta+4) unstable; urgency=low
 
   * update amd64 config
