@@ -1,3 +1,124 @@
+linux-2.6 (2.6.31-1+vyatta+7) unstable; urgency=low
+
+  [ Samuel Thibault ]
+  * x86: fix csum_ipv6_magic asm memory clobber
+
+  [ Linus Torvalds ]
+  * tty: Avoid dropping ldisc_mutex over hangup tty re-initialization
+
+  [ Jan Beulich ]
+  * x86: Don't leak 64-bit kernel register values to 32-bit processes
+
+  [ Manoj Iyer ]
+  * ALSA: hda - Added quirk to enable sound on Toshiba NB200
+
+  [ jolsa@redhat.com ]
+  * tracing: correct module boundaries for ftrace_release
+
+  [ Steven Rostedt ]
+  * ftrace: check for failure for all conversions
+
+  [ Darren Hart ]
+  * futex: fix requeue_pi key imbalance
+
+  [ Thomas Gleixner ]
+  * futex: Move exit_pi_state() call to release_mm()
+
+  [ Peter Zijlstra ]
+  * futex: Nullify robust lists after cleanup
+
+  [ Thomas Gleixner ]
+  * futex: Fix locking imbalance
+
+  [ Eero Nurkkala ]
+  * NOHZ: update idle state also when NOHZ is inactive
+
+  [ Mimi Zohar ]
+  * ima: ecryptfs fix imbalance message
+
+  [ Tejun Heo ]
+  * libata: fix incorrect link online check during probe
+
+  [ Clemens Ladisch ]
+  * sound: via82xx: move DXS volume controls to PCM interface
+
+  [ Mark Brown ]
+  * ASoC: WM8350 capture PGA mutes are inverted
+
+  [ Avi Kivity ]
+  * KVM: Prevent overflow in KVM_GET_SUPPORTED_CPUID
+
+  [ Marcelo Tosatti ]
+  * KVM: VMX: flush TLB with INVEPT on cpu migration
+
+  [ Aurelien Jarno ]
+  * KVM: fix LAPIC timer period overflow
+
+  [ Joerg Roedel ]
+  * KVM: SVM: Fix tsc offset adjustment when running nested
+  * KVM: SVM: Handle tsc in svm_get_msr/svm_set_msr correctly
+
+  [ Jean Delvare ]
+  * net: Fix wrong sizeof
+
+  [ Daisuke Nishimura ]
+  * mm: add_to_swap_cache() must not sleep
+
+  [ Bartlomiej Zolnierkiewicz ]
+  * sis5513: fix PIO setup for ATAPI devices
+
+  [ john stultz ]
+  * PIT fixes to unbreak suspend/resume (bug #14222)
+
+  [ Mimi Zohar ]
+  * IMA: open new file for read
+
+  [ Jean Delvare ]
+  * ACPI: Clarify resource conflict message
+
+  [ Zhao Yakui ]
+  * ACPI: fix Compaq Evo N800c (Pentium 4m) boot hang regression
+
+  [ Eric Dumazet ]
+  * net: restore tx timestamping for accelerated vlans
+
+  [ Miklos Szeredi ]
+  * net: unix: fix sending fds in multiple buffers
+
+  [ Kusanagi Kouichi ]
+  * tun: Return -EINVAL if neither IFF_TUN nor IFF_TAP is set.
+
+  [ Robert Varga ]
+  * tcp: fix CONFIG_TCP_MD5SIG + CONFIG_PREEMPT timer BUG()
+
+  [ Eric Dumazet ]
+  * net: Fix sock_wfree() race
+
+  [ Steve Glendinning ]
+  * smsc95xx: fix transmission where ZLP is expected
+
+  [ Mike McCormack ]
+  * sky2: Set SKY2_HW_RAM_BUFFER in sky2_init
+
+  [ Arnaldo Carvalho de Melo ]
+  * appletalk: Fix skb leak when ipddp interface is not loaded
+
+  [ Jarek Poplawski ]
+  * ax25: Fix possible oops in ax25_make_new
+
+  [ Eric Dumazet ]
+  * ax25: Fix SIOCAX25GETINFO ioctl
+
+  [ Sascha Hlusiak ]
+  * sit: fix off-by-one in ipip6_tunnel_get_prl
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.31.4
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 13 Oct 2009 08:34:02 -0700
+
 linux-2.6 (2.6.31-1+vyatta+6) unstable; urgency=low
 
   [ Alan Stern ]
