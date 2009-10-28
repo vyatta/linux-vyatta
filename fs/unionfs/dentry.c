@@ -271,6 +271,7 @@ bool is_newer_lower(const struct dentry *dentry)
 		/* check if mtime/ctime have changed */
 		if (unlikely(timespec_compare(&inode->i_mtime,
 					      &lower_inode->i_mtime) < 0)) {
+#ifdef CONFIG_UNION_FS_DEBUG
 			if ((lower_inode->i_mtime.tv_sec -
 			     inode->i_mtime.tv_sec) > UNIONFS_MIN_CC_TIME) {
 				pr_info("unionfs: new lower inode mtime "
@@ -278,10 +279,12 @@ bool is_newer_lower(const struct dentry *dentry)
 					dentry->d_name.name);
 				show_dinode_times(dentry);
 			}
+#endif
 			return true;
 		}
 		if (unlikely(timespec_compare(&inode->i_ctime,
 					      &lower_inode->i_ctime) < 0)) {
+#ifdef CONFIG_UNION_FS_DEBUG
 			if ((lower_inode->i_ctime.tv_sec -
 			     inode->i_ctime.tv_sec) > UNIONFS_MIN_CC_TIME) {
 				pr_info("unionfs: new lower inode ctime "
@@ -289,6 +292,7 @@ bool is_newer_lower(const struct dentry *dentry)
 					dentry->d_name.name);
 				show_dinode_times(dentry);
 			}
+#endif
 			return true;
 		}
 	}
