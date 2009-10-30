@@ -1,3 +1,56 @@
+linux-2.6 (2.6.31-1+vyatta+10) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Silence unionfs mtime warnings
+
+  [ Mike McCormack ]
+  * sky2: Avoid rewinding sky2->tx_prod
+  * sky2: Move tx reset functionality to sky2_tx_reset()
+  * sky2: Reset tx train after interrupts disabled.
+
+  [ Stephen Hemminger ]
+  * sky2: hold spinlock around phy_power_down
+  * sky2: hold RTNL when doing suspend/shutdown operations
+  * sky2: cleanup restart operations
+  * sky2: lock less transmit completion
+  * sky2: fix pause negotiation
+  * sky2: version 1.24
+  * sky2: remove restarting workaround flag
+  * sky2: use upper/lower 32 bits
+  * sky2: transmit ring 64 bit conservation
+  * sky2: simplify list element error
+  * sky2: dynamic size transmit ring
+  * sky2: optimize transmit completion
+  * sky2: no recycling
+  * sky2: version 1.25
+  * sky2: fix management of driver LED
+
+  [ Mike McCormack ]
+  * sky2: Create buffer alloc and free helpers
+  * sky2: Use 32bit read to read Y2_VAUX_AVAIL
+
+  [ Stephen Hemminger ]
+  * sky2: only enable Vaux if capable of wakeup
+  * sky2: transmit ring accounting
+  * sky2: Make sure both ports initialize correctly
+
+  [ Joe Perches ]
+  * trivial: remove unnecessary semicolons
+
+  [ Stephen Hemminger ]
+  * sky2: irqname based on pci address
+
+  [ Mike McCormack ]
+  * skge: Make sure both ports initialize correctly
+
+  [ Michal Schmidt ]
+  * skge: use unique IRQ name
+
+  [ Stephen Hemminger ]
+  * net: fold name hash
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 30 Oct 2009 09:17:21 -0700
+
 linux-2.6 (2.6.31-1+vyatta+9) unstable; urgency=low
 
   * Add file open tracing used by sreadahead
