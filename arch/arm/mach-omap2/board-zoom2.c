@@ -13,6 +13,7 @@
 #include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/input.h>
+#include <linux/input/matrix_keypad.h>
 #include <linux/gpio.h>
 #include <linux/i2c/twl4030.h>
 #include <linux/regulator/machine.h>
@@ -22,12 +23,12 @@
 
 #include <mach/common.h>
 #include <mach/usb.h>
-#include <mach/keypad.h>
 
 #include "mmc-twl4030.h"
+#include "sdram-micron-mt46h32m32lf-6.h"
 
 /* Zoom2 has Qwerty keyboard*/
-static int zoom2_twl4030_keymap[] = {
+static int board_keymap[] = {
 	KEY(0, 0, KEY_E),
 	KEY(1, 0, KEY_R),
 	KEY(2, 0, KEY_T),
@@ -82,11 +83,15 @@ static int zoom2_twl4030_keymap[] = {
 	0
 };
 
+static struct matrix_keymap_data board_map_data = {
+	.keymap			= board_keymap,
+	.keymap_size		= ARRAY_SIZE(board_keymap),
+};
+
 static struct twl4030_keypad_data zoom2_kp_twl4030_data = {
+	.keymap_data	= &board_map_data,
 	.rows		= 8,
 	.cols		= 8,
-	.keymap		= zoom2_twl4030_keymap,
-	.keymapsize	= ARRAY_SIZE(zoom2_twl4030_keymap),
 	.rep		= 1,
 };
 
@@ -209,7 +214,8 @@ static void __init omap_zoom2_init_irq(void)
 {
 	omap_board_config = zoom2_config;
 	omap_board_config_size = ARRAY_SIZE(zoom2_config);
-	omap2_init_common_hw(NULL, NULL);
+	omap2_init_common_hw(mt46h32m32lf6_sdrc_params,
+				 mt46h32m32lf6_sdrc_params);
 	omap_init_irq();
 	omap_gpio_init();
 }

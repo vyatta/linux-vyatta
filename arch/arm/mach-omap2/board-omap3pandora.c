@@ -27,6 +27,7 @@
 #include <linux/i2c/twl4030.h>
 #include <linux/leds.h>
 #include <linux/input.h>
+#include <linux/input/matrix_keypad.h>
 #include <linux/gpio_keys.h>
 
 #include <asm/mach-types.h>
@@ -39,7 +40,6 @@
 #include <mach/hardware.h>
 #include <mach/mcspi.h>
 #include <mach/usb.h>
-#include <mach/keypad.h>
 #include <mach/mux.h>
 
 #include "sdram-micron-mt46h32m32lf-6.h"
@@ -133,7 +133,7 @@ static void __init pandora_keys_gpio_init(void)
 	omap_set_gpio_debounce_time(32 * 5, GPIO_DEBOUNCE_TIME);
 }
 
-static int pandora_keypad_map[] = {
+static int board_keymap[] = {
 	/* col, row, code */
 	KEY(0, 0, KEY_9),
 	KEY(0, 1, KEY_0),
@@ -180,11 +180,15 @@ static int pandora_keypad_map[] = {
 	KEY(5, 2, KEY_FN),
 };
 
+static struct matrix_keymap_data board_map_data = {
+	.keymap			= board_keymap,
+	.keymap_size		= ARRAY_SIZE(board_keymap),
+};
+
 static struct twl4030_keypad_data pandora_kp_data = {
+	.keymap_data	= &board_map_data,
 	.rows		= 8,
 	.cols		= 6,
-	.keymap		= pandora_keypad_map,
-	.keymapsize	= ARRAY_SIZE(pandora_keypad_map),
 	.rep		= 1,
 };
 
