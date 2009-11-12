@@ -1,3 +1,276 @@
+linux-2.6 (2.6.31-1+vyatta+12) unstable; urgency=low
+
+  [ Earl Chew ]
+  * fs: pipe.c null pointer dereference
+
+  [ Yinghai Lu ]
+  * pci: increase alignment to make more space for hidden code
+
+  [ Tejun Heo ]
+  * libata: fix internal command failure handling
+  * libata: fix PMP initialization
+  * sata_nv: make sure link is brough up online when skipping hardreset
+
+  [ Yinghai Lu ]
+  * nfs: Fix nfs_parse_mount_options() kfree() leak
+
+  [ Marcelo Tosatti ]
+  * KVM: use proper hrtimer function to retrieve expiration time
+
+  [ Andre Przywara ]
+  * KVM: ignore reads from AMDs C1E enabled MSR
+
+  [ Thomas Gleixner ]
+  * futex: Handle spurious wake up
+
+  [ Darren Hart ]
+  * futex: Check for NULL keys in match_futex
+  * futex: Move drop_futex_key_refs out of spinlock'ed region
+
+  [ Thomas Gleixner ]
+  * futex: Fix spurious wakeup for requeue_pi really
+
+  [ Chuck Ebbert ]
+  * ahci: revert "Restore SB600 sata controller 64 bit DMA"
+
+  [ David S. Miller ]
+  * sparc64: Set IRQF_DISABLED on LDC channel IRQs.
+  * sparc: Kill PROM console driver.
+
+  [ Thomas Gleixner ]
+  * watchdog: Fix rio watchdog probe function
+
+  [ Dmitry Torokhov ]
+  * Input: synaptics - add another Protege M300 to rate blacklist
+
+  [ Jonathan Brassow ]
+  * dm snapshot: free exception store on init failure
+
+  [ Mikulas Patocka ]
+  * dm snapshot: sort by chunk size to fix race
+
+  [ Andrew Morton ]
+  * dm log: userspace fix incorrect luid cast in userspace_ctr
+
+  [ Zdenek Kabelac ]
+  * dm: add missing del_gendisk to alloc_dev error path
+
+  [ Kiyoshi Ueda ]
+  * dm: dec_pending needs locking to save error value
+
+  [ Mikulas Patocka ]
+  * dm exception store: fix failed set_chunk_size error path
+  * dm snapshot: lock snapshot while supplying status
+  * dm snapshot: require non zero chunk size by end of ctr
+  * dm snapshot: use unsigned integer chunk size
+
+  [ Alan Cox ]
+  * ray_cs: Fix copy_from_user handling
+
+  [ KOSAKI Motohiro ]
+  * mbind(): fix leak of never putback pages
+  * do_mbind(): fix memory leak
+
+  [ Benjamin Herrenschmidt ]
+  * 8250_pci: add IBM Saturn serial card
+
+  [ Alan Cox ]
+  * dpt_i2o: Fix up copy*user
+
+  [ OGAWA Hirofumi ]
+  * dpt_i2o: Fix typo of EINVAL
+
+  [ Ben Hutchings ]
+  * hfsplus: refuse to mount volumes larger than 2TB
+
+  [ Stas Sergeev ]
+  * Driver core: fix driver_register() return value
+
+  [ Alan Cox ]
+  * tty: Mark generic_serial users as BROKEN
+
+  [ Rusty Russell ]
+  * param: fix lots of bugs with writing charp params from sysfs, by
+    leaking mem.
+  * param: fix NULL comparison on oom
+  * param: fix setting arrays of bool
+
+  [ Elina Pasheva ]
+  * USB: serial: sierra driver send_setup() autopm fix
+
+  [ Ronnie Furuskog ]
+  * USB: option: Patch for Huawei Mobile Broadband E270+ Modem
+
+  [ Huzaifa Sidhpurwala ]
+  * USB: option: Support for AIRPLUS MCD650 Datacard
+
+  [ Bryan Wu ]
+  * USB: option: TLAYTECH TUE800 support
+
+  [ David Woodhouse ]
+  * libertas if_usb: Fix crash on 64-bit machines
+
+  [ Kevin Hilman ]
+  * cpuidle: always return with interrupts enabled
+
+  [ Michael S. Tsirkin ]
+  * virtio: order used ring after used index read
+
+  [ Steve French ]
+  * CIFS: Fixing to avoid invalid kfree() in cifs_get_tcp_session()
+
+  [ Björn Smedman ]
+  * mac80211: fix for incorrect sequence number on hostapd injected
+    frames
+
+  [ Johannes Berg ]
+  * mac80211: check interface is down before type change
+
+  [ Robin Holt ]
+  * x86, UV: Fix information in __uv_hub_info structure
+  * x86, UV: Set DELIVERY_MODE=4 for vector=NMI_VECTOR in
+    uv_hub_send_ipi()
+
+  [ David Howells ]
+  * NOMMU: Don't pass NULL pointers to fput() in do_mmap_pgoff()
+
+  [ Bo Liu ]
+  * mm: remove incorrect swap_count() from try_to_unuse()
+
+  [ Jan Beulich ]
+  * x86-64: Fix register leak in 32-bit syscall audting
+
+  [ Ryusuke Konishi ]
+  * nilfs2: fix dirty page accounting leak causing hang at write
+
+  [ Zhenyu Wang ]
+  * drm/i915: Fix FDI M/N setting according with correct color depth
+  * drm/i915: fix to setup display reference clock control on Ironlake
+  * drm/i915: fix panel fitting filter coefficient select for Ironlake
+
+  [ Fabian Henze ]
+  * agp/intel: Add B43 chipset support
+  * drm/i915: add B43 chipset support
+
+  [ Jeremy Fitzhardinge ]
+  * xen/hvc: make sure console output is always emitted, with explicit
+    polling
+  * xen: mask extended topology info in cpuid
+
+  [ Linus Torvalds ]
+  * sgi-gru: decrapfiy options_write() function
+
+  [ Gleb Natapov ]
+  * KVM: get_tss_base_addr() should return a gpa_t
+
+  [ Anand V. Avati ]
+  * fuse: prevent fuse_put_request on invalid pointer
+
+  [ Jens Axboe ]
+  * fuse: fix kunmap in fuse_ioctl_copy_user
+
+  [ Joerg Roedel ]
+  * x86/amd-iommu: Workaround for erratum 63
+
+  [ Eric Paris ]
+  * fsnotify: do not set group for a mark before it is on the i_list
+
+  [ Manuel Lauss ]
+  * mips: fix build of vmlinux.lds
+
+  [ Sam Ravnborg ]
+  * alpha: fix build after vmlinux.lds.S cleanup
+
+  [ Rafael J. Wysocki ]
+  * ACPI / PCI: Fix NULL pointer dereference in acpi_get_pci_dev() (rev.
+    2)
+
+  [ Len Brown ]
+  * Revert "ACPI: Attach the ACPI device to the ACPI handle as early as
+    possible"
+
+  [ David Howells ]
+  * KEYS: get_instantiation_keyring() should inc the keyring refcount in
+    all cases
+
+  [ Larry Finger ]
+  * b43: Fix Bugzilla #14181 and the bug from the previous 'fix'
+
+  [ Alan Cox ]
+  * pata_sc1200: Fix crash on boot
+
+  [ Tomoki Sekiyama ]
+  * AF_UNIX: Fix deadlock on connecting to shutdown socket (CVE-2009-
+    3621)
+
+  [ David Henningsson ]
+  * ALSA: ice1724 - Make call to set hw params succeed on ESI Juli@
+
+  [ Jiri Bohac ]
+  * bonding: fix a race condition in calls to slave MII ioctls
+
+  [ Jean Delvare ]
+  * hwmon: (it87) Fix VID reading on IT8718F/IT8720F
+
+  [ Jiri Pirko ]
+  * netlink: fix typo in initialization (CVE-2009-3612)
+
+  [ Ben Hutchings ]
+  * nfs: Avoid overrun when copying client IP address string
+
+  [ Terry Loftin ]
+  * nfs: Panic when commit fails
+
+  [ Trond Myklebust ]
+  * NFSv4: Fix a bug when the server returns NFS4ERR_RESOURCE
+  * NFSv4: Fix two unbalanced put_rpccred() issues.
+  * NFSv4: Kill nfs4_renewd_prepare_shutdown()
+  * NFSv4: The link() operation should return any delegation on the file
+
+  [ Bastian Blank ]
+  * powerpc: Remove SMP warning from PowerMac cpufreq
+
+  [ Wu Fengguang ]
+  * vmscan: limit VM_EXEC protection to file pages
+
+  [ Ingo Molnar ]
+  * x86: mce: Clean up thermal throttling state tracking code
+  * x86: mce: Fix thermal throttling message storm
+
+  [ Reinette Chatre ]
+  * iwlwifi: fix potential rx buffer loss
+  * iwlwifi: reduce noise when skb allocation fails
+
+  [ Joerg Roedel ]
+  * x86/amd-iommu: Un__init function required on shutdown
+
+  [ Darrick J. Wong ]
+  * KVM: Prevent kvm_init from corrupting debugfs structures
+
+  [ Benjamin Herrenschmidt ]
+  * powerpc/pmac: Fix PowerSurge SMP IPI allocation
+  * powerpc/pmac: Fix issues with sleep on some powerbooks
+
+  [ Andre Detsch ]
+  * powerpc/pci: Fix regression in powerpc MSI-X
+
+  [ Benjamin Herrenschmidt ]
+  * powerpc: Fix some late PowerMac G5 with PCIe ATI graphics
+
+  [ JosephChan@via.com.tw ]
+  * sata_via: Remove redundant device ID for VIA VT8261
+  * pata_via: extend the rev_max for VT6330
+
+  [ Rafael J. Wysocki ]
+  * PM / yenta: Split resume into early and late parts (rev. 4)
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.31.6
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 11 Nov 2009 21:11:41 -0800
+
 linux-2.6 (2.6.31-1+vyatta+11) unstable; urgency=low
 
   [ Herbert Xu ]
