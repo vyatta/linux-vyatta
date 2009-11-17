@@ -1147,6 +1147,8 @@ static int ext2_sync_fs(struct super_block *sb, int wait)
 		ext2_sync_super(sb, es);
 	} else {
 		ext2_commit_super(sb, es);
+		if (wait)
+			sync_dirty_buffer(EXT2_SB(sb)->s_sbh);
 	}
 	sb->s_dirt = 0;
 	unlock_kernel();
