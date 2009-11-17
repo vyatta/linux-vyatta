@@ -1121,20 +1121,8 @@ static void ext2_sync_super(struct super_block *sb, struct ext2_super_block *es)
 static int ext2_sync_fs(struct super_block *sb, int wait)
 {
 	struct ext2_super_block *es = EXT2_SB(sb)->s_es;
-	struct buffer_head *sbh = EXT2_SB(sb)->s_sbh;
 
 	lock_kernel();
-	if (buffer_write_io_error(sbh)) {
-		/*
-		 * This happens if USB or floppy device is yanked out.
-		 * Maybe user put device back in so warn and update again.
-		 */
-		printk(KERN_ERR
-		       "EXT2-fs: previous I/O error to superblock detected\n");
-		clear_buffer_write_io_error(sbh);
-		set_buffer_uptodate(sbh);
-	}
-
 	if (es->s_state & cpu_to_le16(EXT2_VALID_FS)) {
 		ext2_debug("setting valid to 0\n");
 		es->s_state &= cpu_to_le16(~EXT2_VALID_FS);
