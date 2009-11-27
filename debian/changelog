@@ -1,3 +1,11 @@
+linux-2.6 (2.6.31-1+vyatta+15) unstable; urgency=low
+
+  * Add Microsoft Hyper-V drivers
+  * Add Hyper-V driver to amd64 config
+  * Add Hyper-V support to i386 configs
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Thu, 26 Nov 2009 18:14:38 -0800
+
 linux-2.6 (2.6.31-1+vyatta+14) unstable; urgency=low
 
   * Revert "ext2: avoid WARN() if device is removed"
