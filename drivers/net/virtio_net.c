@@ -798,7 +798,36 @@ static void virtnet_vlan_rx_kill_vid(struct net_device *dev, u16 vid)
 		dev_warn(&dev->dev, "Failed to kill VLAN ID %d.\n", vid);
 }
 
-static struct ethtool_ops virtnet_ethtool_ops = {
+static void virtnet_get_drvinfo(struct net_device *dev,
+				struct ethtool_drvinfo *info)
+{
+	struct virtnet_info *vi = netdev_priv(dev);
+
+	strcpy(info->driver, "virtnet");
+	strcpy(info->version, "0.1");
+	strcpy(info->fw_version, "N/A");
+	strcpy(info->bus_info, dev_driver_string(&vi->vdev->dev));
+}
+
+static int virtnet_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	cmd->supported = SUPPORTED_1000baseT_Full |
+		SUPPORTED_Autoneg | SUPPORTED_FIBRE;
+	cmd->advertising = ADVERTISED_1000baseT_Full |
+		ADVERTISED_Autoneg | ADVERTISED_FIBRE;
+	cmd->speed = SPEED_1000;
+	cmd->duplex = DUPLEX_FULL;
+	cmd->port = PORT_FIBRE;
+	cmd->phy_address = 0;
+	cmd->transceiver = XCVR_INTERNAL;
+	cmd->autoneg = AUTONEG_ENABLE;
+
+	return 0;
+}
+
+static const struct ethtool_ops virtnet_ethtool_ops = {
+	.get_settings = virtnet_get_settings,
+	.get_drvinfo = virtnet_get_drvinfo,
 	.set_tx_csum = virtnet_set_tx_csum,
 	.set_sg = ethtool_op_set_sg,
 	.set_tso = ethtool_op_set_tso,
