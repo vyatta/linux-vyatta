@@ -1,3 +1,355 @@
+linux-2.6 (2.6.31-1+vyatta+17) unstable; urgency=low
+
+  [ Ryusuke Konishi ]
+  * nilfs2: fix kernel oops in error case of nilfs_ioctl_move_blocks
+
+  [ Jeff Layton ]
+  * cifs: don't use CIFSGetSrvInodeNumber in is_path_accessible
+  * cifs: clean up handling when server doesn't consistently support
+    inode numbers
+
+  [ Suresh Jayaraman ]
+  * cifs: clear server inode number flag while autodisabling
+
+  [ Steve French ]
+  * CIFS: fix oops in cifs_lookup during net boot
+  * CIFS: Duplicate data on appending to some Samba servers
+
+  [ Dave Jones ]
+  * gdth: Prevent negative offsets in ioctl CVE-2009-3080
+
+  [ Larry Finger ]
+  * rtl8187: Fix kernel oops when device is removed when LEDS enabled
+
+  [ NeilBrown ]
+  * md: don't clear endpoint for resync when resync is interrupted.
+  * md/raid5: make sure curr_sync_completes is uptodate when reshape
+    starts
+  * md/raid1/raid10: add a cond_resched
+
+  [ Julian Anastasov ]
+  * ALSA: usb-audio: fix combine_word problem
+
+  [ Daniel J Blueman ]
+  * ALSA: hda - Dell Studio 1557 hd-audio quirk
+
+  [ Russell King ]
+  * ALSA: AACI: fix AC97 multiple-open bug
+  * ALSA: AACI: fix recording bug
+
+  [ David Woodhouse ]
+  * jffs2: Fix memory corruption in jffs2_read_inode_range()
+
+  [ Clemens Ladisch ]
+  * sound: rawmidi: disable active-sensing-on-close by default
+  * sound: rawmidi: fix checking of O_APPEND when opening MIDI device
+  * sound: rawmidi: fix double init when opening MIDI device with
+    O_APPEND
+  * sound: rawmidi: fix MIDI device O_APPEND error handling
+
+  [ Soeren Sandmann ]
+  * highmem: Fix race in debug_kmap_atomic() which could cause
+    warn_count to underflow
+  * highmem: Fix debug_kmap_atomic() to also handle KM_IRQ_PTE, KM_NMI,
+    and KM_NMI_PTE
+
+  [ Becky Bruce ]
+  * powerpc: Fix DEBUG_HIGHMEM build break from d4515646699
+
+  [ Russell King ]
+  * kmap: fix build errors with DEBUG_HIGHMEM enabled
+
+  [ Mike Isely ]
+  * V4L/DVB (13169): bttv: Fix potential out-of-order field processing
+  * V4L/DVB (13170): bttv: Fix reversed polarity error when switching
+    video standard
+
+  [ Seth Barry ]
+  * V4L/DVB (13109): tda18271: fix signedness issue in
+    tda18271_rf_tracking_filters_init
+
+  [ Michael Krufky ]
+  * V4L/DVB (13107): tda18271: fix overflow in FM radio frequency
+    calculation
+
+  [ Devin Heitmueller ]
+  * V4L/DVB (13190): em28xx: fix panic that can occur when starting
+    audio streaming
+
+  [ Martin Samek ]
+  * V4L/DVB (13079): dib0700: fixed xc2028 firmware loading kernel oops
+
+  [ Mike Isely ]
+  * V4L/DVB (13230): s2255drv: Don't conditionalize video buffer
+    completion on waiting processes
+
+  [ Thomas Gleixner ]
+  * uids: Prevent tear down race
+
+  [ Rodolfo Giometti ]
+  * pps: events reporting fix up
+  * pps: locking scheme fix up for PPS_GETPARAMS
+
+  [ Scott Valentine ]
+  * rtc: v3020: fix v3020_mmio_read_bit()
+
+  [ Heiko Carstens ]
+  * fs: add missing compat_ptr handling for FS_IOC_RESVSP ioctl
+
+  [ KAMEZAWA Hiroyuki ]
+  * memcg: fix wrong pointer initialization at page migration when memcg
+    is disabled.
+
+  [ Sukadev Bhattiprolu ]
+  * pidns: fix a leak in /proc dentries and inodes with pid namespaces.
+
+  [ Mel Gorman ]
+  * page allocator: Do not allow interrupts to use ALLOC_HARDER
+  * page allocator: always wake kswapd when restarting an allocation
+    attempt after direct reclaim failed
+
+  [ Alan Cox ]
+  * tty_port: If we are opened non blocking we still need to raise the
+    carrier
+  * tty: cp210x: Fix carrier handling
+
+  [ Libin Yang ]
+  * USB: ohci: quirk AMD prefetch for USB 1.1 ISO transfer
+
+  [ Alan Stern ]
+  * USB: usbmon: fix bug in mon_buff_area_shrink
+
+  [ Zhang Le ]
+  * USB: option.c: add support for D-Link DWM-162-U5
+
+  [ Henry Gebhardt ]
+  * USB: cdc_acm: Fix race condition when opening tty
+
+  [ Sarah Sharp ]
+  * USB: xhci: Fix bug memory free after failed initialization.
+  * USB: xhci: Fix TRB physical to virtual address translation.
+  * USB: xhci: Fix scratchpad deallocation.
+
+  [ Wey-Yi Guy ]
+  * iwlwifi: Use RTS/CTS as the preferred protection mechanism for 6000
+    series
+  * iwlwifi: Fix issue on file transfer stalled in HT mode
+
+  [ Mimi Zohar ]
+  * ima: replace GFP_KERNEL with GFP_NOFS
+
+  [ Trond Myklebust ]
+  * NFSv4: Fix a cache validation bug which causes getcwd() to return
+    ENOENT
+
+  [ Csaba Henk ]
+  * fuse: reject O_DIRECT flag also in fuse_create
+
+  [ Mark Brown ]
+  * ASoC: Fix suspend with active audio streams
+
+  [ Anuj Aggarwal ]
+  * ASoC: AIC23: Fixing infinite loop in resume path
+
+  [ Johannes Berg ]
+  * mac80211: fix two remote exploits
+  * mac80211: fix spurious delBA handling
+
+  [ Larry Finger ]
+  * b43: Work around mac80211 race condition
+
+  [ Johannes Berg ]
+  * rfkill: fix miscdev ops
+
+  [ Roel Kluin ]
+  * thinkpad-acpi: fix sign of ERESTARTSYS return
+
+  [ Harald Welte ]
+  * Enable ACPI PDC handshake for VIA/Centaur CPUs
+
+  [ Robert Lowery ]
+  * V4L/DVB (13436): cxusb: Fix hang on DViCO FusionHDTV DVB-T Dual
+    Digital 4 (rev 1)
+
+  [ Hans Verkuil ]
+  * V4L/DVB (13321): radio-gemtek-pci: fix double mutex_lock
+  * V4L/DVB (12948): v4l1-compat: fix VIDIOC_G_STD handling
+
+  [ Jean-Francois Moine ]
+  * V4L/DVB (12280): gspca - sonixj: Remove auto gain/wb/expo for the
+    ov7660 sensor.
+
+  [ Denis Loginov ]
+  * V4L/DVB (12356): gspca - sonixj: Webcam 0c45:6148 added
+
+  [ Jean-Francois Moine ]
+  * V4L/DVB (12501): gspca - sonixj: Do the ov7660 sensor work again.
+  * V4L/DVB (12691): gspca - sonixj: Don't use mdelay().
+  * V4L/DVB (12696): gspca - sonixj / sn9c102: Two drivers for 0c45:60fc
+    and 0c45:613e.
+
+  [ Chris Wilson ]
+  * drm/i915: Select CONFIG_SHMEM
+
+  [ Jesse Barnes ]
+  * drm: work around EDIDs with bad htotal/vtotal values
+
+  [ Nanhai Zou ]
+  * drm/i915: Fix IRQ stall issue on Ironlake
+
+  [ Eric Dumazet ]
+  * udp: Fix udp_poll() and ioctl()
+
+  [ Ben Hutchings ]
+  * acenic: Pass up error code from ace_load_firmware()
+
+  [ Jamal Hadi Salim ]
+  * pkt_sched: pedit use proper struct
+
+  [ Eric Dumazet ]
+  * net: fix sk_forward_alloc corruption
+
+  [ Jasper Spaans ]
+  * bonding: Modify hash transmit policies to use the packet's source
+    MAC address
+
+  [ Ben Hutchings ]
+  * sfc: Set ip_summed correctly for page buffers passed to GRO
+
+  [ Roel Kluin ]
+  * sparc64: replace parentheses in pmul()
+
+  [ David S. Miller ]
+  * sparc: Move of_set_property_mutex acquisition outside of
+    devtree_lock grab.
+
+  [ Rusty Russell ]
+  * sched: Fix boot crash by zalloc()ing most of the cpu masks
+  * sched: Fix isolcpus boot option
+
+  [ Michael Krufky ]
+  * V4L/DVB (13202): smsusb: add autodetection support for three
+    additional Hauppauge USB IDs
+  * V4L/DVB (13313): saa7134: add support for FORCE_TS_VALID mode for
+    mpeg ts input
+  * V4L/DVB (13314): saa7134: set ts_force_val for the Hauppauge WinTV
+    HVR-1150
+
+  [ David Ford ]
+  * ipv4: additional update of dev_net(dev) to struct *net in
+    ip_fragment.c, NULL ptr OOPS
+
+  [ Rusty Russell ]
+  * speedstep-ich: fix error caused by
+    394122ab144dae4b276d74644a2f11c44a60ac5c
+
+  [ Alan Stern ]
+  * USB: EHCI: don't send Clear-TT-Buffer following a STALL
+
+  [ Sergei Shtylyov ]
+  * USB: musb_gadget: fix STALL handling
+
+  [ Thomas Dahlmann ]
+  * usb: amd5536udc: fixed shared interrupt bug and warning oops
+
+  [ Eric W. Biederman ]
+  * USB: ftdi_sio: Keep going when write errors are encountered.
+
+  [ Oliver Neukum ]
+  * USB: work around for EHCI with quirky periodic schedules
+
+  [ Alan Cox ]
+  * tty_port: handle the nonblocking open of a dead port corner case
+
+  [ Daniel Mack ]
+  * pxamci: call mmc_remove_host() before freeing resources
+
+  [ Rusty Russell ]
+  * param: don't complain about unused module parameters.
+
+  [ Helge Deller ]
+  * modules: don't export section names of empty sections via sysfs
+
+  [ NeilBrown ]
+  * md: revert incorrect fix for read error handling in raid1.
+
+  [ Paul Mackerras ]
+  * perf_event: Adjust frequency and unthrottle for non-group-leader
+    events
+
+  [ Antti Kaijanmäki ]
+  * hso: fix soft-lockup
+
+  [ Neil Brown ]
+  * block: use after free bug in __blkdev_get
+
+  [ Jean Delvare ]
+  * hwmon: (adt7475) Fix temperature fault flags
+  * hwmon: (adt7475) Cache limits for 60 seconds
+
+  [ Zhenyu Wang ]
+  * agp/intel: new host bridge support
+
+  [ Jozsef Kadlecsik ]
+  * netfilter: nf_nat: fix NAT issue in 2.6.30.4+
+
+  [ Jan Engelhardt ]
+  * netfilter: xt_connlimit: fix regression caused by zero family value
+
+  [ Michael Buesch ]
+  * b43: Fix DMA TX bounce buffer copying
+
+  [ Chuck Ebbert ]
+  * crypto: padlock-aes - Use the correct mask when checking whether
+    copying is required
+
+  [ Brandon Philips ]
+  * sky2: set carrier off in probe
+
+  [ Nick Kossifidis ]
+  * ath5k: Linear PCDAC code fixes
+
+  [ Jean Delvare ]
+  * i2c: Fix userspace_device list corruption
+
+  [ Peter Feuerer ]
+  * acerhdf: fix fan control for AOA150 model
+
+  [ Clemens Ladisch ]
+  * drm/fb: fix FBIOGET/PUT_VSCREENINFO pixel clock handling
+
+  [ Michal Simek ]
+  * tty/of_serial: add missing ns16550a id
+
+  [ Erik Andrén ]
+  * V4L/DVB (13255): gspca - m5602-s5k4aa: Add vflip quirk for the
+    Bruneinit laptop
+  * V4L/DVB (13256): gspca - m5602-s5k4aa: Add another MSI GX700 vflip
+    quirk
+  * V4L/DVB (13257): gspca - m5602-s5k4aa: Add vflip for Fujitsu Amilo
+    Xi 2528
+
+  [ Kenji Kaneshige ]
+  * PCI: Prevent AER driver from being loaded on non-root port PCIE
+    devices
+
+  [ Peter Feuerer ]
+  * acerhdf: additional BIOS versions
+  * acerhdf: return temperature in milidegree instead of degree
+
+  [ Samuel Thibault ]
+  * Input: keyboard - fix braille keyboard keysym generation
+
+  [ Roel Kluin ]
+  * isdn: hfc_usb: Fix read buffer overflow
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.31.7
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 08 Dec 2009 14:32:11 -0800
+
 linux-2.6 (2.6.31-1+vyatta+16) unstable; urgency=low
 
   * virtio_net: add more ethtool information
