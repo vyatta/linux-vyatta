@@ -1,3 +1,11 @@
+linux-2.6 (2.6.30-1+vyatta+11+jenner8) unstable; urgency=low
+
+  [ David Ford ]
+  * ipv4: additional update of dev_net(dev) to struct *net in
+    ip_fragment.c, NULL ptr OOPS
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Thu, 10 Dec 2009 15:28:28 -0800
+
 linux-2.6 (2.6.30-1+vyatta+11+jenner7) unstable; urgency=low
 
   [ Linus Torvalds ]
