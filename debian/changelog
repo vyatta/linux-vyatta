@@ -1,3 +1,10 @@
+linux-2.6 (2.6.31-1+vyatta+19) unstable; urgency=low
+
+  [ Eric W. Biederman ]
+  * net: Fix userspace RTM_NEWLINK notifications.
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 16 Dec 2009 09:06:27 -0800
+
 linux-2.6 (2.6.31-1+vyatta+18) unstable; urgency=low
 
   [ Aneesh Kumar K.V ]
