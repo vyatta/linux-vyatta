@@ -1,3 +1,260 @@
+linux-2.6 (2.6.31-1+vyatta+20) unstable; urgency=low
+
+  [ zhao.ming9@zte.com.cn ]
+  * USB: option: add pid for ZTE
+
+  [ Alan Stern ]
+  * USB: usb-storage: fix bug in fill_inquiry
+
+  [ Jay Fenlason ]
+  * firewire: ohci: handle receive packets with a data length of zero
+
+  [ Jaroslav Kysela ]
+  * ALSA: hda - Terradici HDA controllers does not support 64-bit mode
+
+  [ Takashi Iwai ]
+  * ALSA: hrtimer - Fix lock-up
+
+  [ Bob Copeland ]
+  * ath5k: allow setting txpower to 0
+
+  [ Luis R. Rodriguez ]
+  * ath5k: enable EEPROM checksum check
+
+  [ Alexey Dobriyan ]
+  * bsdacct: fix uid/gid misreporting
+
+  [ Mathieu Desnoyers ]
+  * debugfs: fix create mutex racy fops and private data
+
+  [ Sukadev Bhattiprolu ]
+  * devpts_get_tty() should validate inode
+
+  [ Andi Kleen ]
+  * futex: Take mmap_sem for get_user_pages in fault_in_user_writeable
+
+  [ Amerigo Wang ]
+  * hfs: fix a potential buffer overflow
+
+  [ Feng Tang ]
+  * hrtimer: Fix /proc/timer_list regression
+
+  [ Theodore Ts'o ]
+  * jbd2: don't wipe the journal on a failed journal checksum
+
+  [ Carsten Otte ]
+  * KVM: s390: Make psw available on all exits, not just a subset
+
+  [ NeilBrown ]
+  * md/bitmap: protect against bitmap removal while being updated.
+
+  [ Sergei Shtylyov ]
+  * pata_hpt{37x|3x2n}: fix timing register masks (take 2)
+
+  [ Igor Grinberg ]
+  * pxa/em-x270: fix usb hub power up/reset sequence
+
+  [ Michael Buesch ]
+  * ssb: Fix range check in sprom write
+
+  [ Roel Kluin ]
+  * SUNRPC: IS_ERR/PTR_ERR confusion
+
+  [ Russ Dill ]
+  * USB: Close usb_find_interface race v3
+
+  [ Sergei Shtylyov ]
+  * USB: musb_gadget_ep0: fix unhandled endpoint 0 IRQs, again
+
+  [ Zhang Le ]
+  * USB: option.c: add support for D-Link DWM-162-U5
+
+  [ Alan Stern ]
+  * USB: usb-storage: add BAD_SENSE flag
+
+  [ Andre Herms ]
+  * USB: usbtmc: repeat usb_bulk_msg until whole message is transfered
+
+  [ Roel Kluin ]
+  * V4L/DVB: Fix test in copy_reg_bits()
+
+  [ Dave Jones ]
+  * x86: Add new Intel CPU cache size descriptors
+
+  [ Joerg Roedel ]
+  * x86/amd-iommu: attach devices to pre-allocated domains early
+  * x86/amd-iommu: un__init iommu_setup_msi
+
+  [ Mikael Pettersson ]
+  * x86, apic: Enable lapic nmi watchdog on AMD Family 11h
+
+  [ Leann Ogasawara ]
+  * x86: ASUS P4S800 reboot=bios quirk
+
+  [ Darrick J. Wong ]
+  * x86, Calgary IOMMU quirk: Find nearest matching Calgary while
+    walking up the PCI tree
+
+  [ Tejun Heo ]
+  * x86: Fix iommu=nodac parameter handling
+
+  [ Dave Jones ]
+  * x86: Fix typo in Intel CPU cache size descriptor
+
+  [ Joe Perches ]
+  * x86: GART: pci-gart_64.c: Use correct length in strncmp
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: Add quirk for HIS X1300 board
+  * drm/radeon/kms: fix legacy crtc2 dpms
+
+  [ Vasanthakumar Thiagarajan ]
+  * mac80211: Fix bug in computing crc over dynamic IEs in beacon
+
+  [ Naoya Horiguchi ]
+  * mm: hugetlb: fix hugepage memory leak in mincore()
+  * mm: hugetlb: fix hugepage memory leak in walk_page_range()
+
+  [ Benjamin Herrenschmidt ]
+  * powerpc: Fix usage of 64-bit instruction in 32-bit altivec code
+
+  [ Ian Jackson ]
+  * Serial: Do not read IIR in serial8250_start_tx when UART_BUG_TXEN
+
+  [ Mikulas Patocka ]
+  * ide: Serialize CMD643 and CMD646 to fix a hardware bug with SSD
+
+  [ Hemant Pedanekar ]
+  * ide: fix ioctl to pass requested transfer mode to ide_find_dma_mode
+    instead of UDMA6
+
+  [ David S. Miller ]
+  * Revert "ide: try to use PIO Mode 0 during probe if possible"
+
+  [ Bartlomiej Zolnierkiewicz ]
+  * slc90e66: fix UDMA handling
+
+  [ Alexander Beregalov ]
+  * Au1x00: fix crash when trying register_netdev()
+
+  [ Stanislav Brabec ]
+  * b44 WOL setup: one-bit-off stack corruption kernel panic fix
+
+  [ David S. Miller ]
+  * b44: Fix wedge when using netconsole.
+
+  [ Herbert Xu ]
+  * gro: Fix illegal merging of trailer trash
+
+  [ Patrick McHardy ]
+  * ip_fragment: also adjust skb->truesize for packets not owned by a
+    socket
+
+  [ David S. Miller ]
+  * Revert "isdn: isdn_ppp: Use SKB list facilities instead of home-
+    grown implementation."
+
+  [ Eric Dumazet ]
+  * net: Fix the rollback test in dev_change_name()
+
+  [ Russell King - ARM Linux ]
+  * NET: smc91x: Fix irq flags
+
+  [ Steve Glendinning ]
+  * smsc9420: prevent BUG() if ethtool is called with interface down
+
+  [ Eric Dumazet ]
+  * vlan: Fix register_vlan_dev() error path
+
+  [ David S. Miller ]
+  * sparc64: Fix definition of VMEMMAP_SIZE.
+  * sunsab: Do not set sunsab_reg.cons right before registering minors.
+  * sunsu: Fix detection of SU ports which are RSC console or control.
+  * serial: suncore: Add 'ignore_line' argument to
+    sunserial_console_match().
+  * serial: suncore: Fix RSC/LOM handling in
+    sunserial_console_termios().
+  * sunsu: Pass true 'ignore_line' to console match when RSC or LOM
+    console.
+  * sunsu: Use sunserial_console_termios() in sunsu_console_setup().
+  * sparc64: Don't specify IRQF_SHARED for LDC interrupts.
+  * sparc64: Fix overly strict range type matching for PCI devices.
+  * sparc64: Fix stack debugging IRQ stack regression.
+  * sparc: Set UTS_MACHINE correctly.
+
+  [ Jan Beulich ]
+  * x86/mce: Set up timer unconditionally
+
+  [ Larry Finger ]
+  * b43legacy: avoid PPC fault during resume
+  * p54usb: Remove DMA buffer from stack
+
+  [ Yong Wang ]
+  * x86: Under BIOS control, restore AP's APIC_LVTTHMR to the BSP value
+
+  [ Zhao Yakui ]
+  * ACPI: Use the ARB_DISABLE for the CPU which model id is less than
+    0x0f.
+
+  [ Corentin Chary ]
+  * asus-laptop: change light sens default values.
+
+  [ Jean Delvare ]
+  * backlight: lcd - Fix wrong sizeof
+
+  [ Chris Wilson ]
+  * drm/i915: Avoid NULL dereference with component_only tv_modes
+
+  [ Zhenyu Wang ]
+  * drm/i915: Fix CRT hotplug detect by checking really no channels
+    attached
+  * drm/i915: Fix LVDS stability issue on Ironlake
+
+  [ Jesse Barnes ]
+  * drm/i915: save/restore BLC histogram control reg across
+    suspend/resume
+
+  [ Zhenyu Wang ]
+  * drm/i915: PineView only has LVDS and CRT ports
+
+  [ Jan Kara ]
+  * ext3: Fix data / filesystem corruption when write fails to copy data
+
+  [ Simon Horman ]
+  * ipvs: zero usvc and udest
+
+  [ Zhu Yi ]
+  * ipw2100: fix rebooting hang with driver loaded
+
+  [ David Woodhouse ]
+  * jffs2: Fix long-standing bug with symlink garbage collection.
+
+  [ Alan Cox ]
+  * matroxfb: fix problems with display stability
+
+  [ Eric W. Biederman ]
+  * net: Fix userspace RTM_NEWLINK notifications.
+
+  [ Henrique de Moraes Holschuh ]
+  * thinkpad-acpi: fix default brightness_mode for R50e/R51
+  * thinkpad-acpi: preserve rfkill state across suspend/resume
+
+  [ Rafal Milecki ]
+  * V4L/DVB (13116): gspca - ov519: Webcam 041e:4067 added.
+
+  [ Darrick J. Wong ]
+  * powerpc/therm_adt746x: Record pwm invert bit at module load time]
+
+  [ Li Peng ]
+  * drm/i915: Fix sync to vblank when VGA output is turned off
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.31.9
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 18 Dec 2009 16:22:34 -0800
+
 linux-2.6 (2.6.31-1+vyatta+19) unstable; urgency=low
 
   [ Eric W. Biederman ]
