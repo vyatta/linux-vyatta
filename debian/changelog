@@ -1,3 +1,16 @@
+linux-2.6 (2.6.31-1+vyatta+23) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Revert "rt2x00: Disable powersaving for rt61pci and rt2800pci."
+
+  [ Greg Kroah-Hartman ]
+  * Revert "rt2x00: Disable powersaving for rt61pci and rt2800pci."
+  * Linux 2.6.31.11
+
+  [ Stig Thormodsrud ]
+
+ -- Stig Thormodsrud <stig@vyatta.com>  Thu, 07 Jan 2010 12:06:12 -0800
+
 linux-2.6 (2.6.31-1+vyatta+22) unstable; urgency=low
 
   [ Stefan Bader ]
