@@ -1,3 +1,119 @@
+linux-2.6 (2.6.31-1+vyatta+22) unstable; urgency=low
+
+  [ Stefan Bader ]
+  * acerhdf: limit modalias matching to supported
+
+  [ Eric Millbrandt ]
+  * ASoC: Do not write to invalid registers on the wm9712.
+
+  [ Jeff Layton ]
+  * cifs: NULL out tcon, pSesInfo, and srvTcp pointers when chasing DFS
+    referrals
+
+  [ Thomas Gleixner ]
+  * clockevents: Prevent clockevent_devices list corruption on cpu
+    hotplug
+
+  [ Nicolas Ferre ]
+  * dma: at_hdmac: correct incompatible type for argument 1 of
+    'spin_lock_bh'
+
+  [ Julia Lawall ]
+  * drivers/net/usb: Correct code taking the size of a pointer
+
+  [ Daniel Mack ]
+  * Libertas: fix buffer overflow in lbs_get_essid()
+
+  [ NeilBrown ]
+  * md: Fix unfortunate interaction with evms
+
+  [ Bartlomiej Zolnierkiewicz ]
+  * pata_cmd64x: fix overclocking of UDMA0-2 modes
+
+  [ Sergei Shtylyov ]
+  * pata_hpt3x2n: fix clock turnaround
+
+  [ Mike Christie ]
+  * SCSI: fc class: fix fc_transport_init error handling
+
+  [ Clemens Ladisch ]
+  * sound: sgio2audio/pdaudiocf/usb-audio: initialize PCM buffer
+  * USB: emi62: fix crash when trying to load EMI 6|2 firmware
+
+  [ pancho horrillo ]
+  * USB: Fix a bug on appledisplay.c regarding signedness
+
+  [ Sergei Shtylyov ]
+  * USB: musb: gadget_ep0: avoid SetupEnd interrupt
+
+  [ Donny Kurnia ]
+  * USB: option: support hi speed for modem Haier CE100
+
+  [ Suresh Siddha ]
+  * x86, cpuid: Add "volatile" to asm in native_cpuid()
+
+  [ Roger Oksanen ]
+  * e100: Use pci pool to work around GFP_ATOMIC order 5 memory
+    allocation failure
+  * e100: Fix broken cbs accounting due to missing memset.
+
+  [ Martin Decky ]
+  * hostap: Revert a toxic part of the conversion to net_device_ops
+
+  [ Roel Kluin ]
+  * hwmon: (fschmd) Fix check on unsigned in watchdog_write()
+
+  [ Jonathan Cameron ]
+  * hwmon: (sht15) Off-by-one error in array index + incorrect constants
+
+  [ Michele Jr De Candia ]
+  * i2c/tsl2550: Fix lux value in extended mode
+
+  [ Patrick McHardy ]
+  * ipv6: reassembly: use seperate reassembly queues for conntrack and
+    local delivery
+
+  [ Stefan Weinhuber ]
+  * S390: dasd: support DIAG access for read-only devices
+
+  [ Jan Kara ]
+  * udf: Try harder when looking for VAT inode
+
+  [ Dan Carpenter ]
+  * V4L/DVB (13596): ov511.c typo: lock => unlock
+
+  [ Linus Torvalds ]
+  * x86/ptrace: make genregs[32]_get/set more robust
+
+  [ Jan Rekorajski ]
+  * XFS bug in log recover with quota (bugzilla id 855)
+
+  [ Serge E. Hallyn ]
+  * generic_permission: MAY_OPEN is not write access
+
+  [ Gertjan van Wingerde ]
+  * rt2x00: Disable powersaving for rt61pci and rt2800pci.
+
+  [ Daisuke Nishimura ]
+  * memcg: avoid oom-killing innocent task in case of use_hierarchy
+
+  [ Moiseev Vladimir ]
+  * Input: atkbd - add force relese key quirk for Samsung R59P/R60P/R61P
+
+  [ Dmitry Monakhov ]
+  * Add unlocked version of inode_add_bytes() function
+  * quota: decouple fs reserved space from quota reservation
+  * ext4: Convert to generic reserved quota's space management.
+  * ext4: fix sleep inside spinlock issue with quota and dealloc
+    (#14739)
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.31.10
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 06 Jan 2010 21:08:01 -0800
+
 linux-2.6 (2.6.31-1+vyatta+21) unstable; urgency=low
 
   * unionfs: possible fix for panic in unionfs_setattr
