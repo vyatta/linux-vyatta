@@ -187,6 +187,7 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.accept_source_route	= 0,	/* we do not accept RH0 by default. */
 	.disable_ipv6		= 0,
 	.accept_dad		= 1,
+	.address_flush		= 1,
 };
 
 static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
@@ -221,6 +222,7 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.accept_source_route	= 0,	/* we do not accept RH0 by default. */
 	.disable_ipv6		= 0,
 	.accept_dad		= 1,
+	.address_flush		= 1,
 };
 
 /* IPv6 Wildcard Address and Loopback Address defined by RFC2553 */
@@ -2669,18 +2671,26 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 		write_lock_bh(&idev->lock);
 	}
 #endif
-	while ((ifa = idev->addr_list) != NULL) {
-		idev->addr_list = ifa->if_next;
-		ifa->if_next = NULL;
-		ifa->dead = 1;
-		addrconf_del_timer(ifa);
-		write_unlock_bh(&idev->lock);
+	bifa = &idev->addr_list;
+	while ((ifa = *bifa) != NULL) {
+		/* If unregister or address_flush set or temporary 
+		   then delete address */
+		if (how || idev->cnf.address_flush ||
+		    !(ifa->flags & IFA_F_PERMANENT) ) {
+			*bifa = ifa->if_next;
+			ifa->if_next = NULL;
+			ifa->dead = 1;
+			addrconf_del_timer(ifa);
+			write_unlock_bh(&idev->lock);
 
-		__ipv6_ifa_notify(RTM_DELADDR, ifa);
-		atomic_notifier_call_chain(&inet6addr_chain, NETDEV_DOWN, ifa);
-		in6_ifa_put(ifa);
+			__ipv6_ifa_notify(RTM_DELADDR, ifa);
+			atomic_notifier_call_chain(&inet6addr_chain,
+						   NETDEV_DOWN, ifa);
+			in6_ifa_put(ifa);
 
-		write_lock_bh(&idev->lock);
+			write_lock_bh(&idev->lock);
+		} else
+			bifa = &ifa->if_next;
 	}
 	write_unlock_bh(&idev->lock);
 
@@ -3687,6 +3697,8 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 #endif
 	array[DEVCONF_DISABLE_IPV6] = cnf->disable_ipv6;
 	array[DEVCONF_ACCEPT_DAD] = cnf->accept_dad;
+	array[DEVCONF_LINK_FILTER] = cnf->link_filter;
+	array[DEVCONF_ADDRESS_FLUSH] = cnf->address_flush;
 }
 
 static inline size_t inet6_if_nlmsg_size(void)
@@ -4327,6 +4339,14 @@ static struct addrconf_sysctl_table
 			.ctl_name	=	CTL_UNNUMBERED,
 			.procname	=	"accept_dad",
 			.data		=	&ipv6_devconf.accept_dad,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+			.proc_handler	=	proc_dointvec,
+		},
+		{
+			.ctl_name	=	CTL_UNNUMBERED,
+			.procname	=	"address_flush",
+			.data		=	&ipv6_devconf.address_flush,
 			.maxlen		=	sizeof(int),
 			.mode		=	0644,
 			.proc_handler	=	proc_dointvec,
