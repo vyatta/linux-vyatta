@@ -19,8 +19,6 @@ class Gencontrol(Base):
 
     def do_main_packages(self, packages, extra):
         packages.extend(self.process_packages(self.templates["control.main"], self.vars))
-        packages.append(self.process_real_tree(self.templates["control.tree"][0], self.vars))
-        packages.extend(self.process_packages(self.templates["control.support"], self.vars))
 
     def do_arch_setup(self, vars, makeflags, arch, extra):
         vars.update(self.config.get(('image', arch), {}))
@@ -213,21 +211,9 @@ class Gencontrol(Base):
         makefile.append(("source-%s-%s-%s-real:" % (arch, subarch, flavour)))
 
     def do_extra(self, packages, makefile):
-        apply = self.templates['patch.apply']
-        unpatch = self.templates['patch.unpatch']
-
-        vars = {
-            'home': '/usr/src/kernel-patches/all/%s/debian' % self.version.linux_upstream,
-            'revisions': ' '.join([i.version.debian for i in self.changelog[::-1]]),
-            'source': "%(linux_upstream)s-%(debian)s" % self.version.__dict__,
-            'upstream': self.version.linux_upstream,
-        }
-
-        apply = self.substitute(apply, vars)
-        unpatch = self.substitute(unpatch, vars)
-
-        file('debian/bin/patch.apply', 'w').write(apply)
-        file('debian/bin/patch.unpatch', 'w').write(unpatch)
+        # we don't use these
+        print 'I: Not generating bin/patch.*'
+        return
 
     def process_changelog(self):
         in_changelog = Changelog(version = VersionLinux)
