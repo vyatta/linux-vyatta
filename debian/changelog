@@ -1,3 +1,9 @@
+linux-2.6 (2.6.31-1+vyatta+28) unstable; urgency=low
+
+  * Update Microsoft Hyper-V drivers to 2.6.32.6
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 25 Jan 2010 22:50:54 -0800
+
 linux-2.6 (2.6.31-1+vyatta+27) unstable; urgency=low
 
   * generate version files for vyatta modules
