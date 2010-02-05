@@ -1,3 +1,10 @@
+linux-2.6 (2.6.30-1+vyatta+11+jenner9) unstable; urgency=low
+
+  [ Ben McKeegan ]
+  * ppp: fix lost fragments in ppp_mp_explode() (resubmit)
+
+ -- Bob Gilligan <gilligan@vyatta.com>  Fri, 05 Feb 2010 15:25:51 -0800
+
 linux-2.6 (2.6.30-1+vyatta+11+jenner8) unstable; urgency=low
 
   [ David Ford ]
