@@ -1,3 +1,20 @@
+linux-2.6 (2.6.31-1+vyatta+30) unstable; urgency=low
+
+  [ Jesse Brandeburg ]
+  * e1000: enhance frame fragment detection
+  * e1000e: enhance frame fragment detection
+  * e1000/e1000e: don't use small hardware rx buffers
+
+  [ Matt Mackall ]
+  * random: drop weird m_time/a_time manipulation
+
+  [ Herbert Xu ]
+  * random: Remove unused inode variable
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 05 Feb 2010 12:25:49 -0800
+
 linux-2.6 (2.6.31-1+vyatta+29) unstable; urgency=low
 
   [ Jeff Hansen ]
