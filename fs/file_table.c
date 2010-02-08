@@ -186,10 +186,8 @@ struct file *alloc_file(struct path *path, fmode_t mode,
 	 * that we can do debugging checks at __fput()
 	 */
 	if ((mode & FMODE_WRITE) && !special_file(path->dentry->d_inode->i_mode)) {
-		int error = 0;
 		file_take_write(file);
-		error = mnt_clone_write(path->mnt);
-		WARN_ON(error);
+		WARN_ON(mnt_clone_write(path->mnt));
 	}
 	ima_counts_get(file);
 	return file;
@@ -255,6 +253,7 @@ void __fput(struct file *file)
 	if (file->f_op && file->f_op->release)
 		file->f_op->release(inode, file);
 	security_file_free(file);
+	ima_file_free(file);
 	if (unlikely(S_ISCHR(inode->i_mode) && inode->i_cdev != NULL))
 		cdev_put(inode->i_cdev);
 	fops_put(file->f_op);

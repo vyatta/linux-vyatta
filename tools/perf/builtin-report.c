@@ -224,7 +224,7 @@ static int __cmd_report(void)
 
 	perf_session__collapse_resort(session);
 	perf_session__output_resort(session, session->events_stats.total);
-	fprintf(stdout, "# Samples: %ld\n#\n", session->events_stats.total);
+	fprintf(stdout, "# Samples: %Ld\n#\n", session->events_stats.total);
 	perf_session__fprintf_hists(session, NULL, false, stdout);
 	if (sort_order == default_sort_order &&
 	    parent_pattern == default_parent_pattern)
@@ -269,7 +269,7 @@ parse_callchain_opt(const struct option *opt __used, const char *arg,
 
 	else if (!strncmp(tok, "none", strlen(arg))) {
 		callchain_param.mode = CHAIN_NONE;
-		symbol_conf.use_callchain = true;
+		symbol_conf.use_callchain = false;
 
 		return 0;
 	}
@@ -294,8 +294,7 @@ setup:
 	return 0;
 }
 
-//static const char * const report_usage[] = {
-const char * const report_usage[] = {
+static const char * const report_usage[] = {
 	"perf report [<options>] <command>",
 	NULL
 };

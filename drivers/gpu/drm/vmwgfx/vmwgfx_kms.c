@@ -106,8 +106,8 @@ int vmw_du_crtc_cursor_set(struct drm_crtc *crtc, struct drm_file *file_priv,
 	int ret;
 
 	if (handle) {
-		ret = vmw_user_surface_lookup(dev_priv, tfile,
-					      handle, &surface);
+		ret = vmw_user_surface_lookup_handle(dev_priv, tfile,
+						     handle, &surface);
 		if (!ret) {
 			if (!surface->snooper.image) {
 				DRM_ERROR("surface not suitable for cursor\n");
@@ -553,9 +553,7 @@ int vmw_framebuffer_dmabuf_dirty(struct drm_framebuffer *framebuffer,
 	} *cmd;
 	int i, increment = 1;
 
-	if (!num_clips ||
-	    !(dev_priv->fifo.capabilities &
-	      SVGA_FIFO_CAP_SCREEN_OBJECT)) {
+	if (!num_clips) {
 		num_clips = 1;
 		clips = &norect;
 		norect.x1 = norect.y1 = 0;
@@ -574,10 +572,10 @@ int vmw_framebuffer_dmabuf_dirty(struct drm_framebuffer *framebuffer,
 
 	for (i = 0; i < num_clips; i++, clips += increment) {
 		cmd[i].header = cpu_to_le32(SVGA_CMD_UPDATE);
-		cmd[i].body.x = cpu_to_le32(clips[i].x1);
-		cmd[i].body.y = cpu_to_le32(clips[i].y1);
-		cmd[i].body.width = cpu_to_le32(clips[i].x2 - clips[i].x1);
-		cmd[i].body.height = cpu_to_le32(clips[i].y2 - clips[i].y1);
+		cmd[i].body.x = cpu_to_le32(clips->x1);
+		cmd[i].body.y = cpu_to_le32(clips->y1);
+		cmd[i].body.width = cpu_to_le32(clips->x2 - clips->x1);
+		cmd[i].body.height = cpu_to_le32(clips->y2 - clips->y1);
 	}
 
 	vmw_fifo_commit(dev_priv, sizeof(*cmd) * num_clips);
@@ -704,10 +702,13 @@ static struct drm_framebuffer *vmw_kms_fb_create(struct drm_device *dev,
 	struct vmw_dma_buffer *bo = NULL;
 	int ret;
 
-	ret = vmw_user_surface_lookup(dev_priv, tfile,
-				      mode_cmd->handle, &surface);
+	ret = vmw_user_surface_lookup_handle(dev_priv, tfile,
+					     mode_cmd->handle, &surface);
 	if (ret)
 		goto try_dmabuf;
+
+	if (!surface->scanout)
+		goto err_not_scanout;
 
 	ret = vmw_kms_new_framebuffer_surface(dev_priv, surface, &vfb,
 					      mode_cmd->width, mode_cmd->height);
@@ -742,6 +743,13 @@ try_dmabuf:
 	}
 
 	return &vfb->base;
+
+err_not_scanout:
+	DRM_ERROR("surface not marked as scanout\n");
+	/* vmw_user_surface_lookup takes one ref */
+	vmw_surface_unreference(&surface);
+
+	return NULL;
 }
 
 static int vmw_kms_fb_changed(struct drm_device *dev)

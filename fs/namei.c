@@ -37,8 +37,6 @@
 
 #include "internal.h"
 
-#define ACC_MODE(x) ("\000\004\002\006"[(x)&O_ACCMODE])
-
 /* [Feb-1997 T. Schoebel-Theuer]
  * Fundamental changes in the pathname lookup mechanisms (namei)
  * were necessary because of omirr.  The reason is that omirr needs
@@ -234,6 +232,7 @@ int generic_permission(struct inode *inode, int mask,
 	/*
 	 * Searching includes executable on directories, else just read.
 	 */
+	mask &= MAY_READ | MAY_WRITE | MAY_EXEC;
 	if (mask == MAY_READ || (S_ISDIR(inode->i_mode) && !(mask & MAY_WRITE)))
 		if (capable(CAP_DAC_READ_SEARCH))
 			return 0;
@@ -562,6 +561,7 @@ static __always_inline int __do_follow_link(struct path *path, struct nameidata 
 		dget(dentry);
 	}
 	mntget(path->mnt);
+	nd->last_type = LAST_BIND;
 	cookie = dentry->d_inode->i_op->follow_link(dentry, nd);
 	error = PTR_ERR(cookie);
 	if (!IS_ERR(cookie)) {
@@ -1604,11 +1604,12 @@ struct file *do_filp_open(int dfd, const char *pathname,
 	struct file *filp;
 	struct nameidata nd;
 	int error;
-	struct path path, save;
+	struct path path;
 	struct dentry *dir;
 	int count = 0;
 	int will_truncate;
 	int flag = open_to_namei_flags(open_flag);
+	int force_reval = 0;
 
 	/*
 	 * O_SYNC is implemented as __O_SYNC|O_DSYNC.  As many places only
@@ -1620,7 +1621,7 @@ struct file *do_filp_open(int dfd, const char *pathname,
 		open_flag |= O_DSYNC;
 
 	if (!acc_mode)
-		acc_mode = MAY_OPEN | ACC_MODE(flag);
+		acc_mode = MAY_OPEN | ACC_MODE(open_flag);
 
 	/* O_TRUNC implies we need access checks for write permissions */
 	if (flag & O_TRUNC)
@@ -1640,6 +1641,7 @@ struct file *do_filp_open(int dfd, const char *pathname,
 		if (filp == NULL)
 			return ERR_PTR(-ENFILE);
 		nd.intent.open.file = filp;
+		filp->f_flags = open_flag;
 		nd.intent.open.flags = flag;
 		nd.intent.open.create_mode = 0;
 		error = do_path_lookup(dfd, pathname,
@@ -1659,9 +1661,12 @@ struct file *do_filp_open(int dfd, const char *pathname,
 	/*
 	 * Create - we need to know the parent.
 	 */
+reval:
 	error = path_init(dfd, pathname, LOOKUP_PARENT, &nd);
 	if (error)
 		return ERR_PTR(error);
+	if (force_reval)
+		nd.flags |= LOOKUP_REVAL;
 	error = path_walk(pathname, &nd);
 	if (error) {
 		if (nd.root.mnt)
@@ -1685,6 +1690,7 @@ struct file *do_filp_open(int dfd, const char *pathname,
 	if (filp == NULL)
 		goto exit_parent;
 	nd.intent.open.file = filp;
+	filp->f_flags = open_flag;
 	nd.intent.open.flags = flag;
 	nd.intent.open.create_mode = mode;
 	dir = nd.path.dentry;
@@ -1725,13 +1731,12 @@ do_last:
 			mnt_drop_write(nd.path.mnt);
 			goto exit;
 		}
-		filp = nameidata_to_filp(&nd, open_flag);
+		filp = nameidata_to_filp(&nd);
 		mnt_drop_write(nd.path.mnt);
 		if (nd.root.mnt)
 			path_put(&nd.root);
 		if (!IS_ERR(filp)) {
-			error = ima_path_check(&filp->f_path, filp->f_mode &
-				       (MAY_READ | MAY_WRITE | MAY_EXEC));
+			error = ima_file_check(filp, acc_mode);
 			if (error) {
 				fput(filp);
 				filp = ERR_PTR(error);
@@ -1789,10 +1794,9 @@ ok:
 			mnt_drop_write(nd.path.mnt);
 		goto exit;
 	}
-	filp = nameidata_to_filp(&nd, open_flag);
+	filp = nameidata_to_filp(&nd);
 	if (!IS_ERR(filp)) {
-		error = ima_path_check(&filp->f_path, filp->f_mode &
-			       (MAY_READ | MAY_WRITE | MAY_EXEC));
+		error = ima_file_check(filp, acc_mode);
 		if (error) {
 			fput(filp);
 			filp = ERR_PTR(error);
@@ -1852,17 +1856,7 @@ do_link:
 	error = security_inode_follow_link(path.dentry, &nd);
 	if (error)
 		goto exit_dput;
-	save = nd.path;
-	path_get(&save);
 	error = __do_follow_link(&path, &nd);
-	if (error == -ESTALE) {
-		/* nd.path had been dropped */
-		nd.path = save;
-		path_get(&nd.path);
-		nd.flags |= LOOKUP_REVAL;
-		error = __do_follow_link(&path, &nd);
-	}
-	path_put(&save);
 	path_put(&path);
 	if (error) {
 		/* Does someone understand code flow here? Or it is only
@@ -1872,6 +1866,10 @@ do_link:
 		release_open_intent(&nd);
 		if (nd.root.mnt)
 			path_put(&nd.root);
+		if (error == -ESTALE && !force_reval) {
+			force_reval = 1;
+			goto reval;
+		}
 		return ERR_PTR(error);
 	}
 	nd.flags &= ~LOOKUP_PARENT;

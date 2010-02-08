@@ -1037,6 +1037,9 @@ extern void add_active_range(unsigned int nid, unsigned long start_pfn,
 extern void remove_active_range(unsigned int nid, unsigned long start_pfn,
 					unsigned long end_pfn);
 extern void remove_all_active_ranges(void);
+void sort_node_map(void);
+unsigned long __absent_pages_in_range(int nid, unsigned long start_pfn,
+						unsigned long end_pfn);
 extern unsigned long absent_pages_in_range(unsigned long start_pfn,
 						unsigned long end_pfn);
 extern void get_pfn_range_for_nid(unsigned int nid,
@@ -1086,6 +1089,7 @@ extern void zone_pcp_update(struct zone *zone);
 
 /* nommu.c */
 extern atomic_long_t mmap_pages_allocated;
+extern int nommu_shrink_inode_mappings(struct inode *, size_t, size_t);
 
 /* prio_tree.c */
 void vma_prio_tree_add(struct vm_area_struct *, struct vm_area_struct *old);
