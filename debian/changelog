@@ -1,3 +1,23 @@
+linux-2.6 (2.6.31-1+vyatta+31) unstable; urgency=low
+
+  [ Eric Dumazet ]
+  * dst: call cond_resched() in dst_gc_task()
+
+  [ Brian Haley ]
+  * ipv6: Add IFA_F_DADFAILED flag
+
+  [ Jens Rosenboom ]
+  * ipv6: Log the affected address when DAD failure occurs
+
+  [ Moni Shoua ]
+  * bonding: remap muticast addresses without using dev_close() and
+    dev_open()
+
+  [ Stephen Hemminger ]
+  * Fix IPv6 management of permanent addresses
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 09 Feb 2010 14:41:30 -0800
+
 linux-2.6 (2.6.31-1+vyatta+30) unstable; urgency=low
 
   [ Jesse Brandeburg ]
