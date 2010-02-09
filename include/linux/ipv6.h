@@ -168,7 +168,6 @@ struct ipv6_devconf {
 	__s32		disable_ipv6;
 	__s32		accept_dad;
 	__s32		link_filter;
-	__s32		address_flush;
 	void		*sysctl;
 };
 
@@ -210,7 +209,6 @@ enum {
 	DEVCONF_DISABLE_IPV6,
 	DEVCONF_ACCEPT_DAD,
 	DEVCONF_LINK_FILTER,
-	DEVCONF_ADDRESS_FLUSH,
 	DEVCONF_MAX
 };
 

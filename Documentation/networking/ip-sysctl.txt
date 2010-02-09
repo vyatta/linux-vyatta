@@ -1084,11 +1084,6 @@ accept_dad - INTEGER
 	2: Enable DAD, and disable IPv6 operation if MAC-based duplicate
 	   link-local address has been found.
 
-address_flush - BOOLEAN
-	Flush all addresses when link is brought down.
-	If FALSE, only temporary addresses are flushed.
-	Default: TRUE
-
 icmp/*:
 ratelimit - INTEGER
 	Limit the maximal rates for sending ICMPv6 packets.
