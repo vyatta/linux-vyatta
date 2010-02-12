@@ -376,7 +376,9 @@ install-image-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-plain:
 	  install-image-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-plain_image \
 	  DIR='$(DIR)' PACKAGE_DIR='$(PACKAGE_DIR)' INSTALL_DIR='$(INSTALL_DIR)' REAL_VERSION='$(REAL_VERSION)'
 ifeq ($(MODULES),True)
-	cd $(DIR); $(setup_env) make modules_install INSTALL_MOD_PATH=$(PACKAGE_DIR)
+	cd $(DIR); $(setup_env) make modules_install \
+		INSTALL_MOD_PATH=$(PACKAGE_DIR) \
+		INSTALL_FW_PATH=$(PACKAGE_DIR)/lib/firmware/$(VERSION)
 	cp -p $(DIR)/.config $(PACKAGE_DIR)/boot/config-$(REAL_VERSION)
 	cp -p $(DIR)/System.map $(PACKAGE_DIR)/boot/System.map-$(REAL_VERSION)
 	rm $(PACKAGE_DIR)/lib/modules/$(REAL_VERSION)/{build,source,modules.*}
