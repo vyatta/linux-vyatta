@@ -1576,6 +1576,7 @@ unsigned int udp_poll(struct file *file, struct socket *sock, poll_table *wait)
 		mask &= ~(POLLIN | POLLRDNORM);
 
 	return mask;
+
 }
 EXPORT_SYMBOL(udp_poll);
 

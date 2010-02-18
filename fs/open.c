@@ -31,10 +31,6 @@
 #include <linux/falloc.h>
 #include <linux/fs_struct.h>
 
-#include <trace/fs.h>
-
-DEFINE_TRACE(do_sys_open);
-
 int vfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 {
 	int retval = -ENODEV;
@@ -1047,7 +1043,6 @@ long do_sys_open(int dfd, const char __user *filename, int flags, int mode)
 			} else {
 				fsnotify_open(f->f_path.dentry);
 				fd_install(fd, f);
-				trace_do_sys_open(f, flags, mode, fd);
 			}
 		}
 		putname(tmp);
