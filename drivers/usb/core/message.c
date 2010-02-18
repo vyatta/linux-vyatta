@@ -459,35 +459,23 @@ int usb_sg_init(struct usb_sg_request *io, struct usb_device *dev,
 			io->urbs[i]->context = io;
 
 			/*
-			 * Some systems need to revert to PIO when DMA is
-			 * temporarily unavailable.  For their sakes, both
-			 * transfer_buffer and transfer_dma are set when
-			 * possible.  However this can only work on systems
-			 * without:
+			 * Some systems need to revert to PIO when DMA is temporarily
+			 * unavailable.  For their sakes, both transfer_buffer and
+			 * transfer_dma are set when possible.
 			 *
-			 *  - HIGHMEM, since DMA buffers located in high memory
-			 *    are not directly addressable by the CPU for PIO;
-			 *
-			 *  - IOMMU, since dma_map_sg() is allowed to use an
-			 *    IOMMU to make virtually discontiguous buffers be
-			 *    "dma-contiguous" so that PIO and DMA need diferent
-			 *    numbers of URBs.
-			 *
-			 * So when HIGHMEM or IOMMU are in use, transfer_buffer
-			 * is NULL to prevent stale pointers and to help spot
-			 * bugs.
+			 * Note that if IOMMU coalescing occurred, we cannot
+			 * trust sg_page anymore, so check if S/G list shrunk.
 			 */
+			if (io->nents == io->entries && !PageHighMem(sg_page(sg)))
+				io->urbs[i]->transfer_buffer = sg_virt(sg);
+			else
+				io->urbs[i]->transfer_buffer = NULL;
+
 			if (dma) {
 				io->urbs[i]->transfer_dma = sg_dma_address(sg);
 				len = sg_dma_len(sg);
-#if defined(CONFIG_HIGHMEM) || defined(CONFIG_GART_IOMMU)
-				io->urbs[i]->transfer_buffer = NULL;
-#else
-				io->urbs[i]->transfer_buffer = sg_virt(sg);
-#endif
 			} else {
 				/* hc may use _only_ transfer_buffer */
-				io->urbs[i]->transfer_buffer = sg_virt(sg);
 				len = sg->length;
 			}
 
@@ -923,11 +911,11 @@ char *usb_cache_string(struct usb_device *udev, int index)
 	if (index <= 0)
 		return NULL;
 
-	buf = kmalloc(MAX_USB_STRING_SIZE, GFP_KERNEL);
+	buf = kmalloc(MAX_USB_STRING_SIZE, GFP_NOIO);
 	if (buf) {
 		len = usb_string(udev, index, buf, MAX_USB_STRING_SIZE);
 		if (len > 0) {
-			smallbuf = kmalloc(++len, GFP_KERNEL);
+			smallbuf = kmalloc(++len, GFP_NOIO);
 			if (!smallbuf)
 				return buf;
 			memcpy(smallbuf, buf, len);
@@ -1694,7 +1682,7 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	if (cp) {
 		nintf = cp->desc.bNumInterfaces;
 		new_interfaces = kmalloc(nintf * sizeof(*new_interfaces),
-				GFP_KERNEL);
+				GFP_NOIO);
 		if (!new_interfaces) {
 			dev_err(&dev->dev, "Out of memory\n");
 			return -ENOMEM;
@@ -1703,7 +1691,7 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 		for (; n < nintf; ++n) {
 			new_interfaces[n] = kzalloc(
 					sizeof(struct usb_interface),
-					GFP_KERNEL);
+					GFP_NOIO);
 			if (!new_interfaces[n]) {
 				dev_err(&dev->dev, "Out of memory\n");
 				ret = -ENOMEM;

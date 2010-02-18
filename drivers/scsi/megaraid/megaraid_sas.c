@@ -718,7 +718,7 @@ megasas_build_dcdb(struct megasas_instance *instance, struct scsi_cmnd *scp,
  * megasas_build_ldio -	Prepares IOs to logical devices
  * @instance:		Adapter soft state
  * @scp:		SCSI command
- * @cmd:		Command to to be prepared
+ * @cmd:		Command to be prepared
  *
  * Frames (and accompanying SGLs) for regular SCSI IOs use this function.
  */
@@ -3451,7 +3451,7 @@ out:
 	return retval;
 }
 
-static DRIVER_ATTR(poll_mode_io, S_IRUGO|S_IWUGO,
+static DRIVER_ATTR(poll_mode_io, S_IRUGO|S_IWUSR,
 		megasas_sysfs_show_poll_mode_io,
 		megasas_sysfs_set_poll_mode_io);
 
