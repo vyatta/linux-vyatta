@@ -86,6 +86,7 @@
 #include <linux/socket.h>
 #include <linux/sockios.h>
 #include <linux/errno.h>
+#include <linux/hash.h>
 #include <linux/interrupt.h>
 #include <linux/if_ether.h>
 #include <linux/netdevice.h>
@@ -199,7 +200,7 @@ EXPORT_SYMBOL(dev_base_lock);
 static inline struct hlist_head *dev_name_hash(struct net *net, const char *name)
 {
 	unsigned hash = full_name_hash(name, strnlen(name, IFNAMSIZ));
-	return &net->dev_name_head[hash & ((1 << NETDEV_HASHBITS) - 1)];
+	return &net->dev_name_head[hash_long(hash, NETDEV_HASHBITS)];
 }
 
 static inline struct hlist_head *dev_index_hash(struct net *net, int ifindex)

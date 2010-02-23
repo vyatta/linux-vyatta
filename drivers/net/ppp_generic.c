@@ -48,6 +48,7 @@
 #include <linux/mutex.h>
 #include <net/slhc_vj.h>
 #include <asm/atomic.h>
+#include <linux/sysctl.h>
 
 #include <linux/nsproxy.h>
 #include <net/net_namespace.h>
@@ -909,6 +910,52 @@ static struct pernet_operations ppp_net_ops = {
 
 #define PPP_MAJOR	108
 
+static int ppp_multilink_do_pcomp = 1;
+
+#if defined(CONFIG_SYSCTL) && defined(CONFIG_PPP_MULTILINK)
+static struct ctl_table_header *ppp_generic_cth;
+
+static ctl_table ppp_generic_sysctl_table[] = {
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "mlppp_do_pcomp",
+		.data		= &ppp_multilink_do_pcomp,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= 0,
+	}
+};
+
+static struct ctl_path pg_path[] = {
+	{ .procname = "net", .ctl_name = CTL_NET, },
+	{ }
+};
+
+static int ppp_generic_init_sysctl(void)
+{
+	ppp_generic_cth =
+		register_sysctl_paths(pg_path, ppp_generic_sysctl_table);
+	if (!ppp_generic_cth) {
+		printk(KERN_ERR "ppp_generic: can't register to sysctl.\n");
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+static void ppp_generic_fini_sysctl(void)
+{
+	unregister_sysctl_table(ppp_generic_cth);
+}
+
+#else
+#define ppp_generic_init_sysctl()	(0)
+#define ppp_generic_fini_sysctl()	do { } while(0)
+
+#endif	/* CONFIG_SYSCTL && CONFIG_PPP_MULTILINK */
+
 /* Called at boot time if ppp is compiled into the kernel,
    or at module load time (from init_module) if compiled as a module. */
 static int __init ppp_init(void)
@@ -923,10 +970,14 @@ static int __init ppp_init(void)
 		goto out;
 	}
 
+	err = ppp_generic_init_sysctl();
+	if (err)
+		goto out_net;
+
 	err = register_chrdev(PPP_MAJOR, "ppp", &ppp_device_fops);
 	if (err) {
 		printk(KERN_ERR "failed to register PPP device (%d)\n", err);
-		goto out_net;
+		goto out_sysctl;
 	}
 
 	ppp_class = class_create(THIS_MODULE, "ppp");
@@ -942,6 +993,8 @@ static int __init ppp_init(void)
 
 out_chrdev:
 	unregister_chrdev(PPP_MAJOR, "ppp");
+out_sysctl:
+	ppp_generic_fini_sysctl();
 out_net:
 	unregister_pernet_gen_device(ppp_net_id, &ppp_net_ops);
 out:
@@ -1357,13 +1410,14 @@ static int ppp_mp_explode(struct ppp *ppp, struct sk_buff *skb)
 	 * the channels	are	free.  This	gives much better TCP
 	 * performance if we have a	lot	of channels.
 	 */
-	if (nfree == 0 || nfree	< navail / 2)
-		return 0; /* can't take now, leave it in xmit_pending	*/
+	if (nfree == 0 || nfree < navail / 2)
+		return 0;	/* can't take now, leave it in xmit_pending */
+	
+	p = skb->data;
+	len = skb->len;
 
-	/* Do protocol field compression (XXX this should be optional) */
-	p =	skb->data;
-	len	= skb->len;
-	if (*p == 0) {
+	/* compress the protocol field if the option is enabled */
+        if (*p == 0 && ppp_multilink_do_pcomp) {
 		++p;
 		--len;
 	}
@@ -2836,6 +2890,7 @@ static void __exit ppp_cleanup(void)
 	device_destroy(ppp_class, MKDEV(PPP_MAJOR, 0));
 	class_destroy(ppp_class);
 	unregister_pernet_gen_device(ppp_net_id, &ppp_net_ops);
+ 	ppp_generic_fini_sysctl();
 }
 
 /*
