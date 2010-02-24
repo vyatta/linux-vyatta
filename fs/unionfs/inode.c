@@ -922,10 +922,6 @@ static int unionfs_setattr(struct dentry *dentry, struct iattr *ia)
 		goto out;
 	}
 	lower_inode = unionfs_lower_inode(inode);
-	if (!lower_inode) { /* ditto */
-		err = -EINVAL;
-		goto out;
-	}
 
 	/* check if user has permission to change lower inode */
 	err = inode_change_ok(lower_inode, ia);

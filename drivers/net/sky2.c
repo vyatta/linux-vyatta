@@ -1214,9 +1214,6 @@ static int sky2_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	}
 
 	case SIOCSMIIREG:
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-
 		spin_lock_bh(&sky2->phy_lock);
 		err = gm_phy_write(hw, sky2->port, data->reg_num & 0x1f,
 				   data->val_in);
@@ -1602,7 +1599,8 @@ static void sky2_tx_unmap(struct pci_dev *pdev,
  * the number of ring elements will probably be less than the number
  * of list elements used.
  */
-static int sky2_xmit_frame(struct sk_buff *skb, struct net_device *dev)
+static netdev_tx_t sky2_xmit_frame(struct sk_buff *skb,
+				   struct net_device *dev)
 {
 	struct sky2_port *sky2 = netdev_priv(dev);
 	struct sky2_hw *hw = sky2->hw;
@@ -1808,7 +1806,8 @@ static void sky2_tx_complete(struct sky2_port *sky2, u16 done)
 	sky2->tx_cons = idx;
 	smp_mb();
 
-	if (tx_avail(sky2) > MAX_SKB_TX_LE + 4)
+	/* Wake unless it's detached, and called e.g. from sky2_down() */
+	if (tx_avail(sky2) > MAX_SKB_TX_LE + 4 && netif_device_present(dev))
 		netif_wake_queue(dev);
 }
 
@@ -4136,7 +4135,7 @@ static int sky2_debug_show(struct seq_file *seq, void *v)
 
 	seq_printf(seq, "\nRx ring hw get=%d put=%d last=%d\n",
 		   sky2_read16(hw, Y2_QADDR(rxqaddr[port], PREF_UNIT_GET_IDX)),
-		   last = sky2_read16(hw, Y2_QADDR(rxqaddr[port], PREF_UNIT_PUT_IDX)),
+		   sky2_read16(hw, Y2_QADDR(rxqaddr[port], PREF_UNIT_PUT_IDX)),
 		   sky2_read16(hw, Y2_QADDR(rxqaddr[port], PREF_UNIT_LAST_IDX)));
 
 	sky2_read32(hw, B0_Y2_SP_LISR);

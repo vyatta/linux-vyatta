@@ -31,10 +31,6 @@
 #include <linux/falloc.h>
 #include <linux/fs_struct.h>
 
-#include <trace/fs.h>
-
-DEFINE_TRACE(do_sys_open);
-
 int vfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 {
 	int retval = -ENODEV;
@@ -203,7 +199,7 @@ out:
 int do_truncate(struct dentry *dentry, loff_t length, unsigned int time_attrs,
 	struct file *filp)
 {
-	int err;
+	int ret;
 	struct iattr newattrs;
 
 	/* Not pretty: "inode->i_size" shouldn't really be signed. But it is. */
@@ -218,12 +214,14 @@ int do_truncate(struct dentry *dentry, loff_t length, unsigned int time_attrs,
 	}
 
 	/* Remove suid/sgid on truncate too */
-	newattrs.ia_valid |= should_remove_suid(dentry);
+	ret = should_remove_suid(dentry);
+	if (ret)
+		newattrs.ia_valid |= ret | ATTR_FORCE;
 
 	mutex_lock(&dentry->d_inode->i_mutex);
-	err = notify_change(dentry, &newattrs);
+	ret = notify_change(dentry, &newattrs);
 	mutex_unlock(&dentry->d_inode->i_mutex);
-	return err;
+	return ret;
 }
 
 static long do_sys_truncate(const char __user *pathname, loff_t length)
@@ -292,10 +290,9 @@ out:
 	return error;
 }
 
-SYSCALL_DEFINE2(truncate, const char __user *, path, unsigned long, length)
+SYSCALL_DEFINE2(truncate, const char __user *, path, long, length)
 {
-	/* on 32-bit boxen it will cut the range 2^31--2^32-1 off */
-	return do_sys_truncate(path, (long)length);
+	return do_sys_truncate(path, length);
 }
 
 static long do_sys_ftruncate(unsigned int fd, loff_t length, int small)
@@ -961,6 +958,8 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags,
 	int error;
 	struct file *f;
 
+	validate_creds(cred);
+
 	/*
 	 * We must always pass in a valid mount pointer.   Historically
 	 * callers got away with not passing it, but we must enforce this at
@@ -1044,7 +1043,6 @@ long do_sys_open(int dfd, const char __user *filename, int flags, int mode)
 			} else {
 				fsnotify_open(f->f_path.dentry);
 				fd_install(fd, f);
-				trace_do_sys_open(f, flags, mode, fd);
 			}
 		}
 		putname(tmp);

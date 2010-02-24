@@ -1083,6 +1083,8 @@ static int init_substream_urbs(struct snd_usb_substream *subs, unsigned int peri
 	} else
 		urb_packs = 1;
 	urb_packs *= packs_per_ms;
+	if (subs->syncpipe)
+		urb_packs = min(urb_packs, 1U << subs->syncinterval);
 
 	/* decide how many packets to be used */
 	if (is_playback) {
@@ -1934,7 +1936,7 @@ static int snd_usb_pcm_close(struct snd_pcm_substream *substream, int direction)
 	struct snd_usb_stream *as = snd_pcm_substream_chip(substream);
 	struct snd_usb_substream *subs = &as->substream[direction];
 
-	if (subs->interface >= 0) {
+	if (!as->chip->shutdown && subs->interface >= 0) {
 		usb_set_interface(subs->dev, subs->interface, 0);
 		subs->interface = -1;
 	}
@@ -2124,8 +2126,8 @@ static void proc_dump_substream_formats(struct snd_usb_substream *subs, struct s
 		fp = list_entry(p, struct audioformat, list);
 		snd_iprintf(buffer, "  Interface %d\n", fp->iface);
 		snd_iprintf(buffer, "    Altset %d\n", fp->altsetting);
-		snd_iprintf(buffer, "    Format: %#x (%d bits)\n",
-			    fp->format, snd_pcm_format_width(fp->format));
+		snd_iprintf(buffer, "    Format: %s\n",
+			    snd_pcm_format_name(fp->format));
 		snd_iprintf(buffer, "    Channels: %d\n", fp->channels);
 		snd_iprintf(buffer, "    Endpoint: %d %s (%s)\n",
 			    fp->endpoint & USB_ENDPOINT_NUMBER_MASK,

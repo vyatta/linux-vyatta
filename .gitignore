@@ -25,8 +25,7 @@
 *.elf
 *.bin
 *.gz
-*.pyc
-*.lds
+*.bz2
 *.lzma
 *.patch
 *.gcno
@@ -42,7 +41,6 @@ Module.markers
 Module.symvers
 !.gitignore
 !.mailmap
-modules.order
 
 #
 # Generated include files
@@ -75,17 +73,5 @@ GSYMS
 GTAGS
 
 *.orig
-*.rej
 *~
-
-/debian/build
-/debian/stamps
-/debian/files
-/debian/linux-*
-/debian/control
-/debian/control.md5sum
-/debian/rules.gen
-
-stamp-*
-conf.vars
-config.precious
+\#*#
