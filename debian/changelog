@@ -1136,7 +1136,7 @@ linux-2.6 (2.6.32-1+vyatta+1) UNRELEASED; urgency=low
   * mac80211: rework MLME for multiple authentications
   * mac80211: refactor the WEP code to be directly usable
   * cfg80211: fix netdev down problem
-  * cfg80211: dont use union for wext
+  * cfg80211: don't use union for wext
   * cfg80211: mlme API must be able to sleep
   * cfg80211: warn again on spurious deauth
   * cfg80211: properly name driver locking
@@ -8392,7 +8392,7 @@ linux-2.6 (2.6.32-1+vyatta+1) UNRELEASED; urgency=low
   * [SCSI] mpt2sas : Rescan topology from Interrupt context instead of
     work thread
   * [SCSI] mpt2sas: Prevent sending command to FW while Host Reset
-  * [SCSI] mpt2sas: Removed wrapper funtions _scsih_link_change.
+  * [SCSI] mpt2sas: Removed wrapper functions _scsih_link_change.
   * [SCSI] mpt2sas: setting SDEV into RUNNING state from Interrupt
     context
   * [SCSI] mpt2sas: Raid 10 Volume is showing as Raid 1E in dmesg
@@ -10587,7 +10587,7 @@ linux-2.6 (2.6.32-1+vyatta+1) UNRELEASED; urgency=low
     setting it
 
   [ Michael Krufky ]
-  * V4L/DVB (12360): au0828: fix typo: dvb uses bulk xfer, dont say isoc
+  * V4L/DVB (12360): au0828: fix typo: dvb uses bulk xfer, don't say isoc
     in debug
 
   [ Jean Delvare ]
@@ -15593,7 +15593,7 @@ linux-2.6 (2.6.32-1+vyatta+1) UNRELEASED; urgency=low
   * [S390] cio: merge init calls
   * [S390] cio: introduce css_eval_scheduled
   * [S390] cio: introduce css_settle
-  * [S390] cio: dont kfree vmalloced memory
+  * [S390] cio: don't kfree vmalloced memory
   * [S390] cio: idset use actual number of ssids
   * [S390] cio: introduce consistent subchannel scanning
 
@@ -18699,7 +18699,7 @@ linux-2.6 (2.6.32-1+vyatta+1) UNRELEASED; urgency=low
   * KVM: Prevent overflow in KVM_GET_SUPPORTED_CPUID
 
   [ Izik Eidus ]
-  * KVM: MMU: dont hold pagecount reference for mapped sptes pages
+  * KVM: MMU: don't hold pagecount reference for mapped sptes pages
   * KVM: MMU: add SPTE_HOST_WRITEABLE flag to the shadow ptes
   * KVM: add support for change_pte mmu notifiers
 
@@ -21914,7 +21914,7 @@ linux-2.6 (2.6.32-1+vyatta+1) UNRELEASED; urgency=low
     tda18271_rf_tracking_filters_init
 
   [ Hans de Goede ]
-  * V4L/DVB (13122): gscpa - stv06xx + ov518: dont discard every other
+  * V4L/DVB (13122): gscpa - stv06xx + ov518: don't discard every other
     frame
 
   [ Guennadi Liakhovetski ]
@@ -29493,7 +29493,7 @@ linux-2.6 (2.6.30-1+vyatta+1) UNRELEASED; urgency=low
   * mac80211: RX aggregation: clean up stop session
   * mac80211: further cleanups to stopping BA sessions
   * cfg80211/nl80211: scanning (and mac80211 update to use it)
-  * mac80211: dont add BSS when creating IBSS
+  * mac80211: don't add BSS when creating IBSS
   * cfg80211: free_priv for BSS info
   * cfg80211: allow users to request removing a BSS
   * cfg80211: add more flexible BSS lookup
@@ -31512,7 +31512,7 @@ linux-2.6 (2.6.30-1+vyatta+1) UNRELEASED; urgency=low
   * jme: Advance version number after previous changes
 
   [ Ingo Molnar ]
-  * x86, mm: dont use non-temporal stores in pagecache accesses
+  * x86, mm: don't use non-temporal stores in pagecache accesses
 
   [ Jiri Slaby ]
   * x86_32: apic/bigsmp_32, de-inline functions
@@ -34355,7 +34355,7 @@ linux-2.6 (2.6.30-1+vyatta+1) UNRELEASED; urgency=low
   * ASoC: Add separate AVDD for WM8400
 
   [ Ingo Molnar ]
-  * tracepoints: dont update zero-sized tracepoint sections
+  * tracepoints: don't update zero-sized tracepoint sections
 
   [ J. Bruce Fields ]
   * nfsd4: split lockstateid/openstateid release logic
@@ -36952,7 +36952,7 @@ linux-2.6 (2.6.30-1+vyatta+1) UNRELEASED; urgency=low
   * [S390] Fix hypervisor detection for KVM
 
   [ Heiko Carstens ]
-  * [S390] ftrace: dont trace machine check handler
+  * [S390] ftrace: don't trace machine check handler
 
   [ Sachin Sant ]
   * [S390] Fix appldata build break with !NET
@@ -37211,7 +37211,7 @@ linux-2.6 (2.6.30-1+vyatta+1) UNRELEASED; urgency=low
   * ext3: Avoid starting a transaction in writepage when not necessary
 
   [ Alan Cox ]
-  * dontdiff: Fix asm exclude
+  * don'tdiff: Fix asm exclude
 
   [ Yu Zhao ]
   * PCI: fix conflict between SR-IOV and config space sizing
@@ -37836,7 +37836,7 @@ linux-2.6 (2.6.30-1+vyatta+1) UNRELEASED; urgency=low
 
   [ Mohamed Abbas ]
   * iwlagn: allow power level setting all the times
-  * iwlcore: dont commit power command if interface is not up
+  * iwlcore: don't commit power command if interface is not up
   * iwlwifi: support 11h
 
   [ Abhijeet Kolekar ]
@@ -38068,7 +38068,7 @@ linux-2.6 (2.6.30-1+vyatta+1) UNRELEASED; urgency=low
 
   [ Mike Frysinger ]
   * Blackfin arch: add link-time asserts to make sure on-chip regions
-    dont overflow
+    don't overflow
 
   [ Cliff Cai ]
   * Blackfin arch: add RSI's definitions to bf514 and bf516
@@ -45149,7 +45149,7 @@ linux-2.6 (2.6.27-1+vyatta+13) UNRELEASED; urgency=low
   * x86, ptrace: PEBS support, warning fix
 
   [ Cyrill Gorcunov ]
-  * x86: DS cleanup - dont treat 0 as NULL
+  * x86: DS cleanup - don't treat 0 as NULL
 
   [ Ingo Molnar ]
   * x86: PEBS cleanup
@@ -47699,7 +47699,7 @@ linux-2.6 (2.6.27-1+vyatta+6) unstable; urgency=low
   * x86: avoid theoretical vmalloc fault loop
 
   [ Suresh Siddha ]
-  * x86, cpa: dont use large pages for kernel identity mapping with
+  * x86, cpa: don't use large pages for kernel identity mapping with
     DEBUG_PAGEALLOC
 
   [ Jiri Slaby ]
@@ -48215,7 +48215,7 @@ linux-2.6 (2.6.23-1+vyatta+2) unstable; urgency=low
   * SPARC64: Fix memory controller register access when non-SMP.
   * SPARC64: Fix two kernel linear mapping setup bugs.
   * NET: Correct two mistaken skb_reset_mac_header() conversions.
-  * CASSINI: Revert 'dont touch page_count'.
+  * CASSINI: Revert 'don't touch page_count'.
   * CASSINI: Set skb->truesize properly on receive packets.
   * SPARC64: Fix OOPS in dma_sync_*_for_device()
   * SPARC64: Implement pci_resource_to_user()
