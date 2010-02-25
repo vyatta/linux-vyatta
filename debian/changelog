@@ -1,3 +1,12 @@
+linux-2.6 (2.6.32-1+vyatta+2) unstable; urgency=low
+
+  * Fix spelling errors in changelog
+  * Truncate changelog comments
+  * Fix email address causing lintian warning
+  * Fix handling of address ref count on admin down
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Thu, 25 Feb 2010 15:30:24 -0800
+
 linux-2.6 (2.6.32-1+vyatta+1) UNRELEASED; urgency=low
 
   * Merge of 2.6.32  
