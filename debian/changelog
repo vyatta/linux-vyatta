@@ -21,7 +21,7 @@ linux-2.6 (2.6.31-1+vyatta+34) unstable; urgency=low
 
   * update virt build to use arch in package name
 
- -- Robert Bays <rbays@roatan>  Sat, 13 Feb 2010 15:54:47 -0800
+ -- Robert Bays <rbays@vyatta.com>  Sat, 13 Feb 2010 15:54:47 -0800
 
 linux-2.6 (2.6.31-1+vyatta+33) unstable; urgency=low
 
