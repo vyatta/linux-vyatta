@@ -57,14 +57,12 @@ setup_env += DISTRIBUTION_OFFICIAL_BUILD=1 DISTRIBUTION_UPLOADER=$(UPLOADER) DIS
 #
 # Targets
 #
-binary-arch-arch: install-headers-$(ARCH)
 binary-arch-arch: install-libc-dev_$(ARCH)
-binary-arch-subarch: install-headers-$(ARCH)-$(SUBARCH)
+binary-arch-arch: install-vyatta-kbuild
+binary-arch-subarch:
+	@echo "binary-arch-subarch skipped"; true
+
 binary-arch-flavour: install-image-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-$(TYPE)
-binary-arch-flavour: install-vyatta-kbuild
-ifeq ($(MODULES),True)
-  binary-arch-flavour: install-headers-$(ARCH)-$(SUBARCH)-$(FLAVOUR)
-endif
 
 binary-indep:
 	rm -f debian/files
@@ -478,7 +476,6 @@ install-image-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-plain-xen:
 	echo /var/lib/$(PACKAGE_NAME)/xen-versions >> $(PACKAGE_DIR)/DEBIAN/conffiles
 	$(MAKE) -f debian/rules.real install-base
 
-install-vyatta-kbuild: REAL_VERSION = $(UPSTREAMVERSION)$(ABINAME)$(LOCALVERSION)
 install-vyatta-kbuild: PACKAGE = linux-vyatta-kbuild
 install-vyatta-kbuild: pbase := /usr/src/linux-image/debian/build
 install-vyatta-kbuild: pfull := debian/$(PACKAGE)$(pbase)
@@ -489,8 +486,7 @@ install-vyatta-kbuild:
 	mkdir -p $(pfull)
 	cp -al $(BUILD_DIR)/build-$(DEB_BUILD_ARCH)-* $(pfull)/
 	for d in $(pfull)/build-$(DEB_BUILD_ARCH)-*; do \
-		echo -n "$(REAL_VERSION)" >$$d/version.Debian; \
-		echo -n "$(REAL_VERSION)" >$$d/version.Vyatta; \
+		echo -n "$(UPSTREAMVERSION)" >$$d/version.Debian; \
 	done
 	find $(pfull) -regextype posix-extended -regex '^.*\.(k?o|c)(\.cmd)?$$' \
 		| xargs rm

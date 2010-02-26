@@ -27,7 +27,9 @@ class Gencontrol(Base):
         headers_arch = self.templates["control.headers.arch"]
         packages_headers_arch = self.process_packages(headers_arch, vars)
         
-        extra['headers_arch_depends'] = packages_headers_arch[-1]['Depends'] = PackageRelation()
+        # only 1 pkg (libc-dev). original code would generate an empty
+        # Depends in control.
+        extra['headers_arch_depends'] = PackageRelation()
 
         for package in packages_headers_arch:
             name = package['Package']
@@ -58,16 +60,7 @@ class Gencontrol(Base):
                 makeflags[i[1]] = vars[i[0]]
 
     def do_subarch_packages(self, packages, makefile, arch, subarch, vars, makeflags, extra):
-        headers_subarch = self.templates["control.headers.subarch"]
-        package_headers = self.process_package(headers_subarch[0], vars)
-
-        name = package_headers['Package']
-        if packages.has_key(name):
-            package_headers = packages.get(name)
-            package_headers['Architecture'].append(arch)
-        else:
-            package_headers['Architecture'] = [arch]
-            packages.append(package_headers)
+        # control.headers.subarch template skipped
 
         cmds_binary_arch = []
         cmds_binary_arch.append(("$(MAKE) -f debian/rules.real binary-arch-subarch %s" % makeflags,))
@@ -97,7 +90,7 @@ class Gencontrol(Base):
                 makeflags[i[1]] = vars[i[0]]
 
     def do_flavour_packages(self, packages, makefile, arch, subarch, flavour, vars, makeflags, extra):
-        headers = self.templates["control.headers"]
+        # control.headers template skipped
 
         config_entry_base = self.config.merge('base', arch, subarch, flavour)
         config_entry_relations = self.config.merge('relations', arch, subarch, flavour)
@@ -159,10 +152,7 @@ class Gencontrol(Base):
 
         if build_modules:
             makeflags['MODULES'] = True
-            package_headers = self.process_package(headers[0], vars)
-            package_headers['Depends'].extend(relations_compiler)
-            packages_own.append(package_headers)
-            extra['headers_arch_depends'].append('%s (= ${Source-Version})' % packages_own[-1]['Package'])
+            # control.headers template skipped so nothing else to do here
 
         for package in packages_own + packages_dummy:
             name = package['Package']
