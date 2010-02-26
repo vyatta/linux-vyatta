@@ -15,3 +15,12 @@ scripts
 templates.in
 bin/patch.apply
 bin/patch.unpatch
+
+build
+stamps
+files
+linux-*
+control
+control.md5sum
+rules.gen
+
