@@ -490,6 +490,14 @@ install-vyatta-kbuild:
 	done
 	find $(pfull) -regextype posix-extended -regex '^.*\.(k?o|c)(\.cmd)?$$' \
 		| xargs rm
+	tfile=$$(mktemp /tmp/l2h.XXXXXX); \
+		find $(pfull) -type l -xtype f \
+		| while read L; do \
+				cat $$L >$$tfile; \
+				rm -f $$L; \
+				cp -f $$tfile $$L; \
+			done; \
+		rm -f $$tfile
 	$(MAKE) -f debian/rules.real install-base DH_OPTIONS='$(DH_OPTIONS)'
 
 # vim: filetype=make
