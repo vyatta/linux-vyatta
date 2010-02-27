@@ -1,3 +1,11 @@
+linux-2.6 (2.6.31-1+vyatta+35+kenwood5) unstable; urgency=low
+
+  * IPv6: addrconf dad timer unnecessary bh_disable
+  * IPv6: addrconf timer race
+  * IPv6: fix handling of address on device down
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Sat, 27 Feb 2010 08:27:27 -0800
+
 linux-2.6 (2.6.31-1+vyatta+35+kenwood4) unstable; urgency=low
 
   * Fix ipv6 address flushing when device is removed
