@@ -1,6 +1,6 @@
 [base]
 flavours:
- amd64-vyatta vyatta-virt
+ amd64-vyatta amd64-vyatta-virt
 kernel-arch: x86_64
 kernel-header-dirs: i386 x86_64
 
@@ -13,7 +13,7 @@ type: plain
 class: amd64
 longclass: amd64 and compatible
 
-[vyatta-virt]
+[amd64-vyatta-virt]
 class: amd64
 longclass: amd64 and compatible
 
