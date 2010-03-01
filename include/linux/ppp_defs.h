@@ -70,15 +70,18 @@
 #define PPP_IPX		0x2b	/* IPX protocol */
 #define	PPP_VJC_COMP	0x2d	/* VJ compressed TCP */
 #define	PPP_VJC_UNCOMP	0x2f	/* VJ uncompressed TCP */
+#define PPP_BRIDGE	0x31	/* Bridged LAN traffic or BPDU */
 #define PPP_MP		0x3d	/* Multilink protocol */
 #define PPP_IPV6	0x57	/* Internet Protocol Version 6 */
 #define PPP_COMPFRAG	0xfb	/* fragment compressed below bundle */
 #define PPP_COMP	0xfd	/* compressed packet */
+#define PPP_BPDU_IEEE	0x0201	/* IEEE 802.1 (D or G) bridge PDU */
 #define PPP_MPLS_UC	0x0281	/* Multi Protocol Label Switching - Unicast */
 #define PPP_MPLS_MC	0x0283	/* Multi Protocol Label Switching - Multicast */
 #define PPP_IPCP	0x8021	/* IP Control Protocol */
 #define PPP_ATCP	0x8029	/* AppleTalk Control Protocol */
 #define PPP_IPXCP	0x802b	/* IPX Control Protocol */
+#define PPP_BCP		0x8031	/* Bridging Control Protocol */
 #define PPP_IPV6CP	0x8057	/* IPv6 Control Protocol */
 #define PPP_CCPFRAG	0x80fb	/* CCP at link level (below MP bundle) */
 #define PPP_CCP		0x80fd	/* Compression Control Protocol */
@@ -180,5 +183,33 @@ struct ppp_idle {
     __kernel_time_t xmit_idle;	/* time since last NP packet sent */
     __kernel_time_t recv_idle;	/* time since last NP packet received */
 };
+
+/*
+ * Bridging Control Protocol (BCP)
+ */
+struct bcp_hdr {
+	u8	flags;
+	u8	mactype;
+	u8	padbyte;	/* not used (present when "control" is also) */
+	u8	control;	/* 802.4, 802.5, and FDDI only */
+};
+#define BCP_802_3_HDRLEN	2
+
+/*
+ * Fields in bcp_hdr flags.
+ */
+#define BCP_LAN_FCS		0x80	/* set when LAN FCS is present */
+#define BCP_ZERO_PAD		0x20	/* set to pad 802.3 to min size */
+#define BCP_PADS_MASK		0x0F	/* 0-15 bytes padding before PPP FCS */
+
+/*
+ * Values for bcp_hdr mactype.
+ */
+#define BCP_MAC_802_3		0x01	/* 802.3 / Ethernet */
+#define BCP_MAC_802_4		0x02
+#define BCP_MAC_802_5_NC	0x03	/* with non-canonical address */
+#define BCP_MAC_FDDI_NC		0x04	/* with non-canonical address */
+#define BCP_MAC_802_5		0x0B	/* with canonical address */
+#define BCP_MAC_FDDI		0x0C	/* with canonical address */
 
 #endif /* _PPP_DEFS_H_ */
