@@ -2617,7 +2617,7 @@ static void addrconf_bonding_change(struct net_device *dev, unsigned long event)
 static int addrconf_ifdown(struct net_device *dev, int how)
 {
 	struct inet6_dev *idev;
-	struct inet6_ifaddr *ifa, **bifa;
+	struct inet6_ifaddr *ifa, *keep_list, **bifa;
 	struct net *net = dev_net(dev);
 	int i;
 
@@ -2691,11 +2691,22 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 		write_lock_bh(&idev->lock);
 	}
 #endif
-	bifa = &idev->addr_list;
-	while ((ifa = *bifa) != NULL) {
-		if (!how &&
+	keep_list = NULL;
+	bifa = &keep_list;
+	while ((ifa = idev->addr_list) != NULL) {
+		idev->addr_list = ifa->if_next;
+		ifa->if_next = NULL;
+
+		addrconf_del_timer(ifa);
+
+		/* If just doing link down, and address is permanent
+		   and not link-local, then retain it. */
+		if (how == 0 &&
 		    (ifa->flags&IFA_F_PERMANENT) &&
-		    !(ipv6_addr_type(&ifa->addr) & IPV6_ADDR_LINKLOCAL) ) {
+		    !(ipv6_addr_type(&ifa->addr) & IPV6_ADDR_LINKLOCAL)) {
+
+			/* Move to holding list */
+			*bifa = ifa;
 			bifa = &ifa->if_next;
 
 			/* If not doing DAD on this address, just keep it. */
@@ -2712,19 +2723,19 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 			ifa->flags |= IFA_F_TENTATIVE;
 			in6_ifa_hold(ifa);
 		} else {
-			*bifa = ifa->if_next;
-			ifa->if_next = NULL;
 			ifa->dead = 1;
 		}
 		write_unlock_bh(&idev->lock);
 
-		addrconf_del_timer(ifa);
 		__ipv6_ifa_notify(RTM_DELADDR, ifa);
 		atomic_notifier_call_chain(&inet6addr_chain, NETDEV_DOWN, ifa);
 		in6_ifa_put(ifa);
 
 		write_lock_bh(&idev->lock);
 	}
+
+	idev->addr_list = keep_list;
+
 	write_unlock_bh(&idev->lock);
 
 	/* Step 5: Discard multicast list */
@@ -2817,14 +2828,14 @@ static void addrconf_dad_start(struct inet6_ifaddr *ifp, u32 flags)
 	read_lock_bh(&idev->lock);
 	if (ifp->dead)
 		goto out;
-	spin_lock_bh(&ifp->lock);
 
+	spin_lock(&ifp->lock);
 	if (dev->flags&(IFF_NOARP|IFF_LOOPBACK) ||
 	    idev->cnf.accept_dad < 1 ||
 	    !(ifp->flags&IFA_F_TENTATIVE) ||
 	    ifp->flags & IFA_F_NODAD) {
 		ifp->flags &= ~(IFA_F_TENTATIVE|IFA_F_OPTIMISTIC|IFA_F_DADFAILED);
-		spin_unlock_bh(&ifp->lock);
+		spin_unlock(&ifp->lock);
 		read_unlock_bh(&idev->lock);
 
 		addrconf_dad_completed(ifp);
@@ -2832,7 +2843,7 @@ static void addrconf_dad_start(struct inet6_ifaddr *ifp, u32 flags)
 	}
 
 	if (!(idev->if_flags & IF_READY)) {
-		spin_unlock_bh(&ifp->lock);
+		spin_unlock(&ifp->lock);
 		read_unlock_bh(&idev->lock);
 		/*
 		 * If the device is not ready:
@@ -2852,7 +2863,7 @@ static void addrconf_dad_start(struct inet6_ifaddr *ifp, u32 flags)
 		ip6_ins_rt(ifp->rt);
 
 	addrconf_dad_kick(ifp);
-	spin_unlock_bh(&ifp->lock);
+	spin_unlock(&ifp->lock);
 out:
 	read_unlock_bh(&idev->lock);
 }
@@ -2868,6 +2879,7 @@ static void addrconf_dad_timer(unsigned long data)
 		read_unlock(&idev->lock);
 		goto out;
 	}
+
 	spin_lock(&ifp->lock);
 	if (ifp->probes == 0) {
 		/*
@@ -2933,12 +2945,12 @@ static void addrconf_dad_run(struct inet6_dev *idev) {
 
 	read_lock_bh(&idev->lock);
 	for (ifp = idev->addr_list; ifp; ifp = ifp->if_next) {
-		spin_lock_bh(&ifp->lock);
+		spin_lock(&ifp->lock);
 		if (!(ifp->flags & IFA_F_TENTATIVE)) {
-			spin_unlock_bh(&ifp->lock);
+			spin_unlock(&ifp->lock);
 			continue;
 		}
-		spin_unlock_bh(&ifp->lock);
+		spin_unlock(&ifp->lock);
 		addrconf_dad_kick(ifp);
 	}
 	read_unlock_bh(&idev->lock);
