@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.32
-# Tue Feb 23 19:43:19 2010
+# Mon Mar  8 14:30:23 2010
 #
 # CONFIG_64BIT is not set
 CONFIG_X86_32=y
@@ -2000,6 +2000,7 @@ CONFIG_PPP_MPPE=m
 CONFIG_PPPOE=m
 CONFIG_PPPOATM=m
 CONFIG_PPPOL2TP=m
+CONFIG_PPP_BCP=m
 CONFIG_SLIP=m
 CONFIG_SLIP_COMPRESSED=y
 CONFIG_SLHC=m
