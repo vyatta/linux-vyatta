@@ -122,10 +122,11 @@ struct inet_sock {
 	__be32			saddr;
 	__s16			uc_ttl;
 	__u16			cmsg_flags;
-	struct ip_options	*opt;
 	__be16			sport;
 	__u16			id;
+	struct ip_options	*opt;
 	__u8			tos;
+	__u8			min_ttl;
 	__u8			mc_ttl;
 	__u8			pmtudisc;
 	__u8			recverr:1,

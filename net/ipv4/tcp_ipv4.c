@@ -1610,6 +1610,9 @@ process:
 	if (sk->sk_state == TCP_TIME_WAIT)
 		goto do_time_wait;
 
+	if (iph->ttl < inet_sk(sk)->min_ttl)
+		goto discard_and_relse;
+
 	if (!xfrm4_policy_check(sk, XFRM_POLICY_IN, skb))
 		goto discard_and_relse;
 	nf_reset(skb);
