@@ -1,3 +1,9 @@
+linux-2.6 (2.6.32-1+vyatta+6) unstable; urgency=low
+
+  * tcp: Generalized TTL Security Mechanism
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 09 Mar 2010 20:09:17 -0800
+
 linux-2.6 (2.6.32-1+vyatta+5) unstable; urgency=low
 
   * IPv6: addrconf dad timer unnecessary bh_disable
