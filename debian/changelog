@@ -1,3 +1,400 @@
+linux-2.6 (2.6.32-1+vyatta+9) unstable; urgency=low
+
+  [ Al Viro ]
+  * fix LOOKUP_FOLLOW on automount "symlinks"
+
+  [ Guennadi Liakhovetski ]
+  * ARM: 5944/1: scsi: fix timer setup in fas216.c
+
+  [ Richard Guenther ]
+  * V4L/DVB: dvb: l64781.ko broken with gcc 4.5
+
+  [ Mike Frysinger ]
+  * bfin: fix max timeout calculation
+
+  [ Martin Fuzzey ]
+  * V4L/DVB: Video : pwc : Fix regression in pwc_set_shutter_speed
+    caused by bad constant => sizeof conversion.
+
+  [ Jean Delvare ]
+  * V4L/DVB: bttv: Move I2C IR initialization
+
+  [ Ben Hutchings ]
+  * V4L/DVB: cxusb: Select all required frontend and tuner modules
+
+  [ KAMEZAWA Hiroyuki ]
+  * memcg: fix oom killing a child process in an other cgroup
+
+  [ Michael Neuling ]
+  * fs/exec.c: fix initial stack reservation
+
+  [ Wey-Yi Guy ]
+  * iwlwifi: error checking for number of tfds in queue
+
+  [ Dan Halperin ]
+  * iwlwifi: set HT flags after channel in rxon
+
+  [ Stanislaw Gruszka ]
+  * iwlwifi: sanity check before counting number of tfds can be free
+
+  [ Joshua Roys ]
+  * netlabel: fix export of SELinux categories > 127
+
+  [ Robert Hancock ]
+  * ahci: disable FPDMA auto-activate optimization on NVIDIA AHCI
+
+  [ Chandru ]
+  * PCI hotplug: ibmphp: read the length of ebda and map entire ebda
+    region
+
+  [ Andrew Morton ]
+  * PCI hotplug: check ioremap() return value in ibmphp_ebda.c
+
+  [ Len Brown ]
+  * ACPI: remove Asus P2B-DS from acpi=ht blacklist
+  * ACPI: fix "acpi=ht" boot option
+
+  [ Roel Kluin ]
+  * thinkpad-acpi: wrong thermal attribute_group removed in
+    thermal_exit()
+
+  [ Zhang Rui ]
+  * ACPI, i915: blacklist Clevo M5x0N bad_lid state
+
+  [ Pallipadi, Venkatesh ]
+  * ACPI: Be in TS_POLLING state during mwait based C-state entry
+
+  [ Kashyap, Desai ]
+  * mpt2sas: Delete volume before HBA detach.
+
+  [ Haicheng Li ]
+  * slab: initialize unused alien cache entry as NULL at
+    alloc_alien_cache().
+
+  [ Zhu Yi ]
+  * mac80211: quit addba_resp_timer if Tx BA session is torn down
+
+  [ Theodore Kilgore ]
+  * V4L/DVB (13991): gspca_mr973010a: Fix cif type 1 cameras not
+    streaming on UHCI controllers
+
+  [ Wu Fengguang ]
+  * vfs: take f_lock on modifying f_mode after open time
+  * readahead: introduce FMODE_RANDOM for POSIX_FADV_RANDOM
+
+  [ Jiri Kosina ]
+  * HID: remove TENX iBuddy from blacklist
+
+  [ Peter Hutterer ]
+  * HID: add multi-input quirk for NextWindow Touchscreen.
+
+  [ Oliver Neukum ]
+  * HID: usbhid: introduce timeout for stuck ctrl/out URBs
+
+  [ Stanislaw Gruszka ]
+  * airo: fix setting zero length WEP key
+
+  [ Tejun Heo ]
+  * idr: fix a critical misallocation bug, take#2
+
+  [ Al Viro ]
+  * Switch proc/self to nd_set_link()
+
+  [ David S. Miller ]
+  * sparc: Align clone and signal stacks to 16 bytes.
+  * sparc32: Fix page_to_phys().
+  * sparc32: Fix struct stat uid/gid types.
+
+  [ Roel Kluin ]
+  * sparc: leds_resource.end assigned to itself in clock_board_probe()
+
+  [ David S. Miller ]
+  * sparc64: Fix sun4u execute bit check in TSB I-TLB load.
+
+  [ Eric W. Biederman ]
+  * net: Fix sysctl restarts...
+  * net-sysfs: Use rtnl_trylock in wireless sysfs methods.
+
+  [ Ajit Khaparde ]
+  * net: bug fix for vlan + gro issue
+
+  [ Herbert Xu ]
+  * inet: Remove bogus IGMPv3 report handling
+
+  [ Shan Wei ]
+  * ipv6: conntrack: Add member of user to nf_ct_frag6_queue structure
+
+  [ Choi, David ]
+  * drivers/net: ks8851_mll ethernet network driver
+
+  [ stephen hemminger ]
+  * sky2: fix transmit DMA map leakage
+
+  [ Jerome Glisse ]
+  * drm/radeon/kms: Forbid creation of framebuffer with no valid GEM
+    object
+  * drm/radeon/kms: r600/r700 don't test ib if ib initialization fails
+  * drm/radeon: r6xx/r7xx possible security issue, system ram access
+
+  [ Anirban Chakraborty ]
+  * SCSI: qla2xxx: Obtain proper host structure during response-queue
+    processing.
+
+  [ Aaro Koskinen ]
+  * rtc-core: fix memory leak
+
+  [ Daniel Vetter ]
+  * drm/i915: fix get_core_clock_speed for G33 class desktop chips
+
+  [ Zhenyu Wang ]
+  * drm/i915: disable TV hotplug status check
+
+  [ Dave Airlie ]
+  * offb: Add support for framebuffer handoff to offb.
+
+  [ Rajiv Andrade ]
+  * tpm_tis: TPM_STS_DATA_EXPECT workaround
+
+  [ Jussi Kivilinna ]
+  * rndis_wlan: handle NL80211_AUTHTYPE_AUTOMATIC
+  * rndis_wlan: fix buffer overflow in rndis_query_oid
+  * rndis_wlan: disable stall workaround
+
+  [ Jarek Poplawski ]
+  * net/via-rhine: Fix scheduling while atomic bugs
+
+  [ Paul Mundt ]
+  * clocksource: Fix up a registration/IRQ race in the sh drivers.
+
+  [ Ben Hutchings ]
+  * SCSI: qla1280: Drop host_lock while requesting firmware
+
+  [ Greg Kroah-Hartman ]
+  * Staging: hv: add a pci device table
+  * Staging: hv: match on DMI values to know if we should run.
+  * Staging: mimio: remove the mimio driver
+
+  [ Ang Way Chuang ]
+  * dvb-core: Fix DoS bug in ULE decapsulation code that can be
+    triggered by an invalid Payload Pointer
+
+  [ Laurent Pinchart ]
+  * V4L/DVB (13148): uvcvideo: Handle V4L2_CTRL_TYPE_BUTTON control type
+    in VIDIOC_QUERYCTRL
+
+  [ Rafael J. Wysocki ]
+  * PM / Hibernate: Fix preallocating of memory
+
+  [ Jean Delvare ]
+  * macintosh/therm_adt746x: Fix sysfs attributes lifetime
+  * macintosh/hwmon/ams: Fix device removal sequence
+
+  [ Robert Richter ]
+  * oprofile/x86: fix perfctr nmi reservation for mulitplexing
+  * oprofile: remove tracing build dependency
+  * oprofile/x86: remove node check in AMD IBS initialization
+  * oprofile/x86: use kzalloc() instead of kmalloc()
+  * oprofile/x86: fix msr access to reserved counters
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Use 3stack quirk for Toshiba Satellite L40-10Q
+
+  [ Clemens Ladisch ]
+  * ALSA: via82xx: add quirk for D1289 motherboard
+
+  [ Jaroslav Kysela ]
+  * ALSA: pcm core - fix fifo_size channels interval check
+
+  [ Sebastien Alaiwan ]
+  * ALSA: USB MIDI support for Access Music VirusTI
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Use LPIB for Dell Latitude 131L
+  * ALSA: hda: Use LPIB for a Biostar Microtech board
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Add a position_fix quirk for MSI Wind U115
+  * ALSA: hda - Add position_fix quirk for HP dv3
+
+  [ Paul Menzel ]
+  * ALSA: hda-intel: Add position_fix quirk for ASUS M2V-MX SE.
+
+  [ Daniel Mack ]
+  * ASoC: fix ak4104 register array access
+
+  [ Tejun Heo ]
+  * driver-core: fix race condition in get_device_parent()
+
+  [ Kay Sievers ]
+  * Driver-Core: devtmpfs - reset inode permissions before unlinking
+
+  [ Alan Cox ]
+  * tty: Fix the ldisc hangup race
+
+  [ Baruch Siach ]
+  * serial: imx: fix NULL dereference Oops when pdata == NULL
+
+  [ Elina Pasheva ]
+  * USB: serial: sierra driver indat_callback fix
+
+  [ Tanaka Akira ]
+  * USB: SIS USB2VGA DRIVER: support KAIREN's USB VGA adaptor USB20SVGA-
+    MB-PLUS
+
+  [ Luotao Fu ]
+  * USB: fix I2C API usage in ohci-pnx4008.
+
+  [ Jean-François Moine ]
+  * p54usb: Add the USB ID for Belkin (Accton) FD7050E ver 1010ec
+
+  [ Christian Lamparter ]
+  * p54pci: handle dma mapping errors
+
+  [ Mark Brown ]
+  * gpiolib: Actually set output state in wm831x_gpio_direction_output()
+
+  [ Jean Delvare ]
+  * hwmon: (tmp421) Fix temperature conversions
+  * hwmon: (tmp421) Restore missing inputs
+
+  [ Sergei Shtylyov ]
+  * pata_hpt3x2n: always stretch UltraDMA timing
+
+  [ Eric W. Biederman ]
+  * scm: Only support SCM_RIGHTS on unix domain sockets.
+
+  [ Felix Fietkau ]
+  * ath9k: fix beacon timer restart after a card reset
+  * ath9k: fix rate control fallback rate selection
+  * ath9k: disable RIFS search for AR91xx based chips
+
+  [ Bob Copeland ]
+  * ath5k: use correct packet type when transmitting
+
+  [ Larry Finger ]
+  * b43/b43legacy: Wake queues in wireless_core_start
+
+  [ Tim Gardner ]
+  * netfilter: xt_recent: fix buffer overflow
+  * netfilter: xt_recent: fix false match
+
+  [ Ben Hutchings ]
+  * sunxvr500: Additional PCI id for sunxvr500 driver
+
+  [ Henrique de Moraes Holschuh ]
+  * thinkpad-acpi: fix poll thread auto-start
+  * thinkpad-acpi: R52 brightness_mode has been confirmed
+  * thinkpad-acpi: document HKEY event 3006
+  * thinkpad-acpi: make driver events work in NVRAM poll mode
+  * thinkpad-acpi: fix bluetooth/wwan resume
+
+  [ Tao Ma ]
+  * ocfs2: Only bug out in direct io write for reflinked extent.
+
+  [ Jiri Slaby ]
+  * x86, ia32_aout: do not kill argument mapping
+
+  [ Justin P. Mattock ]
+  * x86: Add iMac9,1 to pci_reboot_dmi_table
+
+  [ Ian Campbell ]
+  * x86, xen: Disable highmem PTE allocation even when CONFIG_HIGHPTE=y
+
+  [ Brandon Phiilps ]
+  * x86: Avoid race condition in pci_enable_msix()
+
+  [ Yinghai Lu ]
+  * x86: Fix SCI on IOAPIC != 0
+
+  [ Edward Shao ]
+  * USB: xhci: Fix finding extended capabilities registers
+
+  [ Alan Stern ]
+  * USB: fix the idProduct value for USB-3.0 root hubs
+
+  [ Pete Zaitcev ]
+  * USB: fix crash in uhci_scan_schedule
+
+  [ Alan Stern ]
+  * USB: remove debugging message for uevent constructions
+
+  [ Herbert Xu ]
+  * USB: Move hcd free_dev call into usb_disconnect to fix oops
+
+  [ Andreas Mohr ]
+  * USB: ftdi_sio: isolate all device IDs to new ftdi_sio_ids.h header
+  * USB: ftdi_sio: sort PID/VID entries in new ftdi_sio_ids.h header
+
+  [ Radek Liboska ]
+  * USB: ftdi_sio: new device id for papouch AD4USB
+
+  [ Andreas Mohr ]
+  * USB: ftdi_sio: add device IDs (several ELV, one Mindstorms NXT)
+
+  [ Mitchell Solomon ]
+  * USB: add new ftdi_sio device ids
+
+  [ Daniel Sangorrin ]
+  * USB: serial: ftdi: add CONTEC vendor and product id
+
+  [ Alan Cox ]
+  * USB: cp210x: Add 81E8 (Zephyr Bioharness)
+
+  [ Jan Dumon ]
+  * USB: unusual_devs: Add support for multiple Option 3G sticks
+
+  [ Zhao Yakui ]
+  * drm/i915: Use a dmi quirk to skip a broken SDVO TV output.
+
+  [ Maarten Maathuis ]
+  * drm/ttm: handle OOM in ttm_tt_swapout
+
+  [ Neil Brown ]
+  * sunrpc: remove unnecessary svc_xprt_put
+
+  [ Trond Myklebust ]
+  * SUNRPC: Handle EINVAL error returns from the TCP connect operation
+
+  [ Lars-Peter Clausen ]
+  * s3cmci: s3cmci_card_present: Use no_detect to decide whether there
+    is a card detect pin
+
+  [ James Hogan ]
+  * rtc-coh901331: fix braces in resume code
+
+  [ Trond Myklebust ]
+  * NFS: Fix an allocation-under-spinlock bug
+
+  [ Mikulas Patocka ]
+  * dm: free dm_io before bio_endio not after
+
+  [ Gleb Natapov ]
+  * KVM: x86 emulator: Add group8 instruction decoding
+  * KVM: x86 emulator: Forbid modifying CS segment register by mov
+    instruction
+  * KVM: x86 emulator: Add group9 instruction decoding
+  * KVM: x86 emulator: Check CPL level during privilege instruction
+    emulation
+
+  [ Vaidyanathan Srinivasan ]
+  * sched: Fix sched_mv_power_savings for !SMT
+
+  [ Suresh Siddha ]
+  * sched: Fix SMT scheduler regression in find_busiest_queue()
+
+  [ Thomas Gleixner ]
+  * sched: Don't use possibly stale sched_class
+
+  [ Ian Campbell ]
+  * x86, mm: Allow highmem user page tables to be disabled at boot time
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.32.10
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 15 Mar 2010 11:36:53 -0700
+
 linux-2.6 (2.6.32-1+vyatta+8) unstable; urgency=low
 
   [ Hank Janssen ]
