@@ -1,3 +1,11 @@
+linux-2.6 (2.6.31-1+vyatta+35+kenwood6) unstable; urgency=low
+
+  * Revert "e100: Fix broken cbs accounting due to missing memset."
+  * Revert "e100: Use pci pool to work around GFP_ATOMIC order 5 memory
+    allocation failure"
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 19 Mar 2010 11:42:18 -0700
+
 linux-2.6 (2.6.31-1+vyatta+35+kenwood5) unstable; urgency=low
 
   * IPv6: addrconf dad timer unnecessary bh_disable
