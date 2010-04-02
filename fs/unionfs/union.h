@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2009 Erez Zadok
+ * Copyright (c) 2003-2010 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005      Arun M. Krishnakumar
@@ -7,8 +7,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2009 Stony Brook University
- * Copyright (c) 2003-2009 The Research Foundation of SUNY
+ * Copyright (c) 2003-2010 Stony Brook University
+ * Copyright (c) 2003-2010 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -97,7 +97,7 @@ struct unionfs_file_info {
 	struct unionfs_dir_state *rdstate;
 	struct file **lower_files;
 	int *saved_branch_ids; /* IDs of branches when file was opened */
-	struct vm_operations_struct *lower_vm_ops;
+	const struct vm_operations_struct *lower_vm_ops;
 	bool wrote_to_file;	/* for delayed copyup */
 };
 

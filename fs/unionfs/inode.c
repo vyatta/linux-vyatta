@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2009 Erez Zadok
+ * Copyright (c) 2003-2010 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005-2006 Junjiro Okajima
@@ -8,8 +8,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2009 Stony Brook University
- * Copyright (c) 2003-2009 The Research Foundation of SUNY
+ * Copyright (c) 2003-2010 Stony Brook University
+ * Copyright (c) 2003-2010 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -125,12 +125,12 @@ static int unionfs_create(struct inode *dir, struct dentry *dentry,
 	lower_parent_dentry = lock_parent(lower_dentry);
 	if (IS_ERR(lower_parent_dentry)) {
 		err = PTR_ERR(lower_parent_dentry);
-		goto out;
+		goto out_unlock;
 	}
 
 	err = init_lower_nd(&lower_nd, LOOKUP_CREATE);
 	if (unlikely(err < 0))
-		goto out;
+		goto out_unlock;
 	err = vfs_create(lower_parent_dentry->d_inode, lower_dentry, mode,
 			 &lower_nd);
 	release_lower_nd(&lower_nd, err);
@@ -146,8 +146,8 @@ static int unionfs_create(struct inode *dir, struct dentry *dentry,
 		}
 	}
 
+out_unlock:
 	unlock_dir(lower_parent_dentry);
-
 out:
 	if (!err) {
 		unionfs_postcopyup_setmnt(dentry);
@@ -390,7 +390,7 @@ static int unionfs_symlink(struct inode *dir, struct dentry *dentry,
 	lower_parent_dentry = lock_parent(lower_dentry);
 	if (IS_ERR(lower_parent_dentry)) {
 		err = PTR_ERR(lower_parent_dentry);
-		goto out;
+		goto out_unlock;
 	}
 
 	mode = S_IALLUGO;
@@ -406,8 +406,8 @@ static int unionfs_symlink(struct inode *dir, struct dentry *dentry,
 		}
 	}
 
+out_unlock:
 	unlock_dir(lower_parent_dentry);
-
 out:
 	dput(wh_dentry);
 	kfree(name);
@@ -583,7 +583,7 @@ static int unionfs_mknod(struct inode *dir, struct dentry *dentry, int mode,
 	lower_parent_dentry = lock_parent(lower_dentry);
 	if (IS_ERR(lower_parent_dentry)) {
 		err = PTR_ERR(lower_parent_dentry);
-		goto out;
+		goto out_unlock;
 	}
 
 	err = vfs_mknod(lower_parent_dentry->d_inode, lower_dentry, mode, dev);
@@ -598,8 +598,8 @@ static int unionfs_mknod(struct inode *dir, struct dentry *dentry, int mode,
 		}
 	}
 
+out_unlock:
 	unlock_dir(lower_parent_dentry);
-
 out:
 	dput(wh_dentry);
 	kfree(name);

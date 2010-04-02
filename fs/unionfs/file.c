@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2009 Erez Zadok
+ * Copyright (c) 2003-2010 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005-2006 Junjiro Okajima
@@ -8,8 +8,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2009 Stony Brook University
- * Copyright (c) 2003-2009 The Research Foundation of SUNY
+ * Copyright (c) 2003-2010 Stony Brook University
+ * Copyright (c) 2003-2010 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -98,7 +98,7 @@ static int unionfs_mmap(struct file *file, struct vm_area_struct *vma)
 	struct file *lower_file;
 	struct dentry *dentry = file->f_path.dentry;
 	struct dentry *parent;
-	struct vm_operations_struct *saved_vm_ops = NULL;
+	const struct vm_operations_struct *saved_vm_ops = NULL;
 
 	/*
 	 * Since mm/memory.c:might_fault() (under PROVE_LOCKING) was

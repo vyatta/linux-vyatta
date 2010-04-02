@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2009 Erez Zadok
+ * Copyright (c) 2003-2010 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005-2006 Junjiro Okajima
@@ -8,8 +8,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2009 Stony Brook University
- * Copyright (c) 2003-2009 The Research Foundation of SUNY
+ * Copyright (c) 2003-2010 Stony Brook University
+ * Copyright (c) 2003-2010 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -271,28 +271,24 @@ bool is_newer_lower(const struct dentry *dentry)
 		/* check if mtime/ctime have changed */
 		if (unlikely(timespec_compare(&inode->i_mtime,
 					      &lower_inode->i_mtime) < 0)) {
-#ifdef CONFIG_UNION_FS_DEBUG
 			if ((lower_inode->i_mtime.tv_sec -
 			     inode->i_mtime.tv_sec) > UNIONFS_MIN_CC_TIME) {
-				pr_info("unionfs: new lower inode mtime "
+				pr_debug("unionfs: new lower inode mtime "
 					"(bindex=%d, name=%s)\n", bindex,
 					dentry->d_name.name);
 				show_dinode_times(dentry);
 			}
-#endif
 			return true;
 		}
 		if (unlikely(timespec_compare(&inode->i_ctime,
 					      &lower_inode->i_ctime) < 0)) {
-#ifdef CONFIG_UNION_FS_DEBUG
 			if ((lower_inode->i_ctime.tv_sec -
 			     inode->i_ctime.tv_sec) > UNIONFS_MIN_CC_TIME) {
-				pr_info("unionfs: new lower inode ctime "
+				pr_debug("unionfs: new lower inode ctime "
 					"(bindex=%d, name=%s)\n", bindex,
 					dentry->d_name.name);
 				show_dinode_times(dentry);
 			}
-#endif
 			return true;
 		}
 	}
