@@ -1,3 +1,334 @@
+linux-2.6 (2.6.32-1+vyatta+11) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Update unionfs to new version
+
+  [ Shaohua Li ]
+  * drm/i915: fix gpio register detection logic for BIOS without VBT
+
+  [ Julia Lawall ]
+  * drivers/scsi/ses.c: eliminate double free
+
+  [ Russell King ]
+  * decompress: fix new decompressor for PIC
+  * ARM: Fix decompressor's kernel size estimation for ROM=y
+
+  [ David Daney ]
+  * MIPS: Cleanup forgotten label_module_alloc in tlbex.c
+
+  [ Louis Rilling ]
+  * tg3: Fix tg3_poll_controller() passing wrong pointer to
+    tg3_interrupt()
+
+  [ Matt Carlson ]
+  * tg3: Fix 5906 transmit hangs
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Fix input source elements of secondary ADCs on Realtek
+
+  [ Daniel T Chen ]
+  * ALSA: hda: enable MSI for Gateway M-6866
+
+  [ john stultz ]
+  * timekeeping: Prevent oops when GENERIC_TIME=n
+
+  [ Thomas Bächler ]
+  * Input: alps - add support for the touchpad on Toshiba Tecra A11-11L
+
+  [ Christoph Fritz ]
+  * Input: i8042 - add ALDI/MEDION netbook E1222 to qurik reset table
+
+  [ Jean Delvare ]
+  * i2c-i801: Don't use the block buffer for I2C block writes
+
+  [ Bob Copeland ]
+  * ath5k: dont use external sleep clock in AP mode
+  * ath5k: fix setup for CAB queue
+
+  [ Lai Jiangshan ]
+  * ring-buffer: Move disabled check into preempt disable section
+
+  [ Steven Rostedt ]
+  * function-graph: Init curr_ret_stack with ret_stack
+
+  [ Marcel Holtmann ]
+  * Bluetooth: Fix sleeping function in RFCOMM within invalid context
+
+  [ Steven Rostedt ]
+  * tracing: Use same local variable when resetting the ring buffer
+  * tracing: Disable buffer switching when starting or stopping trace
+  * tracing: Do not record user stack trace from NMI context
+
+  [ Andrew Patterson ]
+  * PCI: unconditionally clear AER uncorr status register during cleanup
+
+  [ Adam Jackson ]
+  * drm/edid: Unify detailed block parsing between base and extension
+    blocks
+
+  [ Marcin Slusarz ]
+  * efifb: fix framebuffer handoff
+
+  [ Neil Horman ]
+  * coredump: suppress uid comparison test if core output files are
+    pipes
+
+  [ Francesco Lavra ]
+  * V4L/DVB (13961): em28xx-dvb: fix memleak in dvb_fini()
+
+  [ Thomas Gleixner ]
+  * hrtimer: Tune hrtimer_interrupt hang logic
+
+  [ Suresh Siddha ]
+  * x86, apic: Don't use logical-flat mode when CPU hotplug may exceed 8
+    CPUs
+
+  [ Srinivas ]
+  * mvsas: add support for Adaptec ASC-1045/1405 SAS/SATA HBA
+
+  [ Alexander Duyck ]
+  * pci: add support for 82576NS serdes to existing SR-IOV quirk
+
+  [ Peter Zijlstra ]
+  * sched: Mark boot-cpu active before smp_init()
+
+  [ David S. Miller ]
+  * sparc64: Make prom entry spinlock NMI safe.
+
+  [ Kees Cook ]
+  * sysctl: require CAP_SYS_RAWIO to set mmap_min_addr
+
+  [ Bruce Allan ]
+  * e1000e: enable new 82567V-3 device
+
+  [ Don Skidmore ]
+  * ixgbe: add support for 82599 KR device 0x1517
+
+  [ Ping Cheng ]
+  * Input: wacom - ensure the device is initialized properly upon resume
+
+  [ Ming Lei ]
+  * ath9k: fix lockdep warning when unloading module
+
+  [ André Goddard Rosa ]
+  * mqueue: fix mq_open() file descriptor leak on user-space processes
+
+  [ Michael S. Tsirkin ]
+  * virtio: fix out of range array access
+
+  [ Oleg Nesterov ]
+  * x86: set_personality_ia32() misses force_personality32
+
+  [ Suresh Siddha ]
+  * sched: Fix SCHED_MC regression caused by change in sched cpu_power
+
+  [ Hisashi Hifumi ]
+  * readahead: add blk_run_backing_dev
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Use LPIB and 6stack-dig for eMachines T5212
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Disable MSI for Nvidia controller
+  * ALSA: hda - Fix secondary ADC of ALC260 basic model
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Fix 0 dB offset for HP laptops using CX20551 (Waikiki)
+
+  [ Clemens Ladisch ]
+  * ALSA: cmipci: work around invalid PCM pointer
+
+  [ Tilman Schmidt ]
+  * gigaset: correct clearing of at_state strings on RING
+  * gigaset: prune use of tty_buffer_request_room
+
+  [ John Kacur ]
+  * perf: Make the install relative to DESTDIR if specified
+
+  [ Paul Mackerras ]
+  * perf_event: Fix oops triggered by cpu offline/online
+
+  [ Ravikiran G Thirumalai ]
+  * tmpfs: fix oops on mounts with mpol=default
+
+  [ KOSAKI Motohiro ]
+  * tmpfs: mpol=bind:0 don't cause mount error.
+  * tmpfs: handle MPOL_LOCAL mount option properly
+  * tmpfs: cleanup mpol_parse_str()
+  * doc: add the documentation for mpol=local
+
+  [ Gal Rosen ]
+  * SCSI: scsi_transport_fc: Fix synchronization issue while deleting
+    vport
+
+  [ Trond Myklebust ]
+  * NFSv4: Don't ignore the NFS_INO_REVAL_FORCED flag in
+    nfs_revalidate_inode()
+  * NFS: Avoid a deadlock in nfs_release_page
+  * NFS: Prevent another deadlock in nfs_release_page()
+
+  [ Alan Cox ]
+  * tty: Keep the default buffering to sub-page units
+
+  [ Mel Gorman ]
+  * tty: Take a 256 byte padding into account when buffering below sub-
+    page units
+
+  [ Alan Stern ]
+  * USB: fix usbfs regression
+
+  [ Clemens Ladisch ]
+  * USB: EHCI: fix ITD list order
+  * USB: EHCI: adjust ehci_iso_stream for changes in ehci_qh
+
+  [ Bernhard Rosenkraenzer ]
+  * USB: qcserial: add new device ids
+
+  [ Andiry Xu ]
+  * USB: xHCI: re-initialize cmd_completion
+
+  [ Daniel Sangorrin ]
+  * USB: serial: ftdi: add CONTEC vendor and product id
+
+  [ Nathaniel McCallum ]
+  * USB: option: fix incorrect manufacturer name in usb/serial/option:
+    MAXON->CMOTECH
+  * USB: option: move hardcoded PID to a macro in usb/serial/option
+  * USB: option: add support for a new CMOTECH device to
+    usb/serial/option
+
+  [ Yoshihiro Shimoda ]
+  * usb: r8a66597-hcd: fix removed from an attached hub
+
+  [ Grazvydas Ignotas ]
+  * wl1251: fix potential crash
+
+  [ Guo-Fu Tseng ]
+  * jme: Fix VLAN memory leak
+  * jme: Protect vlgrp structure by pause RX actions.
+
+  [ Borislav Petkov ]
+  * edac, mce: Filter out invalid values
+
+  [ Stanislaw Gruszka ]
+  * iwlwifi: use dma_alloc_coherent
+
+  [ Adel Gadllah ]
+  * iwlwifi: Silence tfds_in_queue message
+
+  [ Trond Myklebust ]
+  * SUNRPC: Fix a potential memory leak in auth_gss
+
+  [ Dan Carpenter ]
+  * sunrpc: handle allocation errors from __rpc_lookup_create()
+
+  [ Paulius Zaleckas ]
+  * if_tunnel.h: add missing ams/byteorder.h include
+
+  [ Daniel Taylor ]
+  * fs/partitions/msdos: add support for large disks
+
+  [ OGAWA Hirofumi ]
+  * fs/partition/msdos: fix unusable extended partition for > 512B
+    sector
+
+  [ Dean Nelson ]
+  * PCI: fix return value from pcix_get_max_mmrbc()
+  * PCI: fix access of PCI_X_CMD by pcix get and set mmrbc functions
+  * PCI: cleanup error return for pcix get and set mmrbc functions
+
+  [ Ben Hutchings ]
+  * rt2860sta: Fix argument to linux_pci_unmap_single()
+
+  [ Felix Fietkau ]
+  * ath9k: fix BUG_ON triggered by PAE frames
+
+  [ Miao Xie ]
+  * cpuset: fix the problem that cpuset_mem_spread_node() returns an
+    offline node
+
+  [ Colin Ian King ]
+  * softlockup: Stop spurious softlockup messages due to overflow
+
+  [ Chris Wilson ]
+  * drm/i915: Avoid NULL deref in get_pages() unwind after error.
+
+  [ Patrick McHardy ]
+  * netfilter: xt_recent: fix regression in rules using a zero hit_count
+
+  [ Jan Beulich ]
+  * x86: Fix placement of FIX_OHCI1394_BASE
+
+  [ Andreas Herrmann ]
+  * x86, amd: Restrict usage of c1e_idle()
+
+  [ Dean Nelson ]
+  * hwmon: (coretemp) Add missing newline to dev_warn() message
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Use LPIB for ga-ma770-ud3 board
+
+  [ Daniel Chen ]
+  * ALSA: ac97: Add Toshiba P500 to ac97 jack sense blacklist
+
+  [ Daniel T Chen ]
+  * ALSA: ac97: Add IBM ThinkPad R40e to Headphone/Line Jack Sense
+    blacklist
+  * ALSA: hda: Use ALC260_WILL quirk for another Acer model (0x1025007f)
+
+  [ Senthil Balasubramanian ]
+  * ath9k: Enable TIM timer interrupt only when needed.
+
+  [ Vivek Natarajan ]
+  * mac80211: Retry null data frame for power save
+  * ath9k: Enable IEEE80211_HW_REPORTS_TX_ACK_STATUS flag for ath9k
+  * mac80211: Reset dynamic ps timer in Rx path.
+
+  [ Anton Vorontsov ]
+  * leds-gpio: fix default state handling on OF platforms
+
+  [ Dmitry Monakhov ]
+  * quota: manage reserved space when quota is not active [v2]
+
+  [ Jan Kara ]
+  * quota: Fix warning when a delayed write happens before quota is
+    enabled
+
+  [ Tejun Heo ]
+  * ahci: use BIOS date in broken_suspend list
+
+  [ Marcel Holtmann ]
+  * Bluetooth: Fix potential bad memory access with sysfs files
+
+  [ Andrei Emeltchenko ]
+  * Bluetooth: Fix kernel crash on L2CAP stress tests
+
+  [ Nobuhiro Iwamatsu ]
+  * sh: Fix zImage boot using fixed PMB.
+
+  [ Michael Buesch ]
+  * b43: Workaround circular locking in hw-tkip key update callback
+
+  [ Martin K. Petersen ]
+  * block: Backport of various I/O topology fixes from 2.6.33 and 2.6.34
+
+  [ Lars-Peter Clausen ]
+  * s3cmci: initialize default platform data no_wprotect and no_detect
+    with 1
+
+  [ Dimitri Sivanich ]
+  * x86: Fix sched_clock_cpu for systems with unsynchronized TSC
+
+  [ Sachin Prabhu ]
+  * GFS2: Skip check for mandatory locks when unlocking
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.32.11
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@lenny.localdomain>  Thu, 01 Apr 2010 22:49:43 -0700
+
 linux-2.6 (2.6.32-1+vyatta+10) unstable; urgency=low
 
   * Create maximum size DMA pool
