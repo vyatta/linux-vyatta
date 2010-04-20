@@ -126,6 +126,8 @@ int squashfs_read_inode(struct inode *inode, long long ino)
 	err = squashfs_new_inode(sb, inode, sqshb_ino);
 	if (err)
 		goto failed_read;
+	
+	squashfs_i(inode)->xattr = -1;
 
 	block = SQUASHFS_INODE_BLK(ino) + msblk->inode_table;
 	offset = SQUASHFS_INODE_OFFSET(ino);
@@ -203,10 +205,12 @@ int squashfs_read_inode(struct inode *inode, long long ino)
 		inode->i_nlink = le32_to_cpu(sqsh_ino->nlink);
 		inode->i_size = le64_to_cpu(sqsh_ino->file_size);
 		inode->i_fop = &generic_ro_fops;
+		inode->i_op = &squashfs_file_inode_ops;
 		inode->i_mode |= S_IFREG;
 		inode->i_blocks = ((inode->i_size -
 				le64_to_cpu(sqsh_ino->sparse) - 1) >> 9) + 1;
 
+		squashfs_i(inode)->xattr = le32_to_cpu(sqsh_ino->xattr);
 		squashfs_i(inode)->fragment_block = frag_blk;
 		squashfs_i(inode)->fragment_size = frag_size;
 		squashfs_i(inode)->fragment_offset = frag_offset;
@@ -257,6 +261,7 @@ int squashfs_read_inode(struct inode *inode, long long ino)
 		inode->i_op = &squashfs_dir_inode_ops;
 		inode->i_fop = &squashfs_dir_ops;
 		inode->i_mode |= S_IFDIR;
+		squashfs_i(inode)->xattr = le32_to_cpu(sqsh_ino->xattr);
 		squashfs_i(inode)->start = le32_to_cpu(sqsh_ino->start_block);
 		squashfs_i(inode)->offset = le16_to_cpu(sqsh_ino->offset);
 		squashfs_i(inode)->dir_idx_start = block;

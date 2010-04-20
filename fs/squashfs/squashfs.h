@@ -85,6 +85,15 @@ extern const struct address_space_operations squashfs_aops;
 
 /* namei.c */
 extern const struct inode_operations squashfs_dir_inode_ops;
+extern const struct inode_operations squashfs_file_inode_ops;
 
 /* symlink.c */
 extern const struct address_space_operations squashfs_symlink_aops;
+
+/* xattr.c */
+extern ssize_t squashfs_listxattr(struct dentry *dentry, char *buffer,
+	size_t size);
+extern ssize_t squashfs_getxattr(struct dentry *dentry, const char *name,
+	void *buffer, size_t size);
+
+
