@@ -68,7 +68,6 @@ struct squashfs_sb_info {
 	__le64			*inode_lookup_table;
 	u64			inode_table;
 	u64			directory_table;
-	u64			xattr_table;
 	unsigned int		block_size;
 	unsigned short		block_log;
 	long long		bytes_used;
