@@ -1,3 +1,10 @@
+linux-2.6 (2.6.32-1+vyatta+13) unstable; urgency=low
+
+  [ Helge Bahmann ]
+  * Add extended attributes for squashfs
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Thu, 22 Apr 2010 17:37:48 -0700
+
 linux-2.6 (2.6.32-1+vyatta+12) unstable; urgency=low
 
   * Fix routing cache issues when IPv6 link is brought down up
