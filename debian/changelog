@@ -1,3 +1,505 @@
+linux-2.6 (2.6.32-1+vyatta+15) unstable; urgency=low
+
+  * Merge in stable kernel 2.6.32.12
+
+  [ Ben Skeggs ]
+  * drm/edid: allow certain bogus edids to hit a fixup path rather than
+    fail
+
+  [ Alex Deucher ]
+  * drm/radeon: add new RS880 pci id
+
+  [ Zhao Yakui ]
+  * drm: remove the EDID blob stored in the EDID property when it is
+    disconnected
+
+  [ Nikolaus Schulz ]
+  * fat: fix buffer overflow in vfat_create_shortname()
+
+  [ Oleg Nesterov ]
+  * oom: fix the unsafe usage of badness() in proc_oom_score()
+
+  [ Dave Airlie ]
+  * drm/radeon/kms: don't print error on -ERESTARTSYS.
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: fix pal tv-out support on legacy IGP chips
+
+  [ Chris Wilson ]
+  * drm: Return ENODEV if the inode mapping changes
+
+  [ Christoph Hellwig ]
+  * xfs: simplify inode teardown
+  * xfs: fix mmap_sem/iolock inversion in xfs_free_eofblocks
+  * xfs: I/O completion handlers must use NOFS allocations
+
+  [ Andy Poling ]
+  * xfs: Wrapped journal record corruption on read at recovery
+
+  [ Jason Gunthorpe ]
+  * xfs: Fix error return for fallocate() on XFS
+
+  [ Christoph Hellwig ]
+  * xfs: check for not fully initialized inodes in xfs_ireclaim
+  * xfs: fix timestamp handling in xfs_setattr
+
+  [ Dave Chinner ]
+  * xfs: Don't flush stale inodes
+  * xfs: Ensure we force all busy extents in range to disk
+  * xfs: reclaim inodes under a write lock
+  * xfs: Avoid inodes in reclaim when flushing from inode cache
+  * xfs: reclaim all inodes by background tree walks
+  * xfs: fix stale inode flush avoidance
+  * xfs: xfs_swap_extents needs to handle dynamic fork offsets
+
+  [ Christoph Hellwig ]
+  * xfs: quota limit statvfs available blocks
+
+  [ Dave Chinner ]
+  * xfs: don't hold onto reserved blocks on remount, ro
+
+  [ Christoph Hellwig ]
+  * xfs: remove invalid barrier optimization from xfs_fsync
+
+  [ Dave Chinner ]
+  * xfs: Non-blocking inode locking in IO completion
+
+  [ Christoph Hellwig ]
+  * xfs: fix locking for inode cache radix tree tag updates
+
+  [ Matt Fleming ]
+  * sh: Enable the mmu in start_secondary()
+
+  [ Andrew Stubbs ]
+  * sh: Fix FDPIC binary loader
+
+  [ Mike Christie ]
+  * libiscsi: Fix recovery slowdown regression
+
+  [ Matt Helsley ]
+  * Freezer: Fix buggy resume test for tasks frozen with cgroup freezer
+
+  [ Wey-Yi Guy ]
+  * iwlwifi: counting number of tfds can be free for 4965
+
+  [ Stanislaw Gruszka ]
+  * iwlwifi: fix nfreed--
+
+  [ Dan Carpenter ]
+  * iwlwifi: range checking issue
+
+  [ Valentin Longchamp ]
+  * setup correct int pipe type in ar9170_usb_exec_cmd
+
+  [ Johannes Berg ]
+  * mac80211: move netdev queue enabling to correct spot
+
+  [ Wey-Yi Guy ]
+  * mac80211: tear down all agg queues when restart/reconfig hw
+
+  [ Thomas Mingarelli ]
+  * WATCHDOG: hpwdt - fix lower timeout limit
+
+  [ Seth Heasley ]
+  * WATCHDOG: iTCO_wdt: TCO Watchdog patch for additional Intel Cougar
+    Point DeviceIDs
+
+  [ Thomas Gleixner ]
+  * genirq: Force MSI irq handlers to run with interrupts disabled
+
+  [ Oleg Nesterov ]
+  * tty: release_one_tty() forgets to put pids
+
+  [ Éric Piel ]
+  * lis3: fix show rate for 8 bits chips
+
+  [ Alan Cox ]
+  * pata_ali: Fix regression with old devices
+
+  [ Jiri Kosina ]
+  * HID: fix oops in gyration_event()
+
+  [ Anton Blanchard ]
+  * raw: fsync method is now required
+
+  [ Wu Fengguang ]
+  * readahead: fix NULL filp dereference
+
+  [ Dan Carpenter ]
+  * ALSA: mixart: range checking proc file
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Fix 0 dB offset for Lenovo Thinkpad models using AD1981
+
+  [ Andreas Herrmann ]
+  * x86, amd: Get multi-node CPU info from NodeId MSR instead of PCI
+    config space
+
+  [ Jiri Slaby ]
+  * resource: move kernel function inside __KERNEL__
+
+  [ Evan McClain ]
+  * backlight: mbp_nvidia_bl - add five more MacBook variants
+
+  [ Gleb Natapov ]
+  * KVM: x86 emulator: Add Virtual-8086 mode of emulation
+  * KVM: x86 emulator: fix memory access during x86 emulation
+  * KVM: x86 emulator: Check IOPL level during io instruction emulation
+  * KVM: x86 emulator: Fix popf emulation
+  * KVM: Fix segment descriptor loading
+
+  [ Jan Kiszka ]
+  * KVM: VMX: Update instruction length on intercepted BP
+
+  [ Eduardo Habkost ]
+  * KVM: VMX: Use macros instead of hex value on cr0 initialization
+  * KVM: SVM: Reset cr0 properly on vcpu reset
+
+  [ Sheng Yang ]
+  * KVM: VMX: Disable unrestricted guest when EPT disabled
+
+  [ Marcelo Tosatti ]
+  * KVM: x86: disable paravirt mmu reporting
+
+  [ JosephChan@via.com.tw ]
+  * pata_via: Add VIA VX900 support
+
+  [ Eric Sandeen ]
+  * ext3: Don't update the superblock in ext3_statfs()
+  * ext3: journal all modifications in ext3_xattr_set_handle
+
+  [ Henrique de Moraes Holschuh ]
+  * thinkpad-acpi: fix some version quirks
+  * thinkpad-acpi: issue backlight class events
+  * thinkpad-acpi: silence bogus complain during rmmod
+  * thinkpad-acpi: adopt input device
+  * thinkpad-acpi: expose module parameters
+  * thinkpad-acpi: log temperatures on termal alarm (v2)
+  * thinkpad-acpi: use input_set_capability
+  * thinkpad-acpi: sync input device EV_SW initial state
+  * thinkpad-acpi: log initial state of rfkill switches
+
+  [ Alexey Dobriyan ]
+  * thinkpad-acpi: convert to seq_file
+
+  [ Henrique de Moraes Holschuh ]
+  * thinkpad-acpi: lock down video output state access
+
+  [ Alan Jenkins ]
+  * eeepc-laptop: disable cpu speed control on EeePC 701
+
+  [ Corentin Chary ]
+  * eeepc-laptop: dmi blacklist to disable pci hotplug code
+  * eeepc-laptop: add hotplug_disable parameter
+  * eeepc-laptop: disable wireless hotplug for 1201N
+
+  [ Alan Jenkins ]
+  * eeepc-laptop: disable wireless hotplug for 1005PE
+
+  [ Tejun Heo ]
+  * libata: disable NCQ on Crucial C300 SSD
+
+  [ Suresh Jayaraman ]
+  * cifs: Fix a kernel BUG with remote OS/2 server (try #3)
+
+  [ Steve French ]
+  * CIFS: initialize nbytes at the beginning of CIFSSMBWrite()
+
+  [ Wey-Yi Guy ]
+  * iwlwifi: need check for valid qos packet before free
+
+  [ Rabin Vincent ]
+  * ARM: 6031/1: fix Thumb-2 decompressor
+
+  [ Adam Jackson ]
+  * drm/edid/quirks: Envision EN2028
+
+  [ Michel Dänzer ]
+  * drm/radeon: R300 AD only has one quad pipe.
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: fix washed out image on legacy tv dac
+
+  [ Shaohua Li ]
+  * x86-32, resume: do a global tlb flush in S4 resume
+
+  [ Thomas Gleixner ]
+  * x86: hpet: Make WARN_ON understandable
+
+  [ Pallipadi, Venkatesh ]
+  * x86, hpet: Erratum workaround for read after write of HPET
+    comparator
+
+  [ Suresh Siddha ]
+  * x86: Fix double enable_IR_x2apic() call on SMP kernel on !SMP boards
+
+  [ KOSAKI Motohiro ]
+  * sched: sched_getaffinity(): Allow less than NR_CPUS length
+
+  [ Anton Blanchard ]
+  * sched: Fix sched_getaffinity()
+
+  [ Trond Myklebust ]
+  * NFSv4: Fall back to ordinary lookup if nfs4_atomic_open() returns
+    EISDIR
+  * NFSv4: fix delegated locking
+
+  [ Joerg Schirottke ]
+  * ALSA: hda - add a quirk for Clevo M570U laptop
+
+  [ Takashi Iwai ]
+  * ALSA: usb - Fix Oops after usb-midi disconnection
+
+  [ Jerome Oufella ]
+  * hwmon: (sht15) Fix sht15_calc_temp interpolation function
+
+  [ Jean Delvare ]
+  * hwmon: (sht15) Properly handle the case CONFIG_REGULATOR=n
+
+  [ Stefan Bader ]
+  * drm/i915: Add no_lvds entry for the Clientron U800
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: disable the tv encoder when tv/cv is not in use
+  * drm/radeon/kms: fix tv dac conflict resolver
+
+  [ Jerome Glisse ]
+  * drm/radeon/kms: fix rs600 tlb flush
+
+  [ Dave Airlie ]
+  * drm/radeon/kms: add FireMV 2400 PCI ID.
+
+  [ Joerg Roedel ]
+  * x86/amd-iommu: Use helper function to destroy domain
+
+  [ Chris Wright ]
+  * x86/amd-iommu: enable iommu before attaching devices
+  * Revert "x86: disable IOMMUs on kernel crash"
+
+  [ Borislav Petkov ]
+  * x86, lib: Add wbinvd smp helpers
+  * x86, cacheinfo: Fix disabling of L3 cache indices
+  * intel-agp: Switch to wbinvd_on_all_cpus
+  * x86, cacheinfo: Add cache index disable sysfs attrs only to L3
+    caches
+  * x86, cacheinfo: Calculate L3 indices
+  * x86, cacheinfo: Remove NUMA dependency, fix for AMD Fam10h rev D1
+  * x86, cacheinfo: Enable L3 CID only on AMD
+
+  [ Eugene Teo ]
+  * vgaarb: fix "target=default" passing
+
+  [ Linus Torvalds ]
+  * x86-32: clean up rwsem inline asm statements
+  * x86: clean up rwsem type system
+
+  [ H. Peter Anvin ]
+  * x86-64, rwsem: 64-bit xadd rwsem implementation
+
+  [ Linus Torvalds ]
+  * x86-64: support native xadd rwsem implementation
+  * x86: Fix breakage of UML from the changes in the rwsem system
+
+  [ Avi Kivity ]
+  * x86-64, rwsem: Avoid store forwarding hazard in __downgrade_write
+
+  [ Al Viro ]
+  * fix NFS4 handling of mountpoint stat
+
+  [ Kiyoshi Ueda ]
+  * dm mpath: fix stall when requeueing io
+
+  [ Andrew Perepechko ]
+  * quota: Fix possible dq_flags corruption
+
+  [ Bernd Porr ]
+  * Staging: comedi: fix usbdux timeout bug
+  * Staging: comedi: usbdux.c: fix locking up of the driver when the
+    comedi ringbuffer runs empty
+
+  [ Mark Fasheh ]
+  * ocfs2: set i_mode on disk during acl operations
+
+  [ Tao Ma ]
+  * ocfs2: Change bg_chain check for ocfs2_validate_gd_parent.
+
+  [ Sachin Prabhu ]
+  * 9p: Skip check for mandatory locks when unlocking
+
+  [ Mike Christie ]
+  * fc class: fail fast bsg requests
+  * SCSI: add scsi target reset support to scsi ioctl
+
+  [ Alexander Duyck ]
+  * igb: add support for 82576NS SerDes adapter
+
+  [ Youquan Song ]
+  * PCIe AER: prevent AER injection if hardware masks error reporting
+
+  [ Mike Travis ]
+  * vgaarb: Fix VGA arbiter to accept PCI domains other than 0
+
+  [ Harish Zunjarrao ]
+  * SCSI: fc-transport: Use packed modifier for fc_bsg_request
+    structure.
+
+  [ Mike Travis ]
+  * pci: Update pci_set_vga_state() to call arch functions
+
+  [ Paul Mundt ]
+  * PCI: kill off pci_register_set_vga_state() symbol export.
+
+  [ Andrew Patterson ]
+  * PCI: fix nested spinlock hang in aer_inject
+
+  [ Eli Cohen ]
+  * IPoIB: Fix TX queue lockup with mixed UD/CM traffic
+
+  [ Seth Heasley ]
+  * x86/PCI: irq and pci_ids patch for Intel Cougar Point DeviceIDs
+  * ALSA: hda_intel: ALSA HD Audio patch for Intel Cougar Point
+    DeviceIDs
+  * ALSA: hda - enable snoop for Intel Cougar Point
+  * ata_piix: IDE Mode SATA patch for Intel Cougar Point DeviceIDs
+  * ahci: AHCI and RAID mode SATA patch for Intel Cougar Point DeviceIDs
+  * i2c-i801: Add Intel Cougar Point device IDs
+
+  [ Larry Finger ]
+  * b43: Remove reset after fatal DMA error
+  * b43: Allow PIO mode to be selected at module load
+
+  [ Linus Torvalds ]
+  * b43: fall back gracefully to PIO mode after fatal DMA errors
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Add position_fix quirk for Biostar mobo
+
+  [ Bjorn Helgaas ]
+  * agp/hp: fixup hp agp after ACPI changes
+
+  [ Michael Buesch ]
+  * b43: Optimize PIO scratchbuffer usage
+
+  [ Jeff Mahoney ]
+  * ecryptfs: fix use with tmpfs by removing d_drop from
+    ecryptfs_destroy_inode
+
+  [ Tyler Hicks ]
+  * eCryptfs: Decrypt symlink target for stat size
+
+  [ Christian Pulvermacher ]
+  * ecryptfs: fix error code for missing xattrs in lower fs
+
+  [ John Wright ]
+  * sched: Fix a race between ttwu() and migrate_task()
+
+  [ Oliver Neukum ]
+  * USB: cdc-acm: Update to new autopm API
+  * USB: cdc-acm: Fix stupid NULL pointer in resume()
+
+  [ Wey-Yi Guy ]
+  * iwlwifi: clear all tx queues when firmware ready
+
+  [ Reinette Chatre ]
+  * iwlwifi: fix scan race
+
+  [ Terry Loftin ]
+  * e1000e: stop cleaning when we reach tx_ring->next_to_use
+
+  [ Neil Horman ]
+  * r8169: offical fix for CVE-2009-4537 (overlength frame DMAs)
+
+  [ Damian Lukowski ]
+  * tcp: fix ICMP-RTO war
+
+  [ Peter Zijlstra ]
+  * perf_events, x86: Implement Intel Westmere/Nehalem-EX support
+
+  [ Alexey Starikovskiy ]
+  * ACPI: EC: Allow multibyte access to EC
+  * ACPI: EC: Limit burst to 64 bits
+
+  [ Ping Cheng ]
+  * Input: wacom - switch mode upon system resume
+
+  [ Mathieu Desnoyers ]
+  * modules: fix incorrect percpu usage
+  * lockdep: fix incorrect percpu usage
+  * module: fix __module_ref_addr()
+
+  [ NeilBrown ]
+  * md: deal with merge_bvec_fn in component devices better.
+
+  [ J. Bruce Fields ]
+  * nfsd4: don't try to map gid's in generic rpc code
+  * Revert "sunrpc: fix peername failed on closed listener"
+  * Revert "sunrpc: move the close processing after do recvfrom method"
+
+  [ Neil Brown ]
+  * nfsd: ensure sockets are closed on error
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Set Front Mic to input vref 50% for Lenovo 3000 Y410
+
+  [ Johannes Berg ]
+  * mac80211: fix deferred hardware scan requests
+
+  [ Eric Sandeen ]
+  * fs-writeback: Add helper function to start writeback if idle
+  * ext4: flush delalloc blocks when space is low
+  * ext4: fix async i/o writes beyond 4GB to a sparse file
+
+  [ Matt Domsch ]
+  * tpm: autoload tpm_tis based on system PnP IDs
+
+  [ Or Gerlitz ]
+  * IB/iser: Rewrite SG handling for RDMA logic
+
+  [ Kashyap, Desai ]
+  * mptctl : Remove printk which floods unnecessary messages to
+    var/log/message
+  * mptspi: Fix for incorrect data underrun errata
+
+  [ KOSAKI Motohiro ]
+  * sched: Use proper type in sched_getaffinity()
+
+  [ Takuya Yoshikawa ]
+  * KVM: SVM: Fix memory leaks that happen when svm_create_vcpu() fails
+
+  [ Avi Kivity ]
+  * KVM: Don't spam kernel log when injecting exceptions due to bad cr
+    writes
+
+  [ Andre Przywara ]
+  * KVM: allow bit 10 to be cleared in MSR_IA32_MC4_CTL
+
+  [ Avi Kivity ]
+  * KVM: VMX: Save/restore rflags.vm correctly in real mode
+
+  [ Xiao Guangrong ]
+  * KVM: MMU: fix kvm_mmu_zap_page() and its calling path
+
+  [ Takuya Yoshikawa ]
+  * KVM: fix the handling of dirty bitmaps to avoid overflows
+
+  [ Sridhar Samudrala ]
+  * KVM: Increase NR_IOBUS_DEVS limit to 200
+
+  [ Jan Kiszka ]
+  * KVM: x86: Fix TSS size check for 16-bit tasks
+
+  [ Joerg Roedel ]
+  * x86/gart: Disable GART explicitly before initialization
+
+  [ Neil Horman ]
+  * r8169: clean up my printk uglyness
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.32.12
+
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 26 Apr 2010 09:34:34 -0700
+
 linux-2.6 (2.6.32-1+vyatta+14) unstable; urgency=low
 
   * Revert squashfs-xattr
