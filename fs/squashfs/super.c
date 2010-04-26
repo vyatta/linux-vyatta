@@ -139,13 +139,6 @@ static int squashfs_fill_super(struct super_block *sb, void *data, int silent)
 
 	err = -EINVAL;
 
-	/*
-	 * Check if there's xattrs in the filesystem.  These are not
-	 * supported in this version, so warn that they will be ignored.
-	 */
-	if (le64_to_cpu(sblk->xattr_table_start) != SQUASHFS_INVALID_BLK)
-		ERROR("Xattrs in filesystem, these will be ignored\n");
-
 	/* Check the filesystem does not extend beyond the end of the
 	   block device */
 	msblk->bytes_used = le64_to_cpu(sblk->bytes_used);
@@ -179,6 +172,7 @@ static int squashfs_fill_super(struct super_block *sb, void *data, int silent)
 
 	msblk->inode_table = le64_to_cpu(sblk->inode_table_start);
 	msblk->directory_table = le64_to_cpu(sblk->directory_table_start);
+	msblk->xattr_table = le64_to_cpu(sblk->xattr_table_start);
 	msblk->inodes = le32_to_cpu(sblk->inodes);
 	flags = le16_to_cpu(sblk->flags);
 
