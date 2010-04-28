@@ -1,3 +1,13 @@
+linux-2.6 (2.6.32-1+vyatta+16) unstable; urgency=low
+
+  [ Helge Bahmann ]
+  * xattr support for squashfs
+
+  [ Stephen Hemminger ]
+  * Fix checkpatch warnings
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 28 Apr 2010 16:43:13 -0700
+
 linux-2.6 (2.6.32-1+vyatta+15) unstable; urgency=low
 
   * Merge in stable kernel 2.6.32.12
