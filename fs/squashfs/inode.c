@@ -126,7 +126,7 @@ int squashfs_read_inode(struct inode *inode, long long ino)
 	err = squashfs_new_inode(sb, inode, sqshb_ino);
 	if (err)
 		goto failed_read;
-	
+
 	squashfs_i(inode)->xattr = -1;
 
 	block = SQUASHFS_INODE_BLK(ino) + msblk->inode_table;
@@ -162,6 +162,7 @@ int squashfs_read_inode(struct inode *inode, long long ino)
 		inode->i_nlink = 1;
 		inode->i_size = le32_to_cpu(sqsh_ino->file_size);
 		inode->i_fop = &generic_ro_fops;
+		inode->i_op = &squashfs_file_inode_ops;
 		inode->i_mode |= S_IFREG;
 		inode->i_blocks = ((inode->i_size - 1) >> 9) + 1;
 		squashfs_i(inode)->fragment_block = frag_blk;

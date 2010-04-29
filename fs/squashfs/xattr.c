@@ -62,39 +62,41 @@ struct squashfs_xattr_iterator {
 };
 
 static void
-_squashfs_xattr_iterator_release_buffer(struct squashfs_xattr_iterator *iter)
+xattr_iterator_release_buffer(struct squashfs_xattr_iterator *iter)
 {
 	kfree(iter->name);
+	iter->name = NULL;
 	kfree(iter->value);
-	iter->name = 0;
-	iter->value = 0;
+	iter->value = NULL;
 }
 
 static int
-_squashfs_xattr_iterator_read_next(struct squashfs_xattr_iterator *iter)
+xattr_iterator_read_next(struct squashfs_xattr_iterator *iter)
 {
 	int err;
 	int total_len;
-	struct squashfs_xattr_entry_header header;
+	struct squashfs_xattr_entry entry;
 
 	if (iter->remaining_bytes == 0)
 		return 0;
 
-	if (iter->remaining_bytes < sizeof(struct squashfs_xattr_entry_header))
+	if (iter->remaining_bytes < sizeof(struct squashfs_xattr_entry))
 		return -EIO;
 
-	err = squashfs_read_metadata(iter->sb, &header, &iter->block,
-		&iter->offset, sizeof(header));
+	err = squashfs_read_metadata(iter->sb, &entry, &iter->block,
+				     &iter->offset, sizeof(entry));
 	if (err < 0)
 		return err;
-	if (err < sizeof(header))
-		return 0;
-	iter->remaining_bytes -= sizeof(header);
 
-	iter->name_len = le32_to_cpu(header.name_len);
-	iter->value_len = le32_to_cpu(header.value_len);
+	if (err < sizeof(entry))
+		return 0;
+
+	iter->remaining_bytes -= sizeof(entry);
+	iter->name_len = le32_to_cpu(entry.name_len);
+	iter->value_len = le32_to_cpu(entry.value_len);
 	if (iter->name_len > 4096 || iter->value_len > 65536)
 		return -EIO;
+
 	total_len = iter->name_len + iter->value_len;
 	if (total_len > iter->remaining_bytes)
 		return -EIO;
@@ -137,8 +139,8 @@ squashfs_xattr_iterator_start(struct squashfs_xattr_iterator *iter,
 	int err;
 
 	iter->sb = sb;
-	iter->name = 0;
-	iter->value = 0;
+	iter->name = NULL;
+	iter->value = NULL;
 
 	if (xattr == -1 || msblk->xattr_table == -1)
 		return 0;
@@ -155,26 +157,27 @@ squashfs_xattr_iterator_start(struct squashfs_xattr_iterator *iter,
 
 	iter->remaining_bytes = le32_to_cpu(xattr_header.size) - 4;
 
-	return _squashfs_xattr_iterator_read_next(iter);
+	return xattr_iterator_read_next(iter);
 }
 
 static int
 squashfs_xattr_iterator_next(struct squashfs_xattr_iterator *iter)
 {
-	_squashfs_xattr_iterator_release_buffer(iter);
-	return _squashfs_xattr_iterator_read_next(iter);
+	xattr_iterator_release_buffer(iter);
+	return xattr_iterator_read_next(iter);
 }
 
 static void
 squashfs_xattr_iterator_end(struct squashfs_xattr_iterator *iter)
 {
-	_squashfs_xattr_iterator_release_buffer(iter);
+	xattr_iterator_release_buffer(iter);
 }
 
 static inline int filtered(const char *name)
 {
 	if (capable(CAP_SYS_ADMIN))
 		return 0;
+
 	return strncmp(XATTR_TRUSTED_PREFIX, name,
 		       XATTR_TRUSTED_PREFIX_LEN) == 0;
 }
@@ -187,7 +190,6 @@ squashfs_listxattr(struct dentry *dentry, char *buffer, size_t size)
 	ssize_t xattr_names_size = 0;
 
 	next_xattr = squashfs_xattr_iterator_start(&iter, dentry->d_inode);
-
 	while (next_xattr == 1) {
 		if (!filtered(iter.name)) {
 			xattr_names_size += iter.name_len;
@@ -204,10 +206,7 @@ squashfs_listxattr(struct dentry *dentry, char *buffer, size_t size)
 
 	squashfs_xattr_iterator_end(&iter);
 
-	if (next_xattr < 0)
-		return next_xattr;
-	else
-		return xattr_names_size;
+	return (next_xattr < 0) ? next_xattr : xattr_names_size;
 }
 
 ssize_t
@@ -223,8 +222,8 @@ squashfs_getxattr(struct dentry *dentry, const char *name,
 		if (strcmp(name, iter.name) == 0) {
 			if (buffer) {
 				if (size >= iter.value_len) {
-					memcpy(buffer, iter.value,
-					       iter.value_len);
+					memcpy(buffer,
+					       iter.value, iter.value_len);
 					next_xattr = iter.value_len;
 				} else
 					next_xattr = -ERANGE;
