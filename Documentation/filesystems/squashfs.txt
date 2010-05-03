@@ -38,7 +38,7 @@ Hard link support:		yes			no
 Real inode numbers:		yes			no
 32-bit uids/gids:		yes			no
 File creation time:		yes			no
-Xattr and ACL support:		no			no
+Xattr and ACL support:		yes			no
 
 Squashfs compresses data, inodes and directories.  In addition, inode and
 directory data are highly compacted, and packed on byte boundaries.  Each
@@ -78,14 +78,17 @@ alignment:
 	|    export     |
 	|    table      |
 	|---------------|
+	|    xattr      |
+	|    table      |
+	|---------------|
 	|    uid/gid	|
 	|  lookup table	|
 	 ---------------
 
 Compressed data blocks are written to the filesystem as files are read from
 the source directory, and checked for duplicates.  Once all file data has been
-written the completed inode, directory, fragment, export and uid/gid lookup
-tables are written.
+written the completed inode, directory, fragment, export, xattr and uid/gid
+lookup tables are written.
 
 3.1 Inodes
 ----------
@@ -192,18 +195,26 @@ This table is stored compressed into metadata blocks.  A second index table is
 used to locate these.  This second index table for speed of access (and because
 it is small) is read at mount time and cached in memory.
 
+3.7 Extended attributes table
+-----------------------------
+
+Extended attributes are represented as sequences of key/value pairs, preceded
+by a length attribute. All xattrs are compressed into metadata blocks which
+in turn are stored contiguously in the image. The superblock points to the
+first xattr block.
+
+Inodes reference extended attribute sets through a (<block, offset>) tuple
+in a fashion similar to directories. This tuple is encoded into 32 bits
+using 19 bits for the block and 13 bits for the offset. This means that up
+to 512KiB of compressed extended attributes can be supported per
+filesystem. (Given that multiple inodes with identical extended attributes
+will generally reference the same xattr set multiple times, this is
+sufficient for practical purposes).
 
 4. TODOS AND OUTSTANDING ISSUES
 -------------------------------
 
-4.1 Todo list
--------------
-
-Implement Xattr and ACL support.  The Squashfs 4.0 filesystem layout has hooks
-for these but the code has not been written.  Once the code has been written
-the existing layout should not require modification.
-
-4.2 Squashfs internal cache
+4.1 Squashfs internal cache
 ---------------------------
 
 Blocks in Squashfs are compressed.  To avoid repeatedly decompressing

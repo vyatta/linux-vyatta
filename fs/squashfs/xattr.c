@@ -50,7 +50,7 @@
 #include "squashfs.h"
 
 struct squashfs_xattr_iterator {
-	size_t name_len, value_len;
+	unsigned int name_len, value_len;
 	char *name;
 	void *value;
 
@@ -98,9 +98,8 @@ xattr_iterator_read_next(struct squashfs_xattr_iterator *iter)
 	iter->remaining_bytes -= sizeof(entry);
 	iter->name_len = le32_to_cpu(entry.name_len);
 	iter->value_len = le32_to_cpu(entry.value_len);
-
 	if (iter->name_len > 4096 || iter->value_len > 65536) {
-		ERROR("Xattr entry length %zd:%zd  \n",
+		ERROR("Xattr entry length %d:%d  \n",
 		      iter->name_len, iter->value_len);
 		return -EIO;
 	}
@@ -115,7 +114,6 @@ xattr_iterator_read_next(struct squashfs_xattr_iterator *iter)
 	iter->name = kmalloc(iter->name_len+1, GFP_KERNEL);
 	if (!iter->name)
 		return -ENOMEM;
-
 	iter->value = kmalloc(iter->value_len, GFP_KERNEL);
 	if (!iter->value)
 		return -ENOMEM;
@@ -126,7 +124,6 @@ xattr_iterator_read_next(struct squashfs_xattr_iterator *iter)
 		return err;
 	if (err < iter->name_len)
 		return -EIO;
-
 	iter->name[iter->name_len] = 0;
 
 	err = squashfs_read_metadata(iter->sb, iter->value, &iter->block,
@@ -137,14 +134,10 @@ xattr_iterator_read_next(struct squashfs_xattr_iterator *iter)
 		return -EIO;
 
 	iter->remaining_bytes -= total_len;
+
 	return 1;
 }
 
-/* Read metadata about xattr's
- * return 1 if available
- *        0 if none
- *       <0 on error
- */
 static int
 squashfs_xattr_iterator_start(struct squashfs_xattr_iterator *iter,
 			      struct inode *inode)
@@ -155,8 +148,9 @@ squashfs_xattr_iterator_start(struct squashfs_xattr_iterator *iter,
 	struct squashfs_xattr_header xattr_header;
 	int err;
 
-	memset(iter, 0, sizeof(*iter));
 	iter->sb = sb;
+	iter->name = NULL;
+	iter->value = NULL;
 
 	if (xattr == -1 || msblk->xattr_table == -1)
 		return 0;
@@ -168,7 +162,7 @@ squashfs_xattr_iterator_start(struct squashfs_xattr_iterator *iter,
 		&iter->offset, sizeof(xattr_header));
 	if (err < 0) {
 		ERROR("Failed to read xattr header\n");
-		return err;
+ 		return err;
 	}
 	if (err < sizeof(xattr_header)) {
 		ERROR("Xattr header to short\n");
@@ -176,6 +170,7 @@ squashfs_xattr_iterator_start(struct squashfs_xattr_iterator *iter,
 	}
 
 	iter->remaining_bytes = le32_to_cpu(xattr_header.size) - 4;
+
 	TRACE("Xattr header bytes %u\n", iter->remaining_bytes);
 	return 1;
 }
@@ -193,66 +188,52 @@ squashfs_xattr_iterator_end(struct squashfs_xattr_iterator *iter)
 	xattr_iterator_release_buffer(iter);
 }
 
-/* No special permissions are needed to list attributes except for trusted.*/
 static inline int filtered(const char *name)
 {
 	if (capable(CAP_SYS_ADMIN))
 		return 0;
 
-	return strncmp(name, XATTR_TRUSTED_PREFIX,
-		       XATTR_TRUSTED_PREFIX_LEN) != 0;
+	return strncmp(XATTR_TRUSTED_PREFIX, name,
+		       XATTR_TRUSTED_PREFIX_LEN) == 0;
 }
 
-/*
- * Return list of attributes
- * Handle special cases:
- *    buffer == NULL  : return size of required buffer but no copy
- *    size < required : return -ERANGE
- */
 ssize_t
 squashfs_listxattr(struct dentry *dentry, char *buffer, size_t size)
 {
 	struct squashfs_xattr_iterator iter;
 	int err;
-	ssize_t written = 0;
+	ssize_t xattr_names_size = 0;
 
 	err = squashfs_xattr_iterator_start(&iter, dentry->d_inode);
 	if (err <= 0)
 		return err;
 
 	while ((err = squashfs_xattr_iterator_next(&iter)) == 1) {
-		size_t count = iter.name_len + 1;
+		size_t name_size = iter.name_len + 1;
 		if (filtered(iter.name))
 			continue;
 
 		TRACE("Listxattr %.*s", (int)iter.name_len, iter.name);
 
-		written += count;
+		xattr_names_size += name_size;
 		if (!buffer)
 			continue;
 
-		if (size < count) {
+		if (size < name_size) {
 			err = -ERANGE;
 			break;
-		}
-
+ 		}
 		memcpy(buffer, iter.name, iter.name_len);
 		buffer[iter.name_len] = '\0';
-		buffer += count;
-		size -= count;
+		buffer += name_size;
+		size -= name_size;
 	}
 
 	squashfs_xattr_iterator_end(&iter);
 
-	return (err < 0) ? err : written;
+	return (err < 0) ? err : xattr_names_size;
 }
 
-/*
- * Return named attribute
- * Handle special cases:
- *    buffer == NULL  : return size of required buffer but no copy
- *    size < required : return -ERANGE
- */
 ssize_t
 squashfs_getxattr(struct dentry *dentry, const char *name,
 		  void *buffer, size_t size)
@@ -261,27 +242,23 @@ squashfs_getxattr(struct dentry *dentry, const char *name,
 	int err;
 
 	err = squashfs_xattr_iterator_start(&iter, dentry->d_inode);
-	if (err < 0)
+	if (err <= 0)
 		return err;
 
-	if (err == 0)
-		goto notfound;
-
 	while ((err = squashfs_xattr_iterator_next(&iter)) == 1) {
-		if (strncmp(name, iter.name, iter.name_len) != 0)
+		if (strcmp(name, iter.name))
 			continue;
 
-		TRACE("Getxattr %s length %zd\n", name, iter.value_len);
+		TRACE("Getxattr %s length %u\n", name, iter.value_len);
 		err = iter.value_len;
 		if (buffer) {
 			if (size < iter.value_len)
 				err = -ERANGE;
 			else
 				memcpy(buffer, iter.value, iter.value_len);
-		}
+ 		}
 		goto found;
 	}
- notfound:
 	err = -ENODATA;
  found:
 	squashfs_xattr_iterator_end(&iter);

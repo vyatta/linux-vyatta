@@ -247,3 +247,16 @@ const struct inode_operations squashfs_file_inode_ops = {
 	.listxattr = squashfs_listxattr,
 	.getxattr = squashfs_getxattr
 };
+
+const struct inode_operations squashfs_symlink_inode_ops = {
+	.readlink = generic_readlink,
+	.follow_link = page_follow_link_light,
+	.put_link = page_put_link,
+	.listxattr = squashfs_listxattr,
+	.getxattr = squashfs_getxattr
+};
+
+const struct inode_operations squashfs_special_inode_ops = {
+	.listxattr = squashfs_listxattr,
+	.getxattr = squashfs_getxattr
+};

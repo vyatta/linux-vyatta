@@ -276,8 +276,7 @@ int squashfs_read_inode(struct inode *inode, long long ino)
 				le16_to_cpu(sqsh_ino->offset));
 		break;
 	}
-	case SQUASHFS_SYMLINK_TYPE:
-	case SQUASHFS_LSYMLINK_TYPE: {
+	case SQUASHFS_SYMLINK_TYPE: {
 		struct squashfs_symlink_inode *sqsh_ino = &squashfs_ino.symlink;
 
 		err = squashfs_read_metadata(sb, sqsh_ino, &block, &offset,
@@ -287,7 +286,7 @@ int squashfs_read_inode(struct inode *inode, long long ino)
 
 		inode->i_nlink = le32_to_cpu(sqsh_ino->nlink);
 		inode->i_size = le32_to_cpu(sqsh_ino->symlink_size);
-		inode->i_op = &page_symlink_inode_operations;
+		inode->i_op = &squashfs_symlink_inode_ops;
 		inode->i_data.a_ops = &squashfs_symlink_aops;
 		inode->i_mode |= S_IFLNK;
 		squashfs_i(inode)->start = block;
@@ -298,10 +297,30 @@ int squashfs_read_inode(struct inode *inode, long long ino)
 				block, offset);
 		break;
 	}
+	case SQUASHFS_LSYMLINK_TYPE: {
+		struct squashfs_lsymlink_inode *sqsh_ino = &squashfs_ino.lsymlink;
+
+		err = squashfs_read_metadata(sb, sqsh_ino, &block, &offset,
+				sizeof(*sqsh_ino));
+		if (err < 0)
+			goto failed_read;
+
+		inode->i_nlink = le32_to_cpu(sqsh_ino->nlink);
+		inode->i_size = le32_to_cpu(sqsh_ino->symlink_size);
+		inode->i_op = &squashfs_symlink_inode_ops;
+		inode->i_data.a_ops = &squashfs_symlink_aops;
+		inode->i_mode |= S_IFLNK;
+		squashfs_i(inode)->start = block;
+		squashfs_i(inode)->offset = offset;
+		squashfs_i(inode)->xattr = le32_to_cpu(sqsh_ino->xattr);
+
+		TRACE("Symbolic link inode %x:%x, start_block %llx, offset "
+				"%x\n", SQUASHFS_INODE_BLK(ino), offset,
+				block, offset);
+		break;
+	}
 	case SQUASHFS_BLKDEV_TYPE:
-	case SQUASHFS_CHRDEV_TYPE:
-	case SQUASHFS_LBLKDEV_TYPE:
-	case SQUASHFS_LCHRDEV_TYPE: {
+	case SQUASHFS_CHRDEV_TYPE: {
 		struct squashfs_dev_inode *sqsh_ino = &squashfs_ino.dev;
 		unsigned int rdev;
 
@@ -317,15 +336,38 @@ int squashfs_read_inode(struct inode *inode, long long ino)
 		inode->i_nlink = le32_to_cpu(sqsh_ino->nlink);
 		rdev = le32_to_cpu(sqsh_ino->rdev);
 		init_special_inode(inode, inode->i_mode, new_decode_dev(rdev));
+		inode->i_op = &squashfs_special_inode_ops;
+
+		TRACE("Device inode %x:%x, rdev %x\n",
+				SQUASHFS_INODE_BLK(ino), offset, rdev);
+		break;
+	}
+	case SQUASHFS_LBLKDEV_TYPE:
+	case SQUASHFS_LCHRDEV_TYPE: {
+		struct squashfs_ldev_inode *sqsh_ino = &squashfs_ino.ldev;
+		unsigned int rdev;
+
+		err = squashfs_read_metadata(sb, sqsh_ino, &block, &offset,
+				sizeof(*sqsh_ino));
+		if (err < 0)
+			goto failed_read;
+
+		if (type == SQUASHFS_LCHRDEV_TYPE)
+			inode->i_mode |= S_IFCHR;
+		else
+			inode->i_mode |= S_IFBLK;
+		inode->i_nlink = le32_to_cpu(sqsh_ino->nlink);
+		rdev = le32_to_cpu(sqsh_ino->rdev);
+		init_special_inode(inode, inode->i_mode, new_decode_dev(rdev));
+		squashfs_i(inode)->xattr = le32_to_cpu(sqsh_ino->xattr);
+		inode->i_op = &squashfs_special_inode_ops;
 
 		TRACE("Device inode %x:%x, rdev %x\n",
 				SQUASHFS_INODE_BLK(ino), offset, rdev);
 		break;
 	}
 	case SQUASHFS_FIFO_TYPE:
-	case SQUASHFS_SOCKET_TYPE:
-	case SQUASHFS_LFIFO_TYPE:
-	case SQUASHFS_LSOCKET_TYPE: {
+	case SQUASHFS_SOCKET_TYPE: {
 		struct squashfs_ipc_inode *sqsh_ino = &squashfs_ino.ipc;
 
 		err = squashfs_read_metadata(sb, sqsh_ino, &block, &offset,
@@ -339,6 +381,26 @@ int squashfs_read_inode(struct inode *inode, long long ino)
 			inode->i_mode |= S_IFSOCK;
 		inode->i_nlink = le32_to_cpu(sqsh_ino->nlink);
 		init_special_inode(inode, inode->i_mode, 0);
+		inode->i_op = &squashfs_special_inode_ops;
+		break;
+	}
+	case SQUASHFS_LFIFO_TYPE:
+	case SQUASHFS_LSOCKET_TYPE: {
+		struct squashfs_lipc_inode *sqsh_ino = &squashfs_ino.lipc;
+
+		err = squashfs_read_metadata(sb, sqsh_ino, &block, &offset,
+				sizeof(*sqsh_ino));
+		if (err < 0)
+			goto failed_read;
+
+		if (type == SQUASHFS_FIFO_TYPE)
+			inode->i_mode |= S_IFIFO;
+		else
+			inode->i_mode |= S_IFSOCK;
+		inode->i_nlink = le32_to_cpu(sqsh_ino->nlink);
+		init_special_inode(inode, inode->i_mode, 0);
+		inode->i_op = &squashfs_special_inode_ops;
+		squashfs_i(inode)->xattr = le32_to_cpu(sqsh_ino->xattr);
 		break;
 	}
 	default:
