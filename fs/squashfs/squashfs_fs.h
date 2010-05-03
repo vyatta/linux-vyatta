@@ -426,14 +426,4 @@ struct squashfs_xattr_header {
 	__le32			size;
 };
 
-struct squashfs_xattr_entry {
-	__le32			name_len;
-	__le32			value_len;
-	char			name_and_value_data[0];
-};
-
-struct squashfs_xattr_header {
-	__le32			size;
-};
-
 #endif
