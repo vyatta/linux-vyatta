@@ -1,3 +1,10 @@
+linux-2.6 (2.6.32-1+vyatta+18) unstable; urgency=low
+
+  * Fix duplicate definiton.
+  * Add missing pieces from last merge
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 03 May 2010 22:13:40 -0700
+
 linux-2.6 (2.6.32-1+vyatta+17) unstable; urgency=low
 
   * Revised version of squashfs/xattr patch
