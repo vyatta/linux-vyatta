@@ -242,8 +242,11 @@ squashfs_getxattr(struct dentry *dentry, const char *name,
 	int err;
 
 	err = squashfs_xattr_iterator_start(&iter, dentry->d_inode);
-	if (err <= 0)
+	if (err < 0)
 		return err;
+
+	if (err == 0)
+		return -ENODATA;
 
 	while ((err = squashfs_xattr_iterator_next(&iter)) == 1) {
 		if (strcmp(name, iter.name))
