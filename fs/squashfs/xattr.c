@@ -144,24 +144,26 @@ squashfs_xattr_iterator_start(struct squashfs_xattr_iterator *iter,
 {
 	struct super_block *sb = inode->i_sb;
 	struct squashfs_sb_info *msblk = sb->s_fs_info;
-	int xattr = squashfs_i(inode)->xattr;
+	u32 xattr = squashfs_i(inode)->xattr;
 	struct squashfs_xattr_header xattr_header;
 	int err;
 
+	if (msblk->xattr_table == SQUASHFS_INVALID_BLK)
+		return 0;	/* no attributes in filesystem image */
+ 
+	if (xattr == SQUASHFS_INVALID_FRAG)
+		return 0;	/* no attributes on file */
+
+	memset(iter, 0, sizeof(struct squashfs_xattr_iterator));
 	iter->sb = sb;
-	iter->name = NULL;
-	iter->value = NULL;
-
-	if (xattr == -1 || msblk->xattr_table == -1)
-		return 0;
-
-	iter->block = msblk->xattr_table + (xattr >> 13);
-	iter->offset = xattr & 8191;
+	iter->block = msblk->xattr_table + (xattr >> SQUASHFS_METADATA_LOG);
+	iter->offset = xattr & (SQUASHFS_METADATA_SIZE -1);
 
 	err = squashfs_read_metadata(iter->sb, &xattr_header, &iter->block,
 		&iter->offset, sizeof(xattr_header));
 	if (err < 0) {
-		ERROR("Failed to read xattr header\n");
+		ERROR("Failed to read xattr header @ %#llx:%#x\n",
+		      msblk->xattr_table, xattr);
  		return err;
 	}
 	if (err < sizeof(xattr_header)) {
@@ -169,7 +171,8 @@ squashfs_xattr_iterator_start(struct squashfs_xattr_iterator *iter,
 		return -EIO;
 	}
 
-	iter->remaining_bytes = le32_to_cpu(xattr_header.size) - 4;
+	iter->remaining_bytes = le32_to_cpu(xattr_header.size)
+		- sizeof(xattr_header);
 
 	TRACE("Xattr header bytes %u\n", iter->remaining_bytes);
 	return 1;
@@ -244,7 +247,6 @@ squashfs_getxattr(struct dentry *dentry, const char *name,
 	err = squashfs_xattr_iterator_start(&iter, dentry->d_inode);
 	if (err < 0)
 		return err;
-
 	if (err == 0)
 		return -ENODATA;
 
