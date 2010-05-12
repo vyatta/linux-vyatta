@@ -57,7 +57,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/dcache.h>
-#include <linux/zlib.h>
+#include <linux/xattr.h>
 
 #include "squashfs_fs.h"
 #include "squashfs_fs_sb.h"
@@ -239,24 +239,6 @@ failed:
 
 const struct inode_operations squashfs_dir_inode_ops = {
 	.lookup = squashfs_lookup,
-	.listxattr = squashfs_listxattr,
-	.getxattr = squashfs_getxattr
-};
-
-const struct inode_operations squashfs_file_inode_ops = {
-	.listxattr = squashfs_listxattr,
-	.getxattr = squashfs_getxattr
-};
-
-const struct inode_operations squashfs_symlink_inode_ops = {
-	.readlink = generic_readlink,
-	.follow_link = page_follow_link_light,
-	.put_link = page_put_link,
-	.listxattr = squashfs_listxattr,
-	.getxattr = squashfs_getxattr
-};
-
-const struct inode_operations squashfs_special_inode_ops = {
-	.listxattr = squashfs_listxattr,
-	.getxattr = squashfs_getxattr
+	.getxattr = generic_getxattr,
+	.listxattr = squashfs_listxattr
 };
