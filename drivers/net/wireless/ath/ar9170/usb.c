@@ -38,6 +38,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/slab.h>
 #include <linux/usb.h>
 #include <linux/firmware.h>
 #include <linux/etherdevice.h>
@@ -94,6 +95,8 @@ static struct usb_device_id ar9170_usb_ids[] = {
 	{ USB_DEVICE(0x04bb, 0x093f) },
 	/* AVM FRITZ!WLAN USB Stick N */
 	{ USB_DEVICE(0x057C, 0x8401) },
+	/* NEC WL300NU-G */
+	{ USB_DEVICE(0x0409, 0x0249) },
 	/* AVM FRITZ!WLAN USB Stick N 2.4 */
 	{ USB_DEVICE(0x057C, 0x8402), .driver_info = AR9170_REQ_FW1_ONLY },
 
@@ -416,7 +419,7 @@ static int ar9170_usb_exec_cmd(struct ar9170 *ar, enum ar9170_cmd cmd,
 	spin_unlock_irqrestore(&aru->common.cmdlock, flags);
 
 	usb_fill_int_urb(urb, aru->udev,
-			 usb_sndbulkpipe(aru->udev, AR9170_EP_CMD),
+			 usb_sndintpipe(aru->udev, AR9170_EP_CMD),
 			 aru->common.cmdbuf, plen + 4,
 			 ar9170_usb_tx_urb_complete, NULL, 1);
 
@@ -724,12 +727,16 @@ static void ar9170_usb_firmware_failed(struct ar9170_usb *aru)
 {
 	struct device *parent = aru->udev->dev.parent;
 
+	complete(&aru->firmware_loading_complete);
+
 	/* unbind anything failed */
 	if (parent)
 		down(&parent->sem);
 	device_release_driver(&aru->udev->dev);
 	if (parent)
 		up(&parent->sem);
+
+	usb_put_dev(aru->udev);
 }
 
 static void ar9170_usb_firmware_finish(const struct firmware *fw, void *context)
@@ -758,6 +765,8 @@ static void ar9170_usb_firmware_finish(const struct firmware *fw, void *context)
 	if (err)
 		goto err_unrx;
 
+	complete(&aru->firmware_loading_complete);
+	usb_put_dev(aru->udev);
 	return;
 
  err_unrx:
@@ -855,6 +864,7 @@ static int ar9170_usb_probe(struct usb_interface *intf,
 	init_usb_anchor(&aru->tx_pending);
 	init_usb_anchor(&aru->tx_submitted);
 	init_completion(&aru->cmd_wait);
+	init_completion(&aru->firmware_loading_complete);
 	spin_lock_init(&aru->tx_urb_lock);
 
 	aru->tx_pending_urbs = 0;
@@ -874,6 +884,7 @@ static int ar9170_usb_probe(struct usb_interface *intf,
 	if (err)
 		goto err_freehw;
 
+	usb_get_dev(aru->udev);
 	return request_firmware_nowait(THIS_MODULE, 1, "ar9170.fw",
 				       &aru->udev->dev, GFP_KERNEL, aru,
 				       ar9170_usb_firmware_step2);
@@ -893,6 +904,9 @@ static void ar9170_usb_disconnect(struct usb_interface *intf)
 		return;
 
 	aru->common.state = AR9170_IDLE;
+
+	wait_for_completion(&aru->firmware_loading_complete);
+
 	ar9170_unregister(&aru->common);
 	ar9170_usb_cancel_urbs(aru);
 
