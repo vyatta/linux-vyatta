@@ -1,3 +1,295 @@
+linux-2.6 (2.6.32-1+vyatta+22) unstable; urgency=low
+
+  [ Alan Stern ]
+  * USB: EHCI: defer reclamation of siTDs
+
+  [ Shimada Hirofumi ]
+  * p54usb: Add usbid for Corega CG-WLUSB2GT.
+
+  [ NeilBrown ]
+  * md/raid5: allow for more than 2^31 chunks.
+  * md/raid5: fix previous patch.
+
+  [ Tejun Heo ]
+  * libata: fix locking around blk_abort_request()
+
+  [ Jeff Garzik ]
+  * libata: ensure NCQ error result taskfile is fully initialized before
+    returning it via qc->result_tf.
+
+  [ Ian Dall ]
+  * w1: w1 temp: fix negative termperature calculation
+
+  [ Andrea Arcangeli ]
+  * memcg: fix prepare migration
+
+  [ Johannes Berg ]
+  * mac80211: remove bogus TX agg state assignment
+
+  [ Changli Gao ]
+  * flex_array: fix the panic when calling flex_array_alloc() without
+    __GFP_ZERO
+
+  [ Avi Kivity ]
+  * core, x86: make LIST_POISON less deadly
+
+  [ Mel Gorman ]
+  * hugetlb: fix infinite loop in get_futex_key() when backed by huge
+    pages
+
+  [ Jeff Mahoney ]
+  * reiserfs: fix permissions on .reiserfs_priv
+  * reiserfs: fix corruption during shrinking of xattrs
+
+  [ Neil Brown ]
+  * nfsd4: bug in read_buf
+
+  [ David Howells ]
+  * keys: the request_key() syscall should link an existing key to the
+    dest keyring
+
+  [ Eric Lescouet ]
+  * staging: usbip: Fix deadlock
+
+  [ Alan Stern ]
+  * USB: fix remote wakeup settings during system sleep
+
+  [ William Lightning ]
+  * USB: Add id for HP ev2210 a.k.a Sierra MC5725 miniPCI-e Cell Modem.
+
+  [ Dan Carpenter ]
+  * USB: fix testing the wrong variable in fs_create_by_name()
+
+  [ Alan Stern ]
+  * USB: don't choose configs with no interfaces
+  * USB: OHCI: don't look at the root hub to get the number of ports
+
+  [ Sarah Sharp ]
+  * USB: xhci: properly set the "Mult" field of the endpoint context.
+  * USB: xhci: properly set endpoint context fields for periodic eps.
+
+  [ Jerome Marchand ]
+  * procfs: fix tid fdinfo
+
+  [ Tao Ma ]
+  * ocfs2: Update VFS inode's id info after reflink.
+
+  [ Dan Carpenter ]
+  * ocfs2: potential ERR_PTR dereference on error paths
+
+  [ Joel Becker ]
+  * ocfs2: Compute metaecc for superblocks during online resize.
+  * ocfs2_dlmfs: Fix math error when reading LVB.
+
+  [ Mark Langsdorf ]
+  * powernow-k8: Fix frequency reporting
+
+  [ Al Viro ]
+  * nfs d_revalidate() is too trigger-happy with d_drop()
+
+  [ Chuck Lever ]
+  * NFS: rsize and wsize settings ignored on v4 mounts
+
+  [ Haiyang Zhang ]
+  * Staging: hv: Fix a bug affecting IPv6
+
+  [ Cyrill Gorcunov ]
+  * Staging: hv: Fix up memory leak on HvCleanup
+
+  [ Stephen Hemminger ]
+  * Staging: hv: name network device ethX rather than sethX
+
+  [ Jean Delvare ]
+  * i2c: Fix probing of FSC hardware monitoring chips
+
+  [ Tejun Heo ]
+  * perf: Fix resource leak in failure path of perf_event_open()
+
+  [ Dan Williams ]
+  * raid6: fix recovery performance regression
+
+  [ Ping Cheng ]
+  * serial: 8250_pnp - add Fujitsu Wacom device
+
+  [ Richard Kennedy ]
+  * block: ensure jiffies wrap is handled correctly in
+    blk_rq_timed_out_timer
+
+  [ Peter Korsgaard ]
+  * dm9601: fix phy/eeprom write routine
+
+  [ Hans de Goede ]
+  * p54pci: fix bugs in p54p_check_tx_ring
+
+  [ Borislav Petkov ]
+  * edac, mce: Fix wrong mask and macro usage
+
+  [ H. Peter Anvin ]
+  * x86-64: Clear a 64-bit FS/GS base on fork if selector is nonzero
+  * x86: Disable large pages on CPUs with Atom erratum AAE44
+
+  [ Borislav Petkov ]
+  * x86, k8 nb: Fix boot crash: enable k8_northbridges unconditionally
+    on AMD systems
+
+  [ Prarit Bhargava ]
+  * x86, AMD: Fix stale cpuid4_info shared_map data in shared_cpu_map
+    cpumasks
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Use LPIB quirk for DG965OT board version AAD63733-203
+
+  [ Kunal Gangakhedkar ]
+  * ALSA: hda - Add PCI quirk for HP dv6-1110ax.
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Use STAC_DELL_M6_BOTH quirk for Dell Studio XPS 1645
+  * ALSA: hda: Use STAC_DELL_M6_BOTH quirk for Dell Studio 1558
+  * ALSA: hda: Use ALC880_F1734 quirk for Fujitsu Siemens AMILO Xi 1526
+
+  [ Hans de Goede ]
+  * ALSA: snd-meastro3: Add amp_gpio quirk for Compaq EVO N600C
+  * ALSA: snd-meastro3: Ignore spurious HV interrupts during suspend /
+    resume
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Fix max PCM level to 0 dB for Fujitsu-Siemens laptops
+    using CX20549 (Venice)
+  * ALSA: hda: Fix 0 dB for Packard Bell models using Conexant CX20549
+    (Venice)
+  * ALSA: hda: Use olpc-xo-1_5 quirk for Toshiba Satellite Pro T130-15F
+  * ALSA: hda: Use olpc-xo-1_5 quirk for Toshiba Satellite P500-PSPGSC-
+    01800T
+
+  [ Mark Lord ]
+  * libata: Fix accesses at LBA28 boundary (old bug, but nasty) (v2)
+
+  [ Leonard Michlmayr ]
+  * ext4: correctly calculate number of blocks for fiemap
+
+  [ Phillip Lougher ]
+  * initramfs: handle unrecognised decompressor when unpacking
+
+  [ Daniel Vetter ]
+  * drm/i915: fix tiling limits for i915 class hw v2
+
+  [ David Howells ]
+  * CRED: Fix a race in creds_are_invalid() in credentials debugging
+
+  [ Bill Pemberton ]
+  * jfs: fix diAllocExt error in resizing filesystem
+
+  [ Zhang Rui ]
+  * ACPI: introduce kernel parameter acpi_sleep=sci_force_enable
+
+  [ Christian Lamparter ]
+  * p54pci: rx frame length check
+
+  [ Darren Jenkins ]
+  * drivers/net/wireless/p54/txrx.c Fix off by one error
+
+  [ Neil Horman ]
+  * dccp_probe: Fix module load dependencies between dccp and dccp_probe
+
+  [ Marcelo Tosatti ]
+  * KVM: remove unused load_segment_descriptor_to_kvm_desct
+
+  [ Wufei ]
+  * kgdb: don't needlessly skip PAGE_USER test for Fsl booke
+
+  [ David Dillow ]
+  * r8169: use correct barrier between cacheable and non-cacheable
+    memory
+
+  [ Francois Romieu ]
+  * r8169: fix broken register writes
+
+  [ françois romieu ]
+  * r8169: more broken register writes workaround
+
+  [ Matthew Garrett ]
+  * PCI: Ensure we re-enable devices on resume
+
+  [ Douglas Gilbert ]
+  * skip sense logging for some ATA PASS-THROUGH cdbs
+
+  [ Andre Detsch ]
+  * tg3: Fix INTx fallback when MSI fails
+
+  [ Dave Chinner ]
+  * xfs: add a shrinker to background inode reclaim
+
+  [ Carlos O'Donell ]
+  * parisc: Set PCI CLS early in boot.
+
+  [ Lalit Chandivade ]
+  * qla2xxx: Properly handle UNDERRUN completion statuses.
+
+  [ Michael Chan ]
+  * bnx2: Fix lost MSI-X problem on 5709 NICs.
+
+  [ Jeff Mahoney ]
+  * tracing: Fix ftrace_event_call alignment for use with gcc 4.5
+
+  [ Dan Carpenter ]
+  * security: testing the wrong variable in create_by_name()
+
+  [ NeilBrown ]
+  * md: restore ability of spare drives to spin down.
+
+  [ Stijn Tintel ]
+  * virtio: initialize earlier
+
+  [ Gabriele A. Trombetti ]
+  * md/raid6: Fix raid-6 read-error correction in degraded state
+
+  [ Bjørn Mork ]
+  * V4L/DVB: budget: Oops: "BUG: unable to handle kernel NULL pointer
+    dereference"
+
+  [ Alex Chiang ]
+  * ACPI: DMI init_set_sci_en_on_resume for multiple Lenovo ThinkPads
+
+  [ Dan Carpenter ]
+  * power_meter: acpi_device_class "power_meter_resource" too long
+
+  [ Kamal Mostafa ]
+  * ACPI: sleep: init_set_sci_en_on_resume for Dell Studio 155x
+
+  [ Arjan van de Ven ]
+  * cpuidle: Fix incorrect optimization
+
+  [ Jakob Viketoft ]
+  * pxa/colibri: fix missing #include <mach/mfp.h> in colibri.h
+
+  [ Tejun Heo ]
+  * SCSI: fix locking around blk_abort_request()
+
+  [ Mike Christie ]
+  * SCSI: libiscsi: regression: fix header digest errors
+
+  [ Douglas Gilbert ]
+  * scsi_debug: virtual_gb ignores sector_size
+
+  [ Hannes Reinecke ]
+  * Enable retries for SYNCRONIZE_CACHE commands to fix I/O error
+
+  [ James Bottomley ]
+  * SCSI: Retry commands with UNIT_ATTENTION sense codes to fix
+    ext3/ext4 I/O error
+
+  [ Ralf Baechle ]
+  * MIPS: Sibyte: Apply M3 workaround only on affected chip types and
+    versions.
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.32.13
+  * Revert "module: fix __module_ref_addr()"
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 12 May 2010 15:27:44 -0700
+
 linux-2.6 (2.6.32-1+vyatta+21) unstable; urgency=low
 
   [ Phillip Lougher ]
