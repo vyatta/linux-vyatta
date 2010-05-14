@@ -37,11 +37,13 @@
 #include <linux/module.h>
 #include <linux/zlib.h>
 #include <linux/magic.h>
+#include <linux/xattr.h>
 
 #include "squashfs_fs.h"
 #include "squashfs_fs_sb.h"
 #include "squashfs_fs_i.h"
 #include "squashfs.h"
+#include "xattr.h"
 
 static struct file_system_type squashfs_fs_type;
 static const struct super_operations squashfs_super_ops;
@@ -75,7 +77,7 @@ static int squashfs_fill_super(struct super_block *sb, void *data, int silent)
 	long long root_inode;
 	unsigned short flags;
 	unsigned int fragments;
-	u64 lookup_table_start;
+	u64 lookup_table_start, xattr_id_table_start;
 	int err;
 
 	TRACE("Entered squashfs_fill_superblock\n");
@@ -138,13 +140,6 @@ static int squashfs_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_mount;
 
 	err = -EINVAL;
-
-	/*
-	 * Check if there's xattrs in the filesystem.  These are not
-	 * supported in this version, so warn that they will be ignored.
-	 */
-	if (le64_to_cpu(sblk->xattr_table_start) != SQUASHFS_INVALID_BLK)
-		ERROR("Xattrs in filesystem, these will be ignored\n");
 
 	/* Check the filesystem does not extend beyond the end of the
 	   block device */
@@ -249,7 +244,7 @@ static int squashfs_fill_super(struct super_block *sb, void *data, int silent)
 allocate_lookup_table:
 	lookup_table_start = le64_to_cpu(sblk->lookup_table_start);
 	if (lookup_table_start == SQUASHFS_INVALID_BLK)
-		goto allocate_root;
+		goto allocate_xattr_table;
 
 	/* Allocate and read inode lookup table */
 	msblk->inode_lookup_table = squashfs_read_inode_lookup_table(sb,
@@ -262,6 +257,21 @@ allocate_lookup_table:
 
 	sb->s_export_op = &squashfs_export_ops;
 
+allocate_xattr_table:
+	sb->s_xattr = squashfs_xattr_handlers;
+	xattr_id_table_start = le64_to_cpu(sblk->xattr_id_table_start);
+	if (xattr_id_table_start == SQUASHFS_INVALID_BLK)
+		goto allocate_root;
+
+	/* Allocate and read xattr id lookup table */
+	msblk->xattr_id_table = squashfs_read_xattr_id_table(sb,
+		xattr_id_table_start, &msblk->xattr_table, &msblk->xattr_ids);
+	if (IS_ERR(msblk->xattr_id_table)) {
+		err = PTR_ERR(msblk->xattr_id_table);
+		msblk->xattr_id_table = NULL;
+		if (err != -ENOTSUPP)
+			goto failed_mount;
+	}
 allocate_root:
 	root = new_inode(sb);
 	if (!root) {
@@ -295,6 +305,7 @@ failed_mount:
 	kfree(msblk->inode_lookup_table);
 	kfree(msblk->fragment_index);
 	kfree(msblk->id_table);
+	kfree(msblk->xattr_id_table);
 	kfree(msblk->stream.workspace);
 	kfree(sb->s_fs_info);
 	sb->s_fs_info = NULL;
@@ -350,6 +361,7 @@ static void squashfs_put_super(struct super_block *sb)
 		kfree(sbi->fragment_index);
 		kfree(sbi->meta_index);
 		kfree(sbi->stream.workspace);
+		kfree(sbi->xattr_id_table);
 		kfree(sb->s_fs_info);
 		sb->s_fs_info = NULL;
 	}
