@@ -1275,12 +1275,8 @@ static int sip_help(struct sk_buff *skb,
 
 	nf_ct_refresh(ct, skb, sip_timeout * HZ);
 
-	if (!skb_is_nonlinear(skb))
-		dptr = skb->data + dataoff;
-	else {
-		pr_debug("Copy of skbuff not supported yet.\n");
-		return NF_ACCEPT;
-	}
+	if (unlikely(skb_linearize(skb)))
+		return NF_DROP;
 
 	datalen = skb->len - dataoff;
 	if (datalen < strlen("SIP/2.0 200"))
