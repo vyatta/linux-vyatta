@@ -276,14 +276,14 @@ static size_t squashfs_security_list(struct inode *inode, char *list,
 	return XATTR_SECURITY_PREFIX_LEN;
 }
 
-static int squashfs_security_get(struct dentry *d, const char *name,
-	void *buffer, size_t size, int type)
+static int squashfs_security_get(struct inode *inode, const char *name,
+				 void *buffer, size_t size, int type)
 {
 	if (name[0] == '\0')
 		return  -EINVAL;
 
-	return squashfs_xattr_get(d->d_inode, SQUASHFS_XATTR_SECURITY, name,
-		buffer, size);
+	return squashfs_xattr_get(inode, SQUASHFS_XATTR_SECURITY, name,
+				  buffer, size);
 }
 
 static struct xattr_handler squashfs_xattr_security_handler = {
