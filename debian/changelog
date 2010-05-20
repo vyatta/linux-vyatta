@@ -1,3 +1,9 @@
+linux-2.6 (2.6.32-1+vyatta+24) unstable; urgency=low
+
+  * Handle non-linear skb's in conntrack SIP
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Thu, 20 May 2010 10:13:50 -0700
+
 linux-2.6 (2.6.32-1+vyatta+23) unstable; urgency=low
 
   [ Eric Dumazet ]
