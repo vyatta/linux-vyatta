@@ -1,3 +1,113 @@
+linux-2.6 (2.6.32-1+vyatta+25) unstable; urgency=low
+
+  [ Bjørn Mork ]
+  * ipv4: udp: fix short packet and bad checksum logging
+
+  [ Oliver Neukum ]
+  * hp_accel: fix race in device removal
+
+  [ Michael Hennerich ]
+  * fbdev: bfin-t350mcqb-fb: fix fbmem allocation with blanking lines
+
+  [ Mel Gorman ]
+  * hugetlbfs: kill applications that use MAP_NORESERVE with SIGBUS
+    instead of OOM-killer
+
+  [ FUJITA Tomonori ]
+  * dma-mapping: fix dma_sync_single_range_*
+
+  [ Alex Chiang ]
+  * ACPI: sleep: eliminate duplicate entries in acpisleep_dmi_table[]
+
+  [ Nicolas Ferre ]
+  * mmc: atmel-mci: fix two parameters swapped
+  * mmc: atmel-mci: prevent kernel oops while removing card
+  * mmc: atmel-mci: remove data error interrupt after xfer
+
+  [ Gerald Schaefer ]
+  * ptrace: fix return value of do_syscall_trace_enter()
+
+  [ Paul Mackerras ]
+  * powerpc/perf_event: Fix oops due to perf_event_do_pending call
+
+  [ Jeff Layton ]
+  * cifs: guard against hardlinking directories
+
+  [ Valentin Longchamp ]
+  * serial: imx.c: fix CTS trigger level lower to avoid lost chars
+
+  [ Takashi Iwai ]
+  * ALSA: ice1724 - Fix ESI Maya44 capture source control
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Fix 0 dB for Lenovo models using Conexant CX20549
+    (Venice)
+
+  [ Eric Paris ]
+  * inotify: race use after free/double free in inotify inode marks
+
+  [ Pavel Emelyanov ]
+  * inotify: don't leak user struct on inotify release
+
+  [ Hugh Dickins ]
+  * profile: fix stats and data leakage
+
+  [ Borislav Petkov ]
+  * x86, k8: Fix build error when K8_NB is disabled
+
+  [ Frank Arnold ]
+  * x86, cacheinfo: Turn off L3 cache index disable feature in
+    virtualized environments
+
+  [ Andreas Herrmann ]
+  * x86, amd: Check X86_FEATURE_OSVW bit before accessing OSVW MSRs
+
+  [ Dan Rosenberg ]
+  * Btrfs: check for read permission on src file in the clone ioctl
+
+  [ Vitaliy Kulikov ]
+  * ALSA: hda - New Intel HDA controller
+
+  [ KOSAKI Motohiro ]
+  * proc: partially revert "procfs: provide stack information for
+    threads"
+
+  [ Robin Holt ]
+  * revert "procfs: provide stack information for threads" and its fixup
+    commits
+
+  [ Wey-Yi Guy ]
+  * iwlwifi: clear all the stop_queue flag after load firmware
+
+  [ Christian Lamparter ]
+  * p54: disable channels with incomplete calibration data sets
+
+  [ David Howells ]
+  * CacheFiles: Fix error handling in
+    cachefiles_determine_cache_security()
+
+  [ Tomas Henzl ]
+  * megaraid_sas: fix for 32bit apps
+
+  [ Kees Cook ]
+  * mmap_min_addr check CAP_SYS_RAWIO only for write
+
+  [ Ryusuke Konishi ]
+  * nilfs2: fix sync silent failure
+
+  [ Luis R. Rodriguez ]
+  * Revert "ath9k: fix lockdep warning when unloading module" on stable
+    kernels
+
+  [ Herbert Xu ]
+  * crypto: authenc - Add EINPROGRESS check
+
+  [ Greg Kroah-Hartman ]
+  * Revert "parisc: Set PCI CLS early in boot."
+  * Linux 2.6.32.14
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Thu, 27 May 2010 07:57:34 -0700
+
 linux-2.6 (2.6.32-1+vyatta+24) unstable; urgency=low
 
   * Handle non-linear skb's in conntrack SIP
