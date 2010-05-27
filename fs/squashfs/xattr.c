@@ -277,7 +277,7 @@ static size_t squashfs_security_list(struct inode *inode, char *list,
 }
 
 static int squashfs_security_get(struct inode *inode, const char *name,
-				 void *buffer, size_t size, int type)
+				 void *buffer, size_t size)
 {
 	if (name[0] == '\0')
 		return  -EINVAL;
