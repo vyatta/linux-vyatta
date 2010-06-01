@@ -1,3 +1,14 @@
+linux-2.6 (2.6.32-1+vyatta+27) unstable; urgency=low
+
+  [ Greg Kroah-Hartman ]
+  * Revert "lockdep: fix incorrect percpu usage"
+  * Revert "modules: fix incorrect percpu usage"
+  * Linux 2.6.32.15
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 01 Jun 2010 16:28:40 -0700
+
 linux-2.6 (2.6.32-1+vyatta+26) unstable; urgency=low
 
   * Backport of Squashfs with xattr support
