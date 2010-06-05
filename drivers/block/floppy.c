@@ -571,7 +571,6 @@ static void floppy_release_irq_and_dma(void);
  * reset doesn't need to be tested before sending commands, because
  * output_byte is automatically disabled when reset is set.
  */
-#define CHECK_RESET { if (FDCS->reset){ reset_fdc(); return; } }
 static void reset_fdc(void);
 
 /*
@@ -3849,6 +3848,7 @@ static int __floppy_read_block_0(struct block_device *bdev)
 	bio.bi_size = size;
 	bio.bi_bdev = bdev;
 	bio.bi_sector = 0;
+	bio.bi_flags = BIO_QUIET;
 	init_completion(&complete);
 	bio.bi_private = &complete;
 	bio.bi_end_io = floppy_rb0_complete;
