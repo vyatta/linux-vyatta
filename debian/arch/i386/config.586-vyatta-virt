@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.32
-# Wed Jun  2 08:59:00 2010
+# Tue Jun  8 15:14:50 2010
 #
 # CONFIG_64BIT is not set
 CONFIG_X86_32=y
@@ -3323,7 +3323,7 @@ CONFIG_XFS_RT=y
 # CONFIG_GFS2_FS is not set
 # CONFIG_OCFS2_FS is not set
 # CONFIG_BTRFS_FS is not set
-CONFIG_NILFS2_FS=m
+# CONFIG_NILFS2_FS is not set
 CONFIG_FILE_LOCKING=y
 CONFIG_FSNOTIFY=y
 CONFIG_DNOTIFY=y
@@ -3436,8 +3436,7 @@ CONFIG_ROMFS_BACKED_BY_BLOCK=y
 CONFIG_ROMFS_ON_BLOCK=y
 # CONFIG_SYSV_FS is not set
 # CONFIG_UFS_FS is not set
-CONFIG_EXOFS_FS=m
-# CONFIG_EXOFS_DEBUG is not set
+# CONFIG_EXOFS_FS is not set
 CONFIG_NETWORK_FILESYSTEMS=y
 CONFIG_NFS_FS=m
 CONFIG_NFS_V3=y
@@ -3473,8 +3472,7 @@ CONFIG_CIFS_EXPERIMENTAL=y
 # CONFIG_NCP_FS is not set
 # CONFIG_CODA_FS is not set
 # CONFIG_AFS_FS is not set
-CONFIG_9P_FS=m
-# CONFIG_9P_FSCACHE is not set
+# CONFIG_9P_FS is not set
 
 #
 # Partition Types
@@ -3657,7 +3655,8 @@ CONFIG_EARLY_PRINTK=y
 # CONFIG_DEBUG_STACK_USAGE is not set
 # CONFIG_DEBUG_PER_CPU_MAPS is not set
 # CONFIG_X86_PTDUMP is not set
-# CONFIG_DEBUG_RODATA is not set
+CONFIG_DEBUG_RODATA=y
+# CONFIG_DEBUG_RODATA_TEST is not set
 # CONFIG_DEBUG_NX_TEST is not set
 # CONFIG_4KSTACKS is not set
 CONFIG_DOUBLEFAULT=y
