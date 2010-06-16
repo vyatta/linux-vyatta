@@ -127,16 +127,17 @@ void br_netfilter_rtable_init(struct net_bridge *br)
 
 static inline struct rtable *bridge_parent_rtable(const struct net_device *dev)
 {
-	struct net_bridge_port *port = rcu_dereference(dev->br_port);
-
-	return port ? &port->br->fake_rtable : NULL;
+	if (!br_port_exists(dev))
+		return NULL;
+	return &br_port_get_rcu(dev)->br->fake_rtable;
 }
 
 static inline struct net_device *bridge_parent(const struct net_device *dev)
 {
-	struct net_bridge_port *port = rcu_dereference(dev->br_port);
+	if (!br_port_exists(dev))
+		return NULL;
 
-	return port ? port->br->dev : NULL;
+	return br_port_get_rcu(dev)->br->dev;
 }
 
 static inline struct nf_bridge_info *nf_bridge_alloc(struct sk_buff *skb)
@@ -244,8 +245,7 @@ static int br_nf_pre_routing_finish_ipv6(struct sk_buff *skb)
 		kfree_skb(skb);
 		return 0;
 	}
-	dst_hold(&rt->dst);
-	skb_dst_set(skb, &rt->dst);
+	skb_dst_set_noref(skb, &rt->dst);
 
 	skb->dev = nf_bridge->physindev;
 	nf_bridge_update_protocol(skb);
@@ -396,8 +396,7 @@ bridged_dnat:
 			kfree_skb(skb);
 			return 0;
 		}
-		dst_hold(&rt->dst);
-		skb_dst_set(skb, &rt->dst);
+		skb_dst_set_noref(skb, &rt->dst);
 	}
 
 	skb->dev = nf_bridge->physindev;

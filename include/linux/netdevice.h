@@ -673,7 +673,7 @@ struct netdev_rx_queue {
  *	1. Define @ndo_get_stats64 to update a rtnl_link_stats64 structure
  *	   (which should normally be dev->stats64) and return a ponter to
  *	   it. The structure must not be changed asynchronously.
- *	2. Define @ndo_get_stats to update a net_device_stats64 structure
+ *	2. Define @ndo_get_stats to update a net_device_stats structure
  *	   (which should normally be dev->stats) and return a pointer to
  *	   it. The structure may be changed asynchronously only if each
  *	   field is written atomically.
@@ -744,6 +744,8 @@ struct net_device_ops {
 						        unsigned short vid);
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	void                    (*ndo_poll_controller)(struct net_device *dev);
+	int			(*ndo_netpoll_setup)(struct net_device *dev,
+						     struct netpoll_info *info);
 	void			(*ndo_netpoll_cleanup)(struct net_device *dev);
 #endif
 	int			(*ndo_set_vf_mac)(struct net_device *dev,
@@ -977,6 +979,7 @@ struct net_device {
 
 	struct netdev_queue	rx_queue;
 	rx_handler_func_t	*rx_handler;
+	void			*rx_handler_data;
 
 	struct netdev_queue	*_tx ____cacheline_aligned_in_smp;
 
@@ -1044,10 +1047,6 @@ struct net_device {
 	/* mid-layer private */
 	void			*ml_priv;
 
-	/* bridge stuff */
-	struct net_bridge_port	*br_port;
-	/* macvlan */
-	struct macvlan_port	*macvlan_port;
 	/* GARP */
 	struct garp_port	*garp_port;
 
@@ -1710,7 +1709,8 @@ static inline void napi_free_frags(struct napi_struct *napi)
 }
 
 extern int netdev_rx_handler_register(struct net_device *dev,
-				      rx_handler_func_t *rx_handler);
+				      rx_handler_func_t *rx_handler,
+				      void *rx_handler_data);
 extern void netdev_rx_handler_unregister(struct net_device *dev);
 
 extern void		netif_nit_deliver(struct sk_buff *skb);
