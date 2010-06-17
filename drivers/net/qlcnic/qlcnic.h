@@ -51,8 +51,8 @@
 
 #define _QLCNIC_LINUX_MAJOR 5
 #define _QLCNIC_LINUX_MINOR 0
-#define _QLCNIC_LINUX_SUBVERSION 3
-#define QLCNIC_LINUX_VERSIONID  "5.0.3"
+#define _QLCNIC_LINUX_SUBVERSION 4
+#define QLCNIC_LINUX_VERSIONID  "5.0.4"
 #define QLCNIC_DRV_IDC_VER  0x01
 
 #define QLCNIC_VERSION_CODE(a, b, c)	(((a) << 24) + ((b) << 16) + (c))
@@ -891,7 +891,7 @@ struct qlcnic_mac_req {
 #define QLCNIC_LRO_ENABLED		0x08
 #define QLCNIC_BRIDGE_ENABLED       	0X10
 #define QLCNIC_DIAG_ENABLED		0x20
-#define QLCNIC_NPAR_ENABLED		0x40
+#define QLCNIC_ESWITCH_ENABLED		0x40
 #define QLCNIC_IS_MSI_FAMILY(adapter) \
 	((adapter)->flags & (QLCNIC_MSI_ENABLED | QLCNIC_MSIX_ENABLED))
 
