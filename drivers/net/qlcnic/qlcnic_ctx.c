@@ -152,8 +152,13 @@ qlcnic_fw_cmd_create_rx_ctx(struct qlcnic_adapter *adapter)
 
 	prq->host_rsp_dma_addr = cpu_to_le64(cardrsp_phys_addr);
 
-	cap = (QLCNIC_CAP0_LEGACY_CONTEXT | QLCNIC_CAP0_LEGACY_MN);
+	cap = (QLCNIC_CAP0_LEGACY_CONTEXT | QLCNIC_CAP0_LEGACY_MN
+						| QLCNIC_CAP0_VALIDOFF);
 	cap |= (QLCNIC_CAP0_JUMBO_CONTIGUOUS | QLCNIC_CAP0_LRO_CONTIGUOUS);
+
+	prq->valid_field_offset = offsetof(struct qlcnic_hostrq_rx_ctx,
+							 msix_handler);
+	prq->txrx_sds_binding = nsds_rings - 1;
 
 	prq->capabilities[0] = cpu_to_le32(cap);
 	prq->host_int_crb_mode =
@@ -589,11 +594,10 @@ int qlcnic_get_mac_address(struct qlcnic_adapter *adapter, u8 *mac)
 			0,
 			QLCNIC_CDRP_CMD_MAC_ADDRESS);
 
-	if (err == QLCNIC_RCODE_SUCCESS) {
+	if (err == QLCNIC_RCODE_SUCCESS)
 		qlcnic_fetch_mac(adapter, QLCNIC_ARG1_CRB_OFFSET,
 				QLCNIC_ARG2_CRB_OFFSET, 0, mac);
-		dev_info(&adapter->pdev->dev, "MAC address: %pM\n", mac);
-	} else {
+	else {
 		dev_err(&adapter->pdev->dev,
 			"Failed to get mac address%d\n", err);
 		err = -EIO;

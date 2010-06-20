@@ -35,14 +35,14 @@
 #include <linux/inetdevice.h>
 #include <linux/sysfs.h>
 
-MODULE_DESCRIPTION("QLogic 10 GbE Converged Ethernet Driver");
+MODULE_DESCRIPTION("QLogic 1/10 GbE Converged/Intelligent Ethernet Driver");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(QLCNIC_LINUX_VERSIONID);
 MODULE_FIRMWARE(QLCNIC_UNIFIED_ROMIMAGE_NAME);
 
 char qlcnic_driver_name[] = "qlcnic";
-static const char qlcnic_driver_string[] = "QLogic Converged Ethernet Driver v"
-    QLCNIC_LINUX_VERSIONID;
+static const char qlcnic_driver_string[] = "QLogic 1/10 GbE "
+	"Converged/Intelligent Ethernet Driver v" QLCNIC_LINUX_VERSIONID;
 
 static int port_mode = QLCNIC_PORT_MODE_AUTO_NEG;
 
@@ -83,6 +83,7 @@ static void qlcnic_schedule_work(struct qlcnic_adapter *adapter,
 		work_func_t func, int delay);
 static void qlcnic_cancel_fw_work(struct qlcnic_adapter *adapter);
 static int qlcnic_poll(struct napi_struct *napi, int budget);
+static int qlcnic_rx_poll(struct napi_struct *napi, int budget);
 #ifdef CONFIG_NET_POLL_CONTROLLER
 static void qlcnic_poll_controller(struct net_device *netdev);
 #endif
@@ -131,12 +132,6 @@ qlcnic_update_cmd_producer(struct qlcnic_adapter *adapter,
 		struct qlcnic_host_tx_ring *tx_ring)
 {
 	writel(tx_ring->producer, tx_ring->crb_cmd_producer);
-
-	if (qlcnic_tx_avail(tx_ring) <= TX_STOP_THRESH) {
-		netif_stop_queue(adapter->netdev);
-		smp_mb();
-		adapter->stats.xmit_off++;
-	}
 }
 
 static const u32 msi_tgt_status[8] = {
@@ -195,8 +190,13 @@ qlcnic_napi_add(struct qlcnic_adapter *adapter, struct net_device *netdev)
 
 	for (ring = 0; ring < adapter->max_sds_rings; ring++) {
 		sds_ring = &recv_ctx->sds_rings[ring];
-		netif_napi_add(netdev, &sds_ring->napi,
-				qlcnic_poll, QLCNIC_NETDEV_WEIGHT);
+
+		if (ring == adapter->max_sds_rings - 1)
+			netif_napi_add(netdev, &sds_ring->napi, qlcnic_poll,
+				QLCNIC_NETDEV_WEIGHT/adapter->max_sds_rings);
+		else
+			netif_napi_add(netdev, &sds_ring->napi,
+				qlcnic_rx_poll, QLCNIC_NETDEV_WEIGHT*2);
 	}
 
 	return 0;
@@ -661,7 +661,7 @@ static void get_brd_name(struct qlcnic_adapter *adapter, char *name)
 	}
 
 	if (!found)
-		name = "Unknown";
+		sprintf(name, "%pM Gigabit Ethernet", adapter->mac_addr);
 }
 
 static void
@@ -743,8 +743,12 @@ qlcnic_start_firmware(struct qlcnic_adapter *adapter)
 
 	if (load_fw_file)
 		qlcnic_request_firmware(adapter);
-	else
+	else {
+		if (qlcnic_check_flash_fw_ver(adapter))
+			goto err_out;
+
 		adapter->fw_type = QLCNIC_FLASH_ROMIMAGE;
+	}
 
 	err = qlcnic_need_fw_reset(adapter);
 	if (err < 0)
@@ -1127,7 +1131,7 @@ qlcnic_setup_netdev(struct qlcnic_adapter *adapter,
 	adapter->max_mc_count = 38;
 
 	netdev->netdev_ops	   = &qlcnic_netdev_ops;
-	netdev->watchdog_timeo     = 2*HZ;
+	netdev->watchdog_timeo     = 5*HZ;
 
 	qlcnic_change_mtu(netdev, netdev->mtu);
 
@@ -1699,10 +1703,15 @@ qlcnic_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	/* 4 fragments per cmd des */
 	no_of_desc = (frag_count + 3) >> 2;
 
-	if (unlikely(no_of_desc + 2 > qlcnic_tx_avail(tx_ring))) {
+	if (unlikely(qlcnic_tx_avail(tx_ring) <= TX_STOP_THRESH)) {
 		netif_stop_queue(netdev);
-		adapter->stats.xmit_off++;
-		return NETDEV_TX_BUSY;
+		smp_mb();
+		if (qlcnic_tx_avail(tx_ring) > TX_STOP_THRESH)
+			netif_start_queue(netdev);
+		else {
+			adapter->stats.xmit_off++;
+			return NETDEV_TX_BUSY;
+		}
 	}
 
 	producer = tx_ring->producer;
@@ -2008,14 +2017,12 @@ static int qlcnic_process_cmd_ring(struct qlcnic_adapter *adapter)
 		smp_mb();
 
 		if (netif_queue_stopped(netdev) && netif_carrier_ok(netdev)) {
-			__netif_tx_lock(tx_ring->txq, smp_processor_id());
 			if (qlcnic_tx_avail(tx_ring) > TX_STOP_THRESH) {
 				netif_wake_queue(netdev);
-				adapter->tx_timeo_cnt = 0;
 				adapter->stats.xmit_on++;
 			}
-			__netif_tx_unlock(tx_ring->txq);
 		}
+		adapter->tx_timeo_cnt = 0;
 	}
 	/*
 	 * If everything is freed up to consumer then check if the ring is full
@@ -2052,6 +2059,25 @@ static int qlcnic_poll(struct napi_struct *napi, int budget)
 	work_done = qlcnic_process_rcv_ring(sds_ring, budget);
 
 	if ((work_done < budget) && tx_complete) {
+		napi_complete(&sds_ring->napi);
+		if (test_bit(__QLCNIC_DEV_UP, &adapter->state))
+			qlcnic_enable_int(sds_ring);
+	}
+
+	return work_done;
+}
+
+static int qlcnic_rx_poll(struct napi_struct *napi, int budget)
+{
+	struct qlcnic_host_sds_ring *sds_ring =
+		container_of(napi, struct qlcnic_host_sds_ring, napi);
+
+	struct qlcnic_adapter *adapter = sds_ring->adapter;
+	int work_done;
+
+	work_done = qlcnic_process_rcv_ring(sds_ring, budget);
+
+	if (work_done < budget) {
 		napi_complete(&sds_ring->napi);
 		if (test_bit(__QLCNIC_DEV_UP, &adapter->state))
 			qlcnic_enable_int(sds_ring);
