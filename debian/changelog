@@ -1,3 +1,11 @@
+linux-2.6 (2.6.32-1+vyatta+31) unstable; urgency=low
+
+  [ Yang, Bo ]
+  * [SCSI] megaraid_sas: Add new megaraid SAS 2 controller support to
+    the driver
+
+ -- Bob Gilligan <gilligan@vyatta.com>  Thu, 24 Jun 2010 11:39:12 -0700
+
 linux-2.6 (2.6.32-1+vyatta+30) unstable; urgency=low
 
   * floppy: avoid warning message if drive not present
