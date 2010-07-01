@@ -62,6 +62,7 @@
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/idr.h>
+#include <linux/kgdb.h>
 #include <linux/ftrace.h>
 #include <linux/async.h>
 #include <linux/kmemcheck.h>
@@ -124,7 +125,9 @@ static char *ramdisk_execute_command;
 
 #ifdef CONFIG_SMP
 /* Setup configured maximum number of CPUs to activate */
-unsigned int __initdata setup_max_cpus = NR_CPUS;
+unsigned int setup_max_cpus = NR_CPUS;
+EXPORT_SYMBOL(setup_max_cpus);
+
 
 /*
  * Setup routine for controlling SMP activation
@@ -566,7 +569,7 @@ asmlinkage void __init start_kernel(void)
 	setup_per_cpu_areas();
 	smp_prepare_boot_cpu();	/* arch-specific boot-cpu hooks */
 
-	build_all_zonelists();
+	build_all_zonelists(NULL);
 	page_alloc_init();
 
 	printk(KERN_NOTICE "Kernel command line: %s\n", boot_command_line);
@@ -675,6 +678,7 @@ asmlinkage void __init start_kernel(void)
 	buffer_init();
 	key_init();
 	security_init();
+	dbg_late_init();
 	vfs_caches_init(totalram_pages);
 	signals_init();
 	/* rootfs populating might need page-writeback */
