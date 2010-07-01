@@ -1,3 +1,9 @@
+linux-2.6 (2.6.32-1+vyatta+33) unstable; urgency=low
+
+  * Fix uninitalized varable in nf_conntrack_sip
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 30 Jun 2010 21:32:55 -0700
+
 linux-2.6 (2.6.32-1+vyatta+32) unstable; urgency=low
 
   * Add back missing CHECK_RESET
