@@ -1278,6 +1278,7 @@ static int sip_help(struct sk_buff *skb,
 	if (unlikely(skb_linearize(skb)))
 		return NF_DROP;
 
+	dptr = skb->data + dataoff;
 	datalen = skb->len - dataoff;
 	if (datalen < strlen("SIP/2.0 200"))
 		return NF_ACCEPT;
