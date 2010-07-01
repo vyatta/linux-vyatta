@@ -224,10 +224,10 @@ static void e1000e_dump(struct e1000_adapter *adapter)
 	buffer_info = &tx_ring->buffer_info[tx_ring->next_to_clean];
 	printk(KERN_INFO " %5d %5X %5X %016llX %04X %3X %016llX\n",
 		0, tx_ring->next_to_use, tx_ring->next_to_clean,
-		(u64)buffer_info->dma,
+		(unsigned long long)buffer_info->dma,
 		buffer_info->length,
 		buffer_info->next_to_watch,
-		(u64)buffer_info->time_stamp);
+		(unsigned long long)buffer_info->time_stamp);
 
 	/* Print TX Rings */
 	if (!netif_msg_tx_done(adapter))
@@ -279,9 +279,11 @@ static void e1000e_dump(struct e1000_adapter *adapter)
 			"%04X  %3X %016llX %p",
 		       (!(le64_to_cpu(u0->b) & (1<<29)) ? 'l' :
 			((le64_to_cpu(u0->b) & (1<<20)) ? 'd' : 'c')), i,
-		       le64_to_cpu(u0->a), le64_to_cpu(u0->b),
-		       (u64)buffer_info->dma, buffer_info->length,
-		       buffer_info->next_to_watch, (u64)buffer_info->time_stamp,
+		       (unsigned long long)le64_to_cpu(u0->a),
+		       (unsigned long long)le64_to_cpu(u0->b),
+		       (unsigned long long)buffer_info->dma,
+		       buffer_info->length, buffer_info->next_to_watch,
+		       (unsigned long long)buffer_info->time_stamp,
 		       buffer_info->skb);
 		if (i == tx_ring->next_to_use && i == tx_ring->next_to_clean)
 			printk(KERN_CONT " NTC/U\n");
@@ -356,19 +358,19 @@ rx_ring_summary:
 				printk(KERN_INFO "RWB[0x%03X]     %016llX "
 					"%016llX %016llX %016llX "
 					"---------------- %p", i,
-					le64_to_cpu(u1->a),
-					le64_to_cpu(u1->b),
-					le64_to_cpu(u1->c),
-					le64_to_cpu(u1->d),
+					(unsigned long long)le64_to_cpu(u1->a),
+					(unsigned long long)le64_to_cpu(u1->b),
+					(unsigned long long)le64_to_cpu(u1->c),
+					(unsigned long long)le64_to_cpu(u1->d),
 					buffer_info->skb);
 			} else {
 				printk(KERN_INFO "R  [0x%03X]     %016llX "
 					"%016llX %016llX %016llX %016llX %p", i,
-					le64_to_cpu(u1->a),
-					le64_to_cpu(u1->b),
-					le64_to_cpu(u1->c),
-					le64_to_cpu(u1->d),
-					(u64)buffer_info->dma,
+					(unsigned long long)le64_to_cpu(u1->a),
+					(unsigned long long)le64_to_cpu(u1->b),
+					(unsigned long long)le64_to_cpu(u1->c),
+					(unsigned long long)le64_to_cpu(u1->d),
+					(unsigned long long)buffer_info->dma,
 					buffer_info->skb);
 
 				if (netif_msg_pktdata(adapter))
@@ -405,9 +407,11 @@ rx_ring_summary:
 			buffer_info = &rx_ring->buffer_info[i];
 			u0 = (struct my_u0 *)rx_desc;
 			printk(KERN_INFO "Rl[0x%03X]    %016llX %016llX "
-				"%016llX %p",
-				i, le64_to_cpu(u0->a), le64_to_cpu(u0->b),
-				(u64)buffer_info->dma, buffer_info->skb);
+				"%016llX %p", i,
+				(unsigned long long)le64_to_cpu(u0->a),
+				(unsigned long long)le64_to_cpu(u0->b),
+				(unsigned long long)buffer_info->dma,
+				buffer_info->skb);
 			if (i == rx_ring->next_to_use)
 				printk(KERN_CONT " NTU\n");
 			else if (i == rx_ring->next_to_clean)
@@ -2772,7 +2776,7 @@ static void e1000_setup_rctl(struct e1000_adapter *adapter)
 	 * per packet.
 	 */
 	pages = PAGE_USE_COUNT(adapter->netdev->mtu);
-	if (!(adapter->flags & FLAG_IS_ICH) && (pages <= 3) &&
+	if (!(adapter->flags & FLAG_HAS_ERT) && (pages <= 3) &&
 	    (PAGE_SIZE <= 16384) && (rctl & E1000_RCTL_LPE))
 		adapter->rx_ps_pages = pages;
 	else
@@ -3184,8 +3188,6 @@ void e1000e_reset(struct e1000_adapter *adapter)
 		e1000_get_hw_control(adapter);
 
 	ew32(WUC, 0);
-	if (adapter->flags2 & FLAG2_HAS_PHY_WAKEUP)
-		e1e_wphy(&adapter->hw, BM_WUC, 0);
 
 	if (mac->ops.init_hw(hw))
 		e_err("Hardware Error\n");
@@ -3441,13 +3443,18 @@ static int e1000_test_msi(struct e1000_adapter *adapter)
 
 	/* disable SERR in case the MSI write causes a master abort */
 	pci_read_config_word(adapter->pdev, PCI_COMMAND, &pci_cmd);
-	pci_write_config_word(adapter->pdev, PCI_COMMAND,
-			      pci_cmd & ~PCI_COMMAND_SERR);
+	if (pci_cmd & PCI_COMMAND_SERR)
+		pci_write_config_word(adapter->pdev, PCI_COMMAND,
+				      pci_cmd & ~PCI_COMMAND_SERR);
 
 	err = e1000_test_msi_interrupt(adapter);
 
-	/* restore previous setting of command word */
-	pci_write_config_word(adapter->pdev, PCI_COMMAND, pci_cmd);
+	/* re-enable SERR */
+	if (pci_cmd & PCI_COMMAND_SERR) {
+		pci_read_config_word(adapter->pdev, PCI_COMMAND, &pci_cmd);
+		pci_cmd |= PCI_COMMAND_SERR;
+		pci_write_config_word(adapter->pdev, PCI_COMMAND, pci_cmd);
+	}
 
 	/* success ! */
 	if (!err)
@@ -3964,7 +3971,7 @@ static void e1000_print_link_info(struct e1000_adapter *adapter)
 	       ((ctrl & E1000_CTRL_TFCE) ? "TX" : "None" )));
 }
 
-bool e1000e_has_link(struct e1000_adapter *adapter)
+static bool e1000e_has_link(struct e1000_adapter *adapter)
 {
 	struct e1000_hw *hw = &adapter->hw;
 	bool link_active = 0;

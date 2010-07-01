@@ -112,15 +112,42 @@ void qlcnic_release_rx_buffers(struct qlcnic_adapter *adapter)
 		rds_ring = &recv_ctx->rds_rings[ring];
 		for (i = 0; i < rds_ring->num_desc; ++i) {
 			rx_buf = &(rds_ring->rx_buf_arr[i]);
-			if (rx_buf->state == QLCNIC_BUFFER_FREE)
+			if (rx_buf->skb == NULL)
 				continue;
+
 			pci_unmap_single(adapter->pdev,
 					rx_buf->dma,
 					rds_ring->dma_size,
 					PCI_DMA_FROMDEVICE);
-			if (rx_buf->skb != NULL)
-				dev_kfree_skb_any(rx_buf->skb);
+
+			dev_kfree_skb_any(rx_buf->skb);
 		}
+	}
+}
+
+void qlcnic_reset_rx_buffers_list(struct qlcnic_adapter *adapter)
+{
+	struct qlcnic_recv_context *recv_ctx;
+	struct qlcnic_host_rds_ring *rds_ring;
+	struct qlcnic_rx_buffer *rx_buf;
+	int i, ring;
+
+	recv_ctx = &adapter->recv_ctx;
+	for (ring = 0; ring < adapter->max_rds_rings; ring++) {
+		rds_ring = &recv_ctx->rds_rings[ring];
+
+		spin_lock(&rds_ring->lock);
+
+		INIT_LIST_HEAD(&rds_ring->free_list);
+
+		rx_buf = rds_ring->rx_buf_arr;
+		for (i = 0; i < rds_ring->num_desc; i++) {
+			list_add_tail(&rx_buf->list,
+					&rds_ring->free_list);
+			rx_buf++;
+		}
+
+		spin_unlock(&rds_ring->lock);
 	}
 }
 
@@ -266,7 +293,6 @@ int qlcnic_alloc_sw_resources(struct qlcnic_adapter *adapter)
 			list_add_tail(&rx_buf->list,
 					&rds_ring->free_list);
 			rx_buf->ref_handle = i;
-			rx_buf->state = QLCNIC_BUFFER_FREE;
 			rx_buf++;
 		}
 		spin_lock_init(&rds_ring->lock);
@@ -522,16 +548,14 @@ qlcnic_setup_idc_param(struct qlcnic_adapter *adapter) {
 	int timeo;
 	u32 val;
 
-	if (adapter->fw_hal_version == QLCNIC_FW_BASE) {
-		val = QLCRD32(adapter, QLCNIC_CRB_DEV_PARTITION_INFO);
-		val = QLC_DEV_GET_DRV(val, adapter->portnum);
-		if ((val & 0x3) != QLCNIC_TYPE_NIC) {
-			dev_err(&adapter->pdev->dev,
-				"Not an Ethernet NIC func=%u\n", val);
-			return -EIO;
-		}
-		adapter->physical_port = (val >> 2);
+	val = QLCRD32(adapter, QLCNIC_CRB_DEV_PARTITION_INFO);
+	val = QLC_DEV_GET_DRV(val, adapter->portnum);
+	if ((val & 0x3) != QLCNIC_TYPE_NIC) {
+		dev_err(&adapter->pdev->dev,
+			"Not an Ethernet NIC func=%u\n", val);
+		return -EIO;
 	}
+	adapter->physical_port = (val >> 2);
 	if (qlcnic_rom_fast_read(adapter, QLCNIC_ROM_DEV_INIT_TIMEOUT, &timeo))
 		timeo = 30;
 
@@ -1138,7 +1162,7 @@ qlcnic_release_firmware(struct qlcnic_adapter *adapter)
 	adapter->fw = NULL;
 }
 
-int qlcnic_phantom_init(struct qlcnic_adapter *adapter)
+static int qlcnic_cmd_peg_ready(struct qlcnic_adapter *adapter)
 {
 	u32 val;
 	int retries = 60;
@@ -1163,7 +1187,8 @@ int qlcnic_phantom_init(struct qlcnic_adapter *adapter)
 	QLCWR32(adapter, CRB_CMDPEG_STATE, PHAN_INITIALIZE_FAILED);
 
 out_err:
-	dev_err(&adapter->pdev->dev, "firmware init failed\n");
+	dev_err(&adapter->pdev->dev, "Command Peg initialization not "
+		      "complete, state: 0x%x.\n", val);
 	return -EIO;
 }
 
@@ -1195,6 +1220,10 @@ qlcnic_receive_peg_ready(struct qlcnic_adapter *adapter)
 int qlcnic_init_firmware(struct qlcnic_adapter *adapter)
 {
 	int err;
+
+	err = qlcnic_cmd_peg_ready(adapter);
+	if (err)
+		return err;
 
 	err = qlcnic_receive_peg_ready(adapter);
 	if (err)
@@ -1281,13 +1310,11 @@ qlcnic_alloc_rx_skb(struct qlcnic_adapter *adapter,
 	dma_addr_t dma;
 	struct pci_dev *pdev = adapter->pdev;
 
-	buffer->skb = dev_alloc_skb(rds_ring->skb_size);
-	if (!buffer->skb) {
+	skb = dev_alloc_skb(rds_ring->skb_size);
+	if (!skb) {
 		adapter->stats.skb_alloc_failure++;
 		return -ENOMEM;
 	}
-
-	skb = buffer->skb;
 
 	skb_reserve(skb, 2);
 
@@ -1297,13 +1324,11 @@ qlcnic_alloc_rx_skb(struct qlcnic_adapter *adapter,
 	if (pci_dma_mapping_error(pdev, dma)) {
 		adapter->stats.rx_dma_map_error++;
 		dev_kfree_skb_any(skb);
-		buffer->skb = NULL;
 		return -ENOMEM;
 	}
 
 	buffer->skb = skb;
 	buffer->dma = dma;
-	buffer->state = QLCNIC_BUFFER_BUSY;
 
 	return 0;
 }
@@ -1316,14 +1341,15 @@ static struct sk_buff *qlcnic_process_rxbuf(struct qlcnic_adapter *adapter,
 
 	buffer = &rds_ring->rx_buf_arr[index];
 
+	if (unlikely(buffer->skb == NULL)) {
+		WARN_ON(1);
+		return NULL;
+	}
+
 	pci_unmap_single(adapter->pdev, buffer->dma, rds_ring->dma_size,
 			PCI_DMA_FROMDEVICE);
 
 	skb = buffer->skb;
-	if (!skb) {
-		adapter->stats.null_skb++;
-		goto no_skb;
-	}
 
 	if (likely(adapter->rx_csum && cksum == STATUS_CKSUM_OK)) {
 		adapter->stats.csummed++;
@@ -1335,8 +1361,7 @@ static struct sk_buff *qlcnic_process_rxbuf(struct qlcnic_adapter *adapter,
 	skb->dev = adapter->netdev;
 
 	buffer->skb = NULL;
-no_skb:
-	buffer->state = QLCNIC_BUFFER_FREE;
+
 	return skb;
 }
 
@@ -1511,7 +1536,7 @@ qlcnic_process_rcv_ring(struct qlcnic_host_sds_ring *sds_ring, int max)
 
 		WARN_ON(desc_cnt > 1);
 
-		if (rxbuf)
+		if (likely(rxbuf))
 			list_add_tail(&rxbuf->list, &sds_ring->free_list[ring]);
 		else
 			adapter->stats.null_rxbuf++;
