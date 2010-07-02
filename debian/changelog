@@ -1,3 +1,11 @@
+linux-2.6 (2.6.32-1+vyatta+34) unstable; urgency=low
+
+  * remove staging drivers from 64 bit config
+  * Backport VPD access routines
+  * Backport of 2.6.35 version of bnx2x driver
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Thu, 01 Jul 2010 20:31:52 -0700
+
 linux-2.6 (2.6.32-1+vyatta+33) unstable; urgency=low
 
   * Fix uninitalized varable in nf_conntrack_sip
