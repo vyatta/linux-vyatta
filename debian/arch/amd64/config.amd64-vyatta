@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.32
-# Mon Jun 14 14:27:06 2010
+# Thu Jul  1 18:57:03 2010
 #
 CONFIG_64BIT=y
 # CONFIG_X86_32 is not set
@@ -3014,14 +3014,14 @@ CONFIG_STAGING=y
 # CONFIG_OTUS is not set
 # CONFIG_RT2860 is not set
 # CONFIG_RT2870 is not set
-CONFIG_RT3090=m
+# CONFIG_RT3090 is not set
 # CONFIG_COMEDI is not set
 # CONFIG_ASUS_OLED is not set
 # CONFIG_PANEL is not set
 # CONFIG_ALTERA_PCIE_CHDMA is not set
 # CONFIG_RTL8187SE is not set
 # CONFIG_RTL8192SU is not set
-CONFIG_RTL8192E=m
+# CONFIG_RTL8192E is not set
 # CONFIG_TRANZPORT is not set
 
 #
@@ -3035,7 +3035,7 @@ CONFIG_RTL8192E=m
 #
 # Camera Sensor Selection
 #
-CONFIG_INPUT_GPIO=m
+CONFIG_INPUT_GPIO=y
 # CONFIG_DST is not set
 # CONFIG_POHMELFS is not set
 # CONFIG_B3DFG is not set
@@ -3043,55 +3043,22 @@ CONFIG_INPUT_GPIO=m
 # CONFIG_PLAN9AUTH is not set
 # CONFIG_DRM_RADEON_KMS is not set
 # CONFIG_USB_SERIAL_QUATECH2 is not set
-CONFIG_USB_SERIAL_QUATECH_USB2=m
+# CONFIG_USB_SERIAL_QUATECH_USB2 is not set
 # CONFIG_VT6655 is not set
-CONFIG_VT6656=m
+# CONFIG_VT6656 is not set
 # CONFIG_FB_UDL is not set
 CONFIG_HYPERV=m
 CONFIG_HYPERV_STORAGE=m
 CONFIG_HYPERV_BLOCK=m
 CONFIG_HYPERV_NET=m
-CONFIG_VME_BUS=m
-
-#
-# VME Bridge Drivers
-#
-CONFIG_VME_CA91CX42=m
-CONFIG_VME_TSI148=m
-
-#
-# VME Device Drivers
-#
-CONFIG_VME_USER=m
+# CONFIG_VME_BUS is not set
 
 #
 # RAR Register Driver
 #
 CONFIG_RAR_REGISTER=m
-CONFIG_DX_SEP=m
-CONFIG_IIO=m
-# CONFIG_IIO_RING_BUFFER is not set
-# CONFIG_IIO_TRIGGER is not set
-
-#
-# Accelerometers
-#
-# CONFIG_KXSD9 is not set
-# CONFIG_LIS3L02DQ is not set
-
-#
-# Analog to digital convertors
-#
-# CONFIG_MAX1363 is not set
-
-#
-# Light sensors
-#
-# CONFIG_TSL2561 is not set
-
-#
-# Triggers - standalone
-#
+# CONFIG_DX_SEP is not set
+# CONFIG_IIO is not set
 CONFIG_X86_PLATFORM_DEVICES=y
 CONFIG_ACER_WMI=m
 CONFIG_ACERHDF=m
