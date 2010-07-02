@@ -1298,5 +1298,93 @@ extern void pci_hp_create_module_link(struct pci_slot *pci_slot);
 extern void pci_hp_remove_module_link(struct pci_slot *pci_slot);
 #endif
 
+
+#define PCI_VPD_LRDT			0x80	/* Large Resource Data Type */
+#define PCI_VPD_LRDT_ID(x)		(x | PCI_VPD_LRDT)
+
+/* Large Resource Data Type Tag Item Names */
+#define PCI_VPD_LTIN_ID_STRING		0x02	/* Identifier String */
+#define PCI_VPD_LTIN_RO_DATA		0x10	/* Read-Only Data */
+#define PCI_VPD_LTIN_RW_DATA		0x11	/* Read-Write Data */
+
+#define PCI_VPD_LRDT_ID_STRING		PCI_VPD_LRDT_ID(PCI_VPD_LTIN_ID_STRING)
+#define PCI_VPD_LRDT_RO_DATA		PCI_VPD_LRDT_ID(PCI_VPD_LTIN_RO_DATA)
+#define PCI_VPD_LRDT_RW_DATA		PCI_VPD_LRDT_ID(PCI_VPD_LTIN_RW_DATA)
+
+/* Small Resource Data Type Tag Item Names */
+#define PCI_VPD_STIN_END		0x78	/* End */
+
+#define PCI_VPD_SRDT_END		PCI_VPD_STIN_END
+
+#define PCI_VPD_SRDT_TIN_MASK		0x78
+#define PCI_VPD_SRDT_LEN_MASK		0x07
+
+#define PCI_VPD_LRDT_TAG_SIZE		3
+#define PCI_VPD_SRDT_TAG_SIZE		1
+
+#define PCI_VPD_INFO_FLD_HDR_SIZE	3
+
+#define PCI_VPD_RO_KEYWORD_PARTNO	"PN"
+#define PCI_VPD_RO_KEYWORD_MFR_ID	"MN"
+#define PCI_VPD_RO_KEYWORD_VENDOR0	"V0"
+
+/**
+ * pci_vpd_lrdt_size - Extracts the Large Resource Data Type length
+ * @lrdt: Pointer to the beginning of the Large Resource Data Type tag
+ *
+ * Returns the extracted Large Resource Data Type length.
+ */
+static inline u16 pci_vpd_lrdt_size(const u8 *lrdt)
+{
+	return (u16)lrdt[1] + ((u16)lrdt[2] << 8);
+}
+
+/**
+ * pci_vpd_srdt_size - Extracts the Small Resource Data Type length
+ * @lrdt: Pointer to the beginning of the Small Resource Data Type tag
+ *
+ * Returns the extracted Small Resource Data Type length.
+ */
+static inline u8 pci_vpd_srdt_size(const u8 *srdt)
+{
+	return (*srdt) & PCI_VPD_SRDT_LEN_MASK;
+}
+
+/**
+ * pci_vpd_info_field_size - Extracts the information field length
+ * @lrdt: Pointer to the beginning of an information field header
+ *
+ * Returns the extracted information field length.
+ */
+static inline u8 pci_vpd_info_field_size(const u8 *info_field)
+{
+	return info_field[2];
+}
+
+/**
+ * pci_vpd_find_tag - Locates the Resource Data Type tag provided
+ * @buf: Pointer to buffered vpd data
+ * @off: The offset into the buffer at which to begin the search
+ * @len: The length of the vpd buffer
+ * @rdt: The Resource Data Type to search for
+ *
+ * Returns the index where the Resource Data Type was found or
+ * -ENOENT otherwise.
+ */
+int pci_vpd_find_tag(const u8 *buf, unsigned int off, unsigned int len, u8 rdt);
+
+/**
+ * pci_vpd_find_info_keyword - Locates an information field keyword in the VPD
+ * @buf: Pointer to buffered vpd data
+ * @off: The offset into the buffer at which to begin the search
+ * @len: The length of the buffer area, relative to off, in which to search
+ * @kw: The keyword to search for
+ *
+ * Returns the index where the information field keyword was found or
+ * -ENOENT otherwise.
+ */
+int pci_vpd_find_info_keyword(const u8 *buf, unsigned int off,
+			      unsigned int len, const char *kw);
+
 #endif /* __KERNEL__ */
 #endif /* LINUX_PCI_H */
