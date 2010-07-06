@@ -1,3 +1,425 @@
+linux-2.6 (2.6.32-1+vyatta+37) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Simplify kernel configs
+
+  [ Krishna Kumar ]
+  * ixgbe: Fix return of invalid txq
+
+  [ Robert Richter ]
+  * oprofile/x86: fix uninitialized counter usage during cpu hotplug
+
+  [ Andi Kleen ]
+  * oprofile: remove double ring buffering
+
+  [ KOSAKI Motohiro ]
+  * cpumask: fix compat getaffinity
+
+  [ Pavel Emelyanov ]
+  * NFSD: don't report compiled-out versions as present
+
+  [ Tejun Heo ]
+  * sata_nv: use ata_pci_sff_activate_host() instead of
+    ata_host_activate()
+
+  [ Andreas Bombe ]
+  * ARCNET: Limit com20020 PCI ID matches for SOHARD cards
+
+  [ John W. Linville ]
+  * rtl8180: fix tx status reporting
+
+  [ Rodrigo Linfati ]
+  * Staging: add Add Sitecom WL-349 to rtl8192su
+
+  [ Larry Finger ]
+  * staging: vt6655: Fix kernel BUG on driver wpa initialization
+
+  [ Al Viro ]
+  * Fix racy use of anon_inode_getfd() in perf_event.c
+
+  [ Andrey Vagin ]
+  * posix_timer: Fix error path in timer_create
+
+  [ Tejun Heo ]
+  * libata: disable ATAPI AN by default
+
+  [ Sebastian Andrzej Siewior ]
+  * libata: don't flush dcache on slab pages
+
+  [ Tony Breeds ]
+  * mutex: Fix optimistic spinning vs. BKL
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Fix model quirk for Dell M1730
+  * ALSA: hda: Use LPIB for Toshiba A100-259
+  * ALSA: hda: Use LPIB for Acer Aspire 5110
+  * ALSA: hda: Use LPIB for Sony VPCS11V9E
+  * ALSA: hda: Use LPIB for a Shuttle device
+
+  [ Kamal Mostafa ]
+  * ACPI: video: fix acpi_backlight=video
+
+  [ Erik Andrén ]
+  * V4L/DVB: gspca - stv06xx: Remove the 046d:08da from the stv06xx
+    driver
+
+  [ Cory Maccarrone ]
+  * HID: Add the GYR4101US USB ID to hid-gyration
+
+  [ Christian Lamparter ]
+  * ar9170usb: add a couple more USB IDs
+  * ar9170usb: fix panic triggered by undersized rxstream buffer
+
+  [ Johan Hovold ]
+  * USB: visor: fix memory leak
+
+  [ Craig Shelley ]
+  * USB: CP210x New Device IDs 11 New device IDs
+
+  [ Johan Hovold ]
+  * USB: kobil: fix memory leak
+
+  [ zhao1980ming ]
+  * USB: option: add PID for ZTE product
+
+  [ spark ]
+  * USB: option.c: Add Pirelli VID/PID and indicate Pirelli's modem
+    interface is 0xff
+
+  [ Greg Kroah-Hartman ]
+  * USB: serial: option: add cinterion device id
+
+  [ Nils Radtke ]
+  * USB: option.c: OLIVETTI OLICARD100 support
+
+  [ Johan Hovold ]
+  * USB: ir-usb: fix double free
+  * USB: kl5usb105: fix memory leak
+
+  [ Dinh Nguyen ]
+  * USB: mxc: gadget: Fix bitfield for calculating maximum packet size
+
+  [ Hans de Goede ]
+  * USB: unusual-dev: Add bad sense flag for Appotech ax203 based
+    picture frames
+
+  [ Alek Du ]
+  * USB: EHCI: clear PHCD before resuming
+
+  [ Sarah Sharp ]
+  * USB: xhci: Fix issue with set interface after stall.
+  * USB: xhci: Fix check for room on the ring.
+
+  [ Andiry Xu ]
+  * USB: xHCI: Fix wrong usage of macro TRB_TYPE
+
+  [ Andres Salomon ]
+  * mac80211: give warning if building w/out rate ctrl algorithm
+
+  [ Jouni Malinen ]
+  * mac80211: Fix robust management frame handling (MFP)
+
+  [ Shanyu Zhao ]
+  * mac80211: fix rts threshold check
+
+  [ Chris Wilson ]
+  * drm/i915: Reject bind_to_gtt() early if object > aperture
+
+  [ Jan Beulich ]
+  * drivers/base/cpu.c: fix the output from
+    /sys/devices/system/cpu/offline
+
+  [ Oliver Hartkopp ]
+  * can: Fix SJA1000 command register writes on SMP systems
+
+  [ Matthew Wilcox ]
+  * PCI quirk: Disable MSI on VIA K8T890 systems
+
+  [ Alex Deucher ]
+  * PCI quirks: disable msi on AMD rs4xx internal gfx bridges
+
+  [ Ben Hutchings ]
+  * PCI: Disable MSI for MCP55 on P5N32-E SLI
+
+  [ Herbert Xu ]
+  * virtio_net: Make delayed refill more reliable
+
+  [ Andrea Arcangeli ]
+  * mm: hugetlb: fix clear_huge_page()
+
+  [ Adam Jackson ]
+  * drm/edid: Fix 1024x768@85Hz
+
+  [ Alex Deucher ]
+  * drm/radeon/kms/atom: fix typo in LVDS panel info parsing
+
+  [ Jeff Mahoney ]
+  * powerpc: Fix handling of strncmp with zero len
+
+  [ Michael Neuling ]
+  * powerpc/pseries: Only call start-cpu when a CPU is stopped
+  * powerpc/pseries: Make query_cpu_stopped callable outside hotplug cpu
+
+  [ Denis Kirjanov ]
+  * powerpc/oprofile: fix potential buffer overrun in op_model_cell.c
+
+  [ Jens Axboe ]
+  * writeback: disable periodic old data writeback for
+    !dirty_writeback_centisecs
+
+  [ NeilBrown ]
+  * md/raid1: fix counting of write targets.
+  * md: Fix read balancing in RAID1 and RAID10 on drives > 2TB
+
+  [ Dan Williams ]
+  * md: set mddev readonly flag on blkdev BLKROSET ioctl
+
+  [ Joerg Roedel ]
+  * x86/amd-iommu: Fix suspend/resume with IOMMU
+
+  [ Dan Carpenter ]
+  * exofs: confusion between kmap() and kmap_atomic() api
+
+  [ FUJITA Tomonori ]
+  * mn10300: set ARCH_KMALLOC_MINALIGN
+  * m68k: set ARCH_KMALLOC_MINALIGN
+
+  [ Dan Carpenter ]
+  * rtc-cmos: do dev_set_drvdata() earlier in the initialization
+
+  [ Maurus Cuelenaere ]
+  * rtc: s3c: initialize driver data before using it
+
+  [ FUJITA Tomonori ]
+  * frv: set ARCH_KMALLOC_MINALIGN
+  * xtensa: set ARCH_KMALLOC_MINALIGN
+  * Blackfin: set ARCH_KMALLOC_MINALIGN
+
+  [ KOSAKI Motohiro ]
+  * tmpfs: insert tmpfs cache pages to inactive list at first
+
+  [ Sebastien Dugue ]
+  * mlx4_core: Fix possible chunk sg list overflow in mlx4_alloc_icm()
+
+  [ Anfei ]
+  * ARM: 6166/1: Proper prefetch abort handling on pre-ARMv6
+
+  [ Khem Raj ]
+  * ARM: 6164/1: Add kto and kfrom to input operands list.
+
+  [ Marek Vašut ]
+  * ARM: 6146/1: sa1111: Prevent deadlock in resume path
+
+  [ Linus Walleij ]
+  * ARM: 6144/1: TCM memory bug freeing bug
+
+  [ Russell King ]
+  * ARM: VFP: Fix vfp_put_double() for d16-d31
+
+  [ Mark Brown ]
+  * ASoC: Fix dB scales for WM835x
+  * ASoC: Fix dB scales for WM8400
+  * ASoC: Fix dB scales for WM8990
+
+  [ Dave Airlie ]
+  * drm/radeon: r100/r200 ums: block ability for userspace app to trash
+    0 page and beyond
+  * drm/radeon: fix the r100/r200 ums block 0 page fix
+
+  [ Ira W. Snyder ]
+  * hwmon: (ltc4245) Read only one GPIO pin
+
+  [ Oleg Nesterov ]
+  * signals: check_kill_permission(): don't check creds if
+    same_thread_group()
+
+  [ Jeff Moyer ]
+  * do_generic_file_read: clear page errors when issuing a fresh read of
+    the page
+
+  [ Jiri Kosina ]
+  * ipmi: handle run_to_completion properly in deliver_recv_msg()
+
+  [ Gabor Gombas ]
+  * x86, setup: Phoenix BIOS fixup is needed on Dell Inspiron Mini 1012
+
+  [ Ian Campbell ]
+  * xen: ensure timer tick is resumed even on CPU driving the resume
+  * xen: avoid allocation causing potential swap activity on the resume
+    path
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Use LPIB for an ASUS device
+  * ALSA: hda: Use mb31 quirk for an iMac model
+  * ALSA: hda: Use LPIB for another mainboard
+  * ALSA: hda: Use LPIB for ASUS M2V
+
+  [ Martin Homuth-Rosemann ]
+  * Staging: comedi - correct parameter gainlkup for DAQCard-6024E in
+    driver ni_mio_cs.c
+
+  [ Paul Mundt ]
+  * clocksource: sh_cmt: compute mult and shift before registration
+
+  [ Bob Copeland ]
+  * ath5k: retain promiscuous setting
+
+  [ Tejun Heo ]
+  * ahci: add pci quirk for JMB362
+
+  [ Stefan Richter ]
+  * firewire: core: check for 1394a compliant IRM, fix inaccessibility
+    of Sony camcorder
+
+  [ Stephane Eranian ]
+  * perf_events: Fix resource leak in x86 __hw_perf_event_init()
+
+  [ Tejun Heo ]
+  * sata_nv: don't diddle with nIEN on mcp55
+  * sata_via: magic vt6421 fix for transmission problems w/ WD drives
+
+  [ Chris Wilson ]
+  * drm/i915: Rebind bo if currently bound with incorrect alignment.
+
+  [ Johan Hovold ]
+  * USB: mos7840: fix null-pointer dereference
+
+  [ Sarah Sharp ]
+  * USB: xhci: Wait for host to start running.
+  * USB: xhci: Wait for controller to be ready after reset.
+
+  [ Daniel Mack ]
+  * USB: ftdi_sio: fix DTR/RTS line modes
+
+  [ Axel Lin ]
+  * USB: cdc-acm: fix resource reclaim in error path of acm_probe
+
+  [ Jason Dravet ]
+  * p54usb: Add device ID for Dell WLA3310 USB
+
+  [ Ben Hutchings ]
+  * atl1e: Allow TX checksum offload and TSO to be disabled and
+    reenabled
+  * via-velocity: Give RX descriptors to the NIC later on open or MTU
+    change
+  * dmfe/tulip: Let dmfe handle DM910x except for SPARC on-board chips
+  * Documentation/3c509: document ethtool support
+
+  [ John W. Linville ]
+  * wireless: report reasonable bitrate for MCS rates through wext
+
+  [ Luis R. Rodriguez ]
+  * ath9k: add support for 802.11n bonded out AR2427
+
+  [ Jesse Barnes ]
+  * drm/i915: give up on 8xx lid status
+
+  [ Roberto Sassu ]
+  * wrong type for 'magic' argument in simple_fill_super()
+
+  [ Wey-Yi Guy ]
+  * iwlwifi: check for aggregation frame and queue
+
+  [ Reinette Chatre ]
+  * iwlwifi: recalculate average tpt if not current
+
+  [ Wey-Yi Guy ]
+  * iwlwifi: update supported PCI_ID list for 5xx0 series
+
+  [ Grazvydas Ignotas ]
+  * wl1251: fix a memory leak in probe
+
+  [ Steven Whitehouse ]
+  * GFS2: Fix permissions checking for setflags ioctl()
+
+  [ Neil Horman ]
+  * sctp: Fix skb_over_panic resulting from multiple invalid parameter
+    errors (CVE-2010-1173) (v4)
+
+  [ Steve French ]
+  * CIFS: Allow null nd (as nfs server uses) on create
+
+  [ Miklos Szeredi ]
+  * vfs: add NOFOLLOW flag to umount(2)
+
+  [ James Chapman ]
+  * l2tp: Fix oops in pppol2tp_xmit
+
+  [ Shi Weihua ]
+  * Btrfs: should add a permission check for setfacl
+
+  [ Anton Vorontsov ]
+  * ucc_geth: Fix empty TX queue processing
+  * ucc_geth: Fix netdev watchdog triggering on link changes
+
+  [ Jiajun Wu ]
+  * ucc_geth: Fix full TX queue processing
+
+  [ Neil Horman ]
+  * tipc: Fix oops on send prior to entering networked mode (v3)
+
+  [ Dmitry Torokhov ]
+  * Input: psmouse - reset all types of mice before reconnecting
+
+  [ Wei Yongjun ]
+  * KVM: s390: Fix possible memory leak of in kvm_arch_vcpu_create()
+  * KVM: PPC: Do not create debugfs if fail to create vcpu
+
+  [ Glauber Costa ]
+  * x86, paravirt: Add a global synchronization point for pvclock
+
+  [ Avi Kivity ]
+  * KVM: Don't allow lmsw to clear cr0.pe
+
+  [ Sheng Yang ]
+  * KVM: x86: Check LMA bit before set_efer
+
+  [ Avi Kivity ]
+  * KVM: MMU: Segregate shadow pages with different cr0.wp
+
+  [ Shane Wang ]
+  * KVM: VMX: enable VMXON check with SMX enabled (Intel TXT)
+
+  [ Avi Kivity ]
+  * KVM: MMU: Don't read pdptrs with mmu spinlock held in
+    mmu_alloc_roots
+  * KVM: Fix wallclock version writing race
+  * KVM: x86: Add missing locking to arch specific vcpu ioctls
+
+  [ Roedel, Joerg ]
+  * KVM: x86: Inject #GP with the right rip on efer writes
+
+  [ Yin Kangkai ]
+  * jbd: jbd-debug and jbd2-debug should be writable
+
+  [ Helge Deller ]
+  * parisc: clear floating point exception flag on SIGFPE signal
+
+  [ Mikulas Patocka ]
+  * dm snapshot: simplify sector_to_chunk expression
+
+  [ Dan Carpenter ]
+  * KEYS: Return more accurate error codes
+
+  [ Toshiyuki Okajima ]
+  * KEYS: find_keyring_by_name() can gain access to a freed keyring
+
+  [ Ben Hutchings ]
+  * qla2xxx: Disable MSI on qla24xx chips other than QLA2432.
+
+  [ Wei Yongjun ]
+  * sctp: fix append error cause to ERROR chunk correctly
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.32.16
+
+  [ stephen hemminger ]
+  * bridge: fdb cleanup runs too often
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 06 Jul 2010 10:22:53 -0700
+
 linux-2.6 (2.6.32-1+vyatta+36) unstable; urgency=low
 
   * Simplify kernel configs
