@@ -9021,7 +9021,8 @@ err_out1:
 	return err;
 }
 
-static struct net_device_stats *tg3_get_stats(struct net_device *);
+static struct rtnl_link_stats64 *tg3_get_stats64(struct net_device *,
+						 struct rtnl_link_stats64 *);
 static struct tg3_ethtool_stats *tg3_get_estats(struct tg3 *);
 
 static int tg3_close(struct net_device *dev)
@@ -9055,8 +9056,8 @@ static int tg3_close(struct net_device *dev)
 
 	tg3_ints_fini(tp);
 
-	memcpy(&tp->net_stats_prev, tg3_get_stats(tp->dev),
-	       sizeof(tp->net_stats_prev));
+	tg3_get_stats64(tp->dev, &tp->net_stats_prev);
+
 	memcpy(&tp->estats_prev, tg3_get_estats(tp),
 	       sizeof(tp->estats_prev));
 
@@ -9069,24 +9070,12 @@ static int tg3_close(struct net_device *dev)
 	return 0;
 }
 
-static inline unsigned long get_stat64(tg3_stat64_t *val)
-{
-	unsigned long ret;
-
-#if (BITS_PER_LONG == 32)
-	ret = val->low;
-#else
-	ret = ((u64)val->high << 32) | ((u64)val->low);
-#endif
-	return ret;
-}
-
-static inline u64 get_estat64(tg3_stat64_t *val)
+static inline u64 get_stat64(tg3_stat64_t *val)
 {
        return ((u64)val->high << 32) | ((u64)val->low);
 }
 
-static unsigned long calc_crc_errors(struct tg3 *tp)
+static u64 calc_crc_errors(struct tg3 *tp)
 {
 	struct tg3_hw_stats *hw_stats = tp->hw_stats;
 
@@ -9114,7 +9103,7 @@ static unsigned long calc_crc_errors(struct tg3 *tp)
 
 #define ESTAT_ADD(member) \
 	estats->member =	old_estats->member + \
-				get_estat64(&hw_stats->member)
+				get_stat64(&hw_stats->member)
 
 static struct tg3_ethtool_stats *tg3_get_estats(struct tg3 *tp)
 {
@@ -9204,11 +9193,11 @@ static struct tg3_ethtool_stats *tg3_get_estats(struct tg3 *tp)
 	return estats;
 }
 
-static struct net_device_stats *tg3_get_stats(struct net_device *dev)
+static struct rtnl_link_stats64 *tg3_get_stats64(struct net_device *dev,
+						 struct rtnl_link_stats64 *stats)
 {
 	struct tg3 *tp = netdev_priv(dev);
-	struct net_device_stats *stats = &tp->net_stats;
-	struct net_device_stats *old_stats = &tp->net_stats_prev;
+	struct rtnl_link_stats64 *old_stats = &tp->net_stats_prev;
 	struct tg3_hw_stats *hw_stats = tp->hw_stats;
 
 	if (!hw_stats)
@@ -12800,6 +12789,13 @@ done:
 
 static struct pci_dev * __devinit tg3_find_peer(struct tg3 *);
 
+static void inline vlan_features_add(struct net_device *dev, unsigned long flags)
+{
+#if TG3_VLAN_TAG_USED
+	dev->vlan_features |= flags;
+#endif
+}
+
 static int __devinit tg3_get_invariants(struct tg3 *tp)
 {
 	static struct pci_device_id write_reorder_chipsets[] = {
@@ -13032,11 +13028,13 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	if (tp->pci_chip_rev_id == CHIPREV_ID_5700_B0)
 		tp->tg3_flags |= TG3_FLAG_BROKEN_CHECKSUMS;
 	else {
+		unsigned long features = NETIF_F_IP_CSUM | NETIF_F_SG | NETIF_F_GRO;
+
 		tp->tg3_flags |= TG3_FLAG_RX_CHECKSUMS;
-		tp->dev->features |= NETIF_F_IP_CSUM | NETIF_F_SG;
 		if (tp->tg3_flags3 & TG3_FLG3_5755_PLUS)
-			tp->dev->features |= NETIF_F_IPV6_CSUM;
-		tp->dev->features |= NETIF_F_GRO;
+			features |= NETIF_F_IPV6_CSUM;
+		tp->dev->features |= features;
+		vlan_features_add(tp->dev, features);
 	}
 
 	/* Determine TSO capabilities */
@@ -14317,7 +14315,7 @@ static const struct net_device_ops tg3_netdev_ops = {
 	.ndo_open		= tg3_open,
 	.ndo_stop		= tg3_close,
 	.ndo_start_xmit		= tg3_start_xmit,
-	.ndo_get_stats		= tg3_get_stats,
+	.ndo_get_stats64	= tg3_get_stats64,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_set_multicast_list	= tg3_set_rx_mode,
 	.ndo_set_mac_address	= tg3_set_mac_addr,
@@ -14336,7 +14334,7 @@ static const struct net_device_ops tg3_netdev_ops_dma_bug = {
 	.ndo_open		= tg3_open,
 	.ndo_stop		= tg3_close,
 	.ndo_start_xmit		= tg3_start_xmit_dma_bug,
-	.ndo_get_stats		= tg3_get_stats,
+	.ndo_get_stats64	= tg3_get_stats64,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_set_multicast_list	= tg3_set_rx_mode,
 	.ndo_set_mac_address	= tg3_set_mac_addr,
@@ -14525,20 +14523,25 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	 * is off by default, but can be enabled using ethtool.
 	 */
 	if ((tp->tg3_flags2 & TG3_FLG2_HW_TSO) &&
-	    (dev->features & NETIF_F_IP_CSUM))
+	    (dev->features & NETIF_F_IP_CSUM)) {
 		dev->features |= NETIF_F_TSO;
-
+		vlan_features_add(dev, NETIF_F_TSO);
+	}
 	if ((tp->tg3_flags2 & TG3_FLG2_HW_TSO_2) ||
 	    (tp->tg3_flags2 & TG3_FLG2_HW_TSO_3)) {
-		if (dev->features & NETIF_F_IPV6_CSUM)
+		if (dev->features & NETIF_F_IPV6_CSUM) {
 			dev->features |= NETIF_F_TSO6;
+			vlan_features_add(dev, NETIF_F_TSO6);
+		}
 		if ((tp->tg3_flags2 & TG3_FLG2_HW_TSO_3) ||
 		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5761 ||
 		    (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5784 &&
 		     GET_CHIP_REV(tp->pci_chip_rev_id) != CHIPREV_5784_AX) ||
 			GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5785 ||
-		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_57780)
+		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_57780) {
 			dev->features |= NETIF_F_TSO_ECN;
+			vlan_features_add(dev, NETIF_F_TSO_ECN);
+		}
 	}
 
 	if (tp->pci_chip_rev_id == CHIPREV_ID_5705_A1 &&

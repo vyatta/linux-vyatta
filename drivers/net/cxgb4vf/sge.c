@@ -228,15 +228,11 @@ static inline bool is_buf_mapped(const struct rx_sw_desc *sdesc)
  */
 static inline int need_skb_unmap(void)
 {
-	/*
-	 * This structure is used to tell if the platfrom needs buffer
-	 * unmapping by checking if DECLARE_PCI_UNMAP_ADDR defines anything.
-	 */
-	struct dummy {
-		DECLARE_PCI_UNMAP_ADDR(addr);
-	};
-
-	return sizeof(struct dummy) != 0;
+#ifdef CONFIG_NEED_DMA_MAP_STATE
+	return 1;
+#else
+	return 0;
+#endif
 }
 
 /**
@@ -1775,6 +1771,9 @@ static int napi_rx_handler(struct napi_struct *napi, int budget)
 		rspq->next_intr_params = rspq->intr_params;
 	} else
 		intr_params = QINTR_TIMER_IDX(SGE_TIMER_UPD_CIDX);
+
+	if (unlikely(work_done == 0))
+		rspq->unhandled_irqs++;
 
 	t4_write_reg(rspq->adapter,
 		     T4VF_SGE_BASE_ADDR + SGE_VF_GTS,

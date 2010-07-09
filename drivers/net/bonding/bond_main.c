@@ -176,7 +176,7 @@ static int arp_ip_count;
 static int bond_mode	= BOND_MODE_ROUNDROBIN;
 static int xmit_hashtype = BOND_XMIT_POLICY_LAYER2;
 static int lacp_fast;
-
+static int disable_netpoll = 1;
 
 const struct bond_parm_tbl bond_lacp_tbl[] = {
 {	"slow",		AD_LACP_SLOW},
@@ -1766,15 +1766,23 @@ int bond_enslave(struct net_device *bond_dev, struct net_device *slave_dev)
 	bond_set_carrier(bond);
 
 #ifdef CONFIG_NET_POLL_CONTROLLER
-	if (slaves_support_netpoll(bond_dev)) {
-		bond_dev->priv_flags &= ~IFF_DISABLE_NETPOLL;
-		if (bond_dev->npinfo)
-			slave_dev->npinfo = bond_dev->npinfo;
-	} else if (!(bond_dev->priv_flags & IFF_DISABLE_NETPOLL)) {
+	/*
+	 * Netpoll and bonding is broken, make sure it is not initialized
+	 * until it is fixed.
+	 */
+	if (disable_netpoll) {
 		bond_dev->priv_flags |= IFF_DISABLE_NETPOLL;
-		pr_info("New slave device %s does not support netpoll\n",
-			slave_dev->name);
-		pr_info("Disabling netpoll support for %s\n", bond_dev->name);
+	} else {
+		if (slaves_support_netpoll(bond_dev)) {
+			bond_dev->priv_flags &= ~IFF_DISABLE_NETPOLL;
+			if (bond_dev->npinfo)
+				slave_dev->npinfo = bond_dev->npinfo;
+		} else if (!(bond_dev->priv_flags & IFF_DISABLE_NETPOLL)) {
+			bond_dev->priv_flags |= IFF_DISABLE_NETPOLL;
+			pr_info("New slave device %s does not support netpoll\n",
+				slave_dev->name);
+			pr_info("Disabling netpoll support for %s\n", bond_dev->name);
+		}
 	}
 #endif
 	read_unlock(&bond->lock);
@@ -1977,8 +1985,11 @@ int bond_release(struct net_device *bond_dev, struct net_device *slave_dev)
 
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	read_lock_bh(&bond->lock);
-	if (slaves_support_netpoll(bond_dev))
-		bond_dev->priv_flags &= ~IFF_DISABLE_NETPOLL;
+
+	 /* Make sure netpoll over stays disabled until fixed. */
+	if (!disable_netpoll)
+		if (slaves_support_netpoll(bond_dev))
+				bond_dev->priv_flags &= ~IFF_DISABLE_NETPOLL;
 	read_unlock_bh(&bond->lock);
 	if (slave_dev->netdev_ops->ndo_netpoll_cleanup)
 		slave_dev->netdev_ops->ndo_netpoll_cleanup(slave_dev);
@@ -3804,50 +3815,48 @@ static int bond_close(struct net_device *bond_dev)
 	return 0;
 }
 
-static struct rtnl_link_stats64 *bond_get_stats(struct net_device *bond_dev)
+static struct rtnl_link_stats64 *bond_get_stats(struct net_device *bond_dev,
+						struct rtnl_link_stats64 *stats)
 {
 	struct bonding *bond = netdev_priv(bond_dev);
-	struct rtnl_link_stats64 *stats = &bond_dev->stats64;
-	struct rtnl_link_stats64 local_stats;
+	struct rtnl_link_stats64 temp;
 	struct slave *slave;
 	int i;
 
-	memset(&local_stats, 0, sizeof(local_stats));
+	memset(stats, 0, sizeof(*stats));
 
 	read_lock_bh(&bond->lock);
 
 	bond_for_each_slave(bond, slave, i) {
 		const struct rtnl_link_stats64 *sstats =
-			dev_get_stats(slave->dev);
+			dev_get_stats(slave->dev, &temp);
 
-		local_stats.rx_packets += sstats->rx_packets;
-		local_stats.rx_bytes += sstats->rx_bytes;
-		local_stats.rx_errors += sstats->rx_errors;
-		local_stats.rx_dropped += sstats->rx_dropped;
+		stats->rx_packets += sstats->rx_packets;
+		stats->rx_bytes += sstats->rx_bytes;
+		stats->rx_errors += sstats->rx_errors;
+		stats->rx_dropped += sstats->rx_dropped;
 
-		local_stats.tx_packets += sstats->tx_packets;
-		local_stats.tx_bytes += sstats->tx_bytes;
-		local_stats.tx_errors += sstats->tx_errors;
-		local_stats.tx_dropped += sstats->tx_dropped;
+		stats->tx_packets += sstats->tx_packets;
+		stats->tx_bytes += sstats->tx_bytes;
+		stats->tx_errors += sstats->tx_errors;
+		stats->tx_dropped += sstats->tx_dropped;
 
-		local_stats.multicast += sstats->multicast;
-		local_stats.collisions += sstats->collisions;
+		stats->multicast += sstats->multicast;
+		stats->collisions += sstats->collisions;
 
-		local_stats.rx_length_errors += sstats->rx_length_errors;
-		local_stats.rx_over_errors += sstats->rx_over_errors;
-		local_stats.rx_crc_errors += sstats->rx_crc_errors;
-		local_stats.rx_frame_errors += sstats->rx_frame_errors;
-		local_stats.rx_fifo_errors += sstats->rx_fifo_errors;
-		local_stats.rx_missed_errors += sstats->rx_missed_errors;
+		stats->rx_length_errors += sstats->rx_length_errors;
+		stats->rx_over_errors += sstats->rx_over_errors;
+		stats->rx_crc_errors += sstats->rx_crc_errors;
+		stats->rx_frame_errors += sstats->rx_frame_errors;
+		stats->rx_fifo_errors += sstats->rx_fifo_errors;
+		stats->rx_missed_errors += sstats->rx_missed_errors;
 
-		local_stats.tx_aborted_errors += sstats->tx_aborted_errors;
-		local_stats.tx_carrier_errors += sstats->tx_carrier_errors;
-		local_stats.tx_fifo_errors += sstats->tx_fifo_errors;
-		local_stats.tx_heartbeat_errors += sstats->tx_heartbeat_errors;
-		local_stats.tx_window_errors += sstats->tx_window_errors;
+		stats->tx_aborted_errors += sstats->tx_aborted_errors;
+		stats->tx_carrier_errors += sstats->tx_carrier_errors;
+		stats->tx_fifo_errors += sstats->tx_fifo_errors;
+		stats->tx_heartbeat_errors += sstats->tx_heartbeat_errors;
+		stats->tx_window_errors += sstats->tx_window_errors;
 	}
-
-	memcpy(stats, &local_stats, sizeof(struct net_device_stats));
 
 	read_unlock_bh(&bond->lock);
 
