@@ -216,6 +216,16 @@ void rt2x00lib_txdone(struct queue_entry *entry,
 	rt2x00queue_unmap_skb(rt2x00dev, entry->skb);
 
 	/*
+	 * Remove the extra tx headroom from the skb.
+	 */
+	skb_pull(entry->skb, rt2x00dev->ops->extra_tx_headroom);
+
+	/*
+	 * Signal that the TX descriptor is no longer in the skb.
+	 */
+	skbdesc->flags &= ~SKBDESC_DESC_IN_SKB;
+
+	/*
 	 * Remove L2 padding which was added during
 	 */
 	if (test_bit(DRIVER_REQUIRE_L2PAD, &rt2x00dev->flags))
@@ -224,7 +234,7 @@ void rt2x00lib_txdone(struct queue_entry *entry,
 	/*
 	 * If the IV/EIV data was stripped from the frame before it was
 	 * passed to the hardware, we should now reinsert it again because
-	 * mac80211 will expect the the same data to be present it the
+	 * mac80211 will expect the same data to be present it the
 	 * frame as it was passed to us.
 	 */
 	if (test_bit(CONFIG_SUPPORT_HW_CRYPTO, &rt2x00dev->flags))
@@ -241,8 +251,7 @@ void rt2x00lib_txdone(struct queue_entry *entry,
 	 */
 	success =
 	    test_bit(TXDONE_SUCCESS, &txdesc->flags) ||
-	    test_bit(TXDONE_UNKNOWN, &txdesc->flags) ||
-	    test_bit(TXDONE_FALLBACK, &txdesc->flags);
+	    test_bit(TXDONE_UNKNOWN, &txdesc->flags);
 
 	/*
 	 * Update TX statistics.
@@ -264,11 +273,22 @@ void rt2x00lib_txdone(struct queue_entry *entry,
 	/*
 	 * Frame was send with retries, hardware tried
 	 * different rates to send out the frame, at each
-	 * retry it lowered the rate 1 step.
+	 * retry it lowered the rate 1 step except when the
+	 * lowest rate was used.
 	 */
 	for (i = 0; i < retry_rates && i < IEEE80211_TX_MAX_RATES; i++) {
 		tx_info->status.rates[i].idx = rate_idx - i;
 		tx_info->status.rates[i].flags = rate_flags;
+
+		if (rate_idx - i == 0) {
+			/*
+			 * The lowest rate (index 0) was used until the
+			 * number of max retries was reached.
+			 */
+			tx_info->status.rates[i].count = retry_rates - i;
+			i++;
+			break;
+		}
 		tx_info->status.rates[i].count = 1;
 	}
 	if (i < (IEEE80211_TX_MAX_RATES - 1))
@@ -279,6 +299,21 @@ void rt2x00lib_txdone(struct queue_entry *entry,
 			tx_info->flags |= IEEE80211_TX_STAT_ACK;
 		else
 			rt2x00dev->low_level_stats.dot11ACKFailureCount++;
+	}
+
+	/*
+	 * Every single frame has it's own tx status, hence report
+	 * every frame as ampdu of size 1.
+	 *
+	 * TODO: if we can find out how many frames were aggregated
+	 * by the hw we could provide the real ampdu_len to mac80211
+	 * which would allow the rc algorithm to better decide on
+	 * which rates are suitable.
+	 */
+	if (tx_info->flags & IEEE80211_TX_CTL_AMPDU) {
+		tx_info->flags |= IEEE80211_TX_STAT_AMPDU;
+		tx_info->status.ampdu_len = 1;
+		tx_info->status.ampdu_ack_len = success ? 1 : 0;
 	}
 
 	if (rate_flags & IEEE80211_TX_RC_USE_RTS_CTS) {

@@ -69,7 +69,6 @@
 
 #define MPHDRLEN	6	/* multilink protocol header length */
 #define MPHDRLEN_SSN	4	/* ditto with short sequence numbers */
-#define MIN_FRAG_SIZE	64
 
 /*
  * An instance of /dev/ppp can be associated with either a ppp
@@ -539,14 +538,9 @@ static int get_filter(void __user *arg, struct sock_filter **p)
 	}
 
 	len = uprog.len * sizeof(struct sock_filter);
-	code = kmalloc(len, GFP_KERNEL);
-	if (code == NULL)
-		return -ENOMEM;
-
-	if (copy_from_user(code, uprog.filter, len)) {
-		kfree(code);
-		return -EFAULT;
-	}
+	code = memdup_user(uprog.filter, len);
+	if (IS_ERR(code))
+		return PTR_ERR(code);
 
 	err = sk_chk_filter(code, uprog.len);
 	if (err) {
@@ -1933,9 +1927,9 @@ ppp_receive_mp_frame(struct ppp *ppp, struct sk_buff *skb, struct channel *pch)
 	/* If the queue is getting long, don't wait any longer for packets
 	   before the start of the queue. */
 	if (skb_queue_len(&ppp->mrq) >= PPP_MP_MAX_QLEN) {
-		struct sk_buff *skb = skb_peek(&ppp->mrq);
-		if (seq_before(ppp->minseq, skb->sequence))
-			ppp->minseq = skb->sequence;
+		struct sk_buff *mskb = skb_peek(&ppp->mrq);
+		if (seq_before(ppp->minseq, mskb->sequence))
+			ppp->minseq = mskb->sequence;
 	}
 
 	/* Pull completed packets off the queue and receive them. */

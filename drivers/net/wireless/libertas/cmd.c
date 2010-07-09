@@ -7,13 +7,8 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 
-#include "host.h"
 #include "decl.h"
-#include "defs.h"
-#include "dev.h"
-#include "assoc.h"
-#include "wext.h"
-#include "scan.h"
+#include "cfg.h"
 #include "cmd.h"
 
 
@@ -69,6 +64,8 @@ static u8 is_command_allowed_in_ps(u16 cmd)
 {
 	switch (cmd) {
 	case CMD_802_11_RSSI:
+		return 1;
+	case CMD_802_11_HOST_SLEEP_CFG:
 		return 1;
 	default:
 		break;
@@ -175,14 +172,26 @@ int lbs_update_hw_spec(struct lbs_private *priv)
 	if (priv->mesh_dev)
 		memcpy(priv->mesh_dev->dev_addr, priv->current_addr, ETH_ALEN);
 
-	if (lbs_set_regiontable(priv, priv->regioncode, 0)) {
-		ret = -1;
-		goto out;
-	}
-
 out:
 	lbs_deb_leave(LBS_DEB_CMD);
 	return ret;
+}
+
+static int lbs_ret_host_sleep_cfg(struct lbs_private *priv, unsigned long dummy,
+			struct cmd_header *resp)
+{
+	lbs_deb_enter(LBS_DEB_CMD);
+	if (priv->wol_criteria == EHS_REMOVE_WAKEUP) {
+		priv->is_host_sleep_configured = 0;
+		if (priv->psstate == PS_STATE_FULL_POWER) {
+			priv->is_host_sleep_activated = 0;
+			wake_up_interruptible(&priv->host_sleep_q);
+		}
+	} else {
+		priv->is_host_sleep_configured = 1;
+	}
+	lbs_deb_leave(LBS_DEB_CMD);
+	return 0;
 }
 
 int lbs_host_sleep_cfg(struct lbs_private *priv, uint32_t criteria,
@@ -202,12 +211,11 @@ int lbs_host_sleep_cfg(struct lbs_private *priv, uint32_t criteria,
 	else
 		cmd_config.wol_conf.action = CMD_ACT_ACTION_NONE;
 
-	ret = lbs_cmd_with_response(priv, CMD_802_11_HOST_SLEEP_CFG, &cmd_config);
+	ret = __lbs_cmd(priv, CMD_802_11_HOST_SLEEP_CFG, &cmd_config.hdr,
+			le16_to_cpu(cmd_config.hdr.size),
+			lbs_ret_host_sleep_cfg, 0);
 	if (!ret) {
-		if (criteria) {
-			lbs_deb_cmd("Set WOL criteria to %x\n", criteria);
-			priv->wol_criteria = criteria;
-		} else
+		if (p_wol_config)
 			memcpy((uint8_t *) p_wol_config,
 					(uint8_t *)&cmd_config.wol_conf,
 					sizeof(struct wol_config));
@@ -712,6 +720,10 @@ static void lbs_queue_cmd(struct lbs_private *priv,
 		}
 	}
 
+	if (le16_to_cpu(cmdnode->cmdbuf->command) ==
+			CMD_802_11_WAKEUP_CONFIRM)
+		addtail = 0;
+
 	spin_lock_irqsave(&priv->driver_lock, flags);
 
 	if (addtail)
@@ -887,6 +899,66 @@ void lbs_set_mac_control(struct lbs_private *priv)
 }
 
 /**
+ *  @brief This function implements command CMD_802_11D_DOMAIN_INFO
+ *  @param priv       pointer to struct lbs_private
+ *  @param cmd        pointer to cmd buffer
+ *  @param cmdno      cmd ID
+ *  @param cmdOption  cmd action
+ *  @return           0
+*/
+int lbs_cmd_802_11d_domain_info(struct lbs_private *priv,
+				 struct cmd_ds_command *cmd,
+				 u16 cmdoption)
+{
+	struct cmd_ds_802_11d_domain_info *pdomaininfo =
+	    &cmd->params.domaininfo;
+	struct mrvl_ie_domain_param_set *domain = &pdomaininfo->domain;
+	u8 nr_triplet = priv->domain_reg.no_triplet;
+
+	lbs_deb_enter(LBS_DEB_11D);
+
+	lbs_deb_11d("nr_triplet=%x\n", nr_triplet);
+
+	pdomaininfo->action = cpu_to_le16(cmdoption);
+	if (cmdoption == CMD_ACT_GET) {
+		cmd->size = cpu_to_le16(sizeof(pdomaininfo->action) +
+					sizeof(struct cmd_header));
+		lbs_deb_hex(LBS_DEB_11D, "802_11D_DOMAIN_INFO", (u8 *) cmd,
+			le16_to_cpu(cmd->size));
+		goto done;
+	}
+
+	domain->header.type = cpu_to_le16(TLV_TYPE_DOMAIN);
+	memcpy(domain->countrycode, priv->domain_reg.country_code,
+	       sizeof(domain->countrycode));
+
+	domain->header.len = cpu_to_le16(nr_triplet
+				* sizeof(struct ieee80211_country_ie_triplet)
+				+ sizeof(domain->countrycode));
+
+	if (nr_triplet) {
+		memcpy(domain->triplet, priv->domain_reg.triplet,
+				nr_triplet *
+				sizeof(struct ieee80211_country_ie_triplet));
+
+		cmd->size = cpu_to_le16(sizeof(pdomaininfo->action) +
+					     le16_to_cpu(domain->header.len) +
+					     sizeof(struct mrvl_ie_header) +
+					     sizeof(struct cmd_header));
+	} else {
+		cmd->size = cpu_to_le16(sizeof(pdomaininfo->action) +
+					sizeof(struct cmd_header));
+	}
+
+	lbs_deb_hex(LBS_DEB_11D, "802_11D_DOMAIN_INFO", (u8 *) cmd,
+			le16_to_cpu(cmd->size));
+
+done:
+	lbs_deb_enter(LBS_DEB_11D);
+	return 0;
+}
+
+/**
  *  @brief This function prepare the command before send to firmware.
  *
  *  @param priv		A pointer to struct lbs_private structure
@@ -983,6 +1055,11 @@ int lbs_prepare_and_send_command(struct lbs_private *priv,
 
 		ret = 0;
 		goto done;
+
+	case CMD_802_11D_DOMAIN_INFO:
+		cmdptr->command = cpu_to_le16(cmd_no);
+		ret = lbs_cmd_802_11d_domain_info(priv, cmdptr, cmd_action);
+		break;
 
 	case CMD_802_11_TPC_CFG:
 		cmdptr->command = cpu_to_le16(CMD_802_11_TPC_CFG);
@@ -1303,6 +1380,15 @@ int lbs_execute_next_command(struct lbs_private *priv)
 		 * check if in power save mode, if yes, put the device back
 		 * to PS mode
 		 */
+#ifdef TODO
+		/*
+		 * This was the old code for libertas+wext. Someone that
+		 * understands this beast should re-code it in a sane way.
+		 *
+		 * I actually don't understand why this is related to WPA
+		 * and to connection status, shouldn't powering should be
+		 * independ of such things?
+		 */
 		if ((priv->psmode != LBS802_11POWERMODECAM) &&
 		    (priv->psstate == PS_STATE_FULL_POWER) &&
 		    ((priv->connect_status == LBS_CONNECTED) ||
@@ -1324,6 +1410,7 @@ int lbs_execute_next_command(struct lbs_private *priv)
 				lbs_ps_sleep(priv, 0);
 			}
 		}
+#endif
 	}
 
 	ret = 0;
@@ -1352,6 +1439,11 @@ static void lbs_send_confirmsleep(struct lbs_private *priv)
 
 	/* We don't get a response on the sleep-confirmation */
 	priv->dnld_sent = DNLD_RES_RECEIVED;
+
+	if (priv->is_host_sleep_configured) {
+		priv->is_host_sleep_activated = 1;
+		wake_up_interruptible(&priv->host_sleep_q);
+	}
 
 	/* If nothing to do, go back to sleep (?) */
 	if (!kfifo_len(&priv->event_fifo) && !priv->resp_len[priv->resp_idx])

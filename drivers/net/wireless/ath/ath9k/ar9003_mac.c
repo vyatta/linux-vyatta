@@ -90,6 +90,8 @@ static bool ar9003_hw_get_isr(struct ath_hw *ah, enum ath9k_int *masked)
 				  MAP_ISR_S2_CST);
 			mask2 |= ((isr2 & AR_ISR_S2_TSFOOR) >>
 				  MAP_ISR_S2_TSFOOR);
+			mask2 |= ((isr2 & AR_ISR_S2_BB_WATCHDOG) >>
+				  MAP_ISR_S2_BB_WATCHDOG);
 
 			if (!(pCap->hw_caps & ATH9K_HW_CAP_RAC_SUPPORTED)) {
 				REG_WRITE(ah, AR_ISR_S2, isr2);
@@ -167,6 +169,9 @@ static bool ar9003_hw_get_isr(struct ath_hw *ah, enum ath9k_int *masked)
 
 			(void) REG_READ(ah, AR_ISR);
 		}
+
+		if (*masked & ATH9K_INT_BB_WATCHDOG)
+			ar9003_hw_bb_watchdog_read(ah);
 	}
 
 	if (sync_cause) {
@@ -464,6 +469,14 @@ static void ar9003_hw_set11n_virtualmorefrag(struct ath_hw *ah, void *ds,
 	else
 		ads->ctl11 &= ~AR_VirtMoreFrag;
 }
+
+void ar9003_hw_set_paprd_txdesc(struct ath_hw *ah, void *ds, u8 chains)
+{
+	struct ar9003_txc *ads = ds;
+
+	ads->ctl12 |= SM(chains, AR_PAPRDChainMask);
+}
+EXPORT_SYMBOL(ar9003_hw_set_paprd_txdesc);
 
 void ar9003_hw_attach_mac_ops(struct ath_hw *hw)
 {

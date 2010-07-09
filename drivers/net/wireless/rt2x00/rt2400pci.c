@@ -1076,9 +1076,6 @@ static void rt2400pci_write_beacon(struct queue_entry *entry,
 				   struct txentry_desc *txdesc)
 {
 	struct rt2x00_dev *rt2x00dev = entry->queue->rt2x00dev;
-	struct queue_entry_priv_pci *entry_priv = entry->priv_data;
-	struct skb_frame_desc *skbdesc = get_skb_frame_desc(entry->skb);
-	u32 word;
 	u32 reg;
 
 	/*
@@ -1091,9 +1088,15 @@ static void rt2400pci_write_beacon(struct queue_entry *entry,
 
 	rt2x00queue_map_txskb(rt2x00dev, entry->skb);
 
-	rt2x00_desc_read(entry_priv->desc, 1, &word);
-	rt2x00_set_field32(&word, TXD_W1_BUFFER_ADDRESS, skbdesc->skb_dma);
-	rt2x00_desc_write(entry_priv->desc, 1, word);
+	/*
+	 * Write the TX descriptor for the beacon.
+	 */
+	rt2400pci_write_tx_desc(rt2x00dev, entry->skb, txdesc);
+
+	/*
+	 * Dump beacon to userspace through debugfs.
+	 */
+	rt2x00debug_dump_frame(rt2x00dev, DUMP_FRAME_BEACON, entry->skb);
 
 	/*
 	 * Enable beaconing again.
@@ -1585,7 +1588,6 @@ static const struct rt2x00lib_ops rt2400pci_rt2x00_ops = {
 	.reset_tuner		= rt2400pci_reset_tuner,
 	.link_tuner		= rt2400pci_link_tuner,
 	.write_tx_desc		= rt2400pci_write_tx_desc,
-	.write_tx_data		= rt2x00pci_write_tx_data,
 	.write_beacon		= rt2400pci_write_beacon,
 	.kick_tx_queue		= rt2400pci_kick_tx_queue,
 	.kill_tx_queue		= rt2400pci_kill_tx_queue,

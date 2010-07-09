@@ -317,7 +317,7 @@ struct hwsim_radiotap_hdr {
 	u8 rt_rate;
 	__le16 rt_channel;
 	__le16 rt_chbitmask;
-} __attribute__ ((packed));
+} __packed;
 
 
 static netdev_tx_t hwsim_mon_xmit(struct sk_buff *skb,
@@ -1290,6 +1290,11 @@ static int __init init_mac80211_hwsim(void)
 		data->addresses[1].addr[0] |= 0x40;
 		hw->wiphy->n_addresses = 2;
 		hw->wiphy->addresses = data->addresses;
+
+		if (fake_hw_scan) {
+			hw->wiphy->max_scan_ssids = 255;
+			hw->wiphy->max_scan_ie_len = IEEE80211_MAX_DATA_LEN;
+		}
 
 		hw->channel_change_time = 1;
 		hw->queues = 4;

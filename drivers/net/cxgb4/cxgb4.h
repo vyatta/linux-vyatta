@@ -219,6 +219,10 @@ struct adapter_params {
 	struct vpd_params vpd;
 	struct pci_params pci;
 
+	unsigned int sf_size;             /* serial flash size in bytes */
+	unsigned int sf_nsec;             /* # of flash sectors */
+	unsigned int sf_fw_start;         /* start of FW image in flash */
+
 	unsigned int fw_vers;
 	unsigned int tp_vers;
 	u8 api_vers[7];
@@ -305,7 +309,6 @@ enum {                                 /* adapter flags */
 	FULL_INIT_DONE     = (1 << 0),
 	USING_MSI          = (1 << 1),
 	USING_MSIX         = (1 << 2),
-	QUEUES_BOUND       = (1 << 3),
 	FW_OK              = (1 << 4),
 };
 
@@ -646,6 +649,7 @@ void t4_intr_disable(struct adapter *adapter);
 void t4_intr_clear(struct adapter *adapter);
 int t4_slow_intr_handler(struct adapter *adapter);
 
+int t4_wait_dev_ready(struct adapter *adap);
 int t4_link_start(struct adapter *adap, unsigned int mbox, unsigned int port,
 		  struct link_config *lc);
 int t4_restart_aneg(struct adapter *adap, unsigned int mbox, unsigned int port);

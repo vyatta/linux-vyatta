@@ -210,7 +210,7 @@ static void fec_stop(struct net_device *dev);
 /* Transmitter timeout */
 #define TX_TIMEOUT (2 * HZ)
 
-static int
+static netdev_tx_t
 fec_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct fec_enet_private *fep = netdev_priv(dev);
@@ -679,30 +679,24 @@ static int fec_enet_mii_probe(struct net_device *dev)
 {
 	struct fec_enet_private *fep = netdev_priv(dev);
 	struct phy_device *phy_dev = NULL;
-	int phy_addr;
+	int ret;
 
 	fep->phy_dev = NULL;
 
 	/* find the first phy */
-	for (phy_addr = 0; phy_addr < PHY_MAX_ADDR; phy_addr++) {
-		if (fep->mii_bus->phy_map[phy_addr]) {
-			phy_dev = fep->mii_bus->phy_map[phy_addr];
-			break;
-		}
-	}
-
+	phy_dev = phy_find_first(fep->mii_bus);
 	if (!phy_dev) {
 		printk(KERN_ERR "%s: no PHY found\n", dev->name);
 		return -ENODEV;
 	}
 
 	/* attach the mac to the phy */
-	phy_dev = phy_connect(dev, dev_name(&phy_dev->dev),
+	ret = phy_connect_direct(dev, phy_dev,
 			     &fec_enet_adjust_link, 0,
 			     PHY_INTERFACE_MODE_MII);
-	if (IS_ERR(phy_dev)) {
+	if (ret) {
 		printk(KERN_ERR "%s: Could not attach to PHY\n", dev->name);
-		return PTR_ERR(phy_dev);
+		return ret;
 	}
 
 	/* mask with MAC supported features */
@@ -1365,10 +1359,11 @@ fec_drv_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
 static int
-fec_suspend(struct platform_device *dev, pm_message_t state)
+fec_suspend(struct device *dev)
 {
-	struct net_device *ndev = platform_get_drvdata(dev);
+	struct net_device *ndev = dev_get_drvdata(dev);
 	struct fec_enet_private *fep;
 
 	if (ndev) {
@@ -1381,9 +1376,9 @@ fec_suspend(struct platform_device *dev, pm_message_t state)
 }
 
 static int
-fec_resume(struct platform_device *dev)
+fec_resume(struct device *dev)
 {
-	struct net_device *ndev = platform_get_drvdata(dev);
+	struct net_device *ndev = dev_get_drvdata(dev);
 	struct fec_enet_private *fep;
 
 	if (ndev) {
@@ -1395,15 +1390,26 @@ fec_resume(struct platform_device *dev)
 	return 0;
 }
 
+static const struct dev_pm_ops fec_pm_ops = {
+	.suspend	= fec_suspend,
+	.resume		= fec_resume,
+	.freeze		= fec_suspend,
+	.thaw		= fec_resume,
+	.poweroff	= fec_suspend,
+	.restore	= fec_resume,
+};
+#endif
+
 static struct platform_driver fec_driver = {
 	.driver	= {
-		.name    = "fec",
-		.owner	 = THIS_MODULE,
+		.name	= "fec",
+		.owner	= THIS_MODULE,
+#ifdef CONFIG_PM
+		.pm	= &fec_pm_ops,
+#endif
 	},
-	.probe   = fec_probe,
-	.remove  = __devexit_p(fec_drv_remove),
-	.suspend = fec_suspend,
-	.resume  = fec_resume,
+	.probe	= fec_probe,
+	.remove	= __devexit_p(fec_drv_remove),
 };
 
 static int __init

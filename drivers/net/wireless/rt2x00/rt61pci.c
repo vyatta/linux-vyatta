@@ -931,6 +931,9 @@ static void rt61pci_config_retry_limit(struct rt2x00_dev *rt2x00dev,
 	u32 reg;
 
 	rt2x00pci_register_read(rt2x00dev, TXRX_CSR4, &reg);
+	rt2x00_set_field32(&reg, TXRX_CSR4_OFDM_TX_RATE_DOWN, 1);
+	rt2x00_set_field32(&reg, TXRX_CSR4_OFDM_TX_RATE_STEP, 0);
+	rt2x00_set_field32(&reg, TXRX_CSR4_OFDM_TX_FALLBACK_CCK, 0);
 	rt2x00_set_field32(&reg, TXRX_CSR4_LONG_RETRY_LIMIT,
 			   libconf->conf->long_frame_max_tx_count);
 	rt2x00_set_field32(&reg, TXRX_CSR4_SHORT_RETRY_LIMIT,
@@ -1874,6 +1877,16 @@ static void rt61pci_write_beacon(struct queue_entry *entry,
 	rt2x00pci_register_write(rt2x00dev, TXRX_CSR9, reg);
 
 	/*
+	 * Write the TX descriptor for the beacon.
+	 */
+	rt61pci_write_tx_desc(rt2x00dev, entry->skb, txdesc);
+
+	/*
+	 * Dump beacon to userspace through debugfs.
+	 */
+	rt2x00debug_dump_frame(rt2x00dev, DUMP_FRAME_BEACON, entry->skb);
+
+	/*
 	 * Write entire beacon with descriptor to register.
 	 */
 	beacon_base = HW_BEACON_OFFSET(entry->entry_idx);
@@ -2039,28 +2052,23 @@ static void rt61pci_txdone(struct rt2x00_dev *rt2x00dev)
 	struct txdone_entry_desc txdesc;
 	u32 word;
 	u32 reg;
-	u32 old_reg;
 	int type;
 	int index;
+	int i;
 
 	/*
-	 * During each loop we will compare the freshly read
-	 * STA_CSR4 register value with the value read from
-	 * the previous loop. If the 2 values are equal then
-	 * we should stop processing because the chance is
-	 * quite big that the device has been unplugged and
-	 * we risk going into an endless loop.
+	 * TX_STA_FIFO is a stack of X entries, hence read TX_STA_FIFO
+	 * at most X times and also stop processing once the TX_STA_FIFO_VALID
+	 * flag is not set anymore.
+	 *
+	 * The legacy drivers use X=TX_RING_SIZE but state in a comment
+	 * that the TX_STA_FIFO stack has a size of 16. We stick to our
+	 * tx ring size for now.
 	 */
-	old_reg = 0;
-
-	while (1) {
+	for (i = 0; i < TX_ENTRIES; i++) {
 		rt2x00pci_register_read(rt2x00dev, STA_CSR4, &reg);
 		if (!rt2x00_get_field32(reg, STA_CSR4_VALID))
 			break;
-
-		if (old_reg == reg)
-			break;
-		old_reg = reg;
 
 		/*
 		 * Skip this entry when it contains an invalid
@@ -2119,6 +2127,13 @@ static void rt61pci_txdone(struct rt2x00_dev *rt2x00dev)
 			__set_bit(TXDONE_FAILURE, &txdesc.flags);
 		}
 		txdesc.retry = rt2x00_get_field32(reg, STA_CSR4_RETRY_COUNT);
+
+		/*
+		 * the frame was retried at least once
+		 * -> hw used fallback rates
+		 */
+		if (txdesc.retry)
+			__set_bit(TXDONE_FALLBACK, &txdesc.flags);
 
 		rt2x00lib_txdone(entry, &txdesc);
 	}
@@ -2184,6 +2199,12 @@ static irqreturn_t rt61pci_interrupt(int irq, void *dev_instance)
 	 */
 	if (rt2x00_get_field32(reg_mcu, MCU_INT_SOURCE_CSR_TWAKEUP))
 		rt61pci_wakeup(rt2x00dev);
+
+	/*
+	 * 5 - Beacon done interrupt.
+	 */
+	if (rt2x00_get_field32(reg, INT_SOURCE_CSR_BEACON_DONE))
+		rt2x00lib_beacondone(rt2x00dev);
 
 	return IRQ_HANDLED;
 }
@@ -2577,6 +2598,18 @@ static int rt61pci_probe_hw_mode(struct rt2x00_dev *rt2x00dev)
 						   EEPROM_MAC_ADDR_0));
 
 	/*
+	 * As rt61 has a global fallback table we cannot specify
+	 * more then one tx rate per frame but since the hw will
+	 * try several rates (based on the fallback table) we should
+	 * still initialize max_rates to the maximum number of rates
+	 * we are going to try. Otherwise mac80211 will truncate our
+	 * reported tx rates and the rc algortihm will end up with
+	 * incorrect data.
+	 */
+	rt2x00dev->hw->max_rates = 7;
+	rt2x00dev->hw->max_rate_tries = 1;
+
+	/*
 	 * Initialize hw_mode information.
 	 */
 	spec->supported_bands = SUPPORT_BAND_2GHZ;
@@ -2773,7 +2806,6 @@ static const struct rt2x00lib_ops rt61pci_rt2x00_ops = {
 	.reset_tuner		= rt61pci_reset_tuner,
 	.link_tuner		= rt61pci_link_tuner,
 	.write_tx_desc		= rt61pci_write_tx_desc,
-	.write_tx_data		= rt2x00pci_write_tx_data,
 	.write_beacon		= rt61pci_write_beacon,
 	.kick_tx_queue		= rt61pci_kick_tx_queue,
 	.kill_tx_queue		= rt61pci_kill_tx_queue,

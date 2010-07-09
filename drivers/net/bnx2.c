@@ -58,8 +58,8 @@
 #include "bnx2_fw.h"
 
 #define DRV_MODULE_NAME		"bnx2"
-#define DRV_MODULE_VERSION	"2.0.15"
-#define DRV_MODULE_RELDATE	"May 4, 2010"
+#define DRV_MODULE_VERSION	"2.0.16"
+#define DRV_MODULE_RELDATE	"July 2, 2010"
 #define FW_MIPS_FILE_06		"bnx2/bnx2-mips-06-5.0.0.j6.fw"
 #define FW_RV2P_FILE_06		"bnx2/bnx2-rv2p-06-5.0.0.j3.fw"
 #define FW_MIPS_FILE_09		"bnx2/bnx2-mips-09-5.0.0.j15.fw"
@@ -1446,7 +1446,8 @@ bnx2_test_and_disable_2g5(struct bnx2 *bp)
 static void
 bnx2_enable_forced_2g5(struct bnx2 *bp)
 {
-	u32 bmcr;
+	u32 uninitialized_var(bmcr);
+	int err;
 
 	if (!(bp->phy_flags & BNX2_PHY_FLAG_2_5G_CAPABLE))
 		return;
@@ -1456,21 +1457,27 @@ bnx2_enable_forced_2g5(struct bnx2 *bp)
 
 		bnx2_write_phy(bp, MII_BNX2_BLK_ADDR,
 			       MII_BNX2_BLK_ADDR_SERDES_DIG);
-		bnx2_read_phy(bp, MII_BNX2_SERDES_DIG_MISC1, &val);
-		val &= ~MII_BNX2_SD_MISC1_FORCE_MSK;
-		val |= MII_BNX2_SD_MISC1_FORCE | MII_BNX2_SD_MISC1_FORCE_2_5G;
-		bnx2_write_phy(bp, MII_BNX2_SERDES_DIG_MISC1, val);
+		if (!bnx2_read_phy(bp, MII_BNX2_SERDES_DIG_MISC1, &val)) {
+			val &= ~MII_BNX2_SD_MISC1_FORCE_MSK;
+			val |= MII_BNX2_SD_MISC1_FORCE |
+				MII_BNX2_SD_MISC1_FORCE_2_5G;
+			bnx2_write_phy(bp, MII_BNX2_SERDES_DIG_MISC1, val);
+		}
 
 		bnx2_write_phy(bp, MII_BNX2_BLK_ADDR,
 			       MII_BNX2_BLK_ADDR_COMBO_IEEEB0);
-		bnx2_read_phy(bp, bp->mii_bmcr, &bmcr);
+		err = bnx2_read_phy(bp, bp->mii_bmcr, &bmcr);
 
 	} else if (CHIP_NUM(bp) == CHIP_NUM_5708) {
-		bnx2_read_phy(bp, bp->mii_bmcr, &bmcr);
-		bmcr |= BCM5708S_BMCR_FORCE_2500;
+		err = bnx2_read_phy(bp, bp->mii_bmcr, &bmcr);
+		if (!err)
+			bmcr |= BCM5708S_BMCR_FORCE_2500;
 	} else {
 		return;
 	}
+
+	if (err)
+		return;
 
 	if (bp->autoneg & AUTONEG_SPEED) {
 		bmcr &= ~BMCR_ANENABLE;
@@ -1483,7 +1490,8 @@ bnx2_enable_forced_2g5(struct bnx2 *bp)
 static void
 bnx2_disable_forced_2g5(struct bnx2 *bp)
 {
-	u32 bmcr;
+	u32 uninitialized_var(bmcr);
+	int err;
 
 	if (!(bp->phy_flags & BNX2_PHY_FLAG_2_5G_CAPABLE))
 		return;
@@ -1493,20 +1501,25 @@ bnx2_disable_forced_2g5(struct bnx2 *bp)
 
 		bnx2_write_phy(bp, MII_BNX2_BLK_ADDR,
 			       MII_BNX2_BLK_ADDR_SERDES_DIG);
-		bnx2_read_phy(bp, MII_BNX2_SERDES_DIG_MISC1, &val);
-		val &= ~MII_BNX2_SD_MISC1_FORCE;
-		bnx2_write_phy(bp, MII_BNX2_SERDES_DIG_MISC1, val);
+		if (!bnx2_read_phy(bp, MII_BNX2_SERDES_DIG_MISC1, &val)) {
+			val &= ~MII_BNX2_SD_MISC1_FORCE;
+			bnx2_write_phy(bp, MII_BNX2_SERDES_DIG_MISC1, val);
+		}
 
 		bnx2_write_phy(bp, MII_BNX2_BLK_ADDR,
 			       MII_BNX2_BLK_ADDR_COMBO_IEEEB0);
-		bnx2_read_phy(bp, bp->mii_bmcr, &bmcr);
+		err = bnx2_read_phy(bp, bp->mii_bmcr, &bmcr);
 
 	} else if (CHIP_NUM(bp) == CHIP_NUM_5708) {
-		bnx2_read_phy(bp, bp->mii_bmcr, &bmcr);
-		bmcr &= ~BCM5708S_BMCR_FORCE_2500;
+		err = bnx2_read_phy(bp, bp->mii_bmcr, &bmcr);
+		if (!err)
+			bmcr &= ~BCM5708S_BMCR_FORCE_2500;
 	} else {
 		return;
 	}
+
+	if (err)
+		return;
 
 	if (bp->autoneg & AUTONEG_SPEED)
 		bmcr |= BMCR_SPEED1000 | BMCR_ANENABLE | BMCR_ANRESTART;
@@ -3206,6 +3219,10 @@ bnx2_rx_int(struct bnx2 *bp, struct bnx2_napi *bnapi, int budget)
 					      L2_FHDR_ERRORS_UDP_XSUM)) == 0))
 				skb->ip_summed = CHECKSUM_UNNECESSARY;
 		}
+		if ((bp->dev->features & NETIF_F_RXHASH) &&
+		    ((status & L2_FHDR_STATUS_USE_RXHASH) ==
+		     L2_FHDR_STATUS_USE_RXHASH))
+			skb->rxhash = rx_hdr->l2_fhdr_hash;
 
 		skb_record_rx_queue(skb, bnapi - &bp->bnx2_napi[0]);
 
@@ -6172,7 +6189,7 @@ bnx2_setup_int_mode(struct bnx2 *bp, int dis_msi)
 	bp->irq_nvecs = 1;
 	bp->irq_tbl[0].vector = bp->pdev->irq;
 
-	if ((bp->flags & BNX2_FLAG_MSIX_CAP) && !dis_msi && cpus > 1)
+	if ((bp->flags & BNX2_FLAG_MSIX_CAP) && !dis_msi)
 		bnx2_enable_msix(bp, msix_vecs);
 
 	if ((bp->flags & BNX2_FLAG_MSI_CAP) && !dis_msi &&
@@ -6296,9 +6313,14 @@ static void
 bnx2_dump_state(struct bnx2 *bp)
 {
 	struct net_device *dev = bp->dev;
-	u32 mcp_p0, mcp_p1;
+	u32 mcp_p0, mcp_p1, val1, val2;
 
-	netdev_err(dev, "DEBUG: intr_sem[%x]\n", atomic_read(&bp->intr_sem));
+	pci_read_config_dword(bp->pdev, PCI_COMMAND, &val1);
+	netdev_err(dev, "DEBUG: intr_sem[%x] PCI_CMD[%08x]\n",
+		   atomic_read(&bp->intr_sem), val1);
+	pci_read_config_dword(bp->pdev, bp->pm_cap + PCI_PM_CTRL, &val1);
+	pci_read_config_dword(bp->pdev, BNX2_PCICFG_MISC_CONFIG, &val2);
+	netdev_err(dev, "DEBUG: PCI_PM[%08x] PCI_MISC_CFG[%08x]\n", val1, val2);
 	netdev_err(dev, "DEBUG: EMAC_TX_STATUS[%08x] EMAC_RX_STATUS[%08x]\n",
 		   REG_RD(bp, BNX2_EMAC_TX_STATUS),
 		   REG_RD(bp, BNX2_EMAC_RX_STATUS));
@@ -6567,36 +6589,25 @@ bnx2_save_stats(struct bnx2 *bp)
 		temp_stats[i] += hw_stats[i];
 }
 
-#define GET_64BIT_NET_STATS64(ctr)				\
-	(unsigned long) ((unsigned long) (ctr##_hi) << 32) +	\
-	(unsigned long) (ctr##_lo)
+#define GET_64BIT_NET_STATS64(ctr)		\
+	(((u64) (ctr##_hi) << 32) + (u64) (ctr##_lo))
 
-#define GET_64BIT_NET_STATS32(ctr)				\
-	(ctr##_lo)
-
-#if (BITS_PER_LONG == 64)
 #define GET_64BIT_NET_STATS(ctr)				\
 	GET_64BIT_NET_STATS64(bp->stats_blk->ctr) +		\
 	GET_64BIT_NET_STATS64(bp->temp_stats_blk->ctr)
-#else
-#define GET_64BIT_NET_STATS(ctr)				\
-	GET_64BIT_NET_STATS32(bp->stats_blk->ctr) +		\
-	GET_64BIT_NET_STATS32(bp->temp_stats_blk->ctr)
-#endif
 
 #define GET_32BIT_NET_STATS(ctr)				\
 	(unsigned long) (bp->stats_blk->ctr +			\
 			 bp->temp_stats_blk->ctr)
 
-static struct net_device_stats *
-bnx2_get_stats(struct net_device *dev)
+static struct rtnl_link_stats64 *
+bnx2_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *net_stats)
 {
 	struct bnx2 *bp = netdev_priv(dev);
-	struct net_device_stats *net_stats = &dev->stats;
 
-	if (bp->stats_blk == NULL) {
+	if (bp->stats_blk == NULL)
 		return net_stats;
-	}
+
 	net_stats->rx_packets =
 		GET_64BIT_NET_STATS(stat_IfHCInUcastPkts) +
 		GET_64BIT_NET_STATS(stat_IfHCInMulticastPkts) +
@@ -7545,6 +7556,12 @@ bnx2_set_tx_csum(struct net_device *dev, u32 data)
 		return (ethtool_op_set_tx_csum(dev, data));
 }
 
+static int
+bnx2_set_flags(struct net_device *dev, u32 data)
+{
+	return ethtool_op_set_flags(dev, data, ETH_FLAG_RXHASH);
+}
+
 static const struct ethtool_ops bnx2_ethtool_ops = {
 	.get_settings		= bnx2_get_settings,
 	.set_settings		= bnx2_set_settings,
@@ -7574,6 +7591,8 @@ static const struct ethtool_ops bnx2_ethtool_ops = {
 	.phys_id		= bnx2_phys_id,
 	.get_ethtool_stats	= bnx2_get_ethtool_stats,
 	.get_sset_count		= bnx2_get_sset_count,
+	.set_flags		= bnx2_set_flags,
+	.get_flags		= ethtool_op_get_flags,
 };
 
 /* Called with rtnl_lock */
@@ -8259,7 +8278,7 @@ static const struct net_device_ops bnx2_netdev_ops = {
 	.ndo_open		= bnx2_open,
 	.ndo_start_xmit		= bnx2_start_xmit,
 	.ndo_stop		= bnx2_close,
-	.ndo_get_stats		= bnx2_get_stats,
+	.ndo_get_stats64	= bnx2_get_stats64,
 	.ndo_set_rx_mode	= bnx2_set_rx_mode,
 	.ndo_do_ioctl		= bnx2_ioctl,
 	.ndo_validate_addr	= eth_validate_addr,
@@ -8320,7 +8339,8 @@ bnx2_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	memcpy(dev->dev_addr, bp->mac_addr, 6);
 	memcpy(dev->perm_addr, bp->mac_addr, 6);
 
-	dev->features |= NETIF_F_IP_CSUM | NETIF_F_SG | NETIF_F_GRO;
+	dev->features |= NETIF_F_IP_CSUM | NETIF_F_SG | NETIF_F_GRO |
+			 NETIF_F_RXHASH;
 	vlan_features_add(dev, NETIF_F_IP_CSUM | NETIF_F_SG);
 	if (CHIP_NUM(bp) == CHIP_NUM_5709) {
 		dev->features |= NETIF_F_IPV6_CSUM;
