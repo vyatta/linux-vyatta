@@ -2186,7 +2186,7 @@ static int inet6_addr_del(struct net *net, int ifindex, struct in6_addr *pfx,
 			   disable IPv6 on this interface.
 			 */
 			if (idev->addr_list == NULL)
-				addrconf_ifdown(idev->dev, 1);
+				addrconf_ifdown(idev->dev, 0);
 			return 0;
 		}
 	}
@@ -2615,6 +2615,13 @@ static void addrconf_bonding_change(struct net_device *dev, unsigned long event)
 		ipv6_mc_unmap(idev);
 }
 
+static int should_del_addr(int how, const struct inet6_ifaddr *ifa)
+{
+	return how || !(ifa->flags&IFA_F_PERMANENT) ||
+		(ipv6_addr_type(&ifa->addr) & IPV6_ADDR_LINKLOCAL);
+
+}
+
 static int addrconf_ifdown(struct net_device *dev, int how)
 {
 	struct inet6_dev *idev;
@@ -2652,8 +2659,7 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 		write_lock_bh(&addrconf_hash_lock);
 		while ((ifa = *bifa) != NULL) {
 			if (ifa->idev == idev &&
-			    (how || !(ifa->flags&IFA_F_PERMANENT) ||
-			     ipv6_addr_type(&ifa->addr) & IPV6_ADDR_LINKLOCAL)) {
+			    should_del_addr(how, ifa)) {
 				*bifa = ifa->lst_next;
 				ifa->lst_next = NULL;
 				__in6_ifa_put(ifa);
@@ -2702,10 +2708,7 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 
 		/* If just doing link down, and address is permanent
 		   and not link-local, then retain it. */
-		if (how == 0 &&
-		    (ifa->flags&IFA_F_PERMANENT) &&
-		    !(ipv6_addr_type(&ifa->addr) & IPV6_ADDR_LINKLOCAL)) {
-
+		if (!should_del_addr(how, ifa)) {
 			/* Move to holding list */
 			*bifa = ifa;
 			bifa = &ifa->if_next;
@@ -2729,7 +2732,9 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 		write_unlock_bh(&idev->lock);
 
 		__ipv6_ifa_notify(RTM_DELADDR, ifa);
-		atomic_notifier_call_chain(&inet6addr_chain, NETDEV_DOWN, ifa);
+		if (ifa->dead)
+			atomic_notifier_call_chain(&inet6addr_chain,
+						   NETDEV_DOWN, ifa);
 		in6_ifa_put(ifa);
 
 		write_lock_bh(&idev->lock);
@@ -3775,6 +3780,7 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 	array[DEVCONF_DISABLE_IPV6] = cnf->disable_ipv6;
 	array[DEVCONF_ACCEPT_DAD] = cnf->accept_dad;
 	array[DEVCONF_FORCE_TLLAO] = cnf->force_tllao;
+	array[DEVCONF_LINK_FILTER] = cnf->link_filter;
 }
 
 static inline size_t inet6_if_nlmsg_size(void)
@@ -4047,7 +4053,7 @@ static void __ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 			addrconf_leave_anycast(ifp);
 		addrconf_leave_solict(ifp->idev, &ifp->addr);
 		dst_hold(&ifp->rt->u.dst);
-		if (ip6_del_rt(ifp->rt))
+		if (ifp->dead && ip6_del_rt(ifp->rt))
 			dst_free(&ifp->rt->u.dst);
 		break;
 	}

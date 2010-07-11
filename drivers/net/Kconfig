@@ -3191,6 +3191,13 @@ config PPPOL2TP
 	  and session setup). One such daemon is OpenL2TP
 	  (http://openl2tp.sourceforge.net/).
 
+config PPP_BCP
+        tristate "PPP over Bridge"
+	depends on EXPERIMENTAL && PPP && BRIDGE
+	help
+	  Support for PPP over Ethernet Bridge by using the
+	  Bridge Control Protocol (BCP) as defined in RFC 3185.
+
 config SLIP
 	tristate "SLIP (serial line) support"
 	---help---

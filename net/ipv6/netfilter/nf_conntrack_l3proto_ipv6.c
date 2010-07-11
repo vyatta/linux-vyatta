@@ -206,7 +206,6 @@ static enum ip6_defrag_users nf_ct6_defrag_user(unsigned int hooknum,
 		return IP6_DEFRAG_CONNTRACK_IN + zone;
 	else
 		return IP6_DEFRAG_CONNTRACK_OUT + zone;
-
 }
 
 static unsigned int ipv6_defrag(unsigned int hooknum,

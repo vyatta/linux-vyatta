@@ -26,6 +26,8 @@ modules.builtin
 *.elf
 *.bin
 *.gz
+*.pyc
+*.lds
 *.bz2
 *.lzma
 *.patch
@@ -48,6 +50,7 @@ modules.builtin
 #
 !.gitignore
 !.mailmap
+modules.order
 
 #
 # Generated include files
@@ -74,5 +77,11 @@ GSYMS
 GTAGS
 
 *.orig
+*.rej
 *~
+
+stamp-*
+conf.vars
+config.precious
 \#*#
+
