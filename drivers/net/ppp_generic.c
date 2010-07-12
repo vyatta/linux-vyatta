@@ -29,6 +29,7 @@
 #include <linux/list.h>
 #include <linux/idr.h>
 #include <linux/netdevice.h>
+#include <linux/etherdevice.h>
 #include <linux/poll.h>
 #include <linux/ppp_defs.h>
 #include <linux/filter.h>
@@ -49,6 +50,7 @@
 #include <linux/slab.h>
 #include <net/slhc_vj.h>
 #include <asm/atomic.h>
+#include <linux/sysctl.h>
 
 #include <linux/nsproxy.h>
 #include <net/net_namespace.h>
@@ -65,7 +67,9 @@
 #define NP_AT	3		/* Appletalk protocol */
 #define NP_MPLS_UC 4		/* MPLS unicast */
 #define NP_MPLS_MC 5		/* MPLS multicast */
-#define NUM_NP	6		/* Number of NPs. */
+#define NP_BRIDGE	6	/* Bridged LAN packets */
+#define NP_BPDU_IEEE	7	/* IEEE 802.1 (D or G) bridge PDU */
+#define NUM_NP	8		/* Number of NPs. */
 
 #define MPHDRLEN	6	/* multilink protocol header length */
 #define MPHDRLEN_SSN	4	/* ditto with short sequence numbers */
@@ -137,6 +141,9 @@ struct ppp {
 	unsigned pass_len, active_len;
 #endif /* CONFIG_PPP_FILTER */
 	struct net	*ppp_net;	/* the net we belong to */
+#ifdef CONFIG_PPP_BCP
+	struct net_device *bcp;		/* network device for bridging */
+#endif
 };
 
 /*
@@ -297,6 +304,10 @@ static inline int proto_to_npindex(int proto)
 		return NP_MPLS_UC;
 	case PPP_MPLS_MC:
 		return NP_MPLS_MC;
+	case PPP_BRIDGE:
+		return NP_BRIDGE;
+	case PPP_BPDU_IEEE:
+		return NP_BPDU_IEEE;
 	}
 	return -EINVAL;
 }
@@ -309,6 +320,8 @@ static const int npindex_to_proto[NUM_NP] = {
 	PPP_AT,
 	PPP_MPLS_UC,
 	PPP_MPLS_MC,
+	PPP_BRIDGE,
+	PPP_BPDU_IEEE,
 };
 
 /* Translates an ethertype into an NP index */
@@ -341,6 +354,13 @@ static const int npindex_to_ethertype[NUM_NP] = {
 	ETH_P_MPLS_UC,
 	ETH_P_MPLS_MC,
 };
+
+/* IEEE 802.1D bridge PDU destination address */
+static const u8 ieee_8021d_dstaddr[ETH_ALEN] = { 1, 0x80, 0xC2, 0, 0, 0 };
+
+/* A few bytes that are present when and IEEE 802.1D bridge PDU is
+ * packed into an IEEE 802.3 frame. */
+static const u8 ieee_8021d_8023_hdr[] = { 0x42, 0x42, 0x03 };
 
 /*
  * Locking shorthand.
@@ -736,7 +756,22 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			if (copy_to_user(argp, &npi, sizeof(npi)))
 				break;
 		} else {
-			ppp->npmode[i] = npi.mode;
+#ifdef CONFIG_PPP_BCP
+			if (i == NP_BRIDGE) {
+				if (npi.mode == NPMODE_PASS) {
+					err = ppp_create_bcp(ppp);
+					if (err < 0)
+						break;
+					ppp->npmode[i] = npi.mode;
+				} else {
+					ppp->npmode[NP_BRIDGE] = npi.mode;
+					ppp->npmode[NP_BPDU_IEEE] = npi.mode;
+					ppp_shutdown_bcp(ppp);
+				}
+			} else
+#endif
+				ppp->npmode[i] = npi.mode;
+
 			/* we may be able to transmit more packets now (??) */
 			netif_wake_queue(ppp->dev);
 		}
@@ -897,6 +932,49 @@ static struct pernet_operations ppp_net_ops = {
 
 #define PPP_MAJOR	108
 
+static int ppp_multilink_do_pcomp = 1;
+
+#if defined(CONFIG_SYSCTL) && defined(CONFIG_PPP_MULTILINK)
+static struct ctl_table_header *ppp_generic_cth;
+
+static ctl_table ppp_generic_sysctl_table[] = {
+	{
+		.procname	= "mlppp_do_pcomp",
+		.data		= &ppp_multilink_do_pcomp,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{ }
+};
+
+static struct ctl_path pg_path[] = {
+	{ .procname = "net", },
+	{ }
+};
+
+static int ppp_generic_init_sysctl(void)
+{
+	ppp_generic_cth =
+		register_sysctl_paths(pg_path, ppp_generic_sysctl_table);
+	if (!ppp_generic_cth) {
+		printk(KERN_ERR "ppp_generic: can't register to sysctl.\n");
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+static void ppp_generic_fini_sysctl(void)
+{
+	unregister_sysctl_table(ppp_generic_cth);
+}
+
+#else
+#define ppp_generic_init_sysctl()	(0)
+#define ppp_generic_fini_sysctl()	do { } while(0)
+
+#endif	/* CONFIG_SYSCTL && CONFIG_PPP_MULTILINK */
+
 /* Called at boot time if ppp is compiled into the kernel,
    or at module load time (from init_module) if compiled as a module. */
 static int __init ppp_init(void)
@@ -911,10 +989,14 @@ static int __init ppp_init(void)
 		goto out;
 	}
 
+	err = ppp_generic_init_sysctl();
+	if (err)
+		goto out_net;
+
 	err = register_chrdev(PPP_MAJOR, "ppp", &ppp_device_fops);
 	if (err) {
 		printk(KERN_ERR "failed to register PPP device (%d)\n", err);
-		goto out_net;
+		goto out_sysctl;
 	}
 
 	ppp_class = class_create(THIS_MODULE, "ppp");
@@ -930,6 +1012,8 @@ static int __init ppp_init(void)
 
 out_chrdev:
 	unregister_chrdev(PPP_MAJOR, "ppp");
+out_sysctl:
+	ppp_generic_fini_sysctl();
 out_net:
 	unregister_pernet_device(&ppp_net_ops);
 out:
@@ -939,14 +1023,15 @@ out:
 /*
  * Network interface unit routines.
  */
+
+/* Called by PPP and BCP transmission routines. */
 static netdev_tx_t
-ppp_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ppp_common_start_xmit(int npi, struct sk_buff *skb, struct net_device *dev)
 {
 	struct ppp *ppp = netdev_priv(dev);
-	int npi, proto;
+	int proto;
 	unsigned char *pp;
 
-	npi = ethertype_to_npindex(ntohs(skb->protocol));
 	if (npi < 0)
 		goto outf;
 
@@ -982,6 +1067,14 @@ ppp_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	kfree_skb(skb);
 	++dev->stats.tx_dropped;
 	return NETDEV_TX_OK;
+}
+
+static netdev_tx_t
+ppp_start_xmit(struct sk_buff *skb, struct net_device *dev)
+{
+	int npi = ethertype_to_npindex(ntohs(skb->protocol));
+
+	return ppp_common_start_xmit(npi, skb, dev);
 }
 
 static int
@@ -1347,11 +1440,12 @@ static int ppp_mp_explode(struct ppp *ppp, struct sk_buff *skb)
 	 */
 	if (nfree == 0 || nfree < navail / 2)
 		return 0; /* can't take now, leave it in xmit_pending */
-
-	/* Do protocol field compression (XXX this should be optional) */
+	
 	p = skb->data;
 	len = skb->len;
-	if (*p == 0) {
+
+	/* compress the protocol field if the option is enabled */
+        if (*p == 0 && ppp_multilink_do_pcomp) {
 		++p;
 		--len;
 	}
@@ -1654,6 +1748,81 @@ ppp_receive_error(struct ppp *ppp)
 		slhc_toss(ppp->vj);
 }
 
+#ifdef CONFIG_PPP_BCP
+/* Decapsulate a packet from BCP. */
+static struct sk_buff *bcp_decap(struct sk_buff *skb)
+{
+	struct net_device *dev = skb->dev;
+	const struct bcp_hdr *hdr;
+
+	/* Make sure that the data we examine are present. */
+	if (!pskb_may_pull(skb, BCP_802_3_HDRLEN))
+		goto drop;
+
+	/* Currently, only 802.3/Ethernet bridging is supported. */
+	hdr = (struct bcp_hdr *) skb->data;
+	if (hdr->mactype != BCP_MAC_802_3)
+		goto drop;
+
+	skb_pull(skb, BCP_802_3_HDRLEN);
+	skb->mac.raw = skb->data;
+
+	/* remove LAN FCS */
+	if (hdr->flags & BCP_LAN_FCS) {
+		if (skb->len < ETH_FCS_LEN)
+			goto drop;
+		skb_trim(skb, skb->len - ETH_FCS_LEN);
+	}
+
+	/* decompress "Tinygrams" */
+	if ((hdr->flags & BCP_ZERO_PAD) && skb_padto(skb, ETH_ZLEN))
+		return 0;
+
+	/* Parse the ethernet header.  Because of the increased
+	 * hard_header_len, eth_type_trans() skips too much, so push
+	 * some back afterward.
+	 */
+	skb->protocol = eth_type_trans(skb, dev);
+	skb_push(skb, dev->hard_header_len - ETH_HLEN);
+
+	return skb;
+
+ drop:
+	kfree_skb(skb);
+	return 0;
+}
+
+/* Decapsulate an IEEE 802.1 (D or G) PDU. */
+static struct sk_buff *bpdu_ieee_decap(struct sk_buff *skb)
+{
+	struct net_device *const dev = skb->dev;
+	struct ethhdr *eth;
+
+	if (skb_cow_head(skb, ETH_HLEN + sizeof(ieee_8021d_8023_hdr))) {
+		kfree_skb(skb);
+		return 0;
+	}
+
+	/* Prepend the 802.3 SAP and control byte. */
+	memcpy(skb_push(skb, sizeof(ieee_8021d_8023_hdr)),
+	       ieee_8021d_8023_hdr, sizeof(ieee_8021d_8023_hdr));
+
+	/* Prepend an ethernet header. */
+	eth = skb_push(skb, ETH_HLEN);
+	memcpy(eth->h_dest, ieee_8021d_dstaddr, ETH_ALEN);
+	memset(eth->h_source, 0, ETH_ALEN);
+	eth->h_proto = htons(skb->len - ETH_HLEN);
+
+	/* Parse the ethernet header.  Because of the increased
+	 * hard_header_len, eth_type_trans() skips too much, so push
+	 * some back afterward. */
+	skb->protocol = eth_type_trans(skb, dev);
+	skb_push(skb, dev->hard_header_len - ETH_HLEN);
+
+	return skb;
+}
+#endif
+
 static void
 ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 {
@@ -1745,6 +1914,7 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 
 	} else {
 		/* network protocol frame - give it to the kernel */
+		struct net_device *rxdev;
 
 #ifdef CONFIG_PPP_FILTER
 		/* check if the packet passes the pass and active filters */
@@ -1774,13 +1944,44 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 #endif /* CONFIG_PPP_FILTER */
 			ppp->last_recv = jiffies;
 
-		if ((ppp->dev->flags & IFF_UP) == 0 ||
-		    ppp->npmode[npi] != NPMODE_PASS) {
+#ifdef CONFIG_PPP_BCP
+		if (npi == NP_BRIDGE || npi == NP_BPDU_IEEE)
+			rxdev = ppp->bcp;
+		else
+#endif
+			rxdev = ppp->dev;
+
+		if (ppp->npmode[npi] != NPMODE_PASS ||
+		    !rxdev || !(rxdev->flags & IFF_UP)) {
 			kfree_skb(skb);
-		} else {
-			/* chop off protocol */
-			skb_pull_rcsum(skb, 2);
-			skb->dev = ppp->dev;
+			return;
+		}
+
+		/* chop off protocol */
+		skb_pull_rcsum(skb, 2);
+		skb->dev = rxdev;
+
+		switch (npi) {
+#ifdef CONFIG_PPP_BCP
+		case NP_BRIDGE:
+			skb = bcp_decap(skb);
+			if (!skb) {
+				++ppp->bcp->stats.rx_dropped;
+				goto dropped;
+			}
+			++ppp->bcp->stats.rx_packets;
+			break;
+
+		case NP_BPDU_IEEE:
+			skb = bpdu_ieee_decap(skb);
+			if (!skb) {
+				++ppp->bcp->stats.rx_dropped;
+				goto dropped;
+			}
+			++ppp->bcp->stats.rx_packets;
+			break;
+#endif
+		default:
 			skb->protocol = htons(npindex_to_ethertype[npi]);
 			skb_reset_mac_header(skb);
 			netif_rx(skb);
@@ -2549,6 +2750,8 @@ ppp_create_interface(struct net *net, int unit, int *retp)
 	ppp->file.hdrlen = PPP_HDRLEN - 2;	/* don't count proto bytes */
 	for (i = 0; i < NUM_NP; ++i)
 		ppp->npmode[i] = NPMODE_PASS;
+	ppp->npmode[NP_BRIDGE] = NPMODE_DROP;
+	ppp->npmode[NP_BPDU_IEEE] = NPMODE_DROP;
 	INIT_LIST_HEAD(&ppp->channels);
 	spin_lock_init(&ppp->rlock);
 	spin_lock_init(&ppp->wlock);
@@ -2831,6 +3034,7 @@ static void __exit ppp_cleanup(void)
 	device_destroy(ppp_class, MKDEV(PPP_MAJOR, 0));
 	class_destroy(ppp_class);
 	unregister_pernet_device(&ppp_net_ops);
+ 	ppp_generic_fini_sysctl();
 }
 
 /*
@@ -2890,6 +3094,189 @@ static void *unit_find(struct idr *p, int n)
 {
 	return idr_find(p, n);
 }
+
+#ifdef CONFIG_PPP_BCP
+static const struct net_device_ops bcp_netdev_ops = {
+	.ndo_start_xmit = bcp_start_xmit,
+	.ndo_change_mtu = bcp_net_change_mtu,
+	.ndo_set_mac_addr = eth_mac_addr,
+	.ndo_validate_addr = eth_validate_addr,
+};
+
+/*
+ * Create interface for bridging.
+ */
+static int ppp_create_bcp(struct ppp *ppp)
+{
+	struct net_device *dev;
+	int ret = -ENOMEM;
+
+	/* If it already exists, ignore the request. */
+	if (ppp->bcp)
+		return 0;
+
+	/* create a new BCP dev */
+	dev = alloc_etherdev(0);
+	if (!dev)
+		goto err;
+
+	dev->hard_header_len = ppp->dev->hard_header_len
+		+ BCP_802_3_HDRLEN + ETH_HLEN;
+
+	/* ETH_FCS_LEN is not subtracted from the PPP MTU here because
+	 * bcp_start_xmit() never adds the FCS. */
+	dev->mtu = ppp->dev->mtu - (BCP_802_3_HDRLEN + ETH_HLEN);
+
+	if (dev->mtu > ETH_DATA_LEN)
+		dev->mtu = ETH_DATA_LEN;
+
+	dev->netdev_ops = &bcp_netdev_ops;
+	dev->tx_queue_len = 0; /* let PPP device queue packets */
+
+	sprintf(dev->name, "bcp%d", ppp->file.index);
+
+	rtnl_lock();
+	ret = register_netdevice(dev);
+	if (ret == 0)
+		ppp->bcp = dev;
+	rtnl_unlock();
+
+	if (ret) {
+		pr_err("PPP: couldn't register device %s (%d)\n",
+		       dev->name, ret);
+		free_netdev(dev);
+	}
+ err:
+	return ret;
+}
+
+/*
+ * Take down a bcp interface.
+ */
+static void ppp_shutdown_bcp(struct ppp *ppp)
+{
+	struct net_device *bcp;
+
+	bcp = ppp->bcp;
+	if (bcp) {
+		unregister_netdev(bcp);
+		ppp->bcp = 0;
+		free_netdev(bcp);
+	}
+}
+
+static int
+bcp_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+{
+	return -EOPNOTSUPP;
+}
+
+static int
+bcp_net_change_mtu(struct net_device *dev, int new_mtu)
+{
+	/* MTU is negotiated by the PPP daemon and should not be changed. */
+	return -EOPNOTSUPP;
+}
+
+/* input:  ethernet frame in non-shared skbuff
+ * output: bcp-encapsulated frame in non-shared and non-cloned skbuff
+ */
+static struct sk_buff *bcp_encap(struct sk_buff *skb, struct net_device *dev)
+{
+	struct bcp_hdr *bhdr;
+	int pad_len;
+
+	/* @todo Calculate FCS?  NB: If you add this, be sure to
+	 * change the MTU calculation in ppp_create_bcp() to account
+	 * for it. */
+
+
+	/* Add a BCP header and pad to minimum frame size.
+	 *
+	 * Observations:
+	 *   - Headroom is usually adequate, because the kernel usually
+	 *     checks dev->hard_header_len; however, it is possible to
+	 *     be given a buffer that was originally allocated for another
+	 *     device.  (I have not seen it during testing.)
+	 *   - It is not possible for a buffer to be shared, because
+	 *     bcp_start_xmit() calls skb_share_check().
+	 *   - I do not know when a buffer might be cloned; perhaps it
+	 *     is possible in a bridging application where the same
+	 *     packet needs to be transmitted to multiple interfaces.
+	 */
+	if (skb_cow_head(skb, dev->hard_header_len)) {
+		kfree_skb(skb);
+		return 0;
+	}
+
+	bhdr = skb_push(skb, BCP_802_3_HDRLEN);
+	bhdr->flags = 0;		/* no LAN FCS, not a tinygram */
+	bhdr->mactype = BCP_MAC_802_3;	/* 802.3 / Ethernet */
+
+	/* There is currently no communication from pppd regarding the
+	 * peer's Tinygram-Compression option.  Therefore, we always
+	 * pad short frames to minimum Ethernet size in case the peer
+	 * does not support Tinygrams.
+	 */
+	if (skb_padto(skb, ETH_ZLEN))
+		return 0;
+
+	return skb;
+}
+
+/* input:  BPDU ethernet frame in non-shared skbuff
+ * output: naked BPDU in non-shared and non-cloned skbuff
+ */
+static struct sk_buff *bpdu_ieee_encap(struct sk_buff *skb)
+{
+	/* pull off the link header */
+	skb_pull(skb, ETH_HLEN + sizeof(ieee_8021d_8023_hdr));
+
+	return skb_unshare(skb, GFP_ATOMIC);
+}
+
+static int
+bcp_start_xmit(struct sk_buff *skb, struct net_device *dev)
+{
+	struct bcp_device *const bcp = dev_to_bcp(dev);
+	struct ppp *const ppp = bcp_to_ppp(bcp);
+	int npi;
+
+	/* make sure we can push/pull without side effects */
+	skb = skb_share_check(skb, GFP_ATOMIC);
+	if (!skb)
+		goto dropped;
+
+	/* When configured to encapsulate 802.1D bridge PDUs in the
+	 * obsolete manner of RFC 1638, do it.  Otherwise, send it
+	 * like any other packet.
+	 */
+	if ((ppp->npmode[NP_BPDU_IEEE] == NPMODE_PASS) &&
+	    pskb_may_pull(skb, ETH_HLEN + sizeof(ieee_8021d_8023_hdr)) &&
+	    compare_ether_addr(skb->data, ieee_8021d_dstaddr) == 0 &&
+	    memcmp(skb->data + ETH_HLEN, ieee_8021d_8023_hdr,
+		   sizeof(ieee_8021d_8023_hdr)) == 0) {
+		skb = bpdu_ieee_encap(skb, dev);
+		npi = NP_BPDU_IEEE;
+	} else {
+		skb = bcp_encap(skb, dev);
+		npi = NP_BRIDGE;
+	}
+
+	if (!skb)
+		goto dropped;
+
+	/* send packet through the PPP interface */
+	skb->dev = ppp->dev;
+	++bcp->stats.tx_packets;
+
+	return ppp_common_start_xmit(npi, skb, skb->dev);
+
+ dropped:
+	++bcp->stats.tx_dropped;
+	return 0;
+}
+#endif
 
 /* Module/initialization stuff */
 

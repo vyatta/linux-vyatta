@@ -88,6 +88,7 @@
 #include <linux/socket.h>
 #include <linux/sockios.h>
 #include <linux/errno.h>
+#include <linux/hash.h>
 #include <linux/interrupt.h>
 #include <linux/if_ether.h>
 #include <linux/netdevice.h>
@@ -5146,9 +5147,7 @@ int register_netdevice(struct net_device *dev)
 	 *	Prevent userspace races by waiting until the network
 	 *	device is fully setup before sending notifications.
 	 */
-	if (!dev->rtnl_link_ops ||
-	    dev->rtnl_link_state == RTNL_LINK_INITIALIZED)
-		rtmsg_ifinfo(RTM_NEWLINK, dev, ~0U);
+	rtmsg_ifinfo(RTM_NEWLINK, dev, ~0U);
 
 out:
 	return ret;
