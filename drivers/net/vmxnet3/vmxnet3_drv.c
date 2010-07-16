@@ -2249,7 +2249,7 @@ vmxnet3_declare_features(struct vmxnet3_adapter *adapter, bool dma64)
 
 	adapter->rxcsum = true;
 	adapter->jumbo_frame = true;
-	adapter->lro = true;
+	adapter->lro = false;
 
 	if (dma64) {
 		netdev->features |= NETIF_F_HIGHDMA;
