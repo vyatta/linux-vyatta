@@ -158,9 +158,6 @@ static inline int ip_vs_conn_hash(struct ip_vs_conn *cp)
 	unsigned hash;
 	int ret;
 
-	if (cp->flags & IP_VS_CONN_F_ONE_PACKET)
-		return 0;
-
 	/* Hash by protocol, client address and port */
 	hash = ip_vs_conn_hashkey(cp->af, cp->protocol, &cp->caddr, cp->cport);
 
@@ -362,9 +359,8 @@ struct ip_vs_conn *ip_vs_conn_out_get
  */
 void ip_vs_conn_put(struct ip_vs_conn *cp)
 {
-	unsigned long t = (cp->flags & IP_VS_CONN_F_ONE_PACKET) ?
-		0 : cp->timeout;
-	mod_timer(&cp->timer, jiffies+t);
+	/* reset it expire in its timeout */
+	mod_timer(&cp->timer, jiffies+cp->timeout);
 
 	__ip_vs_conn_put(cp);
 }
@@ -657,7 +653,7 @@ static void ip_vs_conn_expire(unsigned long data)
 	/*
 	 *	unhash it if it is hashed in the conn table
 	 */
-	if (!ip_vs_conn_unhash(cp) && !(cp->flags & IP_VS_CONN_F_ONE_PACKET))
+	if (!ip_vs_conn_unhash(cp))
 		goto expire_later;
 
 	/*

@@ -233,27 +233,34 @@ static void tlb_deinitialize(struct bonding *bond)
 	_unlock_tx_hashtbl(bond);
 }
 
-static long long compute_gap(struct slave *slave)
-{
-	return (s64) (slave->speed << 20) - /* Convert to Megabit per sec */
-	       (s64) (SLAVE_TLB_INFO(slave).load << 3); /* Bytes to bits */
-}
-
 /* Caller must hold bond lock for read */
 static struct slave *tlb_get_least_loaded_slave(struct bonding *bond)
 {
 	struct slave *slave, *least_loaded;
-	long long max_gap;
-	int i;
+	s64 max_gap;
+	int i, found = 0;
 
-	least_loaded = NULL;
-	max_gap = LLONG_MIN;
-
-	/* Find the slave with the largest gap */
+	/* Find the first enabled slave */
 	bond_for_each_slave(bond, slave, i) {
 		if (SLAVE_IS_OK(slave)) {
-			long long gap = compute_gap(slave);
+			found = 1;
+			break;
+		}
+	}
 
+	if (!found) {
+		return NULL;
+	}
+
+	least_loaded = slave;
+	max_gap = (s64)(slave->speed << 20) - /* Convert to Megabit per sec */
+			(s64)(SLAVE_TLB_INFO(slave).load << 3); /* Bytes to bits */
+
+	/* Find the slave with the largest gap */
+	bond_for_each_slave_from(bond, slave, i, least_loaded) {
+		if (SLAVE_IS_OK(slave)) {
+			s64 gap = (s64)(slave->speed << 20) -
+					(s64)(SLAVE_TLB_INFO(slave).load << 3);
 			if (max_gap < gap) {
 				least_loaded = slave;
 				max_gap = gap;

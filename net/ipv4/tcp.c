@@ -511,7 +511,7 @@ int tcp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 
 static inline void tcp_mark_push(struct tcp_sock *tp, struct sk_buff *skb)
 {
-	TCP_SKB_CB(skb)->flags |= TCPHDR_PSH;
+	TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_PSH;
 	tp->pushed_seq = tp->write_seq;
 }
 
@@ -527,7 +527,7 @@ static inline void skb_entail(struct sock *sk, struct sk_buff *skb)
 
 	skb->csum    = 0;
 	tcb->seq     = tcb->end_seq = tp->write_seq;
-	tcb->flags   = TCPHDR_ACK;
+	tcb->flags   = TCPCB_FLAG_ACK;
 	tcb->sacked  = 0;
 	skb_header_release(skb);
 	tcp_add_write_queue_tail(sk, skb);
@@ -608,6 +608,7 @@ ssize_t tcp_splice_read(struct socket *sock, loff_t *ppos,
 	ssize_t spliced;
 	int ret;
 
+	sock_rps_record_flow(sk);
 	/*
 	 * We can't seek on a socket input
 	 */
@@ -815,7 +816,7 @@ new_segment:
 		skb_shinfo(skb)->gso_segs = 0;
 
 		if (!copied)
-			TCP_SKB_CB(skb)->flags &= ~TCPHDR_PSH;
+			TCP_SKB_CB(skb)->flags &= ~TCPCB_FLAG_PSH;
 
 		copied += copy;
 		poffset += copy;
@@ -1061,7 +1062,7 @@ new_segment:
 			}
 
 			if (!copied)
-				TCP_SKB_CB(skb)->flags &= ~TCPHDR_PSH;
+				TCP_SKB_CB(skb)->flags &= ~TCPCB_FLAG_PSH;
 
 			tp->write_seq += copy;
 			TCP_SKB_CB(skb)->end_seq += copy;
@@ -1897,10 +1898,6 @@ void tcp_close(struct sock *sk, long timeout)
 	}
 
 	sk_mem_reclaim(sk);
-
-	/* If socket has been already reset (e.g. in tcp_reset()) - kill it. */
-	if (sk->sk_state == TCP_CLOSE)
-		goto adjudge_to_death;
 
 	/* As outlined in RFC 2525, section 2.17, we send a RST here because
 	 * data was lost. To witness the awful effects of the old behavior of
@@ -2962,7 +2959,7 @@ struct tcp_md5sig_pool *tcp_get_md5sig_pool(void)
 	spin_unlock(&tcp_md5sig_pool_lock);
 
 	if (p)
-		return *this_cpu_ptr(p);
+		return *per_cpu_ptr(p, smp_processor_id());
 
 	local_bh_enable();
 	return NULL;
@@ -3003,7 +3000,6 @@ int tcp_md5_hash_skb_data(struct tcp_md5sig_pool *hp,
 	const unsigned head_data_len = skb_headlen(skb) > header_len ?
 				       skb_headlen(skb) - header_len : 0;
 	const struct skb_shared_info *shi = skb_shinfo(skb);
-	struct sk_buff *frag_iter;
 
 	sg_init_table(&sg, 1);
 
@@ -3017,10 +3013,6 @@ int tcp_md5_hash_skb_data(struct tcp_md5sig_pool *hp,
 		if (crypto_hash_update(desc, &sg, f->size))
 			return 1;
 	}
-
-	skb_walk_frags(skb, frag_iter)
-		if (tcp_md5_hash_skb_data(hp, frag_iter, 0))
-			return 1;
 
 	return 0;
 }

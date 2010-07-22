@@ -80,7 +80,7 @@ static const struct ieee80211_regdomain *country_ie_regdomain;
  *     - country_ie_regdomain
  *     - last_request
  */
-static DEFINE_MUTEX(reg_mutex);
+DEFINE_MUTEX(reg_mutex);
 #define assert_reg_lock() WARN_ON(!mutex_is_locked(&reg_mutex))
 
 /* Used to queue up regulatory hints */
@@ -2630,7 +2630,7 @@ out:
 	mutex_unlock(&reg_mutex);
 }
 
-int __init regulatory_init(void)
+int regulatory_init(void)
 {
 	int err = 0;
 
@@ -2676,7 +2676,7 @@ int __init regulatory_init(void)
 	return 0;
 }
 
-void /* __init_or_exit */ regulatory_exit(void)
+void regulatory_exit(void)
 {
 	struct regulatory_request *reg_request, *tmp;
 	struct reg_beacon *reg_beacon, *btmp;

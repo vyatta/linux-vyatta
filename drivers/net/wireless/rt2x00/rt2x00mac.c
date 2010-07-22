@@ -282,8 +282,7 @@ int rt2x00mac_add_interface(struct ieee80211_hw *hw,
 	 * has been initialized. Otherwise the device can reset
 	 * the MAC registers.
 	 */
-	rt2x00lib_config_intf(rt2x00dev, intf, vif->type,
-			      intf->mac, intf->bssid);
+	rt2x00lib_config_intf(rt2x00dev, intf, vif->type, intf->mac, NULL);
 
 	/*
 	 * Some filters depend on the current working mode. We can force
@@ -563,6 +562,7 @@ void rt2x00mac_bss_info_changed(struct ieee80211_hw *hw,
 {
 	struct rt2x00_dev *rt2x00dev = hw->priv;
 	struct rt2x00_intf *intf = vif_to_intf(vif);
+	int update_bssid = 0;
 
 	/*
 	 * mac80211 might be calling this function while we are trying
@@ -577,8 +577,10 @@ void rt2x00mac_bss_info_changed(struct ieee80211_hw *hw,
 	 * conf->bssid can be NULL if coming from the internal
 	 * beacon update routine.
 	 */
-	if (changes & BSS_CHANGED_BSSID)
+	if (changes & BSS_CHANGED_BSSID) {
+		update_bssid = 1;
 		memcpy(&intf->bssid, bss_conf->bssid, ETH_ALEN);
+	}
 
 	spin_unlock(&intf->lock);
 
@@ -590,7 +592,7 @@ void rt2x00mac_bss_info_changed(struct ieee80211_hw *hw,
 	 */
 	if (changes & BSS_CHANGED_BSSID)
 		rt2x00lib_config_intf(rt2x00dev, intf, vif->type, NULL,
-				      bss_conf->bssid);
+				      update_bssid ? bss_conf->bssid : NULL);
 
 	/*
 	 * Update the beacon.

@@ -204,12 +204,10 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 		 * TIME-WAIT * and initialize rx_opt.ts_recent from it,
 		 * when trying new connection.
 		 */
-		if (peer) {
-			inet_peer_refcheck(peer);
-			if ((u32)get_seconds() - peer->tcp_ts_stamp <= TCP_PAWS_MSL) {
-				tp->rx_opt.ts_recent_stamp = peer->tcp_ts_stamp;
-				tp->rx_opt.ts_recent = peer->tcp_ts;
-			}
+		if (peer != NULL &&
+		    (u32)get_seconds() - peer->tcp_ts_stamp <= TCP_PAWS_MSL) {
+			tp->rx_opt.ts_recent_stamp = peer->tcp_ts_stamp;
+			tp->rx_opt.ts_recent = peer->tcp_ts;
 		}
 	}
 
@@ -239,7 +237,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 
 	/* OK, now commit destination to socket.  */
 	sk->sk_gso_type = SKB_GSO_TCPV4;
-	sk_setup_caps(sk, &rt->dst);
+	sk_setup_caps(sk, &rt->u.dst);
 
 	if (!tp->write_seq)
 		tp->write_seq = secure_tcp_sequence_number(inet->inet_saddr,
@@ -795,20 +793,19 @@ static void tcp_v4_reqsk_destructor(struct request_sock *req)
 	kfree(inet_rsk(req)->opt);
 }
 
-static void syn_flood_warning(const struct sk_buff *skb)
-{
-	const char *msg;
-
 #ifdef CONFIG_SYN_COOKIES
-	if (sysctl_tcp_syncookies)
-		msg = "Sending cookies";
-	else
-#endif
-		msg = "Dropping request";
+static void syn_flood_warning(struct sk_buff *skb)
+{
+	static unsigned long warntime;
 
-	pr_info("TCP: Possible SYN flooding on port %d. %s.\n",
-				ntohs(tcp_hdr(skb)->dest), msg);
+	if (time_after(jiffies, (warntime + HZ * 60))) {
+		warntime = jiffies;
+		printk(KERN_INFO
+		       "possible SYN flooding on port %d. Sending cookies.\n",
+		       ntohs(tcp_hdr(skb)->dest));
+	}
 }
+#endif
 
 /*
  * Save and compile IPv4 options into the request_sock if needed.
@@ -1246,8 +1243,6 @@ int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 	 * evidently real one.
 	 */
 	if (inet_csk_reqsk_queue_is_full(sk) && !isn) {
-		if (net_ratelimit())
-			syn_flood_warning(skb);
 #ifdef CONFIG_SYN_COOKIES
 		if (sysctl_tcp_syncookies) {
 			want_cookie = 1;
@@ -1328,12 +1323,15 @@ int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 	if (security_inet_conn_request(sk, skb, req))
 		goto drop_and_free;
 
-	if (!want_cookie || tmp_opt.tstamp_ok)
+	if (!want_cookie)
 		TCP_ECN_create_request(req, tcp_hdr(skb));
 
 	if (want_cookie) {
-		isn = cookie_v4_init_sequence(sk, skb, &req->mss);
+#ifdef CONFIG_SYN_COOKIES
+		syn_flood_warning(skb);
 		req->cookie_ts = tmp_opt.tstamp_ok;
+#endif
+		isn = cookie_v4_init_sequence(sk, skb, &req->mss);
 	} else if (!isn) {
 		struct inet_peer *peer = NULL;
 
@@ -1351,7 +1349,6 @@ int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 		    (dst = inet_csk_route_req(sk, req)) != NULL &&
 		    (peer = rt_get_peer((struct rtable *)dst)) != NULL &&
 		    peer->v4daddr == saddr) {
-			inet_peer_refcheck(peer);
 			if ((u32)get_seconds() - peer->tcp_ts_stamp < TCP_PAWS_MSL &&
 			    (s32)(peer->tcp_ts - req->ts_recent) >
 							TCP_PAWS_WINDOW) {
@@ -1507,7 +1504,7 @@ static struct sock *tcp_v4_hnd_req(struct sock *sk, struct sk_buff *skb)
 	}
 
 #ifdef CONFIG_SYN_COOKIES
-	if (!th->syn)
+	if (!th->rst && !th->syn && th->ack)
 		sk = cookie_v4_check(sk, skb, &(IPCB(skb)->opt));
 #endif
 	return sk;
@@ -1981,11 +1978,6 @@ static inline struct inet_timewait_sock *tw_next(struct inet_timewait_sock *tw)
 		hlist_nulls_entry(tw->tw_node.next, typeof(*tw), tw_node) : NULL;
 }
 
-/*
- * Get next listener socket follow cur.  If cur is NULL, get first socket
- * starting from bucket given in st->bucket; when st->bucket is zero the
- * very first socket in the hash table is returned.
- */
 static void *listening_get_next(struct seq_file *seq, void *cur)
 {
 	struct inet_connection_sock *icsk;
@@ -1996,15 +1988,14 @@ static void *listening_get_next(struct seq_file *seq, void *cur)
 	struct net *net = seq_file_net(seq);
 
 	if (!sk) {
-		ilb = &tcp_hashinfo.listening_hash[st->bucket];
+		st->bucket = 0;
+		ilb = &tcp_hashinfo.listening_hash[0];
 		spin_lock_bh(&ilb->lock);
 		sk = sk_nulls_head(&ilb->head);
-		st->offset = 0;
 		goto get_sk;
 	}
 	ilb = &tcp_hashinfo.listening_hash[st->bucket];
 	++st->num;
-	++st->offset;
 
 	if (st->state == TCP_SEQ_STATE_OPENREQ) {
 		struct request_sock *req = cur;
@@ -2019,7 +2010,6 @@ static void *listening_get_next(struct seq_file *seq, void *cur)
 				}
 				req = req->dl_next;
 			}
-			st->offset = 0;
 			if (++st->sbucket >= icsk->icsk_accept_queue.listen_opt->nr_table_entries)
 				break;
 get_req:
@@ -2055,7 +2045,6 @@ start_req:
 		read_unlock_bh(&icsk->icsk_accept_queue.syn_wait_lock);
 	}
 	spin_unlock_bh(&ilb->lock);
-	st->offset = 0;
 	if (++st->bucket < INET_LHTABLE_SIZE) {
 		ilb = &tcp_hashinfo.listening_hash[st->bucket];
 		spin_lock_bh(&ilb->lock);
@@ -2069,12 +2058,7 @@ out:
 
 static void *listening_get_idx(struct seq_file *seq, loff_t *pos)
 {
-	struct tcp_iter_state *st = seq->private;
-	void *rc;
-
-	st->bucket = 0;
-	st->offset = 0;
-	rc = listening_get_next(seq, NULL);
+	void *rc = listening_get_next(seq, NULL);
 
 	while (rc && *pos) {
 		rc = listening_get_next(seq, rc);
@@ -2089,18 +2073,13 @@ static inline int empty_bucket(struct tcp_iter_state *st)
 		hlist_nulls_empty(&tcp_hashinfo.ehash[st->bucket].twchain);
 }
 
-/*
- * Get first established socket starting from bucket given in st->bucket.
- * If st->bucket is zero, the very first socket in the hash is returned.
- */
 static void *established_get_first(struct seq_file *seq)
 {
 	struct tcp_iter_state *st = seq->private;
 	struct net *net = seq_file_net(seq);
 	void *rc = NULL;
 
-	st->offset = 0;
-	for (; st->bucket <= tcp_hashinfo.ehash_mask; ++st->bucket) {
+	for (st->bucket = 0; st->bucket <= tcp_hashinfo.ehash_mask; ++st->bucket) {
 		struct sock *sk;
 		struct hlist_nulls_node *node;
 		struct inet_timewait_sock *tw;
@@ -2145,7 +2124,6 @@ static void *established_get_next(struct seq_file *seq, void *cur)
 	struct net *net = seq_file_net(seq);
 
 	++st->num;
-	++st->offset;
 
 	if (st->state == TCP_SEQ_STATE_TIME_WAIT) {
 		tw = cur;
@@ -2162,7 +2140,6 @@ get_tw:
 		st->state = TCP_SEQ_STATE_ESTABLISHED;
 
 		/* Look for next non empty bucket */
-		st->offset = 0;
 		while (++st->bucket <= tcp_hashinfo.ehash_mask &&
 				empty_bucket(st))
 			;
@@ -2190,11 +2167,7 @@ out:
 
 static void *established_get_idx(struct seq_file *seq, loff_t pos)
 {
-	struct tcp_iter_state *st = seq->private;
-	void *rc;
-
-	st->bucket = 0;
-	rc = established_get_first(seq);
+	void *rc = established_get_first(seq);
 
 	while (rc && pos) {
 		rc = established_get_next(seq, rc);
@@ -2219,72 +2192,24 @@ static void *tcp_get_idx(struct seq_file *seq, loff_t pos)
 	return rc;
 }
 
-static void *tcp_seek_last_pos(struct seq_file *seq)
-{
-	struct tcp_iter_state *st = seq->private;
-	int offset = st->offset;
-	int orig_num = st->num;
-	void *rc = NULL;
-
-	switch (st->state) {
-	case TCP_SEQ_STATE_OPENREQ:
-	case TCP_SEQ_STATE_LISTENING:
-		if (st->bucket >= INET_LHTABLE_SIZE)
-			break;
-		st->state = TCP_SEQ_STATE_LISTENING;
-		rc = listening_get_next(seq, NULL);
-		while (offset-- && rc)
-			rc = listening_get_next(seq, rc);
-		if (rc)
-			break;
-		st->bucket = 0;
-		/* Fallthrough */
-	case TCP_SEQ_STATE_ESTABLISHED:
-	case TCP_SEQ_STATE_TIME_WAIT:
-		st->state = TCP_SEQ_STATE_ESTABLISHED;
-		if (st->bucket > tcp_hashinfo.ehash_mask)
-			break;
-		rc = established_get_first(seq);
-		while (offset-- && rc)
-			rc = established_get_next(seq, rc);
-	}
-
-	st->num = orig_num;
-
-	return rc;
-}
-
 static void *tcp_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	struct tcp_iter_state *st = seq->private;
-	void *rc;
-
-	if (*pos && *pos == st->last_pos) {
-		rc = tcp_seek_last_pos(seq);
-		if (rc)
-			goto out;
-	}
-
 	st->state = TCP_SEQ_STATE_LISTENING;
 	st->num = 0;
-	st->bucket = 0;
-	st->offset = 0;
-	rc = *pos ? tcp_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
-
-out:
-	st->last_pos = *pos;
-	return rc;
+	return *pos ? tcp_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *tcp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-	struct tcp_iter_state *st = seq->private;
 	void *rc = NULL;
+	struct tcp_iter_state *st;
 
 	if (v == SEQ_START_TOKEN) {
 		rc = tcp_get_idx(seq, 0);
 		goto out;
 	}
+	st = seq->private;
 
 	switch (st->state) {
 	case TCP_SEQ_STATE_OPENREQ:
@@ -2292,8 +2217,6 @@ static void *tcp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 		rc = listening_get_next(seq, v);
 		if (!rc) {
 			st->state = TCP_SEQ_STATE_ESTABLISHED;
-			st->bucket = 0;
-			st->offset = 0;
 			rc	  = established_get_first(seq);
 		}
 		break;
@@ -2304,7 +2227,6 @@ static void *tcp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	}
 out:
 	++*pos;
-	st->last_pos = *pos;
 	return rc;
 }
 
@@ -2343,7 +2265,6 @@ static int tcp_seq_open(struct inode *inode, struct file *file)
 
 	s = ((struct seq_file *)file->private_data)->private;
 	s->family		= afinfo->family;
-	s->last_pos 		= 0;
 	return 0;
 }
 

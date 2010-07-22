@@ -67,7 +67,6 @@ static const struct ar9300_eeprom ar9300_default = {
 		  * bit2 - enable fastClock - enabled
 		  * bit3 - enable doubling - enabled
 		  * bit4 - enable internal regulator - disabled
-		  * bit5 - enable pa predistortion - disabled
 		  */
 		.miscConfiguration = 0, /* bit0 - turn down drivestrength */
 		.eepromWriteEnableGpio = 3,
@@ -130,11 +129,9 @@ static const struct ar9300_eeprom ar9300_default = {
 		.txEndToRxOn = 0x2,
 		.txFrameToXpaOn = 0xe,
 		.thresh62 = 28,
-		.papdRateMaskHt20 = LE32(0x80c080),
-		.papdRateMaskHt40 = LE32(0x80c080),
-		.futureModal = {
+		.futureModal = { /* [32] */
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 0, 0, 0, 0
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 		},
 	 },
 	.calFreqPier2G = {
@@ -329,11 +326,9 @@ static const struct ar9300_eeprom ar9300_default = {
 		.txEndToRxOn = 0x2,
 		.txFrameToXpaOn = 0xe,
 		.thresh62 = 28,
-		.papdRateMaskHt20 = LE32(0xf0e0e0),
-		.papdRateMaskHt40 = LE32(0xf0e0e0),
 		.futureModal = {
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 0, 0, 0, 0
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 		},
 	 },
 	.calFreqPier5G = {
@@ -649,8 +644,6 @@ static u32 ath9k_hw_ar9300_get_eeprom(struct ath_hw *ah,
 		return (pBase->featureEnable & 0x10) >> 4;
 	case EEP_SWREG:
 		return le32_to_cpu(pBase->swreg);
-	case EEP_PAPRD:
-		return !!(pBase->featureEnable & BIT(5));
 	default:
 		return 0;
 	}

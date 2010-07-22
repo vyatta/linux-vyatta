@@ -1237,7 +1237,12 @@ static void ql_get_core_dump(struct ql_adapter *qdev)
 			  "Force Coredump can only be done from interface that is up.\n");
 		return;
 	}
-	ql_queue_fw_error(qdev);
+
+	if (ql_mb_sys_err(qdev)) {
+		netif_err(qdev, ifup, qdev->ndev,
+			  "Fail force coredump with ql_mb_sys_err().\n");
+		return;
+	}
 }
 
 void ql_gen_reg_dump(struct ql_adapter *qdev,

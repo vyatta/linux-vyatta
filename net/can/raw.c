@@ -436,9 +436,14 @@ static int raw_setsockopt(struct socket *sock, int level, int optname,
 
 		if (count > 1) {
 			/* filter does not fit into dfilter => alloc space */
-			filter = memdup_user(optval, optlen);
-			if (IS_ERR(filter))
-				return PTR_ERR(filter);
+			filter = kmalloc(optlen, GFP_KERNEL);
+			if (!filter)
+				return -ENOMEM;
+
+			if (copy_from_user(filter, optval, optlen)) {
+				kfree(filter);
+				return -EFAULT;
+			}
 		} else if (count == 1) {
 			if (copy_from_user(&sfilter, optval, sizeof(sfilter)))
 				return -EFAULT;

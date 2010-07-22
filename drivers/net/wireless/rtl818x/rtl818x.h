@@ -185,7 +185,7 @@ struct rtl818x_csr {
 	u8	reserved_22[4];
 	__le16	TALLY_CNT;
 	u8	TALLY_SEL;
-} __packed;
+} __attribute__((packed));
 
 struct rtl818x_rf_ops {
 	char *name;

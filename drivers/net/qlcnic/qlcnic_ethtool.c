@@ -69,6 +69,8 @@ static const struct qlcnic_stats qlcnic_gstrings_stats[] = {
 		QLC_SIZEOF(stats.xmit_off), QLC_OFF(stats.xmit_off)},
 	{"skb_alloc_failure", QLC_SIZEOF(stats.skb_alloc_failure),
 		QLC_OFF(stats.skb_alloc_failure)},
+	{"null skb",
+		QLC_SIZEOF(stats.null_skb), QLC_OFF(stats.null_skb)},
 	{"null rxbuf",
 		QLC_SIZEOF(stats.null_rxbuf), QLC_OFF(stats.null_rxbuf)},
 	{"rx dma map error", QLC_SIZEOF(stats.rx_dma_map_error),
@@ -348,7 +350,7 @@ qlcnic_get_regs(struct net_device *dev, struct ethtool_regs *regs, void *p)
 	for (i = 0; diag_registers[i] != -1; i++)
 		regs_buff[i] = QLCRD32(adapter, diag_registers[i]);
 
-	if (!test_bit(__QLCNIC_DEV_UP, &adapter->state))
+	if (adapter->is_up != QLCNIC_ADAPTER_UP_MAGIC)
 		return;
 
 	regs_buff[i++] = 0xFFEFCDAB; /* Marker btw regs and ring count*/
@@ -681,13 +683,13 @@ static int qlcnic_loopback_test(struct net_device *netdev)
 	if (ret)
 		goto clear_it;
 
-	ret = adapter->nic_ops->set_ilb_mode(adapter);
+	ret = qlcnic_set_ilb_mode(adapter);
 	if (ret)
 		goto done;
 
 	ret = qlcnic_do_ilb_test(adapter);
 
-	adapter->nic_ops->clear_ilb_mode(adapter);
+	qlcnic_clear_ilb_mode(adapter);
 
 done:
 	qlcnic_diag_free_res(netdev, max_sds_rings);
@@ -713,8 +715,7 @@ static int qlcnic_irq_test(struct net_device *netdev)
 
 	adapter->diag_cnt = 0;
 	ret = qlcnic_issue_cmd(adapter, adapter->ahw.pci_func,
-			adapter->fw_hal_version, adapter->portnum,
-			0, 0, 0x00000011);
+			QLCHAL_VERSION, adapter->portnum, 0, 0, 0x00000011);
 	if (ret)
 		goto done;
 
@@ -833,10 +834,7 @@ static int qlcnic_blink_led(struct net_device *dev, u32 val)
 	struct qlcnic_adapter *adapter = netdev_priv(dev);
 	int ret;
 
-	if (!test_bit(__QLCNIC_DEV_UP, &adapter->state))
-		return -EIO;
-
-	ret = adapter->nic_ops->config_led(adapter, 1, 0xf);
+	ret = qlcnic_config_led(adapter, 1, 0xf);
 	if (ret) {
 		dev_err(&adapter->pdev->dev,
 			"Failed to set LED blink state.\n");
@@ -845,7 +843,7 @@ static int qlcnic_blink_led(struct net_device *dev, u32 val)
 
 	msleep_interruptible(val * 1000);
 
-	ret = adapter->nic_ops->config_led(adapter, 0, 0xf);
+	ret = qlcnic_config_led(adapter, 0, 0xf);
 	if (ret) {
 		dev_err(&adapter->pdev->dev,
 			"Failed to reset LED blink state.\n");
@@ -907,7 +905,7 @@ static int qlcnic_set_intr_coalesce(struct net_device *netdev,
 {
 	struct qlcnic_adapter *adapter = netdev_priv(netdev);
 
-	if (!test_bit(__QLCNIC_DEV_UP, &adapter->state))
+	if (adapter->is_up != QLCNIC_ADAPTER_UP_MAGIC)
 		return -EINVAL;
 
 	/*
@@ -983,19 +981,12 @@ static int qlcnic_set_flags(struct net_device *netdev, u32 data)
 	struct qlcnic_adapter *adapter = netdev_priv(netdev);
 	int hw_lro;
 
-	if (data & ~ETH_FLAG_LRO)
-		return -EINVAL;
-
 	if (!(adapter->capabilities & QLCNIC_FW_CAPABILITY_HW_LRO))
 		return -EINVAL;
 
-	if (data & ETH_FLAG_LRO) {
-		hw_lro = QLCNIC_LRO_ENABLED;
-		netdev->features |= NETIF_F_LRO;
-	} else {
-		hw_lro = 0;
-		netdev->features &= ~NETIF_F_LRO;
-	}
+	ethtool_op_set_flags(netdev, data);
+
+	hw_lro = (data & ETH_FLAG_LRO) ? QLCNIC_LRO_ENABLED : 0;
 
 	if (qlcnic_config_hw_lro(adapter, hw_lro))
 		return -EIO;
