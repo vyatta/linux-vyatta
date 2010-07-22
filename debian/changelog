@@ -1,3 +1,19 @@
+linux-2.6 (2.6.32-1+vyatta+41) unstable; urgency=low
+
+  * Merge branch 'larkspur' of vm:git/linux-vyatta into larkspur
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 20 Jul 2010 15:48:39 -0700
+
+linux-2.6 (2.6.32-1+vyatta+40) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * gre: propagate ipv6 transport class
+
+  [ Robert Bays ]
+  * disable lro on vmxnet3 driver by default.
+
+ -- Robert Bays <robert@vyatta.com>  Fri, 16 Jul 2010 12:06:14 -0700
+
 linux-2.6 (2.6.32-1+vyatta+39) unstable; urgency=low
 
   * Enable Connection tracking flow accounting
