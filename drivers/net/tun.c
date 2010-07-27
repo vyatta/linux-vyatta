@@ -144,6 +144,7 @@ static int tun_attach(struct tun_struct *tun, struct file *file)
 	err = 0;
 	tfile->tun = tun;
 	tun->tfile = tfile;
+	netif_carrier_on(tun->dev);
 	dev_hold(tun->dev);
 	sock_hold(tun->socket.sk);
 	atomic_inc(&tfile->count);
@@ -157,6 +158,7 @@ static void __tun_detach(struct tun_struct *tun)
 {
 	/* Detach from net device */
 	netif_tx_lock_bh(tun->dev);
+	netif_carrier_off(tun->dev);
 	tun->tfile = NULL;
 	netif_tx_unlock_bh(tun->dev);
 
@@ -1425,12 +1427,6 @@ static void tun_set_msglevel(struct net_device *dev, u32 value)
 #endif
 }
 
-static u32 tun_get_link(struct net_device *dev)
-{
-	struct tun_struct *tun = netdev_priv(dev);
-	return !!tun->tfile;
-}
-
 static u32 tun_get_rx_csum(struct net_device *dev)
 {
 	struct tun_struct *tun = netdev_priv(dev);
@@ -1452,7 +1448,7 @@ static const struct ethtool_ops tun_ethtool_ops = {
 	.get_drvinfo	= tun_get_drvinfo,
 	.get_msglevel	= tun_get_msglevel,
 	.set_msglevel	= tun_set_msglevel,
-	.get_link	= tun_get_link,
+	.get_link	= ethtool_op_get_link,
 	.get_rx_csum	= tun_get_rx_csum,
 	.set_rx_csum	= tun_set_rx_csum
 };
