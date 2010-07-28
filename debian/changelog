@@ -1,3 +1,15 @@
+linux-2.6 (2.6.32-1+vyatta+42+larkspur2) unstable; urgency=low
+
+  [ Nolan Leake ]
+  * tun: keep link (carrier) state up to date
+
+  [ Michael S. Tsirkin ]
+  * tun: avoid BUG, dump packet on GSO errors
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 28 Jul 2010 11:57:29 -0700
+
 linux-2.6 (2.6.32-1+vyatta+42+larkspur1) unstable; urgency=low
 
   * UNRELEASED
