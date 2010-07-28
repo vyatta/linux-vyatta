@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 linux-2.6 (2.6.32-1+vyatta+44) unstable; urgency=low
 
   [ Nolan Leake ]
@@ -44,6 +45,8 @@ linux-2.6 (2.6.32-1+vyatta+40) unstable; urgency=low
 
  -- Robert Bays <robert@vyatta.com>  Fri, 16 Jul 2010 12:06:14 -0700
 
+=======
+>>>>>>> 264d437f88990225c5cfb9c20a56368c728263c0
 linux-2.6 (2.6.32-1+vyatta+39) unstable; urgency=low
 
   * Enable Connection tracking flow accounting

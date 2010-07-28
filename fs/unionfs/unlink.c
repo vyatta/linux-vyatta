@@ -184,12 +184,8 @@ static int unionfs_rmdir_first(struct inode *dir, struct dentry *dentry,
 	/* avoid destroying the lower inode if the file is in use */
 	dget(lower_dentry);
 	err = is_robranch(dentry);
-	if (!err) {
-		/* see Documentation/filesystems/unionfs/issues.txt */
-		lockdep_off();
+	if (!err)
 		err = vfs_rmdir(lower_dir_dentry->d_inode, lower_dentry);
-		lockdep_on();
-	}
 	dput(lower_dentry);
 
 	fsstack_copy_attr_times(dir, lower_dir_dentry->d_inode);

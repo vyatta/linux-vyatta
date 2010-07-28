@@ -50,6 +50,7 @@
 #include <linux/async.h>
 #include <linux/seq_file.h>
 #include <linux/cpu.h>
+#include <linux/slab.h>
 #include "md.h"
 #include "raid5.h"
 #include "bitmap.h"
@@ -2943,6 +2944,7 @@ static void handle_stripe5(struct stripe_head *sh)
 	struct r5dev *dev;
 	mdk_rdev_t *blocked_rdev = NULL;
 	int prexor;
+	int dec_preread_active = 0;
 
 	memset(&s, 0, sizeof(s));
 	pr_debug("handling stripe %llu, state=%#lx cnt=%d, pd_idx=%d check:%d "
@@ -3092,12 +3094,8 @@ static void handle_stripe5(struct stripe_head *sh)
 					set_bit(STRIPE_INSYNC, &sh->state);
 			}
 		}
-		if (test_and_clear_bit(STRIPE_PREREAD_ACTIVE, &sh->state)) {
-			atomic_dec(&conf->preread_active_stripes);
-			if (atomic_read(&conf->preread_active_stripes) <
-				IO_THRESHOLD)
-				md_wakeup_thread(conf->mddev->thread);
-		}
+		if (test_and_clear_bit(STRIPE_PREREAD_ACTIVE, &sh->state))
+			dec_preread_active = 1;
 	}
 
 	/* Now to consider new write requests and what else, if anything
@@ -3204,6 +3202,16 @@ static void handle_stripe5(struct stripe_head *sh)
 
 	ops_run_io(sh, &s);
 
+	if (dec_preread_active) {
+		/* We delay this until after ops_run_io so that if make_request
+		 * is waiting on a barrier, it won't continue until the writes
+		 * have actually been submitted.
+		 */
+		atomic_dec(&conf->preread_active_stripes);
+		if (atomic_read(&conf->preread_active_stripes) <
+		    IO_THRESHOLD)
+			md_wakeup_thread(conf->mddev->thread);
+	}
 	return_io(return_bi);
 }
 
@@ -3217,6 +3225,7 @@ static void handle_stripe6(struct stripe_head *sh)
 	struct r6_state r6s;
 	struct r5dev *dev, *pdev, *qdev;
 	mdk_rdev_t *blocked_rdev = NULL;
+	int dec_preread_active = 0;
 
 	pr_debug("handling stripe %llu, state=%#lx cnt=%d, "
 		"pd_idx=%d, qd_idx=%d\n, check:%d, reconstruct:%d\n",
@@ -3354,7 +3363,6 @@ static void handle_stripe6(struct stripe_head *sh)
 	 * completed
 	 */
 	if (sh->reconstruct_state == reconstruct_state_drain_result) {
-		int qd_idx = sh->qd_idx;
 
 		sh->reconstruct_state = reconstruct_state_idle;
 		/* All the 'written' buffers and the parity blocks are ready to
@@ -3376,12 +3384,8 @@ static void handle_stripe6(struct stripe_head *sh)
 					set_bit(STRIPE_INSYNC, &sh->state);
 			}
 		}
-		if (test_and_clear_bit(STRIPE_PREREAD_ACTIVE, &sh->state)) {
-			atomic_dec(&conf->preread_active_stripes);
-			if (atomic_read(&conf->preread_active_stripes) <
-				IO_THRESHOLD)
-				md_wakeup_thread(conf->mddev->thread);
-		}
+		if (test_and_clear_bit(STRIPE_PREREAD_ACTIVE, &sh->state))
+			dec_preread_active = 1;
 	}
 
 	/* Now to consider new write requests and what else, if anything
@@ -3489,6 +3493,18 @@ static void handle_stripe6(struct stripe_head *sh)
 		raid_run_ops(sh, s.ops_request);
 
 	ops_run_io(sh, &s);
+
+
+	if (dec_preread_active) {
+		/* We delay this until after ops_run_io so that if make_request
+		 * is waiting on a barrier, it won't continue until the writes
+		 * have actually been submitted.
+		 */
+		atomic_dec(&conf->preread_active_stripes);
+		if (atomic_read(&conf->preread_active_stripes) <
+		    IO_THRESHOLD)
+			md_wakeup_thread(conf->mddev->thread);
+	}
 
 	return_io(return_bi);
 }
@@ -3720,7 +3736,7 @@ static int bio_fits_rdev(struct bio *bi)
 	if ((bi->bi_size>>9) > queue_max_sectors(q))
 		return 0;
 	blk_recount_segments(q, bi);
-	if (bi->bi_phys_segments > queue_max_phys_segments(q))
+	if (bi->bi_phys_segments > queue_max_segments(q))
 		return 0;
 
 	if (q->merge_bvec_fn)
@@ -3737,7 +3753,7 @@ static int chunk_aligned_read(struct request_queue *q, struct bio * raid_bio)
 {
 	mddev_t *mddev = q->queuedata;
 	raid5_conf_t *conf = mddev->private;
-	unsigned int dd_idx;
+	int dd_idx;
 	struct bio* align_bi;
 	mdk_rdev_t *rdev;
 
@@ -3862,7 +3878,13 @@ static int make_request(struct request_queue *q, struct bio * bi)
 	int cpu, remaining;
 
 	if (unlikely(bio_rw_flagged(bi, BIO_RW_BARRIER))) {
-		bio_endio(bi, -EOPNOTSUPP);
+		/* Drain all pending writes.  We only really need
+		 * to ensure they have been submitted, but this is
+		 * easier.
+		 */
+		mddev->pers->quiesce(mddev, 1);
+		mddev->pers->quiesce(mddev, 0);
+		md_barrier_request(mddev, bi);
 		return 0;
 	}
 
@@ -3986,6 +4008,9 @@ static int make_request(struct request_queue *q, struct bio * bi)
 			finish_wait(&conf->wait_for_overlap, &w);
 			set_bit(STRIPE_HANDLE, &sh->state);
 			clear_bit(STRIPE_DELAYED, &sh->state);
+			if (mddev->barrier && 
+			    !test_and_set_bit(STRIPE_PREREAD_ACTIVE, &sh->state))
+				atomic_inc(&conf->preread_active_stripes);
 			release_stripe(sh);
 		} else {
 			/* cannot get stripe for read-ahead, just give-up */
@@ -4004,6 +4029,14 @@ static int make_request(struct request_queue *q, struct bio * bi)
 			md_write_end(mddev);
 
 		bio_endio(bi, 0);
+	}
+
+	if (mddev->barrier) {
+		/* We need to wait for the stripes to all be handled.
+		 * So: wait for preread_active_stripes to drop to 0.
+		 */
+		wait_event(mddev->thread->wqueue,
+			   atomic_read(&conf->preread_active_stripes) == 0);
 	}
 	return 0;
 }
@@ -4644,7 +4677,7 @@ static int raid5_alloc_percpu(raid5_conf_t *conf)
 {
 	unsigned long cpu;
 	struct page *spare_page;
-	struct raid5_percpu *allcpus;
+	struct raid5_percpu __percpu *allcpus;
 	void *scribble;
 	int err;
 
@@ -5054,7 +5087,9 @@ static int run(mddev_t *mddev)
 	}
 
 	/* Ok, everything is just fine now */
-	if (sysfs_create_group(&mddev->kobj, &raid5_attrs_group))
+	if (mddev->to_remove == &raid5_attrs_group)
+		mddev->to_remove = NULL;
+	else if (sysfs_create_group(&mddev->kobj, &raid5_attrs_group))
 		printk(KERN_WARNING
 		       "raid5: failed to create sysfs attributes for %s\n",
 		       mdname(mddev));
@@ -5100,9 +5135,9 @@ static int stop(mddev_t *mddev)
 	mddev->thread = NULL;
 	mddev->queue->backing_dev_info.congested_fn = NULL;
 	blk_sync_queue(mddev->queue); /* the unplug fn references 'conf'*/
-	sysfs_remove_group(&mddev->kobj, &raid5_attrs_group);
 	free_conf(conf);
 	mddev->private = NULL;
+	mddev->to_remove = &raid5_attrs_group;
 	return 0;
 }
 
@@ -5859,6 +5894,7 @@ static void raid5_exit(void)
 module_init(raid5_init);
 module_exit(raid5_exit);
 MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("RAID4/5/6 (striping with parity) personality for MD");
 MODULE_ALIAS("md-personality-4"); /* RAID5 */
 MODULE_ALIAS("md-raid5");
 MODULE_ALIAS("md-raid4");

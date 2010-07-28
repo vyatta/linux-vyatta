@@ -21,6 +21,8 @@
 * EEPROM access functions and helpers *
 \*************************************/
 
+#include <linux/slab.h>
+
 #include "ath5k.h"
 #include "reg.h"
 #include "debug.h"
@@ -429,8 +431,8 @@ static int ath5k_eeprom_read_modes(struct ath5k_hw *ah, u32 *offset,
 			ee->ee_margin_tx_rx[mode] = (val >> 8) & 0x3f;
 
 		AR5K_EEPROM_READ(o++, val);
-		ee->ee_i_cal[mode] = (val >> 8) & 0x3f;
-		ee->ee_q_cal[mode] = (val >> 3) & 0x1f;
+		ee->ee_i_cal[mode] = (val >> 5) & 0x3f;
+		ee->ee_q_cal[mode] = val & 0x1f;
 
 		if (ah->ah_ee_version >= AR5K_EEPROM_VERSION_4_2) {
 			AR5K_EEPROM_READ(o++, val);
@@ -1517,7 +1519,7 @@ ath5k_eeprom_read_target_rate_pwr_info(struct ath5k_hw *ah, unsigned int mode)
  * This info is used to calibrate the baseband power table. Imagine
  * that for each channel there is a power curve that's hw specific
  * (depends on amplifier etc) and we try to "correct" this curve using
- * offests we pass on to phy chip (baseband -> before amplifier) so that
+ * offsets we pass on to phy chip (baseband -> before amplifier) so that
  * it can use accurate power values when setting tx power (takes amplifier's
  * performance on each channel into account).
  *

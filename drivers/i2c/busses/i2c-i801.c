@@ -564,7 +564,7 @@ static struct i2c_adapter i801_adapter = {
 	.algo		= &smbus_algorithm,
 };
 
-static struct pci_device_id i801_ids[] = {
+static const struct pci_device_id i801_ids[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801AA_3) },
 	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801AB_3) },
 	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_2) },
@@ -771,6 +771,9 @@ static int __devinit i801_probe(struct pci_dev *dev, const struct pci_device_id 
 
 	/* set up the sysfs linkage to our parent device */
 	i801_adapter.dev.parent = &dev->dev;
+
+	/* Retry up to 3 times on lost arbitration */
+	i801_adapter.retries = 3;
 
 	snprintf(i801_adapter.name, sizeof(i801_adapter.name),
 		"SMBus I801 adapter at %04lx", i801_smba);

@@ -49,6 +49,7 @@ static int get_value(struct parse_opt_ctx_t *p,
 				break;
 			/* FALLTHROUGH */
 		case OPTION_BOOLEAN:
+		case OPTION_INCR:
 		case OPTION_BIT:
 		case OPTION_SET_INT:
 		case OPTION_SET_PTR:
@@ -73,6 +74,10 @@ static int get_value(struct parse_opt_ctx_t *p,
 		return 0;
 
 	case OPTION_BOOLEAN:
+		*(bool *)opt->value = unset ? false : true;
+		return 0;
+
+	case OPTION_INCR:
 		*(int *)opt->value = unset ? 0 : *(int *)opt->value + 1;
 		return 0;
 
@@ -430,6 +435,9 @@ int usage_with_options_internal(const char * const *usagestr,
 		pos = fprintf(stderr, "    ");
 		if (opts->short_name)
 			pos += fprintf(stderr, "-%c", opts->short_name);
+		else
+			pos += fprintf(stderr, "    ");
+
 		if (opts->long_name && opts->short_name)
 			pos += fprintf(stderr, ", ");
 		if (opts->long_name)
@@ -475,6 +483,7 @@ int usage_with_options_internal(const char * const *usagestr,
 		case OPTION_GROUP:
 		case OPTION_BIT:
 		case OPTION_BOOLEAN:
+		case OPTION_INCR:
 		case OPTION_SET_INT:
 		case OPTION_SET_PTR:
 		case OPTION_LONG:

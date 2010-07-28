@@ -28,13 +28,14 @@
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 
-#include <linux/vmalloc.h>
 #include <linux/sched.h>
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/file.h>
 #include <linux/swap.h>
+#include <linux/slab.h>
 #include "drm_cache.h"
+#include "drm_mem_util.h"
 #include "ttm/ttm_module.h"
 #include "ttm/ttm_bo_driver.h"
 #include "ttm/ttm_placement.h"
@@ -43,32 +44,15 @@ static int ttm_tt_swapin(struct ttm_tt *ttm);
 
 /**
  * Allocates storage for pointers to the pages that back the ttm.
- *
- * Uses kmalloc if possible. Otherwise falls back to vmalloc.
  */
 static void ttm_tt_alloc_page_directory(struct ttm_tt *ttm)
 {
-	unsigned long size = ttm->num_pages * sizeof(*ttm->pages);
-	ttm->pages = NULL;
-
-	if (size <= PAGE_SIZE)
-		ttm->pages = kzalloc(size, GFP_KERNEL);
-
-	if (!ttm->pages) {
-		ttm->pages = vmalloc_user(size);
-		if (ttm->pages)
-			ttm->page_flags |= TTM_PAGE_FLAG_VMALLOC;
-	}
+	ttm->pages = drm_calloc_large(ttm->num_pages, sizeof(*ttm->pages));
 }
 
 static void ttm_tt_free_page_directory(struct ttm_tt *ttm)
 {
-	if (ttm->page_flags & TTM_PAGE_FLAG_VMALLOC) {
-		vfree(ttm->pages);
-		ttm->page_flags &= ~TTM_PAGE_FLAG_VMALLOC;
-	} else {
-		kfree(ttm->pages);
-	}
+	drm_free_large(ttm->pages);
 	ttm->pages = NULL;
 }
 
@@ -192,26 +176,38 @@ int ttm_tt_populate(struct ttm_tt *ttm)
 	ttm->state = tt_unbound;
 	return 0;
 }
+EXPORT_SYMBOL(ttm_tt_populate);
 
 #ifdef CONFIG_X86
 static inline int ttm_tt_set_page_caching(struct page *p,
-					  enum ttm_caching_state c_state)
+					  enum ttm_caching_state c_old,
+					  enum ttm_caching_state c_new)
 {
+	int ret = 0;
+
 	if (PageHighMem(p))
 		return 0;
 
-	switch (c_state) {
-	case tt_cached:
-		return set_pages_wb(p, 1);
-	case tt_wc:
-	    return set_memory_wc((unsigned long) page_address(p), 1);
-	default:
-		return set_pages_uc(p, 1);
+	if (c_old != tt_cached) {
+		/* p isn't in the default caching state, set it to
+		 * writeback first to free its current memtype. */
+
+		ret = set_pages_wb(p, 1);
+		if (ret)
+			return ret;
 	}
+
+	if (c_new == tt_wc)
+		ret = set_memory_wc((unsigned long) page_address(p), 1);
+	else if (c_new == tt_uncached)
+		ret = set_pages_uc(p, 1);
+
+	return ret;
 }
 #else /* CONFIG_X86 */
 static inline int ttm_tt_set_page_caching(struct page *p,
-					  enum ttm_caching_state c_state)
+					  enum ttm_caching_state c_old,
+					  enum ttm_caching_state c_new)
 {
 	return 0;
 }
@@ -244,7 +240,9 @@ static int ttm_tt_set_caching(struct ttm_tt *ttm,
 	for (i = 0; i < ttm->num_pages; ++i) {
 		cur_page = ttm->pages[i];
 		if (likely(cur_page != NULL)) {
-			ret = ttm_tt_set_page_caching(cur_page, c_state);
+			ret = ttm_tt_set_page_caching(cur_page,
+						      ttm->caching_state,
+						      c_state);
 			if (unlikely(ret != 0))
 				goto out_err;
 		}
@@ -258,7 +256,7 @@ out_err:
 	for (j = 0; j < i; ++j) {
 		cur_page = ttm->pages[j];
 		if (likely(cur_page != NULL)) {
-			(void)ttm_tt_set_page_caching(cur_page,
+			(void)ttm_tt_set_page_caching(cur_page, c_state,
 						      ttm->caching_state);
 		}
 	}

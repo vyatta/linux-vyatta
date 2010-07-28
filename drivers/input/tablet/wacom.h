@@ -70,6 +70,8 @@
  *      v1.50 (pc) - Fixed a TabletPC touch bug in 2.6.28
  *      v1.51 (pc) - Added support for Intuos4
  *      v1.52 (pc) - Query Wacom data upon system resume
+ *                 - add defines for features->type
+ *                 - add new devices (0x9F, 0xE2, and 0XE3)
  */
 
 /*
@@ -83,6 +85,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <linux/mod_devicetable.h>
 #include <linux/init.h>
 #include <linux/usb/input.h>
 #include <asm/unaligned.h>
@@ -118,6 +121,8 @@ struct wacom_combo {
 	struct urb *urb;
 };
 
+extern const struct usb_device_id wacom_ids[];
+
 extern int wacom_wac_irq(struct wacom_wac * wacom_wac, void * wcombo);
 extern void wacom_report_abs(void *wcombo, unsigned int abs_type, int abs_data);
 extern void wacom_report_rel(void *wcombo, unsigned int rel_type, int rel_data);
@@ -134,11 +139,11 @@ extern void input_dev_i4s(struct input_dev *input_dev, struct wacom_wac *wacom_w
 extern void input_dev_i4(struct input_dev *input_dev, struct wacom_wac *wacom_wac);
 extern void input_dev_pl(struct input_dev *input_dev, struct wacom_wac *wacom_wac);
 extern void input_dev_pt(struct input_dev *input_dev, struct wacom_wac *wacom_wac);
+extern void input_dev_tpc(struct input_dev *input_dev, struct wacom_wac *wacom_wac);
+extern void input_dev_tpc2fg(struct input_dev *input_dev, struct wacom_wac *wacom_wac);
 extern void input_dev_mo(struct input_dev *input_dev, struct wacom_wac *wacom_wac);
 extern void input_dev_bee(struct input_dev *input_dev, struct wacom_wac *wacom_wac);
 extern __u16 wacom_le16_to_cpu(unsigned char *data);
 extern __u16 wacom_be16_to_cpu(unsigned char *data);
-extern struct wacom_features *get_wacom_feature(const struct usb_device_id *id);
-extern const struct usb_device_id *get_device_table(void);
 
 #endif

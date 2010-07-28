@@ -95,7 +95,6 @@ sampling rate. If you sample two channels you get 4kHz and so on.
 #include <linux/slab.h>
 #include <linux/input.h>
 #include <linux/usb.h>
-#include <linux/smp_lock.h>
 #include <linux/fcntl.h>
 #include <linux/compiler.h>
 #include <linux/firmware.h>
@@ -289,7 +288,7 @@ struct usbduxsub {
 	/* continous aquisition */
 	short int ai_continous;
 	short int ao_continous;
-	/* number of samples to aquire */
+	/* number of samples to acquire */
 	int ai_sample_count;
 	int ao_sample_count;
 	/* time between samples in units of the timer */
@@ -983,7 +982,7 @@ static int usbdux_ai_cmdtest(struct comedi_device *dev,
 
 	/*
 	 * step 2: make sure trigger sources are unique and mutually compatible
-	 * note that mutual compatiblity is not an issue here
+	 * note that mutual compatibility is not an issue here
 	 */
 	if (cmd->scan_begin_src != TRIG_FOLLOW &&
 	    cmd->scan_begin_src != TRIG_EXT &&
@@ -1561,7 +1560,7 @@ static int usbdux_ao_cmdtest(struct comedi_device *dev,
 
 	/*
 	 * step 2: make sure trigger sources are unique and mutually compatible
-	 * note that mutual compatiblity is not an issue here
+	 * note that mutual compatibility is not an issue here
 	 */
 	if (cmd->scan_begin_src != TRIG_FOLLOW &&
 	    cmd->scan_begin_src != TRIG_EXT &&
@@ -2331,9 +2330,11 @@ static void usbdux_firmware_request_complete_handler(const struct firmware *fw,
 	if (ret) {
 		dev_err(&usbdev->dev,
 			"Could not upload firmware (err=%d)\n", ret);
-		return;
+		goto out;
 	}
 	comedi_usb_auto_config(usbdev, BOARDNAME);
+ out:
+	release_firmware(fw);
 }
 
 /* allocate memory for the urbs and initialise them */
@@ -2584,6 +2585,7 @@ static int usbduxsub_probe(struct usb_interface *uinterf,
 				      FW_ACTION_HOTPLUG,
 				      "usbdux_firmware.bin",
 				      &udev->dev,
+				      GFP_KERNEL,
 				      usbduxsub + index,
 				      usbdux_firmware_request_complete_handler);
 
@@ -2830,7 +2832,7 @@ static struct comedi_driver driver_usbdux = {
 };
 
 /* Table with the USB-devices: just now only testing IDs */
-static struct usb_device_id usbduxsub_table[] = {
+static const struct usb_device_id usbduxsub_table[] = {
 	{USB_DEVICE(0x13d8, 0x0001)},
 	{USB_DEVICE(0x13d8, 0x0002)},
 	{}			/* Terminating entry */

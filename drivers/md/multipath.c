@@ -22,6 +22,7 @@
 #include <linux/blkdev.h>
 #include <linux/raid/md_u.h>
 #include <linux/seq_file.h>
+#include <linux/slab.h>
 #include "md.h"
 #include "multipath.h"
 
@@ -145,7 +146,7 @@ static int multipath_make_request (struct request_queue *q, struct bio * bio)
 	int cpu;
 
 	if (unlikely(bio_rw_flagged(bio, BIO_RW_BARRIER))) {
-		bio_endio(bio, -EOPNOTSUPP);
+		md_barrier_request(mddev, bio);
 		return 0;
 	}
 
@@ -301,13 +302,13 @@ static int multipath_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 					  rdev->data_offset << 9);
 
 		/* as we don't honour merge_bvec_fn, we must never risk
-		 * violating it, so limit ->max_phys_segments to one, lying
+		 * violating it, so limit ->max_segments to one, lying
 		 * within a single page.
 		 * (Note: it is very unlikely that a device with
 		 * merge_bvec_fn will be involved in multipath.)
 		 */
 			if (q->merge_bvec_fn) {
-				blk_queue_max_phys_segments(mddev->queue, 1);
+				blk_queue_max_segments(mddev->queue, 1);
 				blk_queue_segment_boundary(mddev->queue,
 							   PAGE_CACHE_SIZE - 1);
 			}
@@ -479,7 +480,7 @@ static int multipath_run (mddev_t *mddev)
 		 * violating it, not that we ever expect a device with
 		 * a merge_bvec_fn to be involved in multipath */
 		if (rdev->bdev->bd_disk->queue->merge_bvec_fn) {
-			blk_queue_max_phys_segments(mddev->queue, 1);
+			blk_queue_max_segments(mddev->queue, 1);
 			blk_queue_segment_boundary(mddev->queue,
 						   PAGE_CACHE_SIZE - 1);
 		}
@@ -585,6 +586,7 @@ static void __exit multipath_exit (void)
 module_init(multipath_init);
 module_exit(multipath_exit);
 MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("simple multi-path personality for MD");
 MODULE_ALIAS("md-personality-7"); /* MULTIPATH */
 MODULE_ALIAS("md-multipath");
 MODULE_ALIAS("md-level--4");

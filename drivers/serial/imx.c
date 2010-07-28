@@ -46,6 +46,7 @@
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/rational.h>
+#include <linux/slab.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -441,7 +442,7 @@ static irqreturn_t imx_rxint(int irq, void *dev_id)
 
 		temp = readl(sport->port.membase + USR2);
 		if (temp & USR2_BRCD) {
-			writel(temp | USR2_BRCD, sport->port.membase + USR2);
+			writel(USR2_BRCD, sport->port.membase + USR2);
 			if (uart_handle_break(&sport->port))
 				continue;
 		}
@@ -1096,7 +1097,7 @@ imx_console_get_options(struct imx_port *sport, int *baud,
 			   int *parity, int *bits)
 {
 
-	if ( readl(sport->port.membase + UCR1) | UCR1_UARTEN ) {
+	if (readl(sport->port.membase + UCR1) & UCR1_UARTEN) {
 		/* ok, the port was enabled */
 		unsigned int ucr2, ubir,ubmr, uartclk;
 		unsigned int baud_raw;

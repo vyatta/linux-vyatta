@@ -162,7 +162,7 @@ walk:
 		if (rsvd_fault)
 			goto access_error;
 
-		if (write_fault && !is_writeble_pte(pte))
+		if (write_fault && !is_writable_pte(pte))
 			if (user_fault || is_write_protection(vcpu))
 				goto access_error;
 
@@ -467,7 +467,6 @@ static void FNAME(invlpg)(struct kvm_vcpu *vcpu, gva_t gva)
 		level = iterator.level;
 		sptep = iterator.sptep;
 
-		/* FIXME: properly handle invlpg on large guest pages */
 		if (level == PT_PAGE_TABLE_LEVEL  ||
 		    ((level == PT_DIRECTORY_LEVEL && is_large_pte(*sptep))) ||
 		    ((level == PT_PDPE_LEVEL && is_large_pte(*sptep)))) {

@@ -20,6 +20,7 @@
 
 #include <linux/blkdev.h>
 #include <linux/seq_file.h>
+#include <linux/slab.h>
 #include "md.h"
 #include "raid0.h"
 
@@ -176,12 +177,12 @@ static int create_strip_zones(mddev_t *mddev)
 		disk_stack_limits(mddev->gendisk, rdev1->bdev,
 				  rdev1->data_offset << 9);
 		/* as we don't honour merge_bvec_fn, we must never risk
-		 * violating it, so limit ->max_phys_segments to 1, lying within
+		 * violating it, so limit ->max_segments to 1, lying within
 		 * a single page.
 		 */
 
 		if (rdev1->bdev->bd_disk->queue->merge_bvec_fn) {
-			blk_queue_max_phys_segments(mddev->queue, 1);
+			blk_queue_max_segments(mddev->queue, 1);
 			blk_queue_segment_boundary(mddev->queue,
 						   PAGE_CACHE_SIZE - 1);
 		}
@@ -326,7 +327,7 @@ static int raid0_run(mddev_t *mddev)
 	}
 	if (md_check_no_bitmap(mddev))
 		return -EINVAL;
-	blk_queue_max_sectors(mddev->queue, mddev->chunk_sectors);
+	blk_queue_max_hw_sectors(mddev->queue, mddev->chunk_sectors);
 	mddev->queue->queue_lock = &mddev->queue->__queue_lock;
 
 	ret = create_strip_zones(mddev);
@@ -454,7 +455,7 @@ static int raid0_make_request(struct request_queue *q, struct bio *bio)
 	int cpu;
 
 	if (unlikely(bio_rw_flagged(bio, BIO_RW_BARRIER))) {
-		bio_endio(bio, -EOPNOTSUPP);
+		md_barrier_request(mddev, bio);
 		return 0;
 	}
 
@@ -568,6 +569,7 @@ static void raid0_exit (void)
 module_init(raid0_init);
 module_exit(raid0_exit);
 MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("RAID0 (striping) personality for MD");
 MODULE_ALIAS("md-personality-2"); /* RAID0 */
 MODULE_ALIAS("md-raid0");
 MODULE_ALIAS("md-level-0");

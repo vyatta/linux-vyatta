@@ -90,6 +90,7 @@
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/device.h>
+#include <linux/gfp.h>
 #include <scsi/scsi_host.h>
 #include <linux/libata.h>
 #include <linux/dmi.h>
@@ -173,6 +174,7 @@ static int piix_sidpr_scr_read(struct ata_link *link,
 			       unsigned int reg, u32 *val);
 static int piix_sidpr_scr_write(struct ata_link *link,
 				unsigned int reg, u32 val);
+static bool piix_irq_check(struct ata_port *ap);
 #ifdef CONFIG_PM
 static int piix_pci_device_suspend(struct pci_dev *pdev, pm_message_t mesg);
 static int piix_pci_device_resume(struct pci_dev *pdev);
@@ -317,8 +319,13 @@ static struct scsi_host_template piix_sht = {
 	ATA_BMDMA_SHT(DRV_NAME),
 };
 
-static struct ata_port_operations piix_pata_ops = {
+static struct ata_port_operations piix_sata_ops = {
 	.inherits		= &ata_bmdma32_port_ops,
+	.sff_irq_check		= piix_irq_check,
+};
+
+static struct ata_port_operations piix_pata_ops = {
+	.inherits		= &piix_sata_ops,
 	.cable_detect		= ata_cable_40wire,
 	.set_piomode		= piix_set_piomode,
 	.set_dmamode		= piix_set_dmamode,
@@ -334,10 +341,6 @@ static struct ata_port_operations ich_pata_ops = {
 	.inherits		= &piix_pata_ops,
 	.cable_detect		= ich_pata_cable_detect,
 	.set_dmamode		= ich_set_dmamode,
-};
-
-static struct ata_port_operations piix_sata_ops = {
-	.inherits		= &ata_bmdma_port_ops,
 };
 
 static struct ata_port_operations piix_sidpr_sata_ops = {
@@ -607,7 +610,7 @@ static const struct ich_laptop ich_laptop[] = {
 	{ 0x27DF, 0x1028, 0x02b0 },	/* ICH7 on unknown Dell */
 	{ 0x27DF, 0x1043, 0x1267 },	/* ICH7 on Asus W5F */
 	{ 0x27DF, 0x103C, 0x30A1 },	/* ICH7 on HP Compaq nc2400 */
-	{ 0x27DF, 0x103C, 0x361a },	/* ICH7 on unkown HP  */
+	{ 0x27DF, 0x103C, 0x361a },	/* ICH7 on unknown HP  */
 	{ 0x27DF, 0x1071, 0xD221 },	/* ICH7 on Hercules EC-900 */
 	{ 0x27DF, 0x152D, 0x0778 },	/* ICH7 on unknown Intel */
 	{ 0x24CA, 0x1025, 0x0061 },	/* ICH4 on ACER Aspire 2023WLMi */
@@ -968,6 +971,14 @@ static int piix_sidpr_scr_write(struct ata_link *link,
 	piix_sidpr_sel(link, reg);
 	iowrite32(val, hpriv->sidpr + PIIX_SIDPR_DATA);
 	return 0;
+}
+
+static bool piix_irq_check(struct ata_port *ap)
+{
+	if (unlikely(!ap->ioaddr.bmdma_addr))
+		return false;
+
+	return ap->ops->bmdma_status(ap) & ATA_DMA_INTR;
 }
 
 #ifdef CONFIG_PM

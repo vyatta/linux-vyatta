@@ -108,8 +108,6 @@ static int __unionfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	lower_old_dir_dentry = dget_parent(lower_old_dentry);
 	lower_new_dir_dentry = dget_parent(lower_new_dentry);
 
-	/* see Documentation/filesystems/unionfs/issues.txt */
-	lockdep_off();
 	trap = lock_rename(lower_old_dir_dentry, lower_new_dir_dentry);
 	/* source should not be ancenstor of target */
 	if (trap == lower_old_dentry) {
@@ -130,7 +128,6 @@ out_err_unlock:
 		fsstack_copy_attr_times(new_dir, lower_new_dir_dentry->d_inode);
 	}
 	unlock_rename(lower_old_dir_dentry, lower_new_dir_dentry);
-	lockdep_on();
 
 	dput(lower_old_dir_dentry);
 	dput(lower_new_dir_dentry);

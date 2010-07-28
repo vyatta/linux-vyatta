@@ -20,6 +20,7 @@
 #include <linux/spinlock.h>
 #include <linux/poll.h>
 #include <linux/miscdevice.h>
+#include <linux/slab.h>
 
 #include <linux/uaccess.h>
 
@@ -688,7 +689,7 @@ EXPORT_SYMBOL(vga_client_register);
  * the arbiter.
  */
 
-#define MAX_USER_CARDS         16
+#define MAX_USER_CARDS         CONFIG_VGA_ARB_MAX_GPUS
 #define PCI_INVALID_CARD       ((struct pci_dev *)-1UL)
 
 /*

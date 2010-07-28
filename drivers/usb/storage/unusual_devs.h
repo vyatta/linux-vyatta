@@ -374,6 +374,15 @@ UNUSUAL_DEV(  0x04ce, 0x0002, 0x0074, 0x0074,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY),
 
+/* Reported by Ondrej Zary <linux@rainbow-software.org>
+ * The device reports one sector more and breaks when that sector is accessed
+ */
+UNUSUAL_DEV(  0x04ce, 0x0002, 0x026c, 0x026c,
+		"ScanLogic",
+		"SL11R-IDE",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY),
+
 /* Reported by Kriston Fincher <kriston@airmail.net>
  * Patch submitted by Sean Millichamp <sean@bruenor.org>
  * This is to support the Panasonic PalmCam PV-SD4090
@@ -941,7 +950,7 @@ UNUSUAL_DEV(  0x07ab, 0xfccd, 0x0000, 0x9999,
 UNUSUAL_DEV(  0x07af, 0x0004, 0x0100, 0x0133,
 		"Microtech",
 		"USB-SCSI-DB25",
-		US_SC_SCSI, US_PR_BULK, usb_stor_euscsi_init,
+		US_SC_DEVICE, US_PR_DEVICE, usb_stor_euscsi_init,
 		US_FL_SCM_MULT_TARG ), 
 
 UNUSUAL_DEV(  0x07af, 0x0005, 0x0100, 0x0100,
@@ -1379,20 +1388,6 @@ UNUSUAL_DEV(  0x0f19, 0x0105, 0x0100, 0x0100,
 		"A-VOX",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_IGNORE_RESIDUE ),
-
-/* Jeremy Katz <katzj@redhat.com>:
- * The Blackberry Pearl can run in two modes; a usb-storage only mode
- * and a mode that allows access via mass storage and to its database.
- * The berry_charge module will set the device to dual mode and thus we
- * should ignore its native mode if that module is built
- */
-#ifdef CONFIG_USB_BERRY_CHARGE
-UNUSUAL_DEV(  0x0fca, 0x0006, 0x0001, 0x0001,
-		"RIM",
-		"Blackberry Pearl",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_IGNORE_DEVICE ),
-#endif
 
 /* Reported by Michael Stattmann <michael@stattmann.com> */
 UNUSUAL_DEV(  0x0fce, 0xd008, 0x0000, 0x0000,

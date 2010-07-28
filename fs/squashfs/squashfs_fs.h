@@ -209,8 +209,6 @@
 #define SQUASHFS_MAX_FILE_SIZE		(1LL << \
 					(SQUASHFS_MAX_FILE_SIZE_LOG - 2))
 
-#define SQUASHFS_MARKER_BYTE		0xff
-
 /* meta index cache */
 #define SQUASHFS_META_INDEXES	(SQUASHFS_METADATA_SIZE / sizeof(unsigned int))
 #define SQUASHFS_META_ENTRIES	127
@@ -237,7 +235,9 @@ struct meta_index {
 /*
  * definitions for structures on disk
  */
-#define ZLIB_COMPRESSION	 1
+#define ZLIB_COMPRESSION	1
+#define LZMA_COMPRESSION	2
+#define LZO_COMPRESSION		3
 
 struct squashfs_super_block {
 	__le32			s_magic;

@@ -49,7 +49,6 @@
 #include "cnic_defs.h"
 
 #define DRV_MODULE_NAME		"cnic"
-#define PFX DRV_MODULE_NAME	": "
 
 static char version[] __devinitdata =
 	"Broadcom NetXtreme II CNIC Driver " DRV_MODULE_NAME " v" CNIC_MODULE_VERSION " (" CNIC_MODULE_RELDATE ")\n";
@@ -499,8 +498,7 @@ int cnic_unregister_driver(int ulp_type)
 	}
 
 	if (atomic_read(&ulp_ops->ref_count) != 0)
-		printk(KERN_WARNING PFX "%s: Failed waiting for ref count to go"
-					" to zero.\n", dev->netdev->name);
+		netdev_warn(dev->netdev, "Failed waiting for ref count to go to zero\n");
 	return 0;
 
 out_unlock:
@@ -581,8 +579,7 @@ static int cnic_unregister_device(struct cnic_dev *dev, int ulp_type)
 		i++;
 	}
 	if (test_bit(ULP_F_CALL_PENDING, &cp->ulp_flags[ulp_type]))
-		printk(KERN_WARNING PFX "%s: Failed waiting for ULP up call"
-					" to complete.\n", dev->netdev->name);
+		netdev_warn(dev->netdev, "Failed waiting for ULP up call to complete\n");
 
 	return 0;
 }
@@ -1146,12 +1143,12 @@ static int cnic_submit_bnx2_kwqes(struct cnic_dev *dev, struct kwqe *wqes[],
 
 	spin_lock_bh(&cp->cnic_ulp_lock);
 	if (num_wqes > cnic_kwq_avail(cp) &&
-	    !test_bit(CNIC_LCL_FL_KWQ_INIT, &cp->cnic_local_flags)) {
+	    !(cp->cnic_local_flags & CNIC_LCL_FL_KWQ_INIT)) {
 		spin_unlock_bh(&cp->cnic_ulp_lock);
 		return -EAGAIN;
 	}
 
-	clear_bit(CNIC_LCL_FL_KWQ_INIT, &cp->cnic_local_flags);
+	cp->cnic_local_flags &= ~CNIC_LCL_FL_KWQ_INIT;
 
 	prod = cp->kwq_prod_idx;
 	sw_prod = prod & MAX_KWQ_IDX;
@@ -1870,8 +1867,7 @@ static int cnic_bnx2x_connect(struct cnic_dev *dev, struct kwqe *wqes[],
 	}
 
 	if (sizeof(*conn_buf) > CNIC_KWQ16_DATA_SIZE) {
-		printk(KERN_ERR PFX "%s: conn_buf size too big\n",
-		       dev->netdev->name);
+		netdev_err(dev->netdev, "conn_buf size too big\n");
 		return -ENOMEM;
 	}
 	conn_buf = cnic_get_kwqe_16_data(cp, l5_cid, &l5_data);
@@ -2031,13 +2027,13 @@ static int cnic_submit_bnx2x_kwqes(struct cnic_dev *dev, struct kwqe *wqes[],
 			break;
 		default:
 			ret = 0;
-			printk(KERN_ERR PFX "%s: Unknown type of KWQE(0x%x)\n",
-			       dev->netdev->name, opcode);
+			netdev_err(dev->netdev, "Unknown type of KWQE(0x%x)\n",
+				   opcode);
 			break;
 		}
 		if (ret < 0)
-			printk(KERN_ERR PFX "%s: KWQE(0x%x) failed\n",
-			       dev->netdev->name, opcode);
+			netdev_err(dev->netdev, "KWQE(0x%x) failed\n",
+				   opcode);
 		i += work;
 	}
 	return 0;
@@ -2079,8 +2075,8 @@ static void service_kcqes(struct cnic_dev *dev, int num_cqes)
 		else if (kcqe_layer == KCQE_FLAGS_LAYER_MASK_L2)
 			goto end;
 		else {
-			printk(KERN_ERR PFX "%s: Unknown type of KCQE(0x%x)\n",
-			       dev->netdev->name, kcqe_op_flag);
+			netdev_err(dev->netdev, "Unknown type of KCQE(0x%x)\n",
+				   kcqe_op_flag);
 			goto end;
 		}
 
@@ -2096,6 +2092,7 @@ end:
 		i += j;
 		j = 1;
 	}
+	return;
 }
 
 static u16 cnic_bnx2_next_idx(u16 idx)
@@ -2149,56 +2146,17 @@ static int cnic_get_kcqes(struct cnic_dev *dev, u16 hw_prod, u16 *sw_prod)
 	return last_cnt;
 }
 
-static int cnic_l2_completion(struct cnic_local *cp)
-{
-	u16 hw_cons, sw_cons;
-	union eth_rx_cqe *cqe, *cqe_ring = (union eth_rx_cqe *)
-					(cp->l2_ring + (2 * BCM_PAGE_SIZE));
-	u32 cmd;
-	int comp = 0;
-
-	if (!test_bit(CNIC_F_BNX2X_CLASS, &cp->dev->flags))
-		return 0;
-
-	hw_cons = *cp->rx_cons_ptr;
-	if ((hw_cons & BNX2X_MAX_RCQ_DESC_CNT) == BNX2X_MAX_RCQ_DESC_CNT)
-		hw_cons++;
-
-	sw_cons = cp->rx_cons;
-	while (sw_cons != hw_cons) {
-		u8 cqe_fp_flags;
-
-		cqe = &cqe_ring[sw_cons & BNX2X_MAX_RCQ_DESC_CNT];
-		cqe_fp_flags = cqe->fast_path_cqe.type_error_flags;
-		if (cqe_fp_flags & ETH_FAST_PATH_RX_CQE_TYPE) {
-			cmd = le32_to_cpu(cqe->ramrod_cqe.conn_and_cmd_data);
-			cmd >>= COMMON_RAMROD_ETH_RX_CQE_CMD_ID_SHIFT;
-			if (cmd == RAMROD_CMD_ID_ETH_CLIENT_SETUP ||
-			    cmd == RAMROD_CMD_ID_ETH_HALT)
-				comp++;
-		}
-		sw_cons = BNX2X_NEXT_RCQE(sw_cons);
-	}
-	return comp;
-}
-
 static void cnic_chk_pkt_rings(struct cnic_local *cp)
 {
 	u16 rx_cons = *cp->rx_cons_ptr;
 	u16 tx_cons = *cp->tx_cons_ptr;
-	int comp = 0;
 
 	if (cp->tx_cons != tx_cons || cp->rx_cons != rx_cons) {
-		if (test_bit(CNIC_LCL_FL_L2_WAIT, &cp->cnic_local_flags))
-			comp = cnic_l2_completion(cp);
-
 		cp->tx_cons = tx_cons;
 		cp->rx_cons = rx_cons;
 
 		uio_event_notify(cp->cnic_uinfo);
 	}
-	if (comp)
-		clear_bit(CNIC_LCL_FL_L2_WAIT, &cp->cnic_local_flags);
 }
 
 static int cnic_service_bnx2(void *data, void *status_blk)
@@ -2367,6 +2325,7 @@ done:
 			   status_idx, IGU_INT_ENABLE, 1);
 
 	cp->kcq_prod_idx = sw_prod;
+	return;
 }
 
 static int cnic_service_bnx2x(void *data, void *status_blk)
@@ -3371,8 +3330,12 @@ static int cnic_cm_shutdown(struct cnic_dev *dev)
 
 static void cnic_init_context(struct cnic_dev *dev, u32 cid)
 {
+	struct cnic_local *cp = dev->cnic_priv;
 	u32 cid_addr;
 	int i;
+
+	if (CHIP_NUM(cp) == CHIP_NUM_5709)
+		return;
 
 	cid_addr = GET_CID_ADDR(cid);
 
@@ -3487,8 +3450,7 @@ static int cnic_init_bnx2_irq(struct cnic_dev *dev)
 	return 0;
 
 failed:
-	printk(KERN_ERR PFX "%s: " "KCQ index not resetting to 0.\n",
-	       dev->netdev->name);
+	netdev_err(dev->netdev, "KCQ index not resetting to 0\n");
 	return -EBUSY;
 }
 
@@ -3531,11 +3493,14 @@ static void cnic_init_bnx2_tx_ring(struct cnic_dev *dev)
 
 	sb_id = cp->status_blk_num;
 	tx_cid = 20;
+	cnic_init_context(dev, tx_cid);
+	cnic_init_context(dev, tx_cid + 1);
 	cp->tx_cons_ptr = &s_blk->status_tx_quick_consumer_index2;
 	if (ethdev->drv_state & CNIC_DRV_STATE_USING_MSIX) {
 		struct status_block_msix *sblk = cp->status_blk.bnx2;
 
 		tx_cid = TX_TSS_CID + sb_id - 1;
+		cnic_init_context(dev, tx_cid);
 		CNIC_WR(dev, BNX2_TSCH_TSS_CFG, (sb_id << 24) |
 			(TX_TSS_CID << 7));
 		cp->tx_cons_ptr = &sblk->status_tx_quick_consumer_index;
@@ -3554,9 +3519,6 @@ static void cnic_init_bnx2_tx_ring(struct cnic_dev *dev)
 		offset2 = BNX2_L2CTX_TBDR_BHADDR_HI_XI;
 		offset3 = BNX2_L2CTX_TBDR_BHADDR_LO_XI;
 	} else {
-		cnic_init_context(dev, tx_cid);
-		cnic_init_context(dev, tx_cid + 1);
-
 		offset0 = BNX2_L2CTX_TYPE;
 		offset1 = BNX2_L2CTX_CMD_TYPE;
 		offset2 = BNX2_L2CTX_TBDR_BHADDR_HI;
@@ -3730,7 +3692,7 @@ static int cnic_start_bnx2_hw(struct cnic_dev *dev)
 	cp->max_kwq_idx = MAX_KWQ_IDX;
 	cp->kwq_prod_idx = 0;
 	cp->kwq_con_idx = 0;
-	set_bit(CNIC_LCL_FL_KWQ_INIT, &cp->cnic_local_flags);
+	cp->cnic_local_flags |= CNIC_LCL_FL_KWQ_INIT;
 
 	if (CHIP_NUM(cp) == CHIP_NUM_5706 || CHIP_NUM(cp) == CHIP_NUM_5708)
 		cp->kwq_con_idx_ptr = &sblk->status_rx_quick_consumer_index15;
@@ -3810,8 +3772,7 @@ static int cnic_start_bnx2_hw(struct cnic_dev *dev)
 
 	err = cnic_init_bnx2_irq(dev);
 	if (err) {
-		printk(KERN_ERR PFX "%s: cnic_init_irq failed\n",
-		       dev->netdev->name);
+		netdev_err(dev->netdev, "cnic_init_irq failed\n");
 		cnic_reg_wr_ind(dev, BNX2_CP_SCRATCH + 0x20, 0);
 		cnic_reg_wr_ind(dev, BNX2_COM_SCRATCH + 0x20, 0);
 		return err;
@@ -3925,9 +3886,8 @@ static void cnic_init_bnx2x_tx_ring(struct cnic_dev *dev)
 		HC_INDEX_DEF_C_ETH_ISCSI_CQ_CONS;
 	context->cstorm_st_context.status_block_id = BNX2X_DEF_SB_ID;
 
-	if (cli < MAX_X_STAT_COUNTER_ID)
-		context->xstorm_st_context.statistics_data = cli |
-				XSTORM_ETH_ST_CONTEXT_STATISTICS_ENABLE;
+	context->xstorm_st_context.statistics_data = (cli |
+				XSTORM_ETH_ST_CONTEXT_STATISTICS_ENABLE);
 
 	context->xstorm_ag_context.cdu_reserved =
 		CDU_RSRVD_VALUE_TYPE_A(BNX2X_HW_CID(BNX2X_ISCSI_L2_CID, func),
@@ -3935,12 +3895,10 @@ static void cnic_init_bnx2x_tx_ring(struct cnic_dev *dev)
 					ETH_CONNECTION_TYPE);
 
 	/* reset xstorm per client statistics */
-	if (cli < MAX_X_STAT_COUNTER_ID) {
-		val = BAR_XSTRORM_INTMEM +
-		      XSTORM_PER_COUNTER_ID_STATS_OFFSET(port, cli);
-		for (i = 0; i < sizeof(struct xstorm_per_client_stats) / 4; i++)
-			CNIC_WR(dev, val + i * 4, 0);
-	}
+	val = BAR_XSTRORM_INTMEM +
+	      XSTORM_PER_COUNTER_ID_STATS_OFFSET(port, cli);
+	for (i = 0; i < sizeof(struct xstorm_per_client_stats) / 4; i++)
+		CNIC_WR(dev, val + i * 4, 0);
 
 	cp->tx_cons_ptr =
 		&cp->bnx2x_def_status_blk->c_def_status_block.index_values[
@@ -3987,11 +3945,9 @@ static void cnic_init_bnx2x_rx_ring(struct cnic_dev *dev)
 						BNX2X_ISCSI_RX_SB_INDEX_NUM;
 	context->ustorm_st_context.common.clientId = cli;
 	context->ustorm_st_context.common.status_block_id = BNX2X_DEF_SB_ID;
-	if (cli < MAX_U_STAT_COUNTER_ID) {
-		context->ustorm_st_context.common.flags =
-			USTORM_ETH_ST_CONTEXT_CONFIG_ENABLE_STATISTICS;
-		context->ustorm_st_context.common.statistics_counter_id = cli;
-	}
+	context->ustorm_st_context.common.flags =
+		USTORM_ETH_ST_CONTEXT_CONFIG_ENABLE_STATISTICS;
+	context->ustorm_st_context.common.statistics_counter_id = cli;
 	context->ustorm_st_context.common.mc_alignment_log_size = 0;
 	context->ustorm_st_context.common.bd_buff_size =
 						cp->l2_single_buf_size;
@@ -4022,13 +3978,10 @@ static void cnic_init_bnx2x_rx_ring(struct cnic_dev *dev)
 
 	/* client tstorm info */
 	tstorm_client.mtu = cp->l2_single_buf_size - 14;
-	tstorm_client.config_flags = TSTORM_ETH_CLIENT_CONFIG_E1HOV_REM_ENABLE;
-
-	if (cli < MAX_T_STAT_COUNTER_ID) {
-		tstorm_client.config_flags |=
-				TSTORM_ETH_CLIENT_CONFIG_STATSITICS_ENABLE;
-		tstorm_client.statistics_counter_id = cli;
-	}
+	tstorm_client.config_flags =
+			(TSTORM_ETH_CLIENT_CONFIG_E1HOV_REM_ENABLE |
+			TSTORM_ETH_CLIENT_CONFIG_STATSITICS_ENABLE);
+	tstorm_client.statistics_counter_id = cli;
 
 	CNIC_WR(dev, BAR_TSTRORM_INTMEM +
 		   TSTORM_CLIENT_CONFIG_OFFSET(port, cli),
@@ -4038,21 +3991,16 @@ static void cnic_init_bnx2x_rx_ring(struct cnic_dev *dev)
 		   ((u32 *)&tstorm_client)[1]);
 
 	/* reset tstorm per client statistics */
-	if (cli < MAX_T_STAT_COUNTER_ID) {
-
-		val = BAR_TSTRORM_INTMEM +
-		      TSTORM_PER_COUNTER_ID_STATS_OFFSET(port, cli);
-		for (i = 0; i < sizeof(struct tstorm_per_client_stats) / 4; i++)
-			CNIC_WR(dev, val + i * 4, 0);
-	}
+	val = BAR_TSTRORM_INTMEM +
+	      TSTORM_PER_COUNTER_ID_STATS_OFFSET(port, cli);
+	for (i = 0; i < sizeof(struct tstorm_per_client_stats) / 4; i++)
+		CNIC_WR(dev, val + i * 4, 0);
 
 	/* reset ustorm per client statistics */
-	if (cli < MAX_U_STAT_COUNTER_ID) {
-		val = BAR_USTRORM_INTMEM +
-		      USTORM_PER_COUNTER_ID_STATS_OFFSET(port, cli);
-		for (i = 0; i < sizeof(struct ustorm_per_client_stats) / 4; i++)
-			CNIC_WR(dev, val + i * 4, 0);
-	}
+	val = BAR_USTRORM_INTMEM +
+	      USTORM_PER_COUNTER_ID_STATS_OFFSET(port, cli);
+	for (i = 0; i < sizeof(struct ustorm_per_client_stats) / 4; i++)
+		CNIC_WR(dev, val + i * 4, 0);
 
 	cp->rx_cons_ptr =
 		&cp->bnx2x_def_status_blk->u_def_status_block.index_values[
@@ -4187,8 +4135,7 @@ static int cnic_start_bnx2x_hw(struct cnic_dev *dev)
 			   offsetof(struct cstorm_status_block_c,
 				    index_values[HC_INDEX_C_ISCSI_EQ_CONS]));
 	if (eq_idx != 0) {
-		printk(KERN_ERR PFX "%s: EQ cons index %x != 0\n", 
-		       dev->netdev->name, eq_idx);
+		netdev_err(dev->netdev, "EQ cons index %x != 0\n", eq_idx);
 		return -EBUSY;
 	}
 	ret = cnic_init_bnx2x_irq(dev);
@@ -4223,8 +4170,6 @@ static void cnic_init_rings(struct cnic_dev *dev)
 		for (i = 0; i < sizeof(struct ustorm_eth_rx_producers) / 4; i++)
 			CNIC_WR(dev, off + i * 4, ((u32 *) &rx_prods)[i]);
 
-		set_bit(CNIC_LCL_FL_L2_WAIT, &cp->cnic_local_flags);
-
 		cnic_init_bnx2x_tx_ring(dev);
 		cnic_init_bnx2x_rx_ring(dev);
 
@@ -4232,16 +4177,6 @@ static void cnic_init_rings(struct cnic_dev *dev)
 		l5_data.phy_address.hi = 0;
 		cnic_submit_kwqe_16(dev, RAMROD_CMD_ID_ETH_CLIENT_SETUP,
 			BNX2X_ISCSI_L2_CID, ETH_CONNECTION_TYPE, &l5_data);
-		i = 0;
-		while (test_bit(CNIC_LCL_FL_L2_WAIT, &cp->cnic_local_flags) &&
-		       ++i < 10)
-			msleep(1);
-
-		if (test_bit(CNIC_LCL_FL_L2_WAIT, &cp->cnic_local_flags))
-			printk(KERN_ERR PFX
-			       "%s: iSCSI CLIENT_SETUP did not complete\n",
-			       dev->netdev->name);
-		cnic_kwq_completion(dev, 1);
 		cnic_ring_ctl(dev, BNX2X_ISCSI_L2_CID, cli, 1);
 	}
 }
@@ -4254,26 +4189,14 @@ static void cnic_shutdown_rings(struct cnic_dev *dev)
 		struct cnic_local *cp = dev->cnic_priv;
 		u32 cli = BNX2X_ISCSI_CL_ID(CNIC_E1HVN(cp));
 		union l5cm_specific_data l5_data;
-		int i;
 
 		cnic_ring_ctl(dev, BNX2X_ISCSI_L2_CID, cli, 0);
-
-		set_bit(CNIC_LCL_FL_L2_WAIT, &cp->cnic_local_flags);
 
 		l5_data.phy_address.lo = cli;
 		l5_data.phy_address.hi = 0;
 		cnic_submit_kwqe_16(dev, RAMROD_CMD_ID_ETH_HALT,
 			BNX2X_ISCSI_L2_CID, ETH_CONNECTION_TYPE, &l5_data);
-		i = 0;
-		while (test_bit(CNIC_LCL_FL_L2_WAIT, &cp->cnic_local_flags) &&
-		       ++i < 10)
-			msleep(1);
-
-		if (test_bit(CNIC_LCL_FL_L2_WAIT, &cp->cnic_local_flags))
-			printk(KERN_ERR PFX
-				"%s: iSCSI CLIENT_HALT did not complete\n",
-			       dev->netdev->name);
-		cnic_kwq_completion(dev, 1);
+		msleep(10);
 
 		memset(&l5_data, 0, sizeof(l5_data));
 		cnic_submit_kwqe_16(dev, RAMROD_CMD_ID_ETH_CFC_DEL,
@@ -4297,8 +4220,7 @@ static int cnic_register_netdev(struct cnic_dev *dev)
 
 	err = ethdev->drv_register_cnic(dev->netdev, cp->cnic_ops, dev);
 	if (err)
-		printk(KERN_ERR PFX "%s: register_cnic failed\n",
-		       dev->netdev->name);
+		netdev_err(dev->netdev, "register_cnic failed\n");
 
 	return err;
 }
@@ -4332,8 +4254,7 @@ static int cnic_start_hw(struct cnic_dev *dev)
 
 	err = cp->alloc_resc(dev);
 	if (err) {
-		printk(KERN_ERR PFX "%s: allocate resource failure\n",
-		       dev->netdev->name);
+		netdev_err(dev->netdev, "allocate resource failure\n");
 		goto err1;
 	}
 
@@ -4396,15 +4317,7 @@ static void cnic_stop_hw(struct cnic_dev *dev)
 {
 	if (test_bit(CNIC_F_CNIC_UP, &dev->flags)) {
 		struct cnic_local *cp = dev->cnic_priv;
-		int i = 0;
 
-		/* Need to wait for the ring shutdown event to complete
-		 * before clearing the CNIC_UP flag.
-		 */
-		while (cp->uio_dev != -1 && i < 15) {
-			msleep(100);
-			i++;
-		}
 		clear_bit(CNIC_F_CNIC_UP, &dev->flags);
 		rcu_assign_pointer(cp->ulp_ops[CNIC_ULP_L4], NULL);
 		synchronize_rcu();
@@ -4423,10 +4336,9 @@ static void cnic_free_dev(struct cnic_dev *dev)
 		i++;
 	}
 	if (atomic_read(&dev->ref_count) != 0)
-		printk(KERN_ERR PFX "%s: Failed waiting for ref count to go"
-				    " to zero.\n", dev->netdev->name);
+		netdev_err(dev->netdev, "Failed waiting for ref count to go to zero\n");
 
-	printk(KERN_INFO PFX "Removed CNIC device: %s\n", dev->netdev->name);
+	netdev_info(dev->netdev, "Removed CNIC device\n");
 	dev_put(dev->netdev);
 	kfree(dev);
 }
@@ -4442,8 +4354,7 @@ static struct cnic_dev *cnic_alloc_dev(struct net_device *dev,
 
 	cdev = kzalloc(alloc_size , GFP_KERNEL);
 	if (cdev == NULL) {
-		printk(KERN_ERR PFX "%s: allocate dev struct failure\n",
-		       dev->name);
+		netdev_err(dev, "allocate dev struct failure\n");
 		return NULL;
 	}
 
@@ -4461,7 +4372,7 @@ static struct cnic_dev *cnic_alloc_dev(struct net_device *dev,
 
 	spin_lock_init(&cp->cnic_ulp_lock);
 
-	printk(KERN_INFO PFX "Added CNIC device: %s\n", dev->name);
+	netdev_info(dev, "Added CNIC device\n");
 
 	return cdev;
 }
@@ -4717,6 +4628,7 @@ static void __exit cnic_exit(void)
 {
 	unregister_netdevice_notifier(&cnic_netdev_notifier);
 	cnic_release();
+	return;
 }
 
 module_init(cnic_init);
