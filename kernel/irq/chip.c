@@ -119,26 +119,6 @@ void dynamic_irq_cleanup_keep_chip_data(unsigned int irq)
 	dynamic_irq_cleanup_x(irq, true);
 }
 
-/**
- *	dynamic_irq_cleanup - cleanup a dynamically allocated irq
- *	@irq:	irq number to initialize
- */
-void dynamic_irq_cleanup(unsigned int irq)
-{
-	dynamic_irq_cleanup_x(irq, false);
-}
-
-/**
- *	dynamic_irq_cleanup_keep_chip_data - cleanup a dynamically allocated irq
- *	@irq:	irq number to initialize
- *
- *	does not set irq_to_desc(irq)->chip_data to NULL
- */
-void dynamic_irq_cleanup_keep_chip_data(unsigned int irq)
-{
-	dynamic_irq_cleanup_x(irq, true);
-}
-
 
 /**
  *	set_irq_chip - set the irq chip for an irq

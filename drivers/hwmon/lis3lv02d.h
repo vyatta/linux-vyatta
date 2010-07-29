@@ -107,7 +107,6 @@ enum lis3lv02d_ctrl1_12b {
 	CTRL1_DF1	= 0x20,
 	CTRL1_PD0	= 0x40,
 	CTRL1_PD1	= 0x80,
-	CTRL1_DR	= 0x80, /* Data rate on 8 bits */
 };
 
 /* Delta to ctrl1_12b version */

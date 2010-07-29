@@ -323,16 +323,6 @@ static inline unsigned long uv_read_global_mmr64(int pnode, unsigned long offset
 	return readq(uv_global_mmr64_address(pnode, offset));
 }
 
-static inline void uv_write_global_mmr8(int pnode, unsigned long offset, unsigned char val)
-{
-	writeb(val, uv_global_mmr64_address(pnode, offset));
-}
-
-static inline unsigned char uv_read_global_mmr8(int pnode, unsigned long offset)
-{
-	return readb(uv_global_mmr64_address(pnode, offset));
-}
-
 /*
  * Global MMR space addresses when referenced by the GRU. (GRU does
  * NOT use socket addressing).
