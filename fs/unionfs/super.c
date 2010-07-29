@@ -1033,7 +1033,7 @@ out:
 	return ret;
 }
 
-struct super_operations unionfs_sops = {
+const struct super_operations unionfs_sops = {
 	.delete_inode	= unionfs_delete_inode,
 	.put_super	= unionfs_put_super,
 	.statfs		= unionfs_statfs,

@@ -1015,7 +1015,7 @@ out:
 	return err;
 }
 
-struct inode_operations unionfs_symlink_iops = {
+const struct inode_operations unionfs_symlink_iops = {
 	.readlink	= unionfs_readlink,
 	.permission	= unionfs_permission,
 	.follow_link	= unionfs_follow_link,
@@ -1023,7 +1023,7 @@ struct inode_operations unionfs_symlink_iops = {
 	.put_link	= unionfs_put_link,
 };
 
-struct inode_operations unionfs_dir_iops = {
+const struct inode_operations unionfs_dir_iops = {
 	.create		= unionfs_create,
 	.lookup		= unionfs_lookup,
 	.link		= unionfs_link,
@@ -1043,7 +1043,7 @@ struct inode_operations unionfs_dir_iops = {
 #endif /* CONFIG_UNION_FS_XATTR */
 };
 
-struct inode_operations unionfs_main_iops = {
+const struct inode_operations unionfs_main_iops = {
 	.permission	= unionfs_permission,
 	.setattr	= unionfs_setattr,
 #ifdef CONFIG_UNION_FS_XATTR

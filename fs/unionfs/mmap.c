@@ -70,7 +70,7 @@ static int unionfs_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
  * our inode->i_mapping->a_ops to NULL because too many code paths expect
  * the a_ops vector to be non-NULL.
  */
-struct address_space_operations unionfs_aops = {
+const struct address_space_operations unionfs_aops = {
 	/* empty on purpose */
 };
 
@@ -80,10 +80,10 @@ struct address_space_operations unionfs_aops = {
  * generic_file_mmap, which checks if ->readpage exists, else returns
  * -ENOEXEC.
  */
-struct address_space_operations unionfs_dummy_aops = {
+const struct address_space_operations unionfs_dummy_aops = {
 	.readpage	= unionfs_readpage,
 };
 
-struct vm_operations_struct unionfs_vm_ops = {
+const struct vm_operations_struct unionfs_vm_ops = {
 	.fault		= unionfs_fault,
 };
