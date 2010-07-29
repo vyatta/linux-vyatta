@@ -2781,23 +2781,6 @@ static int pci_set_vga_state_arch(struct pci_dev *dev, bool decode,
 	return 0;
 }
 
-/* Some architectures require additional programming to enable VGA */
-static arch_set_vga_state_t arch_set_vga_state;
-
-void __init pci_register_set_vga_state(arch_set_vga_state_t func)
-{
-	arch_set_vga_state = func;	/* NULL disables */
-}
-
-static int pci_set_vga_state_arch(struct pci_dev *dev, bool decode,
-		      unsigned int command_bits, bool change_bridge)
-{
-	if (arch_set_vga_state)
-		return arch_set_vga_state(dev, decode, command_bits,
-						change_bridge);
-	return 0;
-}
-
 /**
  * pci_set_vga_state - set VGA decode state on device and parents if requested
  * @dev: the PCI device
