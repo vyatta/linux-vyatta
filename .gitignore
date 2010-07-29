@@ -39,8 +39,8 @@ modules.builtin
 /tags
 /TAGS
 /linux
-/vmlinux
-/vmlinuz
+vmlinux
+vmlinuz
 /System.map
 /Module.markers
 /Module.symvers
