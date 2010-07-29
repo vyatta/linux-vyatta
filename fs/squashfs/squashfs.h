@@ -92,5 +92,8 @@ extern const struct inode_operations squashfs_dir_inode_ops;
 /* symlink.c */
 extern const struct address_space_operations squashfs_symlink_aops;
 
+/* xattr.c */
+extern struct xattr_handler *squashfs_xattr_handlers[];
+
 /* zlib_wrapper.c */
 extern const struct squashfs_decompressor squashfs_zlib_comp_ops;
