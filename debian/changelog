@@ -1,3 +1,10 @@
+linux-2.6 (2.6.32-1+vyatta+42+larkspur3) unstable; urgency=low
+
+  * Don't offset packets on 64 bit build
+  * Add missing DRR module to virt iso
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 30 Jul 2010 13:45:16 -0700
+
 linux-2.6 (2.6.32-1+vyatta+42+larkspur2) unstable; urgency=low
 
   [ Nolan Leake ]
