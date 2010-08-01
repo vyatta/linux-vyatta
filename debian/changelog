@@ -1,3 +1,13 @@
+linux-2.6 (2.6.32-1+vyatta+42+larkspur4) unstable; urgency=low
+
+  [ Changli Gao ]
+  * cls_u32: use skb_header_pointer() to dereference data safely
+
+  [ Stephen Hemminger ]
+  * Use signed offset for dereferencing header pointer
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Sun, 01 Aug 2010 11:47:41 -0700
+
 linux-2.6 (2.6.32-1+vyatta+42+larkspur3) unstable; urgency=low
 
   * Don't offset packets on 64 bit build
