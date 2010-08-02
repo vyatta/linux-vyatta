@@ -1,3 +1,12 @@
+linux-2.6 (2.6.35-1+vyatta+1) unstable; urgency=low
+
+  * Merge in upstream 2.6.35 kernel
+  * Fix iptables API changes (ipp2p, ipset)
+  * Fix unionfs for VFS changes
+  * Update kernel config for 2.6.35
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 02 Aug 2010 16:04:39 -0700
+
 linux-2.6 (2.6.34-1+vyatta+2) unstable; urgency=low
 
   * Update kernel config for 2.6.34
