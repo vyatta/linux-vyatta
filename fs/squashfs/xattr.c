@@ -314,7 +314,7 @@ static inline const struct xattr_handler *squashfs_xattr_handler(int type)
 	}
 }
 
-struct xattr_handler *squashfs_xattr_handlers[] = {
+const struct xattr_handler *squashfs_xattr_handlers[] = {
 	&squashfs_xattr_user_handler,
 	&squashfs_xattr_trusted_handler,
 	&squashfs_xattr_security_handler,

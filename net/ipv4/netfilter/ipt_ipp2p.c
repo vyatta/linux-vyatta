@@ -778,10 +778,14 @@ match(const struct sk_buff *skb,
 	      int offset, 
 	      unsigned int protoff, 
 	      bool *hotdrop)
-#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,28) */
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35)
 	static bool
 	match(const struct sk_buff *skb,
 	      const struct xt_match_param *par)
+#else
+	static bool
+	match(const struct sk_buff *skb,
+	      struct xt_action_param *par)
 #endif
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
@@ -952,5 +956,3 @@ static void __exit fini(void)
 	
 module_init(init);
 module_exit(fini);
-
-

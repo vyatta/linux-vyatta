@@ -938,7 +938,7 @@ void unionfs_destroy_inode_cache(void)
  *
  * No need to grab sb info's rwsem.
  */
-static int unionfs_write_inode(struct inode *inode, int sync)
+static int unionfs_write_inode(struct inode *inode, struct writeback_control *wbc)
 {
 	struct list_head *pos, *n;
 	struct unionfs_dir_state *rdstate;

@@ -87,4 +87,11 @@ extern long vfs_splice_to(struct file *in, loff_t *ppos,
 			  struct pipe_inode_info *pipe, size_t len,
 			  unsigned int flags);
 
+/*
+ * for dynamic pipe sizing
+ */
+extern int splice_grow_spd(struct pipe_inode_info *, struct splice_pipe_desc *);
+extern void splice_shrink_spd(struct pipe_inode_info *,
+				struct splice_pipe_desc *);
+
 #endif

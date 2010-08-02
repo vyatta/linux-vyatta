@@ -326,8 +326,7 @@ static int __copyup_reg_data(struct dentry *dentry,
 	kfree(buf);
 
 	if (!err)
-		err = output_file->f_op->fsync(output_file,
-					       new_lower_dentry, 0);
+		err = output_file->f_op->fsync(output_file, 0);
 
 	if (err)
 		goto out_close_out;

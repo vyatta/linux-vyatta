@@ -35,7 +35,6 @@
 #include <linux/pagemap.h>
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/zlib.h>
 #include <linux/magic.h>
 #include <linux/xattr.h>
 
@@ -43,28 +42,36 @@
 #include "squashfs_fs_sb.h"
 #include "squashfs_fs_i.h"
 #include "squashfs.h"
+#include "decompressor.h"
 #include "xattr.h"
 
 static struct file_system_type squashfs_fs_type;
 static const struct super_operations squashfs_super_ops;
 
-static int supported_squashfs_filesystem(short major, short minor, short comp)
+static const struct squashfs_decompressor *supported_squashfs_filesystem(short
+	major, short minor, short id)
 {
+	const struct squashfs_decompressor *decompressor;
+
 	if (major < SQUASHFS_MAJOR) {
 		ERROR("Major/Minor mismatch, older Squashfs %d.%d "
 			"filesystems are unsupported\n", major, minor);
-		return -EINVAL;
+		return NULL;
 	} else if (major > SQUASHFS_MAJOR || minor > SQUASHFS_MINOR) {
 		ERROR("Major/Minor mismatch, trying to mount newer "
 			"%d.%d filesystem\n", major, minor);
 		ERROR("Please update your kernel\n");
-		return -EINVAL;
+		return NULL;
 	}
 
-	if (comp != ZLIB_COMPRESSION)
-		return -EINVAL;
+	decompressor = squashfs_lookup_decompressor(id);
+	if (!decompressor->supported) {
+		ERROR("Filesystem uses \"%s\" compression. This is not "
+			"supported\n", decompressor->name);
+		return NULL;
+	}
 
-	return 0;
+	return decompressor;
 }
 
 
@@ -115,24 +122,24 @@ static int squashfs_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_mount;
 	}
 
+	err = -EINVAL;
+
 	/* Check it is a SQUASHFS superblock */
 	sb->s_magic = le32_to_cpu(sblk->s_magic);
 	if (sb->s_magic != SQUASHFS_MAGIC) {
 		if (!silent)
 			ERROR("Can't find a SQUASHFS superblock on %s\n",
 						bdevname(sb->s_bdev, b));
-		err = -EINVAL;
 		goto failed_mount;
 	}
 
-	/* Check the MAJOR & MINOR versions and compression type */
-	err = supported_squashfs_filesystem(le16_to_cpu(sblk->s_major),
+	/* Check the MAJOR & MINOR versions and lookup compression type */
+	msblk->decompressor = supported_squashfs_filesystem(
+			le16_to_cpu(sblk->s_major),
 			le16_to_cpu(sblk->s_minor),
 			le16_to_cpu(sblk->compression));
-	if (err < 0)
+	if (msblk->decompressor == NULL)
 		goto failed_mount;
-
-	err = -EINVAL;
 
 	/* Check the filesystem does not extend beyond the end of the
 	   block device */
@@ -192,6 +199,10 @@ static int squashfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_op = &squashfs_super_ops;
 
 	err = -ENOMEM;
+
+	msblk->stream = squashfs_decompressor_init(msblk);
+	if (msblk->stream == NULL)
+		goto failed_mount;
 
 	msblk->block_cache = squashfs_cache_init("metadata",
 			SQUASHFS_CACHED_BLKS, SQUASHFS_METADATA_SIZE);
@@ -274,7 +285,8 @@ allocate_root:
 
 	err = squashfs_read_inode(root, root_inode);
 	if (err) {
-		iget_failed(root);
+		make_bad_inode(root);
+		iput(root);
 		goto failed_mount;
 	}
 	insert_inode_hash(root);
@@ -295,6 +307,7 @@ failed_mount:
 	squashfs_cache_delete(msblk->block_cache);
 	squashfs_cache_delete(msblk->fragment_cache);
 	squashfs_cache_delete(msblk->read_page);
+	squashfs_decompressor_free(msblk, msblk->stream);
 	kfree(msblk->inode_lookup_table);
 	kfree(msblk->fragment_index);
 	kfree(msblk->id_table);
@@ -348,9 +361,11 @@ static void squashfs_put_super(struct super_block *sb)
 		squashfs_cache_delete(sbi->block_cache);
 		squashfs_cache_delete(sbi->fragment_cache);
 		squashfs_cache_delete(sbi->read_page);
+		squashfs_decompressor_free(sbi, sbi->stream);
 		kfree(sbi->id_table);
 		kfree(sbi->fragment_index);
 		kfree(sbi->meta_index);
+		kfree(sbi->inode_lookup_table);
 		kfree(sbi->xattr_id_table);
 		kfree(sb->s_fs_info);
 		sb->s_fs_info = NULL;
