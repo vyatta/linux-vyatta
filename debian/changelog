@@ -1,3 +1,462 @@
+linux-2.6 (2.6.32-1+vyatta+42+larkspur5) unstable; urgency=low
+
+  [ Michael S. Tsirkin ]
+  * virtio-pci: disable msi at startup
+
+  [ Christoph Fritz ]
+  * ssb: Handle Netbook devices where the SPROM address is changed
+
+  [ Jean Delvare ]
+  * hwmon: (k8temp) Bypass core swapping on single-core processors
+
+  [ Andreas Herrmann ]
+  * hwmon: (k8temp) Fix temperature reporting for ASB1 processor
+    revisions
+
+  [ Jean Delvare ]
+  * hwmon: (coretemp) Properly label the sensors
+  * hwmon: (coretemp) Skip duplicate CPU entries
+  * hwmon: (it87) Fix in7 on IT8720F
+
+  [ Jeff Layton ]
+  * cifs: remove bogus first_time check in NTLMv2 session setup code
+  * cifs: don't attempt busy-file rename unless it's in same directory
+
+  [ David Howells ]
+  * CIFS: Fix a malicious redirect problem in the DNS lookup code
+
+  [ Luke Yelavich ]
+  * ALSA: hda - Add Macbook 5,2 quirk
+
+  [ Florian Fainelli ]
+  * cpmac: do not leak struct net_device on phy_connect errors
+
+  [ Brandon Philips ]
+  * sky2: enable rx/tx in sky2_phy_reinit()
+
+  [ Alexander Duyck ]
+  * igb: change how we handle alternate mac addresses
+
+  [ Rob Landley ]
+  * sparc: Fix use of uid16_t and gid16_t in asm/stat.h
+
+  [ Mikael Pettersson ]
+  * math-emu: correct test for downshifting fraction in _FP_FROM_INT()
+
+  [ Trond Myklebust ]
+  * NFSv4: Fix an embarassing typo in encode_attrs()
+  * NFSv4: Ensure that /proc/self/mountinfo displays the minor version
+    number
+  * SUNRPC: Fix a re-entrancy bug in xs_tcp_read_calldir()
+
+  [ Luis R. Rodriguez ]
+  * ath5k: drop warning on jumbo frames
+  * ath9k: re-enable ps by default for new single chip families
+
+  [ Vivek Natarajan ]
+  * ath9k: Avoid corrupt frames being forwarded to mac80211.
+
+  [ Tim Gardner ]
+  * hostap: Protect against initialization interrupt
+
+  [ Rajiv Andrade ]
+  * TPM: ReadPubEK output struct fix
+
+  [ Dave Airlie ]
+  * fb: fix colliding defines for fb flags.
+
+  [ John W. Linville ]
+  * iwlwifi: cancel scan watchdog in iwl_bg_abort_scan
+
+  [ Stanislaw Gruszka ]
+  * mac80211: do not wip out old supported rates
+
+  [ Javier Cardona ]
+  * mac80211: Handle mesh action frames in ieee80211_rx_h_action
+
+  [ Dan Rosenberg ]
+  * Btrfs: fix checks in BTRFS_IOC_CLONE_RANGE
+
+  [ Joerg Albert ]
+  * p54pci: add Symbol AP-300 minipci adapters pciid
+
+  [ Jason Baron ]
+  * dynamic debug: move ddebug_remove_module() down into free_module()
+
+  [ Daniel J Blueman ]
+  * i915: fix lock imbalance on error path...
+
+  [ Keith Packard ]
+  * drm/i915: Define MI_ARB_STATE bits
+
+  [ Dave Airlie ]
+  * drm/i915: enable low power render writes on GEN3 hardware.
+
+  [ Adam Jackson ]
+  * drm/i915: Make G4X-style PLL search more permissive
+
+  [ Roland Scheidegger ]
+  * drm/radeon/r200: handle more hw tex coord types
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: add quirk for ASUS HD 3600 board
+  * drm/radeon/kms: fix legacy LVDS dpms sequence
+
+  [ Rajiv Andrade ]
+  * tpm_tis: fix subsequent suspend failures
+
+  [ Sven Wegener ]
+  * ipvs: Add missing locking during connection table hashing and
+    unhashing
+
+  [ Eric Dumazet ]
+  * netfilter: ip6t_REJECT: fix a dst leak in ipv6 REJECT
+
+  [ Julia Lawall ]
+  * SCSI: aacraid: Eliminate use after free
+
+  [ Ben Hutchings ]
+  * amd64-agp: Probe unknown AGP devices the right way
+
+  [ Frederic Weisbecker ]
+  * perf: Resurrect flat callchains
+
+  [ Andi Kleen ]
+  * x86: Fix vsyscall on gcc 4.5 with -Os
+
+  [ Darrick J. Wong ]
+  * x86, Calgary: Increase max PHB number
+  * x86, Calgary: Limit the max PHB number to 256
+
+  [ Will Deacon ]
+  * sched: Prevent compiler from optimising the sched_avg_update() loop
+
+  [ Alex,Shi ]
+  * sched: Fix over-scheduling bug
+
+  [ Thomas Gleixner ]
+  * genirq: Deal with desc->set_type() changing desc->chip
+
+  [ Dongdong Deng ]
+  * serial: cpm_uart: implement the cpm_uart_early_write() function for
+    console poll
+
+  [ Sergei Shtylyov ]
+  * cmd640: fix kernel oops in test_irq() method
+
+  [ Mikulas Patocka ]
+  * ide: Fix IDE taskfile with cfq scheduler
+
+  [ Doug Kehn ]
+  * net/core: neighbour update Oops
+
+  [ Ilpo Järvinen ]
+  * tcp: fix crash in tcp_xmit_retransmit_queue
+
+  [ Joakim Tjernlund ]
+  * rtc: fix ds1388 time corruption
+
+  [ Ben Hutchings ]
+  * ethtool: Fix potential kernel buffer overflow in ETHTOOL_GRXCLSRLALL
+
+  [ Marek Szyprowski ]
+  * sdhci-s3c: add missing remove function
+
+  [ Mark Brown ]
+  * ASoC: Remove duplicate AUX definition from WM8776
+
+  [ Yinghai Lu ]
+  * x86: Fix x2apic preenabled system with kexec
+
+  [ Or Gerlitz ]
+  * IPoIB: Fix world-writable child interface control sysfs attributes
+
+  [ Kamal Mostafa ]
+  * Input: i8042 - add Gigabyte Spring Peak to dmi_noloop_table
+
+  [ Dmitry Torokhov ]
+  * Input: twl40300-keypad - fix handling of "all ground" rows
+
+  [ Catalin Marinas ]
+  * ARM: 6201/1: RealView: Do not use outer_sync() on ARM11MPCore boards
+    with L220
+
+  [ Nicolas Pitre ]
+  * ARM: 6226/1: fix kprobe bug in ldr instruction emulation
+
+  [ Stefano Stabellini ]
+  * x86: Do not try to disable hpet if it hasn't been initialized before
+
+  [ Stephane Glondu ]
+  * staging: rtl8192su: add USB VID/PID for HWNUm-300
+
+  [ Pavel Roskin ]
+  * Staging: rtl8192su: add USB ID for 0bda:8171
+
+  [ Alan Stern ]
+  * USB: obey the sysfs power/wakeup setting
+
+  [ Jon Povey ]
+  * USB: g_serial: don't set low_latency flag
+  * USB: g_serial: fix tty cleanup on unload
+
+  [ Ömer Sezgin Ugurlu ]
+  * USB: option: add support for 1da5:4518
+
+  [ august huber ]
+  * USB: Add PID for Sierra 250U to drivers/usb/serial/sierra.c
+
+  [ Colin Leitner ]
+  * USB: ftdi_sio: support for Signalyzer tools based on FTDI chips
+
+  [ Dennis Jansen ]
+  * USB: option: Add support for AMOI Skypephone S2
+
+  [ Paul Mortier ]
+  * USB: adds Artisman USB dongle to list of quirky devices
+
+  [ Oliver Neukum ]
+  * USB: sisusbvga: Fix for USB 3.0
+  * USB: add quirk for Broadcom BT dongle
+
+  [ Corey Minyard ]
+  * USB: FTDI: Add support for the RT System VX-7 radio programming
+    cable
+
+  [ Ben Hutchings ]
+  * ethtool: Fix potential user buffer overflow for ETHTOOL_{G, S}RXFH
+
+  [ Dmitry Monakhov ]
+  * ext4: Fix potential quota deadlock
+
+  [ Surbhi Palande ]
+  * ext4: replace BUG() with return -EIO in ext4_ext_get_blocks
+
+  [ Theodore Ts'o ]
+  * ext4, jbd2: Add barriers for file systems with exernal journals
+
+  [ Julia Lawall ]
+  * ext4: Eliminate potential double free on error path
+
+  [ Richard Kennedy ]
+  * ext4: return correct wbc.nr_to_write in ext4_da_writepages
+
+  [ Aneesh Kumar K.V ]
+  * ext4: Ensure zeroout blocks have no dirty metadata
+
+  [ Theodore Ts'o ]
+  * ext4: Patch up how we claim metadata blocks for quota purposes
+  * ext4: Fix accounting of reserved metadata blocks
+  * ext4: Calculate metadata requirements more accurately
+
+  [ Aneesh Kumar K.V ]
+  * ext4: Handle -EDQUOT error on write
+  * ext4: Fix quota accounting error with fallocate
+  * ext4: Drop EXT4_GET_BLOCKS_UPDATE_RESERVE_SPACE flag
+
+  [ Theodore Ts'o ]
+  * ext4: Use bitops to read/modify EXT4_I(inode)->i_state
+
+  [ Curt Wohlgemuth ]
+  * ext4: Fix BUG_ON at fs/buffer.c:652 in no journal mode
+
+  [ Jiaying Zhang ]
+  * ext4: Add flag to files with blocks intentionally past EOF
+
+  [ Tao Ma ]
+  * ext4: Fix fencepost error in chosing choosing group vs file
+    preallocation.
+
+  [ Dmitry Monakhov ]
+  * ext4: fix error handling in migrate
+  * ext4: explicitly remove inode from orphan list after failed direct
+    io
+  * ext4: Handle non empty on-disk orphan link
+
+  [ Toshiyuki Okajima ]
+  * ext4: make "offset" consistent in ext4_check_dir_entry()
+
+  [ Akira Fujita ]
+  * ext4: Fix insertion point of extent in mext_insert_across_blocks()
+  * ext4: Fix the NULL reference in double_down_write_data_sem()
+  * ext4: Code cleanup for EXT4_IOC_MOVE_EXT ioctl
+
+  [ Jan Kara ]
+  * ext4: Fix estimate of # of blocks needed to write indirect-mapped
+    files
+
+  [ Eric Sandeen ]
+  * ext4: Fixed inode allocator to correctly track a flex_bg's used_dirs
+
+  [ Curt Wohlgemuth ]
+  * ext4: Fix possible lost inode write in no journal mode
+  * ext4: Fix buffer head leaks after calls to ext4_get_inode_loc()
+
+  [ Theodore Ts'o ]
+  * ext4: Issue the discard operation *before* releasing the blocks to
+    be reused
+
+  [ Dmitry Monakhov ]
+  * ext4: check missed return value in ext4_sync_file()
+
+  [ Jing Zhang ]
+  * ext4: fix memory leaks in error path handling of ext4_ext_zeroout()
+  * ext4: Remove unnecessary call to ext4_get_group_desc() in mballoc
+  * ext4: rename ext4_mb_release_desc() to ext4_mb_unload_buddy()
+
+  [ Christian Borntraeger ]
+  * ext4: allow defrag (EXT4_IOC_MOVE_EXT) in 32bit compat mode
+
+  [ Dmitry Monakhov ]
+  * ext4: fix quota accounting in case of fallocate
+
+  [ Eric Sandeen ]
+  * ext4: check s_log_groups_per_flex in online resize code
+  * ext4: don't return to userspace after freezing the fs with a mutex
+    held
+  * ext4: stop issuing discards if not supported by device
+  * ext4: don't scan/accumulate more pages than mballoc will allocate
+
+  [ Dmitry Monakhov ]
+  * ext4: Do not zero out uninitialized extents beyond i_size
+  * ext4: clean up inode bitmaps manipulation in ext4_free_inode
+  * ext4: init statistics after journal recovery
+
+  [ Curt Wohlgemuth ]
+  * ext4: Remove extraneous newlines in ext4_msg() calls
+
+  [ Nikanth Karthikesan ]
+  * ext4: Prevent creation of files larger than RLIMIT_FSIZE using
+    fallocate
+
+  [ Curt Wohlgemuth ]
+  * ext4: check for a good block group before loading buddy pages
+
+  [ Jan Kara ]
+  * ext4: Show journal_checksum option
+
+  [ Dmitry Monakhov ]
+  * ext4: Use bitops to read/modify i_flags in struct ext4_inode_info
+
+  [ Theodore Ts'o ]
+  * ext4: Avoid crashing on NULL ptr dereference on a filesystem error
+  * ext4: Clear the EXT4_EOFBLOCKS_FL flag only when warranted
+
+  [ Dmitry Monakhov ]
+  * ext4: restart ext4_ext_remove_space() after transaction restart
+
+  [ Ben Hutchings ]
+  * ext4: Conditionally define compat ioctl numbers
+  * ext4: Fix compat EXT4_IOC_ADD_GROUP
+
+  [ Frank Mayhar ]
+  * ext4: Make fsync sync new parent directories in no-journal mode
+
+  [ Avi Kivity ]
+  * KVM: MMU: Remove user access when allowing kernel access to gpte.w=0
+    page
+
+  [ Joerg Roedel ]
+  * KVM: SVM: Handle MCEs early in the vmexit process
+  * KVM: SVM: Implement workaround for Erratum 383
+
+  [ Marcelo Tosatti ]
+  * KVM: MMU: invalidate and flush on spte small->large page size change
+
+  [ Michal Hocko ]
+  * futex: futex_find_get_task remove credentails check
+
+  [ Steven Whitehouse ]
+  * GFS2: Fix up system xattrs
+
+  [ Ondrej Zary ]
+  * PM / x86: Save/restore MISC_ENABLE register
+
+  [ Len Brown ]
+  * ACPI: skip checking BM_STS if the BIOS doesn't ask for it
+
+  [ Matthew Garrett ]
+  * ACPI: Unconditionally set SCI_EN on resume
+
+  [ Daniel Mack ]
+  * libertas/sdio: 8686: set ECSI bit for 1-bit transfers
+
+  [ Baruch Siach ]
+  * dm9000: fix "BUG: spinlock recursion"
+
+  [ David Woodhouse ]
+  * firmware_class: fix memory leak - free allocated pages
+
+  [ Andrej Gelenberg ]
+  * revert "[CPUFREQ] remove rwsem lock from CPUFREQ_GOV_STOP call
+    (second call site)"
+
+  [ Giuliano Pochini ]
+  * ALSA: Echoaudio, fix Guru Meditation #00000005.48454C50
+
+  [ Ang Way Chuang ]
+  * V4L/DVB: dvb-core: Fix ULE decapsulation bug
+
+  [ Jean Delvare ]
+  * V4L/DVB: FusionHDTV: Use quick reads for I2C IR device probing
+
+  [ Ayaz Abdulla ]
+  * forcedeth: fix tx limit2 flag check
+
+  [ Richard Airlie ]
+  * staging: rtl8192su: add Support for Belkin F5D8053 v6
+
+  [ Shane McDonald ]
+  * MIPS FPU emulator: allow Cause bits of FCSR to be writeable by ctc1
+
+  [ Ben Hutchings ]
+  * V4L/DVB: budget: Select correct frontends
+
+  [ Hiroshi Shimamoto ]
+  * cxgb3: fix linkup issue
+
+  [ Stanislaw Gruszka ]
+  * mac80211: fix supported rates IE if AP doesn't give us it's rates
+
+  [ Laurent Pinchart ]
+  * V4L/DVB: uvcvideo: Add support for unbranded Arkmicro 18ec:3290
+    webcams
+  * V4L/DVB: uvcvideo: Add support for Packard Bell EasyNote MX52
+    integrated webcam
+  * V4L/DVB: uvcvideo: Add support for V4L2_PIX_FMT_Y16
+
+  [ Shanyu Zhao ]
+  * iwlagn: verify flow id in compressed BA packet
+
+  [ Krzysztof Halasa ]
+  * kbuild: Fix modpost segfault
+
+  [ Alan Jenkins ]
+  * eeepc-laptop: check wireless hotplug events
+
+  [ Tony Luck ]
+  * Fix spinaphore down_spin()
+
+  [ Andre Osterhues ]
+  * ecryptfs: Bugfix for error related to ecryptfs_hash_buckets
+
+  [ Bob Copeland ]
+  * ath5k: initialize ah->ah_current_channel
+
+  [ Dmitry Torokhov ]
+  * Input: RX51 keymap - fix recent compile breakage
+
+  [ Daniel Ritz ]
+  * V4L/DVB (13830): uvcvideo: add another YUYV format GUID for iSight
+    cameras
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.32.17
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 02 Aug 2010 21:43:31 -0700
+
 linux-2.6 (2.6.32-1+vyatta+42+larkspur4) unstable; urgency=low
 
   [ Changli Gao ]
