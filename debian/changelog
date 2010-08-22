@@ -1,3 +1,318 @@
+linux-2.6 (2.6.35-1+vyatta+3) unstable; urgency=low
+
+  [ Helge Deller ]
+  * PARISC: led.c - fix potential stack overflow in led_proc_write()
+
+  [ Baruch Siach ]
+  * arm/imx/gpio: add spinlock protection
+
+  [ Tejun Heo ]
+  * block_dev: always serialize exclusive open attempts
+
+  [ Kyle McMartin ]
+  * parisc: pass through '\t' to early (iodc) console
+
+  [ Borislav Petkov ]
+  * amd64_edac: Fix DCT base address selector
+  * amd64_edac: Correct scrub rate setting
+  * amd64_edac: Fix operator precendence error
+
+  [ Ian Campbell ]
+  * arp_notify: allow drivers to explicitly request a notification
+    event.
+  * xen: netfront: explicitly generate arp_notify event after migration.
+
+  [ Dean Nelson ]
+  * e1000e: don't inadvertently re-set INTX_DISABLE
+
+  [ Bruce Allan ]
+  * e1000e: 82577/82578 PHY register access issues
+
+  [ Dan Carpenter ]
+  * 9p: strlen() doesn't count the terminator
+
+  [ Greg Rose ]
+  * igb: Use only a single Tx queue in SR-IOV mode
+
+  [ John W. Linville ]
+  * ath9k: enable serialize_regmode for non-PCIE AR9160
+
+  [ Felix Fietkau ]
+  * ath9k: fix a potential buffer leak in the STA teardown path
+  * ath9k_hw: prevent a fast channel change after a rx DMA stuck issue
+  * ath9k_hw: fix a sign error in the IQ calibration code
+  * ath9k_hw: fix an off-by-one error in the PDADC boundaries
+    calculation
+  * ath9k: fix retry count for A-MPDU rate control status reports
+  * ath9k: fix a buffer leak in A-MPDU completion
+  * ath9k: another fix for the A-MPDU buffer leak
+  * ath9k: fix TSF after reset on AR913x
+  * ath9k: fix yet another buffer leak in the tx aggregation code
+  * ath9k_hw: fix antenna diversity on AR9285
+
+  [ Stanislaw Gruszka ]
+  * iwlwifi: fix scan abort
+
+  [ Larry Finger ]
+  * ssb: Handle alternate SSPROM location
+
+  [ Johannes Berg ]
+  * cfg80211: ignore spurious deauth
+  * cfg80211: don't get expired BSSes
+
+  [ John W. Linville ]
+  * mac80211: avoid scheduling while atomic in mesh_rx_plink_frame
+
+  [ David Howells ]
+  * CRED: Fix RCU warning due to previous patch fixing __task_cred()'s
+    checks
+
+  [ James Bottomley ]
+  * SCSI: enclosure: fix error path - actually return ERR_PTR() on error
+
+  [ Jeremy Fitzhardinge ]
+  * xen: drop xen_sched_clock in favour of using plain wallclock time
+
+  [ Alex Deucher ]
+  * drm/radeon: add new pci ids
+
+  [ Michel Dänzer ]
+  * drm/radeon: fall back to GTT if bo creation/validation in VRAM
+    fails.
+
+  [ Alex Deucher ]
+  * drm/radeon/kms/r7xx: add workaround for hw issue with HDP flush
+  * drm/radeon/kms: handle the case of no active displays properly in
+    the bandwidth code
+
+  [ Chris Wilson ]
+  * drm/i915: Unset cursor if out-of-bounds upon mode change (v4)
+  * drm/i915: Check overlay stride errata for i830 and i845
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.35.1
+
+  [ Alok Kataria ]
+  * x86, vmware: Preset lpj values when on VMware.
+
+  [ Tejun Heo ]
+  * ata_piix: fix locking around SIDPR access
+
+  [ Scott Wood ]
+  * perf, powerpc: fsl_emb: Restore setting perf_sample_data.period
+
+  [ Sam Ravnborg ]
+  * powerpc: fix build with make 3.82
+
+  [ Marcin Slusarz ]
+  * x86, kmmio/mmiotrace: Fix double free of kmmio_fault_pages
+
+  [ Bjorn Helgaas ]
+  * x86/PCI: use host bridge _CRS info on ASRock ALiveSATA2-GLAN
+
+  [ Dominik Brodowski ]
+  * pcmcia: avoid buffer overflow in pcmcia_setup_isa_irq
+
+  [ H. Peter Anvin ]
+  * x86: Add memory modify constraints to xchg() and cmpxchg()
+
+  [ Larry Finger ]
+  * staging: rt2870: Add USB ID for Belkin F6D4050 v2
+
+  [ Randy Dunlap ]
+  * Staging: line6: needs to select SND_PCM
+
+  [ Peter Huewe ]
+  * Staging: panel: Prevent double-calling of parport_release - fix
+    oops.
+
+  [ Haiyang Zhang ]
+  * staging: hv: Fix Kconfig dependency of hv_blkvsc
+
+  [ Lytochkin Boris ]
+  * serial: add support for OX16PCI958 card
+
+  [ Rafael J. Wysocki ]
+  * PCI: Do not run NVidia quirks related to MSI with MSI disabled
+
+  [ Tejun Heo ]
+  * PCI: disable MSI on VIA K8M800
+
+  [ David Woodhouse ]
+  * solos-pci: Fix race condition in tasklet RX handling
+
+  [ Suresh Siddha ]
+  * x86, mtrr: Use stop machine context to rendezvous all the cpu's
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Add PC-beep whitelist for an Intel board
+
+  [ Jiri Slaby ]
+  * Char: nozomi, fix tty->count counting
+  * Char: nozomi, set tty->driver_data appropriately
+
+  [ KAMEZAWA Hiroyuki ]
+  * mm: fix corruption of hibernation caused by reusing swap during
+    image saving
+
+  [ Peter Huewe ]
+  * drivers/video/w100fb.c: ignore void return value / fix build failure
+
+  [ Johannes Berg ]
+  * iwlwifi: fix TX tracer
+
+  [ John W. Linville ]
+  * rtl8180: avoid potential NULL deref in rtl8180_beacon_work
+
+  [ Yinghai Lu ]
+  * ipmi: fix ACPI detection with regspacing
+
+  [ Borislav Petkov ]
+  * ide-cd: Do not access completed requests in the irq handler
+
+  [ Dan Williams ]
+  * md: move revalidate_disk() back outside open_mutex
+
+  [ NeilBrown ]
+  * md: fix another deadlock with removing sysfs attributes.
+  * md/raid10: fix deadlock with unaligned read during resync
+
+  [ Jeff Kirsher ]
+  * e100/e1000*/igb*/ixgb*: Add missing read memory barrier
+
+  [ Dan Williams ]
+  * ioat2: catch and recover from broken vtd configurations v6
+
+  [ Al Viro ]
+  * Fix sget() race with failing mount
+
+  [ Chris Wright ]
+  * blkdev: cgroup whitelist permission fix
+
+  [ Tyler Hicks ]
+  * eCryptfs: Handle ioctl calls with unlocked and compat functions
+
+  [ Lino Sanfilippo ]
+  * ecryptfs: release reference to lower mount if interpose fails
+
+  [ Julia Lawall ]
+  * fs/ecryptfs/file.c: introduce missing free
+
+  [ Philipp Reisner ]
+  * drbd: Initialize all members of sync_conf to their defaults [Bugz
+    315]
+  * drbd: Disable delay probes for the upcomming release
+
+  [ Tejun Heo ]
+  * bio, fs: update RWA_MASK, READA and SWRITE to match the
+    corresponding BIO_RW_* bits
+
+  [ Nathan Lynch ]
+  * signalfd: fill in ssi_int for posix timers and message queues
+
+  [ Igor Grinberg ]
+  * pxa/cm-x300: fix ffuart registration
+
+  [ Catalin Marinas ]
+  * smsc911x: Add spinlocks around registers access
+
+  [ Will Deacon ]
+  * ARM: 6299/1: errata: TLBIASIDIS and TLBIMVAIS operations can
+    broadcast a faulty ASID
+
+  [ Uwe Kleine-König ]
+  * ARM: 6280/1: imx: Fix build failure when including <mach/gpio.h>
+    without <linux/spinlock.h>
+
+  [ Anand Gadiyar ]
+  * USB: musb: use correct register widths in register dumps
+
+  [ Alan Stern ]
+  * USB: EHCI: remove PCI assumption
+
+  [ Steven Robertson ]
+  * USB: resizing usbmon binary interface buffer causes protection
+    faults
+
+  [ Phil Dibowitz ]
+  * USB delay init quirk for logitech Harmony 700-series devices
+
+  [ John G. Rogers ]
+  * USB: serial: enabling support for Segway RMP in ftdi_sio
+
+  [ Pavel Kazlou ]
+  * USB: option: Huawei ETS 1220 support added
+
+  [ Andrew Bird ]
+  * USB: option: add huawei k3765 k4505 devices to work properly
+
+  [ dranch@trinnet.net ]
+  * USB: ftdi_sio: device id for Navitator
+
+  [ Alessio Igor Bogani ]
+  * USB: cp210x: Add four new device IDs
+
+  [ Ming Lei ]
+  * USB: usbtest: avoid to free coherent buffer in atomic context
+
+  [ Christian Lamparter ]
+  * USB: fix thread-unsafe anchor utiliy routines
+
+  [ Johan Hovold ]
+  * USB: serial: fix stalled writes
+
+  [ Cyril Lacoux ]
+  * Bluetooth: Added support for controller shipped with iMac i5
+
+  [ Peter Zijlstra ]
+  * sched: Revert nohz_ratelimit() for now
+
+  [ Eric Bénard ]
+  * mtd: mxc_nand: fix unbalanced enable for IRQ
+
+  [ Marek Vasut ]
+  * mtd: gen_nand: fix support for multiple chips
+
+  [ James Chapman ]
+  * l2tp: fix export of header file for userspace
+
+  [ Dave Kleikamp ]
+  * jfs: don't allow os2 xattr namespace overlap with others
+
+  [ David S. Miller ]
+  * net: Fix NETDEV_NOTIFY_PEERS to not conflict with
+    NETDEV_BONDING_DESLAVE.
+
+  [ Ian Campbell ]
+  * irq: Add new IRQ flag IRQF_NO_SUSPEND
+  * xen: Do not suspend IPI IRQs.
+
+  [ Alexander Shishkin ]
+  * crypto: testmgr - add an option to disable cryptoalgos' self-tests
+
+  [ Eric Sandeen ]
+  * ext4: fix freeze deadlock under IO
+
+  [ Linus Torvalds ]
+  * mm: keep a guard page below a grow-down stack segment
+  * mm: fix missing page table unmap for stack guard page failure case
+  * x86: don't send SIGBUS for kernel page faults
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.35.2
+
+  [ Linus Torvalds ]
+  * mm: fix page table unmap for stack guard page properly
+  * mm: fix up some user-visible effects of the stack guard page
+
+  [ Greg Kroah-Hartman ]
+  * vmware: fix build error in vmware.c
+  * Linux 2.6.35.3
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Sun, 22 Aug 2010 11:58:12 -0700
+
 linux-2.6 (2.6.35-1+vyatta+2) unstable; urgency=low
 
   * fix 2.6.35 debian build
