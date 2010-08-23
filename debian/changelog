@@ -1,3 +1,9 @@
+linux-2.6 (2.6.35-1+vyatta+6) unstable; urgency=low
+
+  * Fix kernel build
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 23 Aug 2010 10:48:25 -0700
+
 linux-2.6 (2.6.35-1+vyatta+5) unstable; urgency=low
 
   * UNRELEASED
