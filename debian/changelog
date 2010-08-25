@@ -1,3 +1,9 @@
+linux-2.6 (2.6.35-1+vyatta+7) unstable; urgency=low
+
+  * Fix kernel config for i386
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 24 Aug 2010 22:19:53 -0700
+
 linux-2.6 (2.6.35-1+vyatta+6) unstable; urgency=low
 
   * Fix kernel build
