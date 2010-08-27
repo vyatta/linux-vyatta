@@ -1,3 +1,12 @@
+linux-2.6 (2.6.35-1+vyatta+8) unstable; urgency=low
+
+  * Enable more drivers on i386
+  * Allow non-root to query more ethtool values
+  * Update AMD64 config
+  * Fix amd64 kernel config
+
+ -- Stephen Hemminger <shemminger@lenny-amd64>  Thu, 26 Aug 2010 10:19:03 -0700
+
 linux-2.6 (2.6.35-1+vyatta+7) unstable; urgency=low
 
   * Fix kernel config for i386
