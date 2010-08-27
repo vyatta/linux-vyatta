@@ -1,3 +1,311 @@
+linux-2.6 (2.6.35-1+vyatta+9) unstable; urgency=low
+
+  [ Maxim Levitsky ]
+  * memstick: init sysfs attributes
+  * memstick: fix hangs on unexpected device removal in mspro_blk
+
+  [ Thomas Gleixner ]
+  * acpi: fix bogus preemption logic
+
+  [ Mark Brown ]
+  * ASoC: Fix inverted mute controls for WM8580
+  * ASoC: Remove DSP mode support for WM8776
+
+  [ Cliff Cai ]
+  * ASoC: register cache should be 1 byte aligned for 1 byte long
+    register
+
+  [ Joonyoung Shim ]
+  * regulator: Default GPIO controlled WM8994 regulators to disabled
+
+  [ Takashi Iwai ]
+  * ALSA: riptide - Fix detection / load of firmware files
+
+  [ Jaroslav Kysela ]
+  * ALSA: emu10k1 - delay the PCM interrupts (add pcm_irq_delay
+    parameter)
+
+  [ Jonathan Woithe ]
+  * ALSA: hda - Fix missing stream for second ADC on Realtek ALC260 HDA
+    codec
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Add quirk for Dell Vostro 1220
+
+  [ Tiger Yang ]
+  * ocfs2: do not overwrite error codes in ocfs2_init_acl
+
+  [ Wengang Wang ]
+  * ocfs2/dlm: fix a dead lock
+
+  [ Srinivas Eeda ]
+  * ocfs2 fix o2dlm dlm run purgelist (rev 3)
+
+  [ Tao Ma ]
+  * ocfs2: Count more refcount records in file system fragmentation.
+
+  [ Wengang Wang ]
+  * ocfs2/dlm: avoid incorrect bit set in refmap on recovery master
+  * ocfs2/dlm: remove potential deadlock -V3
+
+  [ Yuri Kululin ]
+  * wl1251: fix trigger scan timeout usage
+
+  [ Ryusuke Konishi ]
+  * nilfs2: fix list corruption after ifile creation failure
+
+  [ Shaohua Li ]
+  * tracing: Fix an unallocated memory access in function_graph
+
+  [ Huang Ying ]
+  * tracing: Fix ring_buffer_read_page reading out of page boundary
+
+  [ Johannes Berg ]
+  * cfg80211: fix locking in action frame TX
+
+  [ Luca Barbieri ]
+  * x86, asm: Refactor atomic64_386_32.S to support old binutils and be
+    cleaner
+
+  [ Cyrill Gorcunov ]
+  * perf, x86: P4 PMU -- update nmi irq statistics and unmask lvt entry
+    properly
+
+  [ Eric W. Biederman ]
+  * x86, apic: Map the local apic when parsing the MP table.
+
+  [ Victor van den Elzen ]
+  * platform/x86: move rfkill for Dell Mini 1012 to compal-laptop
+
+  [ Borislav Petkov ]
+  * x86, hotplug: Serialize CPU hotplug to avoid bringup concurrency
+    issues
+
+  [ Zhang, Yanmin ]
+  * perf, x86: Fix Intel-nhm PMU programming errata workaround
+
+  [ Daniel Kiper ]
+  * x86, apic: Fix apic=debug boot crash
+
+  [ Jiaju Zhang ]
+  * Fix the nested PR lock calling issue in ACL
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: add additional quirk for Acer rv620 laptop
+
+  [ Dr. David Alan Gilbert ]
+  * drm/radeon/kms: add missing copy from user
+
+  [ Jean Delvare ]
+  * hwmon: (pc87360) Fix device resource declaration
+
+  [ Russell King ]
+  * ARM: Tighten check for allowable CPSR values
+
+  [ Marek Vasut ]
+  * ARM: Fix gen_nand probe structures contents
+  * BFIN: Fix gen_nand probe structures contents
+
+  [ Rajkumar Manoharan ]
+  * ath9k_htc: fix panic on packet injection using airbase-ng tool.
+
+  [ Patrick J. LoPresti ]
+  * nfs: Add "lookupcache" to displayed mount options
+
+  [ Trond Myklebust ]
+  * NFS: Fix an Oops in the NFSv4 atomic open code
+
+  [ Maxim Levitsky ]
+  * ath5k: disable ASPM L0s for all cards
+
+  [ Axel Lin ]
+  * pxa3xx: fix ns2cycle equation
+
+  [ Ondrej Zary ]
+  * matroxfb: fix incorrect use of memcpy_toio()
+
+  [ Tilman Sauerbeck ]
+  * mtd: nand: Fix probe of Samsung NAND chips
+
+  [ Stefani Seibold ]
+  * mtd: change struct flchip_shared spinlock locking into mutex
+
+  [ Daniel Vetter ]
+  * drm/i915: fixup pageflip ringbuffer commands for i8xx
+  * drm/i915: i8xx also doesn't like multiple oustanding pageflips
+
+  [ Chris Wilson ]
+  * drm/i915/edp: Flush the write before waiting for PLLs
+
+  [ Mikulas Patocka ]
+  * dm snapshot: iterate origin and cow devices
+  * dm snapshot: test chunk size against both origin and snapshot
+
+  [ Kiyoshi Ueda ]
+  * dm: prevent access to md being deleted
+  * dm ioctl: release _hash_lock between devices in remove_all
+
+  [ Linus Torvalds ]
+  * mm: make the vma list be doubly linked
+  * mm: make the mlock() stack guard page checks stricter
+  * mm: make stack guard page logic use vm_prev pointer
+
+  [ H. Peter Anvin ]
+  * x86, asm: Clean up and simplify set_64bit()
+
+  [ Carsten Otte ]
+  * slab: fix object alignment
+
+  [ David S. Miller ]
+  * sparc64: Add missing ID to parport probing code.
+  * sparc64: Fix rwsem constant bug leading to hangs.
+  * sparc64: Fix atomic64_t routine return values.
+  * sparc: Really fix "console=" for serial consoles.
+
+  [ Stephen Hemminger ]
+  * bridge: add rcu_read_lock on transmit
+
+  [ Dmitry Popov ]
+  * tcp: cookie transactions setsockopt memory leak
+
+  [ Herbert Xu ]
+  * bridge: Fix skb leak when multicast parsing fails on TX
+
+  [ Changli Gao ]
+  * act_nat: the checksum of ICMP doesn't have pseudo header
+
+  [ Oliver Hartkopp ]
+  * can: add limit for nframes and clean up signed/unsigned variables
+
+  [ Dan Carpenter ]
+  * isdn: fix information leak
+
+  [ Jarek Poplawski ]
+  * net: Fix napi_gro_frags vs netpoll path
+  * net: Fix a memmove bug in dev_gro_receive()
+  * pkt_sched: Fix sch_sfq vs tcf_bind_filter oops
+  * pkt_sched: Fix sch_sfq vs tc_modify_qdisc oops
+
+  [ Changli Gao ]
+  * net: disable preemption before call smp_processor_id()
+  * act_nat: fix wild pointer
+
+  [ David Howells ]
+  * Fix init ordering of /dev/console vs callers of modprobe
+
+  [ Marek Vasut ]
+  * gen_nand: Test if nr_chips field is valid
+
+  [ Tilman Schmidt ]
+  * isdn/gigaset: reduce syslog spam
+
+  [ Dan Carpenter ]
+  * isdn: gigaset: add missing unlock
+
+  [ John Villalovos ]
+  * Oprofile: Change CPUIDS from decimal to hex, and add some comments
+
+  [ Josh Hunt ]
+  * oprofile: add support for Intel processor model 30
+
+  [ Jesse Barnes ]
+  * drm/agp/i915: trim stolen space to 32M
+
+  [ Jason Wessel ]
+  * timekeeping: Fix overflow in rawtime tv_nsec on 32 bit archs
+
+  [ John Stultz ]
+  * time: Workaround gcc loop optimization that causes 64bit div errors
+
+  [ Oliver Hartkopp ]
+  * can-raw: Fix skb_orphan_try handling
+
+  [ Johannes Berg ]
+  * iwlagn: fix rts cts protection
+
+  [ Kiyoshi Ueda ]
+  * dm: separate device deletion from dm_put
+
+  [ Bruce Allan ]
+  * e1000e: disable ASPM L1 on 82573
+  * e1000e: don't check for alternate MAC addr on parts that don't
+    support it
+
+  [ Johannes Berg ]
+  * iwlwifi: fix 3945 filter flags
+
+  [ Jan Beulich ]
+  * fixes for using make 3.82
+
+  [ Daniel T Chen ]
+  * ALSA: intel8x0: Mute External Amplifier by default for ThinkPad X31
+
+  [ Johannes Berg ]
+  * netlink: fix compat recvmsg
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: don't enable MSIs on AGP boards
+  * drm/radeon/kms/pm: bail early if nothing's changing
+  * drm/radeon/kms: fix typo in radeon_compute_pll_gain
+  * drm/radeon/kms/DCE3+: switch pads to ddc mode when going i2c
+  * drm/radeon/kms: fix sideport detection on newer rs880 boards
+
+  [ Jerome Glisse ]
+  * drm/radeon/kms: fix GTT/VRAM overlapping test
+
+  [ Dave Airlie ]
+  * drm: stop information leak of old kernel stack.
+
+  [ Marek Lindner ]
+  * Staging: batman-adv: unify orig_hash_lock spinlock handling to avoid
+    deadlocks
+
+  [ Sven Eckelmann ]
+  * Staging: batman-adv: Create batman_if only on register event
+  * Staging: batman-adv: Don't use net_dev after dev_put
+  * Staging: batman-adv: Don't write in not allocated packet_buff
+
+  [ Anatolij Gustschin ]
+  * powerpc: Fix typo in uImage target
+
+  [ Michael Tokarev ]
+  * USB: option: add Celot CT-650
+
+  [ Ross Burton ]
+  * USB: add device IDs for igotu to navman
+
+  [ Jef Driesen ]
+  * USB: pl2303: New vendor and product id
+
+  [ Craig Shelley ]
+  * USB: CP210x Fix Break On/Off
+
+  [ Michael Wileczka ]
+  * USB: ftdi_sio: fix endianess of max packet size
+
+  [ Greg Kroah-Hartman ]
+  * USB: io_ti: check firmware version before updating
+
+  [ John Youn ]
+  * USB: xhci: Remove buggy assignment in next_trb()
+
+  [ Martin Michlmayr ]
+  * USB: ftdi_sio: Add ID for Ionics PlugComputer
+
+  [ Galen Seitz ]
+  * USB: ftdi_sio: add product ID for Lenz LI-USB
+
+  [ Tim Chen ]
+  * mutex: Improve the scalability of optimistic spinning
+
+  [ Arjan van de Ven ]
+  * tracing: Fix timer tracing
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.35.4
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Thu, 26 Aug 2010 20:23:58 -0700
+
 linux-2.6 (2.6.35-1+vyatta+8) unstable; urgency=low
 
   * Enable more drivers on i386
