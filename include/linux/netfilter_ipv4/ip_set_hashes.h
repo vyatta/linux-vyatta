@@ -36,14 +36,14 @@ type##_retry(struct ip_set *set)					\
 	tmp = kmalloc(sizeof(struct ip_set_##type)			\
 		      + map->probes * sizeof(initval_t), GFP_ATOMIC);	\
 	if (!tmp) {							\
-		DP("out of memory for %lu bytes",			\
+		DP("out of memory for %zu bytes",			\
 		   sizeof(struct ip_set_##type)				\
 		   + map->probes * sizeof(initval_t));			\
 		return -ENOMEM;						\
 	}								\
 	tmp->members = harray_malloc(hashsize, sizeof(dtype), GFP_ATOMIC);\
 	if (!tmp->members) {						\
-		DP("out of memory for %lu bytes", hashsize * sizeof(dtype));\
+		DP("out of memory for %zu bytes", hashsize * sizeof(dtype));\
 		kfree(tmp);						\
 		return -ENOMEM;						\
 	}								\
@@ -109,7 +109,7 @@ type##_create(struct ip_set *set, const void *data, u_int32_t size)	\
 	map = kmalloc(sizeof(struct ip_set_##type)			\
 		      + req->probes * sizeof(initval_t), GFP_KERNEL);	\
 	if (!map) {							\
-		DP("out of memory for %lu bytes",			\
+		DP("out of memory for %zu bytes",			\
 		   sizeof(struct ip_set_##type)				\
 		   + req->probes * sizeof(initval_t));			\
 		return -ENOMEM;						\
@@ -126,7 +126,7 @@ type##_create(struct ip_set *set, const void *data, u_int32_t size)	\
 	}								\
 	map->members = harray_malloc(map->hashsize, sizeof(dtype), GFP_KERNEL);\
 	if (!map->members) {						\
-		DP("out of memory for %lu bytes", map->hashsize * sizeof(dtype));\
+		DP("out of memory for %zu bytes", map->hashsize * sizeof(dtype));\
 		kfree(map);						\
 		return -ENOMEM;						\
 	}								\
@@ -182,38 +182,46 @@ type##_list_header(const struct ip_set *set, void *data)		\
 
 #define HASH_LIST_MEMBERS_SIZE(type, dtype)				\
 static int								\
-type##_list_members_size(const struct ip_set *set)			\
+type##_list_members_size(const struct ip_set *set, char dont_align)	\
 {									\
 	const struct ip_set_##type *map = set->data;			\
 									\
-	return (map->hashsize * sizeof(dtype));				\
+	return (map->elements * IPSET_VALIGN(sizeof(dtype), dont_align));\
 }
 
 #define HASH_LIST_MEMBERS(type, dtype)					\
 static void								\
-type##_list_members(const struct ip_set *set, void *data)		\
+type##_list_members(const struct ip_set *set, void *data, char dont_align)\
 {									\
 	const struct ip_set_##type *map = set->data;			\
-	dtype *elem;							\
-	uint32_t i;							\
+	dtype *elem, *d;						\
+	uint32_t i, n = 0;						\
 									\
 	for (i = 0; i < map->hashsize; i++) {				\
 		elem = HARRAY_ELEM(map->members, dtype *, i);		\
-		((dtype *)data)[i] = *elem;				\
+		if (*elem) {						\
+			d = data + n * IPSET_VALIGN(sizeof(dtype), dont_align);\
+			*d = *elem;					\
+			n++;						\
+		}							\
 	}								\
 }
 
-#define HASH_LIST_MEMBERS_MEMCPY(type, dtype)				\
+#define HASH_LIST_MEMBERS_MEMCPY(type, dtype, nonzero)			\
 static void								\
-type##_list_members(const struct ip_set *set, void *data)		\
+type##_list_members(const struct ip_set *set, void *data, char dont_align)\
 {									\
 	const struct ip_set_##type *map = set->data;			\
 	dtype *elem;							\
-	uint32_t i;							\
+	uint32_t i, n = 0;						\
 									\
 	for (i = 0; i < map->hashsize; i++) {				\
 		elem = HARRAY_ELEM(map->members, dtype *, i);		\
-		memcpy((((dtype *)data)+i), elem, sizeof(dtype));	\
+		if (nonzero) {						\
+			memcpy(data + n * IPSET_VALIGN(sizeof(dtype), dont_align),\
+			       elem, sizeof(dtype));			\
+			n++;						\
+		}							\
 	}								\
 }
 

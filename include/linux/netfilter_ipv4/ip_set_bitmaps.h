@@ -19,7 +19,7 @@ type##_create(struct ip_set *set, const void *data, u_int32_t size)	\
 									\
 	map = kmalloc(sizeof(struct ip_set_##type), GFP_KERNEL);	\
 	if (!map) {							\
-		DP("out of memory for %lu bytes",			\
+		DP("out of memory for %zu bytes",			\
 		   sizeof(struct ip_set_##type));			\
 		return -ENOMEM;						\
 	}								\
@@ -77,22 +77,21 @@ type##_list_header(const struct ip_set *set, void *data)		\
 	__##type##_list_header(map, header);				\
 }
 
-#define BITMAP_LIST_MEMBERS_SIZE(type)					\
+#define BITMAP_LIST_MEMBERS_SIZE(type, dtype, sizeid, testfn)		\
 static int								\
-type##_list_members_size(const struct ip_set *set)			\
+type##_list_members_size(const struct ip_set *set, char dont_align)	\
 {									\
 	const struct ip_set_##type *map = set->data;			\
+	ip_set_ip_t i, elements = 0;					\
 									\
-	return map->size;						\
-}
-
-#define BITMAP_LIST_MEMBERS(type)					\
-static void								\
-type##_list_members(const struct ip_set *set, void *data)		\
-{									\
-	const struct ip_set_##type *map = set->data;			\
+	if (dont_align)							\
+		return map->size;					\
 									\
-	memcpy(data, map->members, map->size);				\
+	for (i = 0; i < sizeid; i++)					\
+		if (testfn)						\
+			elements++;					\
+									\
+	return elements * IPSET_ALIGN(sizeof(dtype));			\
 }
 
 #define IP_SET_TYPE(type, __features)					\
