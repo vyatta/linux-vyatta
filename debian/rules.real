@@ -76,7 +76,7 @@ source-arch: $(STAMPS_DIR)/source
 source-subarch: $(STAMPS_DIR)/source-$(ARCH)-$(SUBARCH)
 
 $(BUILD_DIR)/config.$(ARCH)-$(SUBARCH)-$(FLAVOUR): $(foreach t,$(KCONFIG),debian/arch/$(t))
-	python2.4 debian/bin/kconfig.py '$@' $(KCONFIG)
+	python debian/bin/kconfig.py '$@' $(KCONFIG)
 
 $(STAMPS_DIR)/source: SOURCE_FILES = $(filter-out debian .git, $(wildcard * .[^.]*))
 $(STAMPS_DIR)/source: DIR = $(BUILD_DIR)/source
@@ -138,14 +138,14 @@ $(STAMPS_DIR)/build-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-$(TYPE): $(STAMPS_DIR)/setup-$
 
 $(STAMPS_DIR)/build-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-kernel-package:
 	cd '$(DIR)'; $(setup_env) $(setup_env_kpkg_jobs) $(kpkg_image) build
-	python2.4 debian/bin/abicheck.py $(DIR) $(ARCH) $(SUBARCH) $(FLAVOUR)
+	python debian/bin/abicheck.py $(DIR) $(ARCH) $(SUBARCH) $(FLAVOUR)
 	touch '$@'
 
 $(STAMPS_DIR)/build-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-plain \
 $(STAMPS_DIR)/build-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-plain-s390-tape \
 $(STAMPS_DIR)/build-$(ARCH)-$(SUBARCH)-$(FLAVOUR)-plain-xen:
 	cd '$(DIR)'; $(setup_env) make $(JOBS_ARG)
-	python2.4 debian/bin/abicheck.py $(DIR) $(ARCH) $(SUBARCH) $(FLAVOUR)
+	python debian/bin/abicheck.py $(DIR) $(ARCH) $(SUBARCH) $(FLAVOUR)
 	touch '$@'
 
 $(STAMPS_DIR)/build-doc: SOURCE_DIR=$(BUILD_DIR)/source
