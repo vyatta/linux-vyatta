@@ -2102,10 +2102,9 @@ vmxnet3_declare_features(struct vmxnet3_adapter *adapter, bool dma64)
 		NETIF_F_HW_VLAN_RX |
 		NETIF_F_HW_VLAN_FILTER |
 		NETIF_F_TSO |
-		NETIF_F_TSO6 |
-		NETIF_F_LRO;
+		NETIF_F_TSO6; /*  | NETIF_F_LRO */
 
-	printk(KERN_INFO "features: sg csum vlan jf tso tsoIPv6 lro");
+	printk(KERN_INFO "features: sg csum vlan jf tso tsoIPv6");
 
 	adapter->rxcsum = true;
 	adapter->jumbo_frame = true;
