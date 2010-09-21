@@ -1,3 +1,353 @@
+linux-2.6 (2.6.35-1+vyatta+13) unstable; urgency=low
+
+  [ Axel Lin ]
+  * hwmon: (ads7871) Fix ads7871_probe error paths
+
+  [ Andreas Herrmann ]
+  * hwmon: (k8temp) Differentiate between AM2 and ASB1
+
+  [ Jeremy Fitzhardinge ]
+  * xen: handle events as edge-triggered
+  * xen: use percpu interrupts for IPIs and VIRQs
+
+  [ Dave Chinner ]
+  * xfs: fix untrusted inode number lookup
+  * xfs: ensure we mark all inodes in a freed cluster XFS_ISTALE
+
+  [ David Henningsson ]
+  * ALSA: hda - Add Sony VAIO quirk for ALC269
+  * ALSA: HDA: Use model=auto for LG R510
+  * ALSA: hda - Rename iMic to Int Mic on Lenovo NB0763
+
+  [ Mark Lord ]
+  * libata-sff: remove harmful BUG_ON from ata_bmdma_qc_issue
+  * sata_mv: fix broken DSM/TRIM support (v2)
+
+  [ Tejun Heo ]
+  * pata_cmd64x: revert commit d62f5576
+
+  [ Dave Chinner ]
+  * writeback: write_cache_pages doesn't terminate at nr_to_write <= 0
+
+  [ Suresh Siddha ]
+  * x86, tsc, sched: Recompute cyc2ns_offset's during resume from sleep
+    states
+
+  [ Lin Ming ]
+  * perf, x86, Pentium4: Clear the P4_CCCR_FORCE_OVF flag
+
+  [ Florian Westphal ]
+  * netfilter: fix CONFIG_COMPAT support
+
+  [ Ben Hutchings ]
+  * PCI: MSI: Remove unsafe and unnecessary hardware access
+  * PCI: MSI: Restore read_msi_msg_desc(); add get_cached_msi_msg_desc()
+
+  [ Christoph Hellwig ]
+  * direct-io: move aio_complete into ->end_io
+
+  [ Jiaying Zhang ]
+  * ext4: move aio completion after unwritten extent conversion
+
+  [ Christoph Hellwig ]
+  * xfs: move aio completion after unwritten extent conversion
+
+  [ Benjamin Herrenschmidt ]
+  * Revert "Input: appletouch - fix integer overflow issue"
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Handle missing NID 0x1b on ALC259 codec
+  * ALSA: hda - Handle pin NID 0x1a on ALC259/269
+
+  [ Ben Hutchings ]
+  * Staging: rt2870sta: Add more device IDs from vendor drivers
+
+  [ Haiyang Zhang ]
+  * staging: hv: Fix missing functions for net_device_ops
+
+  [ Hank Janssen ]
+  * staging: hv: Fixed bounce kmap problem by using correct index
+
+  [ Haiyang Zhang ]
+  * staging: hv: Fixed the value of the 64bit-hole inside ring buffer
+
+  [ Hank Janssen ]
+  * staging: hv: Increased storvsc ringbuffer and max_io_requests
+  * staging: hv: Fixed lockup problem with bounce_buffer scatter list
+
+  [ Miklos Szeredi ]
+  * fuse: flush background queue on connection close
+
+  [ Johannes Berg ]
+  * mac80211: delete work timer
+
+  [ Vivek Natarajan ]
+  * ath9k_htc: Fix disconnect issue in HT40 mode.
+
+  [ Luis R. Rodriguez ]
+  * ath9k_hw: Fix EEPROM uncompress block reading on AR9003
+  * ath9k_hw: fix parsing of HT40 5 GHz CTLs
+
+  [ Sunil Mushran ]
+  * ocfs2: Fix incorrect checksum validation error
+
+  [ Sonic Zhang ]
+  * serial: bfin_sport_uart: restore transmit frame sync fix
+
+  [ Dan Carpenter ]
+  * USB: ehci-ppc-of: problems in unwind
+
+  [ Maxim Osipov ]
+  * USB: Fix kernel oops with g_ether and Windows
+
+  [ Craig Shelley ]
+  * USB: CP210x Add new device ID
+
+  [ Jason Detring ]
+  * USB: cp210x: Add B&G H3000 link cable ID
+
+  [ Thadeu Lima de Souza Cascardo ]
+  * usb: allow drivers to use allocated bandwidth until unbound
+
+  [ Luke Lowrey ]
+  * USB: ftdi_sio: Added custom PIDs for ChamSys products
+
+  [ Dave Ludlow ]
+  * usb: serial: mos7840: Add USB ID to support the B&B Electronics
+    USOPTL4-2P.
+  * usb: serial: mos7840: Add USB IDs to support more B&B USB/RS485
+    converters.
+
+  [ Mimi Zohar ]
+  * ima: always maintain counters
+
+  [ Simon Arlott ]
+  * USB: cxacru: Use a bulk/int URB to access the command endpoint
+
+  [ Toby Gray ]
+  * USB: cdc-acm: Adding second ACM channel support for various Nokia
+    and one Samsung phones
+
+  [ Philippe Corbes ]
+  * USB: cdc-acm: Add pseudo modem without AT command capabilities
+
+  [ Toby Gray ]
+  * USB: cdc-acm: Fixing crash when ACM probing interfaces with no
+    endpoint descriptors.
+
+  [ David Henningsson ]
+  * ALSA: hda - Add a new hp-laptop model for Conexant 5066, tested on
+    HP G60
+
+  [ Clemens Ladisch ]
+  * ALSA: usb-audio: fix detection of vendor-specific device protocol
+    settings
+  * ALSA: virtuoso: work around missing reset in the Xonar DS Windows
+    driver
+  * ALSA: virtuoso: fix setting of Xonar DS line-in/mic-in controls
+
+  [ Takashi Iwai ]
+  * ALSA: seq/oss - Fix double-free at error path of snd_seq_oss_open()
+  * ALSA: usb - Release capture substream URBs properly
+  * ALSA: hda - Add quirk for Lenovo T400s
+
+  [ Brian Austin ]
+  * ALSA: hda - Add errata initverb sequence for CS42xx codecs
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Fix wrong HP pin detection in
+    snd_hda_parse_pin_def_config()
+
+  [ Daniel Mack ]
+  * ALSA: usb-audio: Assume first control interface is for audio
+
+  [ Stephen Warren ]
+  * ALSA: hda - patch_nvhdmi.c: Add missing codec IDs, unify names
+
+  [ Hugh Dickins ]
+  * swap: prevent reuse during hibernation
+  * swap: discard while swapping only if SWAP_FLAG_DISCARD
+
+  [ Christoph Hellwig ]
+  * swap: do not send discards as barriers
+
+  [ Dan Carpenter ]
+  * sysfs: checking for NULL instead of ERR_PTR
+
+  [ Robert Richter ]
+  * oprofile: fix crash when accessing freed task structs
+  * oprofile, x86: fix init_sysfs error handling
+  * oprofile, x86: fix init_sysfs() function stub
+
+  [ Alan Ott ]
+  * HID: Set Report ID properly for Output reports on the Control
+    endpoint.
+
+  [ Tejun Heo ]
+  * libata: skip EH autopsy and recovery during suspend
+  * libata,pata_via: revert ata_wait_idle() removal from
+    ata_sff/via_tf_load()
+  * ahci: fix hang on failed softreset
+
+  [ Jeff Moyer ]
+  * O_DIRECT: fix the splitting up of contiguous I/O
+
+  [ Li Zefan ]
+  * tracing: Fix a race in function profile
+
+  [ Steven Rostedt ]
+  * tracing: Do not allow llseek to set_ftrace_filter
+
+  [ Chris Wright ]
+  * tracing: t_start: reset FTRACE_ITER_HASH in case of seek/pread
+
+  [ Dan Carpenter ]
+  * irda: off by one
+
+  [ Takashi Iwai ]
+  * hp_accel: add quirks for HP ProBook 532x and HP Mini 5102
+
+  [ Peter Oberparleiter ]
+  * gcov: fix null-pointer dereference for certain module types
+
+  [ Yusuke Goda ]
+  * tmio_mmc: don't clear unhandled pending interrupts
+
+  [ Guennadi Liakhovetski ]
+  * mmc: fix the use of kunmap_atomic() in tmio_mmc.h
+
+  [ Maxim Levitsky ]
+  * mmc: fix all hangs related to mmc/sd card insert/removal during
+    suspend/resume
+
+  [ Uwe Kleine-König ]
+  * mmc: build fix: mmc_pm_notify is only available with CONFIG_PM=y
+
+  [ Menyhart Zoltan ]
+  * statfs() gives ESTALE error
+
+  [ Jorge Boncompte [DTI2] ]
+  * minix: fix regression in minix_mkdir()
+
+  [ Gary King ]
+  * bounce: call flush_dcache_page() after bounce_copy_vec()
+
+  [ Minchan Kim ]
+  * mm: compaction: handle active and inactive fairly in
+    too_many_isolated
+
+  [ Jerome Marchand ]
+  * kernel/groups.c: fix integer overflow in groups_search
+
+  [ Jan Sembera ]
+  * binfmt_misc: fix binfmt_misc priority
+
+  [ Dmitry Torokhov ]
+  * Input: i8042 - fix device removal on unload
+  * Input: i8042 - reset keyboard controller wehen resuming from S2R
+
+  [ KAMEZAWA Hiroyuki ]
+  * memory hotplug: fix next block calculation in is_removable
+
+  [ Frederic Weisbecker ]
+  * perf: Initialize callchains roots's childen hits
+
+  [ Paul Mackerras ]
+  * powerpc/perf_event: Reduce latency of calling perf_event_do_pending
+
+  [ Christian Lamparter ]
+  * p54: fix tx feedback status flag check
+
+  [ John W. Linville ]
+  * ath5k: check return value of ieee80211_get_tx_rate
+
+  [ Johannes Berg ]
+  * wireless extensions: fix kernel heap content leak
+
+  [ Steve Wise ]
+  * RDMA/cxgb3: Don't exceed the max HW CQ depth
+
+  [ Peter Zijlstra ]
+  * x86, tsc: Fix a preemption leak in restore_sched_clock_state()
+
+  [ H. Peter Anvin ]
+  * x86-64, compat: Test %rax for the syscall number, not %eax
+  * compat: Make compat_alloc_user_space() incorporate the access_ok()
+
+  [ Roland McGrath ]
+  * x86-64, compat: Retruncate rax after ia32 syscall entry tracing
+
+  [ David Henningsson ]
+  * ALSA: HDA: Enable internal speaker on Dell M101z
+
+  [ Thomas Gleixner ]
+  * x86: hpet: Work around hardware stupidity
+
+  [ Al Viro ]
+  * arm: fix really nasty sigreturn bug
+
+  [ Yong Wang ]
+  * hwmon: (emc1403) Remove unnecessary hwmon_device_unregister
+
+  [ Guillem Jover ]
+  * hwmon: (f75375s) Shift control mode to the correct bit position
+  * hwmon: (f75375s) Do not overwrite values read from registers
+
+  [ Anton Vorontsov ]
+  * apm_power: Add missing break statement
+
+  [ Jeff Layton ]
+  * cifs: fix potential double put of TCP session reference
+
+  [ Trond Myklebust ]
+  * NFS: Fix a typo in nfs_sockaddr_match_ipaddr6
+  * SUNRPC: Fix race corrupting rpc upcall
+
+  [ Chris Wilson ]
+  * agp/intel: Promote warning about failure to setup flush to error.
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: fix a regression on r7xx AGP due to the HDP flush
+    fix
+
+  [ Zhenyu Wang ]
+  * drm/i915: Enable MI_FLUSH on Sandybridge
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: force legacy pll algo for RV515 LVDS
+  * drm/radeon/kms: force legacy pll algo for RV620 LVDS
+  * drm/radeon/kms: properly set crtc high base on r7xx
+  * drm/radeon/kms/evergreen: fix gpu hangs in userspace accel code
+  * drm/radeon/kms/evergreen: fix backend setup
+
+  [ Dan Carpenter ]
+  * i915: return -EFAULT if copy_to_user fails
+  * i915_gem: return -EFAULT if copy_to_user fails
+
+  [ Chris Wilson ]
+  * drm/i915/dp: Really try 5 times before giving up.
+  * drm/i915: Allocate the PCI resource for the MCHBAR
+
+  [ Daniel Vetter ]
+  * drm/i915: overlay on gen2 can't address above 1G
+
+  [ Chris Wilson ]
+  * drm/i915: Prevent double dpms on
+
+  [ Jesse Barnes ]
+  * drm/i915: don't enable self-refresh on Ironlake
+
+  [ Chris Wilson ]
+  * Revert "drm/i915: Allow LVDS on pipe A on gen4+"
+  * drm: Only decouple the old_fb from the crtc is we call mode_set*
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.35.5
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 20 Sep 2010 22:33:19 -0700
+
 linux-2.6 (2.6.35-1+vyatta+12) unstable; urgency=low
 
   [ Stephen Hemminger ]
