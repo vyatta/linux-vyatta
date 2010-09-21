@@ -1,3 +1,10 @@
+linux-2.6 (2.6.32-1+vyatta+42+larkspur10) unstable; urgency=low
+
+  [ H. Peter Anvin ]
+  * x86-64, compat: Test %rax for the syscall number, not %eax
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 21 Sep 2010 14:47:40 -0700
+
 linux-2.6 (2.6.32-1+vyatta+42+larkspur9) unstable; urgency=low
 
   [ Linus Torvalds ]
