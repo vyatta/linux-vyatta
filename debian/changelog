@@ -1,3 +1,19 @@
+linux-2.6 (2.6.32-1+vyatta+42+larkspur7) unstable; urgency=low
+
+  [ Hank Janssen ]
+  * staging: hv: Fixed bounce kmap problem by using correct index
+
+  [ Haiyang Zhang ]
+  * staging: hv: Fixed the value of the 64bit-hole inside ring buffer
+
+  [ Hank Janssen ]
+  * staging: hv: Increased storvsc ringbuffer and max_io_requests
+  * staging: hv: Fixed lockup problem with bounce_buffer scatter list
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 21 Sep 2010 14:36:48 -0700
+
 linux-2.6 (2.6.32-1+vyatta+42+larkspur6) unstable; urgency=low
 
   [ Haiyang Zhang ]
