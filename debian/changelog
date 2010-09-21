@@ -1,3 +1,15 @@
+linux-2.6 (2.6.32-1+vyatta+42+larkspur9) unstable; urgency=low
+
+  [ Linus Torvalds ]
+  * mm: keep a guard page below a grow-down stack segment
+  * mm: fix missing page table unmap for stack guard page failure case
+  * mm: fix page table unmap for stack guard page properly
+  * mm: fix up some user-visible effects of the stack guard page
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 21 Sep 2010 14:47:20 -0700
+
 linux-2.6 (2.6.32-1+vyatta+42+larkspur8) unstable; urgency=low
 
   [ Greg Kroah-Hartman ]
