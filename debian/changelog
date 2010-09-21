@@ -1,3 +1,15 @@
+linux-2.6 (2.6.35-1+vyatta+12) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Fix changelog email address
+
+  [ Eric Dumazet ]
+  * ip_gre: CONFIG_IPV6_MODULE support
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 20 Sep 2010 22:31:31 -0700
+
 linux-2.6 (2.6.35-1+vyatta+11) unstable; urgency=low
 
   * fix squeeze build issues
