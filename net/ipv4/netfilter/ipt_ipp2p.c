@@ -875,61 +875,11 @@ match(const struct sk_buff *skb,
 		return 0;
 	}
 }
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,16)
-static int
-checkentry(const char *tablename,
-	   const struct ipt_ip *ip,
-	   void *matchinfo,
-	   unsigned int matchsize,
-	   unsigned int hook_mask)
-#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,6,17)
-static int
-checkentry(const char *tablename,
-	   const void *inf,
-	   void *matchinfo,
-	   unsigned int matchsize,
-	   unsigned int hook_mask)
-#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
-static int
-checkentry(const char *tablename,
-	   const void *inf,
-	   const struct xt_match *match,
-	   void *matchinfo,
-	   unsigned int matchsize,
-	   unsigned int hook_mask)
-#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23)
-static int
-checkentry(const char *tablename,
-	   const void *inf,
-	   const struct xt_match *match,
-	   void *matchinfo,
-	   unsigned int hook_mask)
-#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
-static bool
-checkentry(const char *tablename,
-	   const void *inf,
-	   const struct xt_match *match,
-	   void *matchinfo,
-	   unsigned int hook_mask)
-#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,28) */
-static bool
-checkentry(const struct xt_mtchk_param *par)
-#endif
-{
-        /* Must specify -p tcp */
-/*    if (ip->proto != IPPROTO_TCP || (ip->invflags & IPT_INV_PROTO)) {
- *	printk("ipp2p: Only works on TCP packets, use -p tcp\n");
- *	return 0;
- *    }*/
-    return 1;
-}
 									    
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,17)
 static struct xt_match ipp2p_match = {
 	.name		= "ipp2p",
 	.match		= &match,
-	.checkentry	= &checkentry,
 	.me		= THIS_MODULE
 };
 #else /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,17) */
@@ -938,7 +888,6 @@ static struct xt_match ipp2p_match = {
 	.family		= AF_INET,
 	.match		= &match,
 	.matchsize	= sizeof(struct ipt_p2p_info),
-	.checkentry	= &checkentry,
 	.me		= THIS_MODULE
 };
 #endif
