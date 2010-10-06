@@ -1,3 +1,246 @@
+linux-2.6 (2.6.35-1+vyatta+16) unstable; urgency=low
+
+  [ Mathias Nyman ]
+  * usb: musb_debugfs: don't use the struct file private_data field with
+    seq_files
+
+  [ Dan Rosenberg ]
+  * USB: serial/mos*: prevent reading uninitialized stack memory
+
+  [ David S. Miller ]
+  * bridge: Clear INET control block of SKBs passed into ip_fragment().
+
+  [ Eric Dumazet ]
+  * gro: fix different skb headrooms
+
+  [ Jarek Poplawski ]
+  * gro: Re-fix different skb headrooms
+
+  [ David S. Miller ]
+  * irda: Correctly clean up self->ias_obj on irda_bind() failure.
+
+  [ Eric Dumazet ]
+  * rds: fix a leak of kernel memory
+
+  [ David S. Miller ]
+  * net: RPS needs to depend upon USE_GENERIC_SMP_HELPERS
+  * tcp: Combat per-cpu skew in orphan tests.
+
+  [ Eric Dumazet ]
+  * tcp: fix three tcp sysctls tuning
+
+  [ KOSAKI Motohiro ]
+  * tcp: select(writefds) don't hang up when a peer close connection
+
+  [ Alexey Kuznetsov ]
+  * tcp: Prevent overzealous packetization by SWS logic.
+
+  [ Eric Dumazet ]
+  * udp: add rehash on connect()
+
+  [ Tetsuo Handa ]
+  * UNIX: Do not loop forever at unix_autobind().
+
+  [ Eric Dumazet ]
+  * l2tp: test for ethernet header in l2tp_eth_dev_recv()
+
+  [ Jianzhao Wang ]
+  * net: blackhole route should always be recalculated
+
+  [ David S. Miller ]
+  * sparc64: Get rid of indirect p1275 PROM call buffer.
+
+  [ Dan Rosenberg ]
+  * drivers/net/usb/hso.c: prevent reading uninitialized memory
+  * drivers/net/cxgb3/cxgb3_main.c: prevent reading uninitialized stack
+    memory
+  * drivers/net/eql.c: prevent reading uninitialized stack memory
+
+  [ Andy Gospodarek ]
+  * bonding: correctly process non-linear skbs
+
+  [ Dan Carpenter ]
+  * Staging: vt6655: fix buffer overflow
+  * net/llc: make opt unsigned in llc_ui_setsockopt()
+
+  [ Andrea Arcangeli ]
+  * mm: fix swapin race condition
+
+  [ Hugh Dickins ]
+  * mm: further fix swapin race condition
+
+  [ Amit Shah ]
+  * virtio: console: Prevent userspace from submitting NULL buffers
+
+  [ Hans de Goede ]
+  * virtio: console: Fix poll blocking even though there is data to read
+
+  [ Zhenyu Wang ]
+  * intel_agp, drm/i915: Add all sandybridge graphics devices support
+  * agp/intel: fix physical address mask bits for sandybridge
+  * agp/intel: fix dma mask bits on sandybridge
+
+  [ Matt Helsley ]
+  * hw breakpoints: Fix pid namespace bug
+
+  [ Paul E. McKenney ]
+  * pid: make setpgid() system call use RCU read-side critical section
+
+  [ Stanislaw Gruszka ]
+  * sched: Fix user time incorrectly accounted as system time on 32-bit
+
+  [ Patrick Simmons ]
+  * oprofile: Add Support for Intel CPU Family 6 / Model 22 (Intel
+    Celeron 540)
+
+  [ Chris Wilson ]
+  * drm/i915,agp/intel: Add second set of PCI-IDs for B43
+
+  [ Jan Kara ]
+  * bdi: Initialize noop_backing_dev_info properly
+  * char: Mark /dev/zero and /dev/kmem as not capable of writeback
+
+  [ Andrew Morton ]
+  * drivers/pci/intel-iommu.c: fix build with older gcc's
+
+  [ Andrea Arcangeli ]
+  * mmap: call unlink_anon_vmas() in __split_vma() in case of error
+
+  [ Dan Rosenberg ]
+  * drivers/video/sis/sis_main.c: prevent reading uninitialized stack
+    memory
+
+  [ Vladimir Zapolskiy ]
+  * rtc: s3c: balance state changes of wakeup flag
+
+  [ Dan Rosenberg ]
+  * Prevent freeing uninitialized pointer in compat_do_readv_writev
+
+  [ Arnd Bergmann ]
+  * /proc/vmcore: fix seeking
+
+  [ Minchan Kim ]
+  * vmscan: check all_unreclaimable in direct reclaim path
+
+  [ Tejun Heo ]
+  * percpu: fix pcpu_last_unit_cpu
+
+  [ Jan Kara ]
+  * aio: do not return ERESTARTSYS as a result of AIO
+
+  [ Jeff Moyer ]
+  * aio: check for multiplication overflow in do_io_submit
+
+  [ Thomas Renninger ]
+  * x86 platform drivers: hp-wmi Reorder event id processing
+
+  [ Steven Whitehouse ]
+  * GFS2: gfs2_logd should be using interruptible waits
+
+  [ Marcin Slusarz ]
+  * drm/nv50: initialize ramht_refs list for faked 0 channel
+
+  [ Eric Paris ]
+  * inotify: send IN_UNMOUNT events
+
+  [ Ryan Kuester ]
+  * SCSI: mptsas: fix hangs caused by ATA pass-through
+
+  [ Avi Kivity ]
+  * KVM: Keep slot ID in memory slot structure
+  * KVM: Prevent internal slots from being COWed
+
+  [ Xiao Guangrong ]
+  * KVM: MMU: fix direct sp's access corrupted
+
+  [ Gleb Natapov ]
+  * KVM: x86: emulator: inc/dec can have lock prefix
+
+  [ Andrea Arcangeli ]
+  * KVM: MMU: fix mmu notifier invalidate handler for huge spte
+
+  [ Avi Kivity ]
+  * KVM: VMX: Fix host GDT.LIMIT corruption
+
+  [ Tony Luck ]
+  * IA64: fix siglock
+
+  [ Petr Tesarik ]
+  * IA64: Optimize ticket spinlocks in fsys_rt_sigprocmask
+
+  [ David Howells ]
+  * KEYS: Fix RCU no-lock warning in keyctl_session_to_parent()
+  * KEYS: Fix bug in keyctl_session_to_parent() if parent has no session
+    keyring
+
+  [ Dan Rosenberg ]
+  * xfs: prevent reading uninitialized stack memory
+  * drivers/video/via/ioctl.c: prevent reading uninitialized stack
+    memory
+
+  [ Nicolas Ferre ]
+  * AT91: change dma resource index
+
+  [ Colin Cross ]
+  * PM: Prevent waiting forever on asynchronous resume after failing
+    suspend
+
+  [ Rafael J. Wysocki ]
+  * PM / Hibernate: Avoid hitting OOM during preallocation of memory
+
+  [ Luca Barbieri ]
+  * x86, asm: Use a lower case name for the end macro in
+    atomic64_386_32.S
+
+  [ Daniel J Blueman ]
+  * ALSA: hda - Fix beep frequency on IDT 92HD73xx and 92HD71Bxx codecs
+
+  [ Morten H. Larsen ]
+  * Fix call to replaced SuperIO functions
+
+  [ Islam Amer ]
+  * dell-wmi: Add support for eject key on Dell Studio 1555
+
+  [ Mel Gorman ]
+  * mm: page allocator: drain per-cpu lists after direct reclaim
+    allocation fails
+
+  [ Christoph Lameter ]
+  * mm: page allocator: calculate a better estimate of NR_FREE_PAGES
+    when memory is low and kswapd is awake
+
+  [ Mel Gorman ]
+  * mm: page allocator: update free page counters after pages are placed
+    on the free list
+
+  [ Luck, Tony ]
+  * guard page for stacks that grow upwards
+
+  [ Daniel J Blueman ]
+  * Fix unprotected access to task credentials in waitid()
+
+  [ Vlad Yasevich ]
+  * sctp: Do not reset the packet during sctp_packet_config().
+
+  [ Chris Wilson ]
+  * drm/i915: Ensure that the crtcinfo is populated during mode_fixup()
+
+  [ Michael Cree ]
+  * alpha: Fix printk format errors
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.35.6
+
+  [ James Dingwall ]
+  * Xen: fix typo in previous patch
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.35.7
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 06 Oct 2010 16:51:21 -0700
+
 linux-2.6 (2.6.35-1+vyatta+15) unstable; urgency=low
 
   * merge upstream ipset 4.4
