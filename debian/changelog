@@ -1,3 +1,10 @@
+linux-2.6 (2.6.35-1+vyatta+18) unstable; urgency=low
+
+  * Revert "Add infinband drivers"
+  * Fix i386 config for Infiniband
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 11 Oct 2010 22:51:11 -0700
+
 linux-2.6 (2.6.35-1+vyatta+17) unstable; urgency=low
 
   * Cleanup ipt_ipp2p code
