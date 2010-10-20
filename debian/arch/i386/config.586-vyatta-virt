@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35
-# Mon Oct 11 22:48:52 2010
+# Wed Oct 20 16:58:52 2010
 #
 # CONFIG_64BIT is not set
 CONFIG_X86_32=y
@@ -1166,7 +1166,8 @@ CONFIG_NET_9P_VIRTIO=m
 # Generic Driver Options
 #
 CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-# CONFIG_DEVTMPFS is not set
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
 CONFIG_STANDALONE=y
 CONFIG_PREVENT_FIRMWARE_BUILD=y
 CONFIG_FW_LOADER=y
