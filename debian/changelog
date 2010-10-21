@@ -1,3 +1,10 @@
+linux-2.6 (2.6.35-1+vyatta+19) unstable; urgency=low
+
+  * Add devtmpfs for amd64
+  * Update i386 config to support devtmpfs
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 20 Oct 2010 17:01:24 -0700
+
 linux-2.6 (2.6.35-1+vyatta+18) unstable; urgency=low
 
   * Revert "Add infinband drivers"
