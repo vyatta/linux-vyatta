@@ -1,3 +1,10 @@
+linux-2.6 (2.6.35-1+vyatta+20) unstable; urgency=low
+
+  * Disable deprecated sysfs features
+  * Update i386 config to remove deprecated SYSFS hooks
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 22 Oct 2010 15:23:04 -0700
+
 linux-2.6 (2.6.35-1+vyatta+19) unstable; urgency=low
 
   * Add devtmpfs for amd64
