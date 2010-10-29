@@ -1,3 +1,290 @@
+linux-2.6 (2.6.35-1+vyatta+21) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Disable FCOE and USB device filesystem (amd64)
+
+  [ H. Peter Anvin ]
+  * x86, cpu: After uncapping CPUID, re-run CPU feature detection
+
+  [ Dan Rosenberg ]
+  * ALSA: sound/pci/rme9652: prevent reading uninitialized stack memory
+
+  [ Erik J. Staab ]
+  * ALSA: oxygen: fix analog capture on Claro halo cards
+
+  [ Luke Yelavich ]
+  * ALSA: hda - Add Dell Latitude E6400 model quirk
+
+  [ Dan Rosenberg ]
+  * ALSA: prevent heap corruption in snd_ctl_new()
+
+  [ Clemens Ladisch ]
+  * ALSA: rawmidi: fix oops (use after free) when unloading a driver
+    module
+
+  [ Takashi Iwai ]
+  * hwmon: (lis3) Fix Oops with NULL platform data
+
+  [ Alan Stern ]
+  * USB: fix bug in initialization of interface minor numbers
+
+  [ Ming Lei ]
+  * usb: musb: gadget: fix kernel panic if using out ep with FIFO_TXRX
+    style
+
+  [ Sergei Shtylyov ]
+  * usb: musb: gadget: restart request on clearing endpoint halt
+
+  [ Antonio Ospite ]
+  * HID: hidraw, fix a NULL pointer dereference in hidraw_ioctl
+  * HID: hidraw, fix a NULL pointer dereference in hidraw_write
+
+  [ Tejun Heo ]
+  * ahci: fix module refcount breakage introduced by libahci split
+
+  [ Don Mullis ]
+  * lib/list_sort: do not pass bad pointers to cmp callback
+
+  [ Len Brown ]
+  * ACPI: invoke DSDT corruption workaround on all Toshiba Satellite
+
+  [ Jiri Olsa ]
+  * oprofile: Add Support for Intel CPU Family 6 / Model 29
+
+  [ Robert Richter ]
+  * oprofile, ARM: Release resources on failure
+
+  [ Steve Wise ]
+  * RDMA/cxgb3: Turn off RX coalescing for iWARP connections
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: fix bad cast/shift in evergreen.c
+  * drm/radeon/kms: avivo cursor workaround applies to evergreen as well
+
+  [ Peter Korsgaard ]
+  * ARM: 6400/1: at91: fix arch_gettimeoffset fallout
+
+  [ Catalin Marinas ]
+  * ARM: 6395/1: VExpress: Set bit 22 in the PL310 (cache controller)
+    AuxCtlr register
+
+  [ Jason Wang ]
+  * V4L/DVB: gspca - main: Fix a crash of some webcams on ARM arch
+
+  [ Jean-François Moine ]
+  * V4L/DVB: gspca - sn9c20x: Bad transfer size of Bayer images
+
+  [ Marek Szyprowski ]
+  * mmc: sdhci-s3c: fix NULL ptr access in sdhci_s3c_remove
+
+  [ Joerg Roedel ]
+  * x86/amd-iommu: Set iommu configuration flags in enable-loop
+  * x86/amd-iommu: Fix rounding-bug in __unmap_single
+  * x86/amd-iommu: Work around S3 BIOS bug
+
+  [ Jeremy Fitzhardinge ]
+  * tracing/x86: Don't use mcount in pvclock.c
+
+  [ Steven Rostedt ]
+  * tracing/x86: Don't use mcount in kvmclock.c
+
+  [ Hugh Dickins ]
+  * ksm: fix bad user data when swapping
+
+  [ Marcin Slusarz ]
+  * i7core_edac: fix panic in udimm sysfs attributes registration
+
+  [ Linus Torvalds ]
+  * v4l1: fix 32-bit compat microcode loading translation
+
+  [ Mauro Carvalho Chehab ]
+  * V4L/DVB: cx231xx: Avoid an OOPS when card is unknown (card=0)
+
+  [ Maxim Levitsky ]
+  * V4L/DVB: IR: fix keys beeing stuck down forever
+
+  [ Mauro Carvalho Chehab ]
+  * V4L/DVB: Don't identify PV SBTVD Hybrid as a DibCom device
+
+  [ Kenneth Waters ]
+  * Input: joydev - fix JSIOCSAXMAP ioctl
+
+  [ Aristeu Rozanski ]
+  * Input: wacom - fix pressure in Cintiq 21UX2
+
+  [ Dan Williams ]
+  * ioat2: fix performance regression
+
+  [ Johannes Berg ]
+  * mac80211: fix use-after-free
+
+  [ Thomas Gleixner ]
+  * x86, hpet: Fix bogus error check in hpet_assign_irq()
+  * x86, irq: Plug memory leak in sparse irq
+
+  [ Tejun Heo ]
+  * ubd: fix incorrect sector handling during request restart
+
+  [ Dan Carpenter ]
+  * OSS: soundcard: locking bug in sound_ioctl()
+
+  [ Mike Snitzer ]
+  * virtio-blk: fix request leak.
+
+  [ Steven Rostedt ]
+  * ring-buffer: Fix typo of time extends per page
+
+  [ Simon Guinot ]
+  * dmaengine: fix interrupt clearing for mv_xor
+
+  [ Julia Lawall ]
+  * drivers/gpu/drm/i915/i915_gem.c: Add missing error handling code
+
+  [ Salman Qazi ]
+  * hrtimer: Preserve timer state in remove_hrtimer()
+
+  [ Yegor Yefremov ]
+  * i2c-pca: Fix waitforcompletion() return value
+
+  [ Frederic Weisbecker ]
+  * reiserfs: fix dependency inversion between inode and reiserfs
+    mutexes
+  * reiserfs: fix unwanted reiserfs lock recursion
+
+  [ Joel Becker ]
+  * ocfs2: Don't walk off the end of fast symlinks.
+
+  [ Mark Brown ]
+  * mfd: Ignore non-GPIO IRQs when setting wm831x IRQ types
+
+  [ Johannes Berg ]
+  * wext: fix potential private ioctl memory content leak
+
+  [ Luca Tettamanti ]
+  * atl1: fix resume
+
+  [ Yinghai Lu ]
+  * x86, numa: For each node, register the memory blocks actually used
+
+  [ Borislav Petkov ]
+  * x86, AMD, MCE thresholding: Fix the MCi_MISCj iteration order
+
+  [ Linus Torvalds ]
+  * De-pessimize rds_page_copy_user
+
+  [ Stefan Richter ]
+  * firewire: ohci: fix TI TSB82AA2 regression since 2.6.35
+
+  [ Chris Wilson ]
+  * drm/i915: Prevent module unload to avoid random memory corruption
+  * drm/i915: Sanity check pread/pwrite
+
+  [ Jesse Barnes ]
+  * drm/i915: fix GMCH power reporting
+
+  [ Chris Wilson ]
+  * drm: Prune GEM vma entries
+  * drm: Hold the mutex when dropping the last GEM reference (v2)
+
+  [ Dave Airlie ]
+  * drm/radeon: fix PCI ID 5657 to be an RV410
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: fix possible sigbus in evergreen accel code
+  * drm/radeon/kms: fix up encoder info messages for DFP6
+  * drm/radeon/kms: fix potential segfault in r600_ioctl_wait_idle
+  * drm/radeon/kms: add quirk for MSI K9A2GM motherboard
+
+  [ Ohad Ben-Cohen ]
+  * mmc: sdio: fix SDIO suspend/resume regression
+
+  [ Olivier Grenie ]
+  * V4L/DVB: dib7770: enable the current mirror
+
+  [ Johannes Weiner ]
+  * xfs: properly account for reclaimed inodes
+
+  [ Stanislaw Gruszka ]
+  * skge: add quirk to limit DMA
+  * r8169: allocate with GFP_KERNEL flag when able to sleep
+
+  [ Marcelo Tosatti ]
+  * KVM: i8259: fix migration
+  * KVM: x86: Fix SVM VMCB reset
+  * KVM: x86: Move TSC reset out of vmcb_init
+  * KVM: fix irqfd assign/deassign race
+  * KVM: Fix reboot on Intel hosts
+
+  [ FUJITA Tomonori ]
+  * bsg: fix incorrect device_status value
+
+  [ Martin K. Petersen ]
+  * Fix VPD inquiry page wrapper
+
+  [ Amit Shah ]
+  * virtio: console: Don't block entire guest if host doesn't read data
+
+  [ Yinghai Lu ]
+  * ACPI: Handle ACPI0007 Device in acpi_early_set_pdc
+
+  [ Matt Evans ]
+  * powerpc: Initialise paca->kstack before early_setup_secondary
+
+  [ Michael Neuling ]
+  * powerpc: Don't use kernel stack with translation off
+
+  [ Paul Fertser ]
+  * b44: fix carrier detection on bind
+
+  [ Herton Ronaldo Krzesinski ]
+  * ALSA: hda - add ideapad model for Conexant 5051 codec
+
+  [ Colin Ian King ]
+  * ACPI: enable repeated PCIEXP wakeup by clearing PCIEXP_WAKE_STS on
+    resume
+
+  [ Len Brown ]
+  * intel_idle: PCI quirk to prevent Lenovo Ideapad s10-3 boot hang
+  * ACPI: EC: add Vista incompatibility DMI entry for Toshiba Satellite
+    L355
+  * ACPI: delete ZEPTO idle=nomwait DMI quirk
+
+  [ Zhang Rui ]
+  * ACPI: Disable Windows Vista compatibility for Toshiba P305D
+
+  [ Rafael J. Wysocki ]
+  * PM / ACPI: Blacklist systems known to require acpi_sleep=nonvs
+
+  [ Jacob Pan ]
+  * x86: detect scattered cpuid features earlier
+
+  [ Zhenyu Wang ]
+  * agp/intel: Fix cache control for Sandybridge
+
+  [ Joerg Roedel ]
+  * x86-32: Separate 1:1 pagetables from swapper_pg_dir
+
+  [ H. Peter Anvin ]
+  * x86-32: Fix dummy trampoline-related inline stubs
+
+  [ Hugh Dickins ]
+  * x86, mm: Fix CONFIG_VMSPLIT_1G and 2G_OPT trampoline
+
+  [ Roland McGrath ]
+  * setup_arg_pages: diagnose excessive argument size
+  * execve: improve interactivity with large arguments
+  * execve: make responsive to SIGKILL with large arguments
+
+  [ Stefan Bader ]
+  * mm: Move vma_stack_continue into mm.h
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.35.8
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Fri, 29 Oct 2010 16:42:30 -0700
+
 linux-2.6 (2.6.35-1+vyatta+20) unstable; urgency=low
 
   * Disable deprecated sysfs features
