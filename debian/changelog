@@ -1,3 +1,9 @@
+linux-2.6 (2.6.35-1+vyatta+22) unstable; urgency=low
+
+  * Add statistics to basic classifier
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Thu, 04 Nov 2010 11:18:36 -0700
+
 linux-2.6 (2.6.35-1+vyatta+21) unstable; urgency=low
 
   [ Stephen Hemminger ]
