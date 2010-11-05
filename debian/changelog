@@ -1,3 +1,9 @@
+linux-2.6 (2.6.32-1+vyatta+42+larkspur12) unstable; urgency=low
+
+  * Bugfix 5749: Disable flow director in ixgbe driver.
+
+ -- Bob Gilligan <gilligan@vyatta.com>  Fri, 05 Nov 2010 16:26:38 -0700
+
 linux-2.6 (2.6.32-1+vyatta+42+larkspur11) unstable; urgency=low
 
   [ Roland McGrath ]
