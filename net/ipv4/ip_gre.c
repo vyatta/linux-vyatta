@@ -1060,19 +1060,13 @@ ipgre_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 		if (!capable(CAP_NET_ADMIN))
 			goto done;
 
-		printk("%s: dev=%s\n", __func__, dev->name);
 		if (dev == ign->fb_tunnel_dev) {
 			err = -EFAULT;
 			if (copy_from_user(&p, ifr->ifr_ifru.ifru_data, sizeof(p)))
 				goto done;
-			
 			err = -ENOENT;
 			if ((t = ipgre_tunnel_locate(net, &p, 0)) == NULL)
 				goto done;
-
-			printk("ipgre_tunnel_locate: found %s\n", __func__, 
-			       t->dev->name);
-
 			err = -EPERM;
 			if (t == netdev_priv(ign->fb_tunnel_dev))
 				goto done;
