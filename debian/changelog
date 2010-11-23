@@ -1,3 +1,254 @@
+linux-2.6 (2.6.35-1+vyatta+26) unstable; urgency=low
+
+  [ Kevin Cernekee ]
+  * netfilter: nf_conntrack_sip: Handle Cisco 7941/7945 IP phones
+
+  [ Max Vozeler ]
+  * staging: usbip: Notify usb core of port status changes
+  * staging: usbip: Process event flags without delay
+
+  [ Greg Kroah-Hartman ]
+  * Staging: phison: fix problem caused by libata change
+
+  [ Stephane Eranian ]
+  * perf_events: Fix bogus AMD64 generic TLB events
+  * perf_events: Fix bogus context time tracking
+
+  [ Paul Mackerras ]
+  * powerpc/perf: Fix sampling enable for PPC970
+
+  [ Vasiliy Kulikov ]
+  * pcmcia: synclink_cs: fix information leak to userland
+
+  [ Linus Walleij ]
+  * sched: Drop all load weight manipulation for RT tasks
+
+  [ Mathieu Desnoyers ]
+  * sched: Fix string comparison in /proc/sched_features
+
+  [ Alan Cox ]
+  * bluetooth: Fix missing NULL check
+
+  [ Darren Hart ]
+  * futex: Fix errors in nested key ref-counting
+
+  [ Suresh Jayaraman ]
+  * cifs: fix broken oplock handling
+
+  [ Tejun Heo ]
+  * libahci: fix result_tf handling after an ATA PIO data-in command
+
+  [ Len Brown ]
+  * intel_idle: do not use the LAPIC timer for ATOM C2
+
+  [ Cliff Wickman ]
+  * mm, x86: Saving vmcore with non-lazy freeing of vmas
+
+  [ Andre Przywara ]
+  * x86, cpu: Fix renamed, not-yet-shipping AMD CPUID feature bit
+
+  [ Alok Kataria ]
+  * x86, kexec: Make sure to stop all CPUs before exiting the kernel
+
+  [ Paul Fox ]
+  * x86, olpc: Don't retry EC commands forever
+
+  [ Andreas Herrmann ]
+  * x86, mtrr: Assume SYS_CFG[Tom2ForceMemTypeWB] exists on all future
+    AMD CPUs
+
+  [ Suresh Siddha ]
+  * x86, intr-remap: Set redirection hint in the IRTE
+
+  [ Cliff Wickman ]
+  * x86, kdump: Change copy_oldmem_page() to use cached addressing
+
+  [ Bart Oldeman ]
+  * x86, vm86: Fix preemption bug for int1 debug and int3 breakpoint
+    handlers.
+
+  [ Joerg Roedel ]
+  * KVM: X86: Report SVM bit to userspace only when supported
+  * KVM: SVM: Restore correct registers after sel_cr0 intercept
+    emulation
+
+  [ Johan Hovold ]
+  * USB: mct_u232: fix broken close
+
+  [ Nicolas Kaiser ]
+  * pipe: fix failure to return error code on ->confirm()
+
+  [ Christian Lamparter ]
+  * p54usb: fix off-by-one on !CONFIG_PM
+  * p54usb: add five more USBIDs
+
+  [ Julia Lawall ]
+  * drivers/net/wireless/p54/eeprom.c: Return -ENOMEM on memory
+    allocation failure
+
+  [ Roger Quadros ]
+  * usb gadget: composite: prevent OOPS for non-standard control request
+
+  [ Michal Nazarewicz ]
+  * USB: gadget: g_ffs: fixed vendor and product ID
+  * USB: gadget: g_multi: fixed vendor and product ID
+
+  [ Rich Mattes ]
+  * USB: ftdi_sio: Add PID for accesio products
+
+  [ Johan Hovold ]
+  * USB: ftdi_sio: revert "USB: ftdi_sio: fix DTR/RTS line modes"
+
+  [ Rainer Keller ]
+  * USB: add PID for FTDI based OpenDCC hardware
+
+  [ Daniel Suchy ]
+  * USB: ftdi_sio: new VID/PIDs for various Papouch devices
+
+  [ Greg Kroah-Hartman ]
+  * USB: ftdi_sio: add device ids for ScienceScope
+
+  [ Sergei Shtylyov ]
+  * USB: MUSB: fix kernel WARNING/oops when unloading module in OTG mode
+  * usb: musb: blackfin: call usb_nop_xceiv_unregister() in
+    musb_platform_exit()
+  * usb: musb: blackfin: call gpio_free() on error path in
+    musb_platform_init()
+
+  [ Praveena Nadahally ]
+  * USB: Change acm_iad_descriptor bFunctionProtocol to
+    USB_CDC_ACM_PROTO_AT_V25TER
+
+  [ Mauro Carvalho Chehab ]
+  * USB: option: Add more ZTE modem USB id's
+
+  [ DJ Delorie ]
+  * USB: cp210x: Add Renesas RX-Stick device ID
+
+  [ Anders Larsen ]
+  * USB: cp210x: Add WAGO 750-923 Service Cable device ID
+
+  [ Jean-Christophe PLAGNIOL-VILLARD ]
+  * USB: atmel_usba_udc: force vbus_pin at -EINVAL when gpio_request
+    failled
+
+  [ Alan Stern ]
+  * USB: disable endpoints after unbinding interfaces, not before
+
+  [ Johan Hovold ]
+  * USB: visor: fix initialisation of UX50/TH55 devices
+
+  [ Alon Ziv ]
+  * USB: opticon: Fix long-standing bugs in opticon driver
+
+  [ Nobuhiro Iwamatsu ]
+  * usb: r8a66597-hcd: Change mistake of the outsw function
+
+  [ Alan Stern ]
+  * USB: accept some invalid ep0-maxpacket values
+
+  [ Corentin Chary ]
+  * asus-laptop: fix gps rfkill
+
+  [ Michael Reed ]
+  * sd name space exhaustion causes system hang
+
+  [ David Milburn ]
+  * libsas: fix NCQ mixing with non-NCQ
+
+  [ Dan Carpenter ]
+  * gdth: integer overflow in ioctl
+
+  [ Christof Schmitt ]
+  * Fix race when removing SCSI devices
+
+  [ Mike Christie ]
+  * Fix regressions in scsi_internal_device_block
+
+  [ Kees Cook ]
+  * net: clear heap allocations for privileged ethtool actions
+
+  [ Dan Carpenter ]
+  * gianfar: fix double lock typo
+
+  [ Jarek Poplawski ]
+  * gianfar: Fix crashes on RX path (Was Re: [Bugme-new] [Bug 19692]
+    New: linux-2.6.36-rc5 crash with gianfar ethernet at full line rate
+    traffic)
+
+  [ Eric Dumazet ]
+  * ip: fix truesize mismatch in ip fragmentation
+
+  [ Ursula Braun ]
+  * ipv6: fix refcnt problem related to POSTDAD state
+
+  [ Maciej Żenczykowski ]
+  * net: Fix IPv6 PMTU disc. w/ asymmetric routes
+
+  [ Eric Dumazet ]
+  * netxen: dont set skb->truesize
+  * qlcnic: dont set skb->truesize
+
+  [ Kumar Sanghvi ]
+  * Phonet: Correct header retrieval after pskb_may_pull
+
+  [ Ben Hutchings ]
+  * r6040: Fix multicast filter some more
+
+  [ David S. Miller ]
+  * rose: Fix signedness issues wrt. digi count.
+
+  [ Nagendra Tomar ]
+  * net: Fix the condition passed to sk_wait_event()
+
+  [ holt@sgi.com ]
+  * Limit sysctl_tcp_mem and sysctl_udp_mem initializers to prevent
+    integer overflows.
+
+  [ Tom Marshall ]
+  * tcp: Fix race in tcp_poll
+
+  [ Damian Lukowski ]
+  * net-2.6: SYN retransmits: Add new parameter to
+    retransmits_timed_out()
+
+  [ Neil Horman ]
+  * Revert c6537d6742985da1fbf12ae26cde6a096fd35b5c
+  * Revert d88dca79d3852a3623f606f781e013d61486828a
+
+  [ Eric Dumazet ]
+  * net: add a recursion limit in xmit path
+
+  [ Ben Greear ]
+  * net/core: Allow tagged VLAN packets to flow through VETH devices.
+
+  [ Ulrich Weber ]
+  * xfrm4: strip ECN bits from tos field
+
+  [ Eric Paris ]
+  * secmark: do not return early if there was no error
+
+  [ Mac Lin ]
+  * ARM: cns3xxx: Fixup the missing second parameter to addruart macro
+    to allow them to build.
+
+  [ Robin Holt ]
+  * sgi-xp: incoming XPC channel messages can come in after the
+    channel's partition structures have been torn down
+
+  [ Tilman Schmidt ]
+  * isdn: avoid calling tty_ldisc_flush() in atomic context
+
+  [ Avi Kivity ]
+  * KVM: x86 emulator: fix regression with cmpxchg8b on i386 hosts
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.35.9
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 22 Nov 2010 16:16:58 -0800
+
 linux-2.6 (2.6.35-1+vyatta+25) unstable; urgency=low
 
   * debug tunnel
