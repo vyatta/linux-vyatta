@@ -1,3 +1,9 @@
+linux-2.6 (2.6.35-1+vyatta+27) unstable; urgency=low
+
+  * netfilter:  fix  race in conntrack between dump_table and destroy
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Sat, 27 Nov 2010 10:21:08 -0800
+
 linux-2.6 (2.6.35-1+vyatta+26) unstable; urgency=low
 
   [ Kevin Cernekee ]
