@@ -1,3 +1,12 @@
+linux-2.6 (2.6.35-1+vyatta+28) unstable; urgency=low
+
+  [ Phil Oester ]
+  * vlan: Match underlying dev carrier on vlan add
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 01 Dec 2010 14:02:59 -0800
+
 linux-2.6 (2.6.35-1+vyatta+27) unstable; urgency=low
 
   * netfilter:  fix  race in conntrack between dump_table and destroy
