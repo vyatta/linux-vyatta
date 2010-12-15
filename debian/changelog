@@ -1,3 +1,600 @@
+linux-2.6 (2.6.35-1+vyatta+29) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Fix typo in rtc message
+
+  [ Martin K. Petersen ]
+  * block: Ensure physical block size is unsigned int
+
+  [ Jan Kara ]
+  * block: Fix race during disk initialization
+
+  [ Jens Axboe ]
+  * block: limit vec count in bio_kmalloc() and bio_alloc_map_data()
+  * block: take care not to overflow when calculating total iov length
+  * block: check for proper length of iov entries in
+    blk_rq_map_user_iov()
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: don't disable shared encoders on pre-DCE3 display
+    blocks
+
+  [ Guo-Fu Tseng ]
+  * jme: Fix PHY power-off error
+
+  [ Samuel Ortiz ]
+  * irda: Fix parameter extraction stack overflow
+  * irda: Fix heap memory corruption in iriap.c
+
+  [ Johannes Berg ]
+  * cfg80211: fix BSS double-unlinking
+  * cfg80211: fix locking
+
+  [ Luis R. Rodriguez ]
+  * cfg80211: fix regression on processing country IEs
+  * mac80211: fix channel assumption for association done work
+  * mac80211: fix offchannel assumption upon association
+
+  [ Jouni Malinen ]
+  * mac80211: Fix signal strength average initialization for CQM events
+
+  [ Luis R. Rodriguez ]
+  * mac80211: add helper for reseting the connection monitor
+  * mac80211: reset connection idle when going offchannel
+  * mac80211: make the beacon monitor available externally
+  * mac80211: send last 3/5 probe requests as unicast
+  * mac80211: disable beacon monitor while going offchannel
+
+  [ Johannes Berg ]
+  * mac80211: use correct station flags lock
+
+  [ Christian Lamparter ]
+  * mac80211: clear txflags for ps-filtered frames
+
+  [ Luis R. Rodriguez ]
+  * mac80211: reset probe send counter upon connection timer reset
+
+  [ Rajkumar Manoharan ]
+  * mac80211: Fix ibss station got expired immediately
+
+  [ Christian Lamparter ]
+  * mac80211: don't sanitize invalid rates
+
+  [ Johannes Berg ]
+  * mac80211: delete AddBA response timer
+
+  [ Tilman Schmidt ]
+  * isdn/gigaset: fix bas_gigaset AT read error handling
+  * isdn/gigaset: correct bas_gigaset rx buffer handling
+  * isdn/gigaset: bas_gigaset locking fix
+
+  [ Nobuhiro Iwamatsu ]
+  * i2c-pca-platform: Change device name of request_irq
+
+  [ Florian Tobias Schandinat ]
+  * viafb: fix i2c_transfer error handling
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: register an i2c adapter name for the dp aux bus
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Fix wrong SPDIF NID assignment for CA0110
+  * ALSA: hda - Add some workarounds for Creative IBG
+
+  [ Jaroslav Kysela ]
+  * ALSA: OSS mixer emulation - fix locking
+
+  [ David Henningsson ]
+  * ALSA: HDA: Enable internal mic on Dell E6410 and Dell E6510
+
+  [ Michael Neuling ]
+  * powerpc: Fix call to subpage_protection()
+
+  [ Thomas Backlund ]
+  * microblaze: Fix build with make 3.82
+
+  [ Trond Myklebust ]
+  * NFSv4: Don't call nfs4_reclaim_complete() on receiving
+    NFS4ERR_STALE_CLIENTID
+  * NFSv4: Don't call nfs4_state_mark_reclaim_reboot() from error
+    handlers
+  * NFSv4: Fix open recovery
+  * NFS: Don't SIGBUS if nfs_vm_page_mkwrite races with a cache
+    invalidation
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: MC vram map needs to be >= pci aperture size
+  * drm/radeon/kms: properly compute group_size on 6xx/7xx
+  * drm/radeon/kms: make sure blit addr masks are 64 bit
+  * drm/radeon/kms: fix handling of tex lookup disable in cs checker on
+    r2xx
+
+  [ Keith Packard ]
+  * drm/i915: Free hardware status page on unload when physically mapped
+
+  [ Jesse Barnes ]
+  * drm/i915: diasable clock gating for the panel power sequencer
+
+  [ Chris Wilson ]
+  * drm/i915/overlay: Ensure that the reg_bo is in the GTT prior to
+    writing.
+
+  [ Ken Kawasaki ]
+  * pcnet_cs: add new_id
+
+  [ David Howells ]
+  * SH: Add missing consts to sys_execve() declaration
+
+  [ Frederic Weisbecker ]
+  * reiserfs: fix inode mutex - reiserfs lock misordering
+  * reiserfs: don't acquire lock recursively in reiserfs_acl_chmod
+
+  [ Larry Finger ]
+  * staging: rt2870: Add new USB ID for Belkin F6D4050 v1
+
+  [ Greg Kroah-Hartman ]
+  * Staging: asus_oled: fix up some sysfs attribute permissions
+  * Staging: asus_oled: fix up my fixup for some sysfs attribute
+    permissions
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Use hp-laptop quirk to enable headphones automute for
+    Asus A52J
+
+  [ Greg Kroah-Hartman ]
+  * Staging: line6: fix up some sysfs attribute permissions
+
+  [ Clemens Ladisch ]
+  * hpet: fix unwanted interrupt due to stale irq status bit
+
+  [ Jiri Slaby ]
+  * hpet: unmap unused I/O space
+
+  [ Richard A. Smith ]
+  * olpc_battery: Fix endian neutral breakage for s16 values
+
+  [ Masanori ITOH ]
+  * percpu: fix list_head init bug in __percpu_counter_init()
+
+  [ Eric Dumazet ]
+  * ipmi: proper spinlock initialization
+
+  [ Richard Weinberger ]
+  * um: remove PAGE_SIZE alignment in linker script causing kernel
+    segfault.
+  * um: fix global timer issue when using CONFIG_NO_HZ
+
+  [ Eric Dumazet ]
+  * numa: fix slab_node(MPOL_BIND)
+
+  [ Jean Delvare ]
+  * hwmon: (lm85) Fix ADT7468 frequency table
+
+  [ Santosh Shilimkar ]
+  * oprofile: Fix the hang while taking the cpu offline
+
+  [ KAMEZAWA Hiroyuki ]
+  * mm: fix return value of scan_lru_pages in memory unplug
+
+  [ Mel Gorman ]
+  * mm, page-allocator: do not check the state of a non-existant buddy
+    during free
+
+  [ KAMEZAWA Hiroyuki ]
+  * mm: fix is_mem_section_removable() page_order BUG_ON check
+
+  [ Chris Wilson ]
+  * agp/intel: Also add B43.1 to list of supported devices
+
+  [ Larry Finger ]
+  * b43: Fix warning at drivers/mmc/core/core.c:237 in mmc_wait_for_cmd
+
+  [ Guennadi Liakhovetski ]
+  * wireless: b43: fix error path in SDIO
+
+  [ Daniel Klaffenbach ]
+  * ssb: b43-pci-bridge: Add new vendor for BCM4318
+
+  [ Michael Hennerich ]
+  * drivers/misc/ad525x_dpot.c: fix typo in spi write16 and write24
+    transfer counts
+
+  [ Robin@sgi.com ]
+  * sgi-xpc: XPC fails to discover partitions with all nasids above 128
+
+  [ Ian Campbell ]
+  * xen: ensure that all event channels start off bound to VCPU 0
+
+  [ Jeremy Fitzhardinge ]
+  * xen: don't bother to stop other cpus on shutdown/reboot
+
+  [ Dan Rosenberg ]
+  * ipc: initialize structure memory to zero for compat functions
+
+  [ Vasiliy Kulikov ]
+  * ipc: shm: fix information leak to userland
+
+  [ Ben Hutchings ]
+  * net: NETIF_F_HW_CSUM does not imply FCoE CRC offload
+
+  [ Graham Gower ]
+  * drivers/char/vt_ioctl.c: fix VT_OPENQRY error value
+
+  [ Florian Tobias Schandinat ]
+  * viafb: use proper register for colour when doing fill ops
+
+  [ Tejun Heo ]
+  * sata_via: apply magic FIFO fix to vt6420 too
+
+  [ Tyler Hicks ]
+  * eCryptfs: Clear LOOKUP_OPEN flag when creating lower file
+
+  [ Roberto Sassu ]
+  * ecryptfs: call vfs_setxattr() in ecryptfs_setxattr()
+
+  [ NeilBrown ]
+  * md/raid1: really fix recovery looping when single good device fails.
+
+  [ Justin Maggard ]
+  * md: fix return value of rdev_size_change()
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Use BIOS auto-parsing instead of existing model quirk for
+    MEDION MD2
+
+  [ Jiri Olsa ]
+  * tty: prevent DOS in the flush_to_ldisc
+
+  [ Jiri Slaby ]
+  * TTY: restore tty_ldisc_wait_idle
+
+  [ Philippe Rétornaz ]
+  * tty_ldisc: Fix BUG() on hangup
+
+  [ Jiri Slaby ]
+  * TTY: ldisc, fix open flag handling
+
+  [ Ming Lei ]
+  * usbnet: fix usb_autopm_get_interface failure(v1)
+
+  [ Philipp Merkel ]
+  * HID: Fix for problems with eGalax/DWAV multi-touch-screen
+
+  [ Jean-François Moine ]
+  * gspca - sonixj: Fix a regression of sensors hv7131r and mi0360
+
+  [ James M McLaren ]
+  * hdpvr: Add missing URB_NO_TRANSFER_DMA_MAP flag
+
+  [ Andrew Morton ]
+  * drivers/media/video/cx23885/cx23885-core.c: fix
+    cx23885_dev_checkrevision()
+
+  [ Michael S. Tsirkin ]
+  * KVM: Write protect memory after slot swap
+
+  [ Vasiliy Kulikov ]
+  * KVM: x86: fix information leak to userland
+
+  [ Avi Kivity ]
+  * KVM: Correct ordering of ldt reload wrt fs/gs reload
+
+  [ Mark Brown ]
+  * ASoC: Remove volatility from WM8900 POWER1 register
+
+  [ Axel Lin ]
+  * ASoC: wm8961 - clear WM8961_DACSLOPE bit for normal mode
+  * ASoC: wm8961 - clear WM8961_MCLKDIV bit for freq <= 16500000
+
+  [ Clemens Ladisch ]
+  * firewire: ohci: fix buffer overflow in AR split packet handling
+  * firewire: ohci: fix race in AR split packet handling
+
+  [ Kailang Yang ]
+  * ALSA: hda - Fixed ALC887-VD initial error
+
+  [ Daniel T Chen ]
+  * ALSA: ac97: Apply quirk for Dell Latitude D610 binding Master and
+    Headphone controls
+
+  [ David Henningsson ]
+  * ALSA: HDA: Add fixup pins for Ideapad Y550
+
+  [ Valentine Sinitsyn ]
+  * ALSA: hda - Added fixup for Lenovo Y550P
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Add speaker pin to automute Acer Aspire 8943G
+  * ALSA: hda: Add Samsung R720 SSID for subwoofer pin fixup
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Use ALC_INIT_DEFAULT for really default initialization
+
+  [ Herton Ronaldo Krzesinski ]
+  * ALSA: hda - Fix ALC660-VD/ALC861-VD capture/playback mixers
+
+  [ David Henningsson ]
+  * ALSA: HDA: Add an extra DAC for Realtek ALC887-VD
+
+  [ Takashi Iwai ]
+  * ALSA: Fix SNDCTL_DSP_RESET ioctl for OSS emulation
+
+  [ Daniel T Chen ]
+  * ALSA: hda: Use "alienware" model quirk for another SSID
+
+  [ Eric Dumazet ]
+  * netfilter: nf_conntrack: allow nf_ct_alloc_hashtable() to get
+    highmem pages
+
+  [ Eric Paris ]
+  * netfilter: NF_HOOK_COND has wrong conditional
+
+  [ Nick Piggin ]
+  * radix-tree: fix RCU bug
+
+  [ Ken Chen ]
+  * latencytop: fix per task accumulator
+
+  [ Dave Hansen ]
+  * mm/vfs: revalidate page->mapping in do_generic_file_read()
+
+  [ Jens Axboe ]
+  * bio: take care not overflow page count when mapping/copying user
+    data
+
+  [ Alex Deucher ]
+  * drm/radeon/kms/atom: set sane defaults in
+    atombios_get_encoder_mode()
+  * drm/radeon/kms: fix typos in disabled vbios code
+  * drm/radeon/kms: add workaround for dce3 ddc line vbios bug
+
+  [ Michel Dänzer ]
+  * drm/radeon/kms: Fix retrying ttm_bo_init() after it failed once.
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: fix interlaced and doublescan handling
+
+  [ Oleg Nesterov ]
+  * exec: make argv/envp memory visible to oom-killer
+  * exec: copy-and-paste the fixes into compat_do_execve() paths
+
+  [ Chris Wilson ]
+  * drm/i915/sdvo: Always add a 30ms delay to make SDVO TV detection
+    reliable
+
+  [ Daniel Vetter ]
+  * intel-gtt: fix gtt_total_entries detection
+
+  [ Peter Zijlstra ]
+  * sched: fix RCU lockdep splat from task_group()
+
+  [ Tejun Heo ]
+  * libata: fix NULL sdev dereference race in atapi_qc_complete()
+
+  [ Martin Wilck ]
+  * PCI: fix size checks for mmap() on /proc/bus/pci files
+
+  [ Darrick J. Wong ]
+  * PCI: fix offset check for sysfs mmapped files
+
+  [ Andiry Xu ]
+  * xHCI: fix wMaxPacketSize mask
+
+  [ Paul Zimmerman ]
+  * xhci: Fix reset-device and configure-endpoint commands
+
+  [ Sarah Sharp ]
+  * xhci: Setup array of USB 2.0 and USB 3.0 ports.
+  * xhci: Don't let the USB core disable SuperSpeed ports.
+
+  [ Josh Wu ]
+  * USB: gadget: AT91: fix typo in atmel_usba_udc driver
+
+  [ Ming Lei ]
+  * usb: musb: fix kernel oops when loading musb_hdrc module for the 2nd
+    time
+
+  [ Sebastien Bourdeauducq ]
+  * USB: ftdi_sio: add device IDs for Milkymist One JTAG/serial
+
+  [ ma rui ]
+  * USB: option: fix when the driver is loaded incorrectly for some
+    Huawei devices.
+
+  [ Vasiliy Kulikov ]
+  * usb: misc: sisusbvga: fix information leak to userland
+  * usb: misc: iowarrior: fix information leak to userland
+  * usb: core: fix information leak to userland
+
+  [ John Tapsell ]
+  * Staging: rt2870: Add USB ID for Buffalo Airstation WLI-UC-GN
+
+  [ Alan Stern ]
+  * USB: EHCI: fix obscure race in ehci_endpoint_disable
+
+  [ Greg Kroah-Hartman ]
+  * USB: storage: sierra_ms: fix sysfs file attribute
+  * USB: atm: ueagle-atm: fix up some permissions on the sysfs files
+  * USB: misc: cypress_cy7c63: fix up some sysfs attribute permissions
+  * USB: misc: usbled: fix up some sysfs attribute permissions
+  * USB: misc: trancevibrator: fix up a sysfs attribute permission
+  * USB: misc: usbsevseg: fix up some sysfs attribute permissions
+
+  [ Michael Stuermer ]
+  * USB: ftdi_sio: Add ID for RT Systems USB-29B radio cable
+
+  [ Jacques Viviers ]
+  * USB: serial: ftdi_sio: Vardaan USB RS422/485 converter PID added
+
+  [ Alan Stern ]
+  * USB: fix autosuspend bug in usb-serial
+
+  [ Anupam Chanda ]
+  * e1000: fix screaming IRQ
+
+  [ Zhang Rui ]
+  * ACPI battery: support percentage battery remaining capacity
+  * acpi-cpufreq: fix a memleak when unloading driver
+
+  [ Dave Jones ]
+  * ACPI: debugfs custom_method open to non-root
+
+  [ Dmitry Torokhov ]
+  * PNPACPI: cope with invalid device IDs
+
+  [ Dmitri Belimov ]
+  * saa7134: Fix autodetect for Behold A7 and H7 TV cards
+
+  [ Ken Sumrall ]
+  * fuse: fix attributes after open(O_TRUNC)
+
+  [ Andres Salomon ]
+  * cs5535-gpio: apply CS5536 errata workaround for GPIOs
+
+  [ Nelson Elhage ]
+  * do_exit(): make sure that we run with get_fs() == USER_DS
+
+  [ Oskar Schirmer ]
+  * cifs: fix another memleak, in cifs_root_iget
+
+  [ Will Newton ]
+  * uml: disable winch irq before freeing handler data
+
+  [ Uwe Kleine-König ]
+  * backlight: grab ops_lock before testing bd->ops
+
+  [ Steven J. Magnani ]
+  * nommu: yield CPU while disposing VM
+
+  [ Frederic Weisbecker ]
+  * x86: Ignore trap bits on single step exceptions
+
+  [ Guennadi Liakhovetski ]
+  * mmc: fix rmmod race for hosts using card-detection polling
+
+  [ Dan Rosenberg ]
+  * DECnet: don't leak uninitialized stack byte
+
+  [ Pekka Enberg ]
+  * perf_events: Fix perf_counter_mmap() hook in mprotect()
+
+  [ Mika Westerberg ]
+  * ARM: 6464/2: fix spinlock recursion in adjust_pte()
+
+  [ Will Deacon ]
+  * ARM: 6489/1: thumb2: fix incorrect optimisation in usracc
+
+  [ James Jones ]
+  * ARM: 6482/2: Fix find_next_zero_bit and related assembly
+
+  [ Steven Rostedt ]
+  * leds: fix bug with reading NAS SS4200 dmi code
+
+  [ Greg Kroah-Hartman ]
+  * Staging: udlfb: fix up some sysfs attribute permissions
+  * Staging: iio: adis16220: fix up some sysfs attribute permissions
+  * Staging: iio: adis16220: fix up my fixup for some sysfs attribute
+    permissions
+  * Staging: samsung-laptop: fix up some sysfs attribute permissions
+  * Staging: samsung-laptop: fix up my fixup for some sysfs attribute
+    permissions
+  * Staging: frontier: fix up some sysfs attribute permissions
+
+  [ Larry Finger ]
+  * staging: rtl8187se: Change panic to warn when RF switch turned off
+
+  [ Marek Lindner ]
+  * Staging: batman-adv: ensure that eth_type_trans gets linear memory
+
+  [ Thomas Gleixner ]
+  * perf: Fix inherit vs. context rotation bug
+
+  [ Marcelo Roberto Jimenez ]
+  * ARM: 6456/1: Fix for building DEBUG with sa11xx_base.c as a module.
+
+  [ Rafael J. Wysocki ]
+  * PM / Hibernate: Fix memory corruption related to swap
+
+  [ Thadeu Lima de Souza Cascardo ]
+  * wmi: use memcmp instead of strncmp to compare GUIDs
+
+  [ Heiko Carstens ]
+  * nohz/s390: fix arch_needs_cpu() return value on offline cpus
+
+  [ Kenji Kaneshige ]
+  * genirq: Fix incorrect proc spurious output
+
+  [ Linus Torvalds ]
+  * net: Truncate recvfrom and sendto length to INT_MAX.
+
+  [ David S. Miller ]
+  * net: Limit socket I/O iovec total length to INT_MAX.
+
+  [ Dmitry Torokhov ]
+  * Input: i8042 - add Sony VAIO VPCZ122GX to nomux list
+
+  [ Jarkko Nikula ]
+  * omap: dma: Fix buffering disable bit setting for omap24xx
+
+  [ Peter Ujfalusi ]
+  * OMAP3: DMA: Errata i541: sDMA FIFO draining does not finish
+
+  [ andrew hendry ]
+  * memory corruption in X.25 facilities parsing
+
+  [ Hagen Paul Pfeifer ]
+  * net: optimize Berkeley Packet Filter (BPF) processing
+
+  [ David S. Miller ]
+  * filter: make sure filters dont read uninitialized memory
+
+  [ Oliver Hartkopp ]
+  * can-bcm: fix minor heap overflow
+
+  [ Dan Rosenberg ]
+  * x25: Prevent crashing when parsing bad X.25 facilities
+
+  [ Herbert Xu ]
+  * crypto: padlock - Fix AES-CBC handling on odd-block-sized input
+
+  [ Phil Blundell ]
+  * econet: disallow NULL remote addr for sendmsg(), fixes CVE-2010-3849
+  * econet: fix CVE-2010-3850
+  * econet: fix CVE-2010-3848
+
+  [ Dan Rosenberg ]
+  * rds: Integer overflow in RDS cmsg handling
+
+  [ Luis R. Rodriguez ]
+  * cfg80211: fix extension channel checks to initiate communication
+
+  [ Eric Dumazet ]
+  * r8169: fix rx checksum offload
+
+  [ Stanislaw Gruszka ]
+  * r8169: (re)init phy on resume
+
+  [ Shan Wei ]
+  * r8169: fix checksum broken
+
+  [ Heiko Carstens ]
+  * nmi: fix clock comparator revalidation
+
+  [ Linus Torvalds ]
+  * Rename 'pipe_info()' to 'get_pipe_info()'
+  * Export 'get_pipe_info()' to other users
+  * Un-inline get_pipe_info() helper function
+
+  [ Dan Rosenberg ]
+  * Fix pktcdvd ioctl dev_minor range check
+
+  [ Andi Kleen ]
+  * Release 2.6.35.10
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 14 Dec 2010 17:05:38 -0800
+
 linux-2.6 (2.6.35-1+vyatta+28) unstable; urgency=low
 
   [ Phil Oester ]
