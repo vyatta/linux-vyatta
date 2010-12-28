@@ -1,3 +1,9 @@
+linux-2.6 (2.6.35-1+vyatta+31+mendocino1) unstable; urgency=low
+
+  * restore default flavour
+
+ -- An-Cheng Huang <ancheng@vyatta.com>  Tue, 28 Dec 2010 20:32:00 +0000
+
 linux-2.6 (2.6.35-1+vyatta+31) unstable; urgency=low
 
   [ Dan Carpenter ]
