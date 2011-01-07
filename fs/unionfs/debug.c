@@ -438,7 +438,6 @@ void __unionfs_check_nd(const struct nameidata *nd,
 			PRINT_CALLER(fname, fxn, line);
 			pr_debug(" CND1: lower_file of type %s\n",
 				 file->f_path.dentry->d_sb->s_type->name);
-			BUG();
 		}
 	}
 }

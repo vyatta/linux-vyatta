@@ -193,6 +193,7 @@ int unionfs_fsync(struct file *file, int datasync)
 	int bindex, bstart, bend;
 	struct file *lower_file;
 	struct dentry *dentry = file->f_path.dentry;
+	struct dentry *lower_dentry;
 	struct dentry *parent;
 	struct inode *lower_inode, *inode;
 	int err = -EINVAL;
@@ -222,9 +223,9 @@ int unionfs_fsync(struct file *file, int datasync)
 		if (!lower_inode || !lower_inode->i_fop->fsync)
 			continue;
 		lower_file = unionfs_lower_file_idx(file, bindex);
+		lower_dentry = unionfs_lower_dentry_idx(dentry, bindex);
 		mutex_lock(&lower_inode->i_mutex);
-		err = lower_inode->i_fop->fsync(lower_file,
-						datasync);
+		err = lower_inode->i_fop->fsync(lower_file, datasync);
 		if (!err && bindex == bstart)
 			fsstack_copy_attr_times(inode, lower_inode);
 		mutex_unlock(&lower_inode->i_mutex);
@@ -361,7 +362,7 @@ out:
 	return err;
 }
 
-const struct file_operations unionfs_main_fops = {
+struct file_operations unionfs_main_fops = {
 	.llseek		= generic_file_llseek,
 	.read		= unionfs_read,
 	.write		= unionfs_write,
