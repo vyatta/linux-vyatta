@@ -716,6 +716,7 @@ static void unionfs_put_link(struct dentry *dentry, struct nameidata *nd,
 			     void *cookie)
 {
 	struct dentry *parent;
+	char *buf;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
 	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
@@ -726,8 +727,13 @@ static void unionfs_put_link(struct dentry *dentry, struct nameidata *nd,
 		       "unionfs: put_link failed to revalidate dentry\n");
 
 	unionfs_check_dentry(dentry);
+#if 0
+	/* XXX: can't run this check b/c this fxn can receive a poisoned 'nd' PTR */
 	unionfs_check_nd(nd);
-	kfree(nd_get_link(nd));
+#endif
+	buf = nd_get_link(nd);
+	if (!IS_ERR(buf))
+		kfree(buf);
 	unionfs_unlock_dentry(dentry);
 	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
@@ -1015,7 +1021,7 @@ out:
 	return err;
 }
 
-const struct inode_operations unionfs_symlink_iops = {
+struct inode_operations unionfs_symlink_iops = {
 	.readlink	= unionfs_readlink,
 	.permission	= unionfs_permission,
 	.follow_link	= unionfs_follow_link,
@@ -1023,7 +1029,7 @@ const struct inode_operations unionfs_symlink_iops = {
 	.put_link	= unionfs_put_link,
 };
 
-const struct inode_operations unionfs_dir_iops = {
+struct inode_operations unionfs_dir_iops = {
 	.create		= unionfs_create,
 	.lookup		= unionfs_lookup,
 	.link		= unionfs_link,
@@ -1043,7 +1049,7 @@ const struct inode_operations unionfs_dir_iops = {
 #endif /* CONFIG_UNION_FS_XATTR */
 };
 
-const struct inode_operations unionfs_main_iops = {
+struct inode_operations unionfs_main_iops = {
 	.permission	= unionfs_permission,
 	.setattr	= unionfs_setattr,
 #ifdef CONFIG_UNION_FS_XATTR

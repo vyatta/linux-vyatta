@@ -938,7 +938,8 @@ void unionfs_destroy_inode_cache(void)
  *
  * No need to grab sb info's rwsem.
  */
-static int unionfs_write_inode(struct inode *inode, struct writeback_control *wbc)
+static int unionfs_write_inode(struct inode *inode,
+			       struct writeback_control *wbc)
 {
 	struct list_head *pos, *n;
 	struct unionfs_dir_state *rdstate;
@@ -1033,7 +1034,7 @@ out:
 	return ret;
 }
 
-const struct super_operations unionfs_sops = {
+struct super_operations unionfs_sops = {
 	.delete_inode	= unionfs_delete_inode,
 	.put_super	= unionfs_put_super,
 	.statfs		= unionfs_statfs,

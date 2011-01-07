@@ -68,15 +68,15 @@
 #define UNIONFS_MIN_CC_TIME	3
 
 /* Operations vectors defined in specific files. */
-extern const struct file_operations unionfs_main_fops;
-extern const struct file_operations unionfs_dir_fops;
-extern const struct inode_operations unionfs_main_iops;
-extern const struct inode_operations unionfs_dir_iops;
-extern const struct inode_operations unionfs_symlink_iops;
-extern const struct super_operations unionfs_sops;
-extern const struct dentry_operations unionfs_dops;
-extern const struct address_space_operations unionfs_aops, unionfs_dummy_aops;
-extern const struct vm_operations_struct unionfs_vm_ops;
+extern struct file_operations unionfs_main_fops;
+extern struct file_operations unionfs_dir_fops;
+extern struct inode_operations unionfs_main_iops;
+extern struct inode_operations unionfs_dir_iops;
+extern struct inode_operations unionfs_symlink_iops;
+extern struct super_operations unionfs_sops;
+extern struct dentry_operations unionfs_dops;
+extern struct address_space_operations unionfs_aops, unionfs_dummy_aops;
+extern struct vm_operations_struct unionfs_vm_ops;
 
 /* How long should an entry be allowed to persist */
 #define RDCACHE_JIFFIES	(5*HZ)
