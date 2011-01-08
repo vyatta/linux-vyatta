@@ -1,3 +1,10 @@
+linux-2.6 (2.6.35-1+vyatta+31+mendocino2) unstable; urgency=low
+
+  * Update to lastest unionfs 2.5.7
+  * Turn off netfilter CONF_NF_CT_ACCT warning
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 07 Jan 2011 16:12:56 -0800
+
 linux-2.6 (2.6.35-1+vyatta+31+mendocino1) unstable; urgency=low
 
   * restore default flavour
