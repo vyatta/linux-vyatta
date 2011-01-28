@@ -1,3 +1,9 @@
+linux-2.6 (2.6.35-1+vyatta+31+mendocino3) unstable; urgency=low
+
+  * Change config to enable XEN on 32 bit virt kernel
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Thu, 27 Jan 2011 21:16:28 -0800
+
 linux-2.6 (2.6.35-1+vyatta+31+mendocino2) unstable; urgency=low
 
   * Update to lastest unionfs 2.5.7
