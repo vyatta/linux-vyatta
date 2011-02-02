@@ -38,6 +38,7 @@ enum
 	IPV4_DEVCONF_ACCEPT_LOCAL,
 	IPV4_DEVCONF_SRC_VMARK,
 	IPV4_DEVCONF_PROXY_ARP_PVLAN,
+	IPV4_DEVCONF_LINKFILTER,
 	__IPV4_DEVCONF_MAX
 };
 
@@ -141,6 +142,7 @@ static inline void ipv4_devconf_setall(struct in_device *in_dev)
 #define IN_DEV_ARP_ANNOUNCE(in_dev)	IN_DEV_MAXCONF((in_dev), ARP_ANNOUNCE)
 #define IN_DEV_ARP_IGNORE(in_dev)	IN_DEV_MAXCONF((in_dev), ARP_IGNORE)
 #define IN_DEV_ARP_NOTIFY(in_dev)	IN_DEV_MAXCONF((in_dev), ARP_NOTIFY)
+#define IN_DEV_LINKFILTER(in_dev)	IN_DEV_MAXCONF((in_dev), LINKFILTER)
 
 struct in_ifaddr {
 	struct in_ifaddr	*ifa_next;
