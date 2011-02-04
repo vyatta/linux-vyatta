@@ -1,3 +1,12 @@
+linux-2.6 (2.6.35-1+vyatta+31+mendocino6) lucid; urgency=low
+
+  [ Pablo Neira Ayuso ]
+  * netfilter: ctnetlink: fix missing refcount increment during dumps
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Fri, 04 Feb 2011 13:39:22 +0100
+
 linux-2.6 (2.6.35-1+vyatta+31+mendocino5) unstable; urgency=low
 
   * Fix Xen configuration
