@@ -23,4 +23,5 @@ linux-*
 control
 control.md5sum
 rules.gen
+*.pyc
 
