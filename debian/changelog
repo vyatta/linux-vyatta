@@ -1,3 +1,27 @@
+linux-2.6 (2.6.37-1+vyatta+2) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Add Vyatta Logo
+  * set_rtc_mmss: show warning message only once
+  * Add link_filter sysctl
+  * Add ipp2p netfilter module
+  * Add netlink support for ipset
+  * Add IPSET 6.0
+  * Add compiled python to .gitignore
+  * Remove extraversion
+
+  [ Robert Bays ]
+  * disable lro on vmxnet3 driver by default.
+
+  [ Kevin Cernekee ]
+  * netfilter: nf_conntrack_sip: Handle Cisco 7941/7945 IP phones
+
+  [ Jozsef Kadlecsik ]
+  * ipv6: Prepare the tree for un-inlined jhash.
+  * The new jhash implementation
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 23 Feb 2011 08:43:18 -0800
+
 linux-2.6 (2.6.37-1+vyatta+1) unstable; urgency=low
 
   * Rebase on 2.6.37
