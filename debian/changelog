@@ -1,3 +1,194 @@
+linux-2.6 (2.6.37-1+vyatta+4) unstable; urgency=low
+
+  [ Greg Kroah-Hartman ]
+  * Revert "USB: prevent buggy hubs from crashing the USB stack"
+
+  [ Konstantin Khorenko ]
+  * NFSD: memory corruption due to writing beyond the stat array
+
+  [ Kashyap, Desai ]
+  * mptfusion: mptctl_release is required in mptctl.c
+  * mptfusion: Fix Incorrect return value in mptscsih_dev_reset
+
+  [ Chris Wilson ]
+  * drm/i915/sdvo: If we have an EDID confirm it matches the mode of the
+    connection
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: fix interlaced modes on dce4+
+
+  [ Dave Airlie ]
+  * drm/radeon: fix memory debugging since
+    d961db75ce86a84f1f04e91ad1014653ed7d9f46
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: add connector table for mac g5 9600
+  * drm/radeon/kms: improve 6xx/7xx CS error output
+  * drm/radeon/kms: add bounds checking to avivo pll algo
+  * drm/radeon/kms: hopefully fix pll issues for real (v3)
+
+  [ Ben Hutchings ]
+  * drm/nouveau: Only select ACPI_VIDEO if its dependencies are met
+
+  [ Dave Airlie ]
+  * vt: fix issue when fbcon wants to takeover a second time.
+
+  [ Jochen Friedrich ]
+  * ARM: 6606/1: sa1100: Fix platform device registration
+
+  [ Chase Douglas ]
+  * HID: magicmouse: Don't report REL_{X, Y} for Magic Trackpad
+
+  [ Thomas Renninger ]
+  * perf timechart: Adjust perf timechart to the new power events
+
+  [ Brian Gerst ]
+  * x86: Clear irqstack thread_info
+
+  [ Jesse Barnes ]
+  * drm/i915: make DP training try a little harder
+
+  [ Stefan Bader ]
+  * xen: p2m: correctly initialize partial p2m leaf
+  * xen/p2m: Mark INVALID_P2M_ENTRY the mfn_list past max_pfn.
+
+  [ Dan Carpenter ]
+  * av7110: check for negative array offset
+
+  [ Dave Chinner ]
+  * xfs: fix dquot shaker deadlock
+
+  [ Benjamin Tissoires ]
+  * HID: add Add Cando touch screen 10.1-inch product id
+  * HID: Switch turbox/mosart touchscreen to hid-mosart
+
+  [ Tetsuo Handa ]
+  * CRED: Fix kernel panic upon security_file_alloc() failure.
+
+  [ Dan Rosenberg ]
+  * btrfs: prevent heap corruption in btrfs_ioctl_space_info()
+
+  [ Tetsuo Handa ]
+  * CRED: Fix BUG() upon security_cred_alloc_blank() failure
+  * CRED: Fix memory and refcount leaks upon security_prepare_creds()
+    failure
+
+  [ Chris Wright ]
+  * security: add cred argument to security_capable()
+  * pci: use security_capable() when checking capablities during config
+    space read
+
+  [ Rafael J. Wysocki ]
+  * ACPI / Wakeup: Enable button GPEs unconditionally during
+    initialization
+
+  [ NeilBrown ]
+  * nfsd: correctly handle return value from nfsd_map_name_to_*
+
+  [ Borislav Petkov ]
+  * x86, hotplug: Fix powersavings with offlined cores on AMD
+
+  [ Martin Schwidefsky ]
+  * s390: remove task_show_regs
+
+  [ Jacob Pan ]
+  * x86, mrst: Set correct APB timer IRQ affinity for secondary cpu
+
+  [ Stanislaw Gruszka ]
+  * PM / Hibernate: Return error code when alloc_image_page() fails
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: add missing frac fb div flag for dce4+
+
+  [ Timo Warns ]
+  * fs/partitions: Validate map_count in Mac partition tables
+
+  [ Tejun Heo ]
+  * workqueue: wake up a worker when a rescuer is leaving a gcwq
+  * workqueue: make sure MAYDAY_INITIAL_TIMEOUT is at least 2 jiffies
+    long
+
+  [ Eric Dumazet ]
+  * net: deinit automatic LIST_HEAD
+
+  [ Stanislaw Gruszka ]
+  * iwl3945: remove plcp check
+
+  [ David Henningsson ]
+  * ALSA: HDA: Add position_fix quirk for an Asus device
+
+  [ Takashi Iwai ]
+  * ALSA: caiaq - Fix possible string-buffer overflow
+
+  [ David Henningsson ]
+  * ALSA: HDA: Do not announce false surround in Conexant auto
+
+  [ Jan Beulich ]
+  * hwmon: (lm85) extend to support EMC6D103 chips
+
+  [ Robert Richter ]
+  * x86, AMD, PCI: Add AMD northbridge PCI device id for CPU families
+    12h and 14h
+
+  [ Clemens Ladisch ]
+  * hwmon: (k10temp) add support for AMD Family 12h/14h CPUs
+  * hwmon: (jc42) fix type mismatch
+  * hwmon: (jc42) more helpful documentation
+  * hwmon: (jc42) do not allow writing to locked registers
+
+  [ Stephen Hemminger ]
+  * netfilter: fix race in conntrack between dump_table and destroy
+
+  [ Pablo Neira Ayuso ]
+  * netfilter: ctnetlink: fix missing refcount increment during dumps
+
+  [ Geert Uytterhoeven ]
+  * radio-aimslab.c needs #include <linux/delay.h>
+
+  [ Russell King ]
+  * ARM: Ensure predictable endian state on signal handler entry
+  * ARM: Keep exit text/data around for SMP_ON_UP
+
+  [ Jeff Layton ]
+  * cifs: fix handling of scopeid in cifs_convert_address
+
+  [ Shirish Pargaonkar ]
+  * cifs: Fix regression in LANMAN (LM) auth code
+
+  [ Matthew Garrett ]
+  * acer-wmi: Fix capitalisation of GUID
+
+  [ Dominik Brodowski ]
+  * pcmcia: re-enable Zoomed Video support
+
+  [ Tyler Hicks ]
+  * eCryptfs: Copy up lower inode attrs in getattr
+
+  [ Thomas Gleixner ]
+  * genirq: Prevent access beyond allocated_irqs bitmap
+  * genirq: Disable the SHIRQ_DEBUG call in request_threaded_irq for now
+
+  [ Peter Zijlstra ]
+  * perf: Fix throttle logic
+
+  [ Stephen Warren ]
+  * ASoC: WM8903: Fix mic detection enable logic
+
+  [ Vasiliy Kulikov ]
+  * net: can: janz-ican3: world-writable sysfs termination file
+  * platform: x86: acer-wmi: world-writable sysfs threeg file
+  * platform: x86: asus_acpi: world-writable procfs files
+  * platform: x86: tc1100-wmi: world-writable sysfs wireless and jogdial
+    files
+
+  [ Greg Kroah-Hartman ]
+  * Revert: tpm_tis: Use timeouts returned from TPM
+  * Linux 2.6.37.2
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 08 Mar 2011 08:20:17 -0800
+
 linux-2.6 (2.6.37-1+vyatta+3) unstable; urgency=low
 
   * Update i386 config for 2.6.37
