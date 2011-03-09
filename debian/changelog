@@ -1,3 +1,220 @@
+linux-2.6 (2.6.37-1+vyatta+5) unstable; urgency=low
+
+  [ Johan Hovold ]
+  * usb: musb: omap2430: fix kernel panic on reboot
+
+  [ Alan Stern ]
+  * USB: add quirks entry for Keytouch QWERTY Panel
+
+  [ Maciej Szmigiero ]
+  * USB: Add Samsung SGH-I500/Android modem ID switch to visor driver
+  * USB: Add quirk for Samsung Android phone modem
+
+  [ Jiri Slaby ]
+  * USB: serial/usb_wwan, fix tty NULL dereference
+
+  [ Jon Thomas ]
+  * sierra: add new ID for Airprime/Sierra USB IP modem
+
+  [ Linus Torvalds ]
+  * Revert "Bluetooth: Enable USB autosuspend by default on btusb"
+
+  [ Christian Lamparter ]
+  * p54pci: update receive dma buffers before and after processing
+
+  [ Alex Deucher ]
+  * Revert "drm/radeon/kms: switch back to min->max pll post divider
+    iteration"
+
+  [ Eric Dumazet ]
+  * tcp: fix inet_twsk_deschedule()
+
+  [ Miklos Szeredi ]
+  * mm: prevent concurrent unmap_mapping_range() on the same inode
+
+  [ Arend van Spriel ]
+  * staging: brcm80211: remove assert to avoid panic since 2.6.37 kernel
+
+  [ Roland Vossen ]
+  * staging: brcm80211: bugfix for softmac crash on multi cpu
+    configurations
+
+  [ Max Vozeler ]
+  * staging: usbip: vhci: update reference count for usb_device
+  * staging: usbip: vhci: give back URBs from in-flight unlink requests
+  * staging: usbip: vhci: refuse to enqueue for dead connections
+  * staging: usbip: vhci: use urb->dev->portnum to find port
+
+  [ Davide Libenzi ]
+  * epoll: prevent creating circular epoll structures
+
+  [ FUJITA Tomonori ]
+  * swiotlb: fix wrong panic
+
+  [ Timo Warns ]
+  * ldm: corrupted partition table can cause kernel oops
+
+  [ Lei Xu ]
+  * drivers/rtc/rtc-ds3232.c: fix time range difference between linux
+    and RTC chip
+
+  [ Namhyung Kim ]
+  * mm: fix dubious code in __count_immobile_pages()
+
+  [ NeilBrown ]
+  * md: correctly handle probe of an 'mdp' device.
+  * md: avoid spinlock problem in blk_throtl_exit
+  * md: Fix - again - partition detection when array becomes active
+  * Fix over-zealous flush_disk when changing device size.
+
+  [ Rafael J. Wysocki ]
+  * PM: Make ACPI wakeup from S5 work again when CONFIG_PM_SLEEP is
+    unset
+
+  [ Andreas Herrmann ]
+  * x86 quirk: Fix polarity for IRQ0 pin2 override on SB800 systems
+
+  [ Paul Zimmerman ]
+  * xhci: Avoid BUG() in interrupt context
+  * xhci: Clarify some expressions in the TRB math
+  * xhci: Fix errors in the running total calculations in the TRB math
+  * xhci: Fix an error in count_sg_trbs_needed()
+
+  [ Luben Tuikov ]
+  * USB: Reset USB 3.0 devices on (re)discovery
+
+  [ Alan Stern ]
+  * USB: prevent buggy hubs from crashing the USB stack
+
+  [ Felipe Balbi ]
+  * usb: musb: core: set has_tt flag
+
+  [ David Henningsson ]
+  * ALSA: HDA: Add a new Conexant codec 506e (20590)
+
+  [ Takashi Iwai ]
+  * ALSA: usb-audio: fix oops due to cleanup race when disconnecting
+
+  [ David Henningsson ]
+  * ALSA: HDA: Fix mic initialization in VIA auto parser
+  * ALSA: HDA: Add ideapad quirk for two Dell machines
+
+  [ Mark Fasheh ]
+  * ocfs2: Check heartbeat mode for kernel stacks only
+
+  [ Tristan Ye ]
+  * Ocfs2/refcounttree: Fix a bug for refcounttree to writeback clusters
+    in a right number.
+
+  [ Dave Airlie ]
+  * drm: fix unsigned vs signed comparison issue in modeset ctl ioctl.
+
+  [ Vasiliy Kulikov ]
+  * ACPI / debugfs: Fix buffer overflows, double free
+
+  [ vwadekar@nvidia.com ]
+  * mfd: Avoid tps6586x burst writes
+
+  [ Jochen Friedrich ]
+  * mfd: Fix NULL pointer due to non-initialized ucb1x00-ts absinfo
+
+  [ Don Zickus ]
+  * x86: Use u32 instead of long to set reset vector back to 0
+
+  [ Yu-Chen Cho ]
+  * Bluetooth: add Atheros BT AR9285 fw supported
+
+  [ Oliver Neukum ]
+  * Bluetooth: fix crash with quirky dongles doing sound
+
+  [ Yu-Chen Cho ]
+  * Bluetooth: Add Atheros BT AR5BBU12 fw supported
+
+  [ Eric Bénard ]
+  * eukrea-tlv320: fix platform_name
+
+  [ Dmitry Eremin-Solenikov ]
+  * ASoC: correct pxa AC97 DAI names
+
+  [ Miklos Szeredi ]
+  * fuse: fix hang of single threaded fuseblk filesystem
+
+  [ Thomas Gleixner ]
+  * clockevents: Prevent oneshot mode when broadcast device is periodic
+
+  [ Josh Hunt ]
+  * ext2: Fix link count corruption under heavy link+rename load
+
+  [ Mel Gorman ]
+  * mm: vmstat: use a single setter function and callback for adjusting
+    percpu thresholds
+
+  [ Bruce Allan ]
+  * e1000e: 82579 PHY incorrectly identified during init
+
+  [ Ian Abbott ]
+  * Staging: comedi: Add MODULE_LICENSE and similar to NI modules
+
+  [ Daniel J Blueman ]
+  * fix cfg80211_wext_siwfreq lock ordering...
+
+  [ Matt Carlson ]
+  * tg3: Restrict phy ioctl access
+
+  [ Jan Niehusmann ]
+  * drm/i915: fix memory corruption with GM965 and >4GB RAM
+
+  [ Vivek Goyal ]
+  * blk-throttle: Do not use kblockd workqueue for throtl work
+
+  [ Tejun Heo ]
+  * block: add @force_kblockd to __blk_run_queue()
+  * block: blk-flush shouldn't call directly into q->request_fn()
+    __blk_run_queue()
+
+  [ Petr Uzel ]
+  * block: kill loop_mutex
+
+  [ Sujith Manoharan ]
+  * ath9k_htc: Fix an endian issue
+
+  [ Christian Lamparter ]
+  * p54usb: add Senao NUB-350 usbid
+
+  [ Ryusuke Konishi ]
+  * nilfs2: fix regression that i-flag is not set on changeless
+    checkpoints
+
+  [ Jan Puk ]
+  * carl9170: add Airlive X.USB a/b/g/n USBID
+
+  [ Stanislaw Gruszka ]
+  * r8169: disable ASPM
+
+  [ Gerrit Renker ]
+  * dccp: fix oops on Reset after close
+
+  [ Bruce Allan ]
+  * e1000e: disable broken PHY wakeup for ICH10 LOMs, use MAC wakeup
+    instead
+
+  [ David Howells ]
+  * DNS: Fix a NULL pointer deref when trying to read an error key [CVE-
+    2011-1076]
+
+  [ Ian Campbell ]
+  * arp_notify: unconditionally send gratuitous ARP for
+    NETDEV_NOTIFY_PEERS.
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.37.3
+
+  [ Stephen Hemminger ]
+  * Update ipset to latest upstream
+  * Add missing xt_set to Makfile
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 08 Mar 2011 17:31:30 -0800
+
 linux-2.6 (2.6.37-1+vyatta+4) unstable; urgency=low
 
   [ Greg Kroah-Hartman ]
