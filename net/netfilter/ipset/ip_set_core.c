@@ -206,12 +206,7 @@ ip_set_alloc(size_t size)
 		return members;
 	}
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 37)
-	members = __vmalloc(size, GFP_KERNEL | __GFP_ZERO | __GFP_HIGHMEM,
-			    PAGE_KERNEL);
-#else
 	members = vzalloc(size);
-#endif
 	if (!members)
 		return NULL;
 	pr_debug("%p: allocated with vmalloc\n", members);
