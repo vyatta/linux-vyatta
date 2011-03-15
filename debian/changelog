@@ -1,3 +1,103 @@
+linux-2.6 (2.6.37-1+vyatta+6) unstable; urgency=low
+
+  [ Li Zefan ]
+  * cpuset: add a missing unlock in cpuset_write_resmask()
+
+  [ Amit Shah ]
+  * virtio: console: Don't access vqs if device was unplugged
+
+  [ Dan Carpenter ]
+  * keyboard: integer underflow bug
+
+  [ Mark Brown ]
+  * ASoC: Fix WM9081 platform data initialisation
+
+  [ David Henningsson ]
+  * ALSA: HDA: Realtek: Fixup jack detection to input subsystem
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Don't set to D3 in Cirrus errata init verbs
+
+  [ Axel Lin ]
+  * drivers/misc/bmp085.c: add MODULE_DEVICE_TABLE
+
+  [ Neil Horman ]
+  * nfs4: Ensure that ACL pages sent over NFS were not allocated from
+    the slab (v3)
+
+  [ Anton Blanchard ]
+  * RxRPC: Fix v1 keys
+
+  [ Mohammed Shafi Shajakhan ]
+  * ath9k: Fix ath9k prevents CPU to enter C3 states
+
+  [ Don Skidmore ]
+  * ixgbe: fix for 82599 erratum on Header Splitting
+
+  [ Hugh Dickins ]
+  * mm: fix possible cause of a page_mapped BUG
+
+  [ Jan Engelhardt ]
+  * netfilter: nf_log: avoid oops in (un)bind with invalid nfproto
+    values
+
+  [ Naga Chumbalkar ]
+  * pcc-cpufreq: don't load driver if get_freq fails during init.
+
+  [ roel ]
+  * nfsd: wrong index used in inner loop
+
+  [ Benjamin Tissoires ]
+  * HID: hid-mosart: ignore buttons report
+
+  [ Chuck Lever ]
+  * NFS: NFSv4 readdir loses entries
+
+  [ Julian Anastasov ]
+  * ipvs: fix dst_lock locking on dest update
+
+  [ Vasiliy Kulikov ]
+  * net: don't allow CAP_NET_ADMIN to load non-netdev kernel modules
+
+  [ Pablo Neira Ayuso ]
+  * netfilter: arpt_mangle: fix return values of checkentry
+
+  [ Ivan Vecera ]
+  * r8169: use RxFIFO overflow workaround for 8168c chipset.
+
+  [ Francois Romieu ]
+  * r8169: RxFIFO overflow oddities with 8168 chipsets.
+  * r8169: prevent RxFIFO induced loops in the irq handler.
+
+  [ Ivan Vecera ]
+  * drivers/net: Call netif_carrier_off at the end of the probe
+
+  [ Balbir Singh ]
+  * sched: Fix sched rt group scheduling when hierachy is enabled
+
+  [ Michael ]
+  * ivtv: Fix corrective action taken upon DMA ERR interrupt to avoid
+    hang
+
+  [ Andy Walls ]
+  * cx23885: Revert "Check for slave nack on all transactions"
+
+  [ Sven Barth ]
+  * cx25840: fix probing of cx2583x chips
+
+  [ Olivier Grenie ]
+  * DiB7000M: add pid filtering
+
+  [ stephen hemminger ]
+  * ip6ip6: autoload ip6 tunnel
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.37.4
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 14 Mar 2011 21:18:39 -0700
+
 linux-2.6 (2.6.37-1+vyatta+5) unstable; urgency=low
 
   [ Johan Hovold ]
