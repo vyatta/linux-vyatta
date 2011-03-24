@@ -1,3 +1,253 @@
+linux-2.6 (2.6.37-1+vyatta+8) unstable; urgency=low
+
+  [ Hans de Goede ]
+  * hwmon/f71882fg: Set platform drvdata to NULL later
+
+  [ Antony Pavlov ]
+  * mtd: jedec_probe: Change variable name from cfi_p to cfi
+  * mtd: jedec_probe: initialise make sector erase command variable
+
+  [ Axel Lin ]
+  * mtd: add "platform:" prefix for platform modalias
+
+  [ Maxim Levitsky ]
+  * mtd: mtd_blkdevs: fix double free on error path
+
+  [ Joakim Tjernlund ]
+  * mtd: fix race in cfi_cmdset_0001 driver
+
+  [ Mark Brown ]
+  * ASoC: Fix broken bitfield definitions in WM8978
+
+  [ Ben Hutchings ]
+  * sunrpc: Propagate errors from xs_bind() through xs_create_sock()
+
+  [ Chuck Lever ]
+  * NFS: NFSROOT should default to "proto=udp"
+
+  [ Timo Warns ]
+  * Fix corrupted OSF partition table parsing
+
+  [ Chris Mason ]
+  * Btrfs: deal with short returns from copy_from_user
+
+  [ Pablo Neira Ayuso ]
+  * netfilter: fix export secctx error handling
+
+  [ Ivo van Doorn ]
+  * rt2x00: Fix crash on USB unplug
+
+  [ Johannes Stezenbach ]
+  * rt2x00: fix hang when unplugging USB device in use
+
+  [ Takashi Iwai ]
+  * drm/i915: Fix calculation of backlight value in combined mode
+
+  [ Lukas Czerner ]
+  * block: fix mis-synchronisation in blkdev_issue_zeroout()
+
+  [ Jovi Zhang ]
+  * nfs: fix compilation warning
+
+  [ Florian Fainelli ]
+  * MIPS: MTX-1: Make au1000_eth probe all PHY addresses
+
+  [ Andrea Arcangeli ]
+  * x86/mm: Fix pgd_lock deadlock
+
+  [ Naga Chumbalkar ]
+  * x86: Don't check for BIOS corruption in first 64K when there's no
+    need to
+
+  [ Andrey Vagin ]
+  * x86/mm: Handle mm_fault_error() in kernel space
+
+  [ Steven Rostedt ]
+  * ftrace: Fix memory leak with function graph and cpu hotplug
+
+  [ Kamal Mostafa ]
+  * x86: Fix panic when handling "mem={invalid}" param
+  * x86: Emit "mem=nopentium ignored" warning when not supported
+
+  [ Per Jessen ]
+  * ahci: recognize Marvell 88se9125 PCIe SATA 6.0 Gb/s controller
+
+  [ Seth Heasley ]
+  * ahci: AHCI mode SATA patch for Intel DH89xxCC DeviceIDs
+  * ahci: AHCI mode SATA patch for Intel Patsburg SATA RAID controller
+
+  [ Tejun Heo ]
+  * libata: fix hotplug for drivers which don't implement LPM
+
+  [ Sean Hefty ]
+  * RDMA/cma: Fix crash in request handlers
+
+  [ Linus Torvalds ]
+  * Increase OSF partition limit from 8 to 18
+
+  [ Sean Hefty ]
+  * IB/cm: Bump reference count on cm_id before invoking callback
+
+  [ Andreas Herrmann ]
+  * x86, quirk: Fix SB600 revision check
+
+  [ Steven J. Magnani ]
+  * microblaze: Fix /dev/zero corruption from __clear_user()
+
+  [ Mathieu Desnoyers ]
+  * x86: stop_machine_text_poke() should issue sync_core()
+
+  [ Tetsuo Handa ]
+  * TOMOYO: Fix memory leak upon file open.
+
+  [ Chris Wilson ]
+  * drm: Hold the mode mutex whilst probing for sysfs status
+
+  [ Senthil Balasubramanian ]
+  * ath9k_hw: read and backup AR_WA register value even before chip
+    reset on.
+  * ath9k_hw: Fix incorrect macversion and macrev checks
+
+  [ Felix Fietkau ]
+  * ath9k: remove support for the FIF_PROMISC_IN_BSS filter flag
+
+  [ Alan Stern ]
+  * USB: serial drivers need to use larger bulk-in buffers
+
+  [ Jiri Slaby ]
+  * USB: serial/kobil_sct, fix potential tty NULL dereference
+
+  [ Herton Ronaldo Krzesinski ]
+  * USB: serial: option: Apply OPTION_BLACKLIST_SENDSETUP also for ZTE
+    MF626
+
+  [ wangyanqing ]
+  * USB: serial: ch341: add new id
+
+  [ Jeff Mahoney ]
+  * staging: winbond: needs <linux/delay.h> for msleep and friends
+
+  [ Felipe Contreras ]
+  * staging: tidspbridge: protect dmm_map properly
+
+  [ Sebastian Andrzej Siewior ]
+  * USB: isp1760: Implement solution for erratum 2
+
+  [ Matthew Garrett ]
+  * ehci: Check individual port status registers on resume
+
+  [ Alan Stern ]
+  * USB: move usbcore away from hcd->state
+
+  [ Sarah Sharp ]
+  * xhci: Update internal dequeue pointers after stalls.
+  * xhci: Fix cycle bit calculation during stall handling.
+
+  [ Paul Zimmerman ]
+  * USB: Add support for SuperSpeed isoc endpoints
+
+  [ Trond Myklebust ]
+  * NFS: Fix a decoding problem in nfs3_decode_dirent
+
+  [ David Henningsson ]
+  * ALSA: HDA: Realtek ALC88x: Do not over-initialize speakers and hp
+    that are primary outputs
+
+  [ Vitaliy Kulikov ]
+  * ALSA: hda - fix digital mic selection in mixer on 92HD8X codecs
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Initialize special cases for input src in init phase
+
+  [ Henrik Rydberg ]
+  * HID: hid-magicmouse: Correct touch orientation direction
+
+  [ Herton Ronaldo Krzesinski ]
+  * HID: add support for Ortek PKB-1700
+
+  [ Brandeburg, Jesse ]
+  * PCI: remove quirk for pre-production systems
+
+  [ Jiri Slaby ]
+  * PCI: add more checking to ICH region quirks
+  * PCI: do not create quirk I/O regions below PCIBIOS_MIN_IO for ICH
+
+  [ Ben Hutchings ]
+  * PCI: sysfs: Fix failure path for addition of "vpd" attribute
+
+  [ Dan Rosenberg ]
+  * ALSA: sound/pci/asihpi: check adapter index in hpi_ioctl
+
+  [ Takashi Iwai ]
+  * ALSA: aloop - Fix possible IRQ lock inversion
+
+  [ Przemyslaw Bruski ]
+  * ALSA: ctxfi - Fix incorrect SPDIF status bit mask
+  * ALSA: ctxfi - Fix SPDIF status retrieval
+  * ALSA: ctxfi - Clear input settings before initialization
+
+  [ Joseph Gruher ]
+  * scsi_dh_alua: fix deadlock in stpg_endio
+
+  [ Trond Myklebust ]
+  * SUNRPC: Ensure we always run the tk_callback before tk_action
+
+  [ Stanislav Kinsbursky ]
+  * RPC: killing RPC tasks races fixed
+
+  [ Frederic Weisbecker ]
+  * perf: Fix the software events state check
+  * perf: Handle stopped state with tracepoints
+
+  [ Anton Blanchard ]
+  * perf, powerpc: Handle events that raise an exception without
+    overflowing
+
+  [ Josh Hunt ]
+  * perf tools: Version incorrect with some versions of grep
+
+  [ Eric Sandeen ]
+  * ext3: Always set dx_node's fake_dirent explicitly.
+
+  [ Milton Miller ]
+  * call_function_many: fix list delete vs add race
+  * call_function_many: add missing ordering
+  * smp_call_function_many: handle concurrent clearing of mask
+
+  [ Shaohua Li ]
+  * x86: Flush TLB if PGD entry is changed in i386 PAE mode
+
+  [ Alexander Duyck ]
+  * ixgbe: limit VF access to network traffic
+
+  [ Amir Hanania ]
+  * ixgbe: work around for DDP last buffer size
+
+  [ Thomas Gleixner ]
+  * fix per-cpu flag problem in the cpu affinity checkers
+
+  [ Roman Fietze ]
+  * i2c: Fix typo in instantiating-devices document
+
+  [ Manoj Iyer ]
+  * mmc: sdhci: Add Ricoh e823 PCI ID
+
+  [ Stefan Nilsson XK ]
+  * mmc: sdio: remember new card RCA when redetecting card
+
+  [ Alexander van Heukelum ]
+  * x86, binutils, xen: Fix another wrong size directive
+
+  [ Vivien Didelot ]
+  * hwmon: (sht15) Fix integer overflow in humidity calculation
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.37.5
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Thu, 24 Mar 2011 09:30:19 -0700
+
 linux-2.6 (2.6.37-1+vyatta+7) unstable; urgency=low
 
   * Fix bug 6918.  Mask XSAVE from guest cpu.  See:
