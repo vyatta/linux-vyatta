@@ -99,6 +99,7 @@ struct robust_list_head;
 struct bio_list;
 struct fs_struct;
 struct perf_event_context;
+struct blk_plug;
 
 /*
  * List of flags we want to share for kernel threads,
@@ -516,7 +517,7 @@ struct thread_group_cputimer {
 struct autogroup;
 
 /*
- * NOTE! "signal_struct" does not have it's own
+ * NOTE! "signal_struct" does not have its own
  * locking, because a shared signal_struct always
  * implies a shared sighand_struct, so locking
  * sighand_struct is always a proper superset of
@@ -1427,6 +1428,11 @@ struct task_struct {
 
 /* stacked block device info */
 	struct bio_list *bio_list;
+
+#ifdef CONFIG_BLOCK
+/* stack plugging */
+	struct blk_plug *plug;
+#endif
 
 /* VM state */
 	struct reclaim_state *reclaim_state;

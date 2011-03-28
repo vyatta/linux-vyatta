@@ -133,6 +133,7 @@ config TPS6105X
 	tristate "TPS61050/61052 Boost Converters"
 	depends on I2C
 	select REGULATOR
+	select MFD_CORE
 	select REGULATOR_FIXED_VOLTAGE
 	help
 	  This option enables a driver for the TP61050/TPS61052
@@ -591,7 +592,7 @@ config AB3550_CORE
 config MFD_CS5535
 	tristate "Support for CS5535 and CS5536 southbridge core functions"
 	select MFD_CORE
-	depends on PCI
+	depends on PCI && X86
 	---help---
 	  This is the core driver for CS5535/CS5536 MFD functions.  This is
           necessary for using the board's GPIO and MFGPT functionality.
@@ -666,7 +667,7 @@ config MFD_VX855
 	  and/or vx855_gpio drivers for this to do anything useful.
 
 config MFD_WL1273_CORE
-	tristate
+	tristate "Support for TI WL1273 FM radio."
 	depends on I2C
 	select MFD_CORE
 	default n

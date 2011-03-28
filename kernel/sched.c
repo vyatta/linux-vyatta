@@ -4115,6 +4115,16 @@ need_resched:
 		switch_count = &prev->nvcsw;
 	}
 
+	/*
+	 * If we are going to sleep and we have plugged IO queued, make
+	 * sure to submit it to avoid deadlocks.
+	 */
+	if (prev->state != TASK_RUNNING && blk_needs_flush_plug(prev)) {
+		raw_spin_unlock(&rq->lock);
+		blk_flush_plug(prev);
+		raw_spin_lock(&rq->lock);
+	}
+
 	pre_schedule(rq, prev);
 
 	if (unlikely(!rq->nr_running))
@@ -5463,6 +5473,8 @@ EXPORT_SYMBOL(yield);
  * yield_to - yield the current processor to another thread in
  * your thread group, or accelerate that thread toward the
  * processor it's on.
+ * @p: target task
+ * @preempt: whether task preemption is allowed or not
  *
  * It's the caller's job to ensure that the target task struct
  * can't go away on us before we can do any checks.
@@ -5528,6 +5540,7 @@ void __sched io_schedule(void)
 
 	delayacct_blkio_start();
 	atomic_inc(&rq->nr_iowait);
+	blk_flush_plug(current);
 	current->in_iowait = 1;
 	schedule();
 	current->in_iowait = 0;
@@ -5543,6 +5556,7 @@ long __sched io_schedule_timeout(long timeout)
 
 	delayacct_blkio_start();
 	atomic_inc(&rq->nr_iowait);
+	blk_flush_plug(current);
 	current->in_iowait = 1;
 	ret = schedule_timeout(timeout);
 	current->in_iowait = 0;
@@ -8437,7 +8451,6 @@ int alloc_fair_sched_group(struct task_group *tg, struct task_group *parent)
 {
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se;
-	struct rq *rq;
 	int i;
 
 	tg->cfs_rq = kzalloc(sizeof(cfs_rq) * nr_cpu_ids, GFP_KERNEL);
@@ -8450,8 +8463,6 @@ int alloc_fair_sched_group(struct task_group *tg, struct task_group *parent)
 	tg->shares = NICE_0_LOAD;
 
 	for_each_possible_cpu(i) {
-		rq = cpu_rq(i);
-
 		cfs_rq = kzalloc_node(sizeof(struct cfs_rq),
 				      GFP_KERNEL, cpu_to_node(i));
 		if (!cfs_rq)
