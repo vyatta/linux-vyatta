@@ -1,3 +1,157 @@
+linux-2.6 (2.6.37-1+vyatta+9) unstable; urgency=low
+
+  [ Lydia Wang ]
+  * ALSA: hda - VIA: Fix stereo mixer recording no sound issue
+  * ALSA: hda - VIA: Fix independent headphone no sound issue
+  * ALSA: hda - VIA: Add missing support for VT1718S in A-A path
+  * ALSA: hda - VIA: Fix invalid A-A path volume adjust issue
+  * ALSA: hda - VIA: Fix codec type for VT1708BCE at the right timing
+  * ALSA: hda - VIA: Fix VT1708 can't build up Headphone control issue
+
+  [ Ben Hutchings ]
+  * ethtool: Compat handling for struct ethtool_rxnfc
+
+  [ Pekka Enberg ]
+  * Revert "slab: Fix missing DEBUG_SLAB last user"
+
+  [ Roland Dreier ]
+  * aio: wake all waiters when destroying ctx
+
+  [ Phil Carmody ]
+  * cgroups: if you list_empty() a head then don't list_del() it
+
+  [ Hugh Dickins ]
+  * shmem: let shared anonymous be nonlinear again
+
+  [ Mel Gorman ]
+  * mm: swap: unlock swapfile inode mutex before closing file on bad
+    swapfiles
+
+  [ David Rientjes ]
+  * oom: prevent unnecessary oom kills or kernel panics
+
+  [ Andrey Vagin ]
+  * oom: skip zombies when iterating tasklist
+
+  [ David Rientjes ]
+  * oom: avoid deferring oom killer if exiting task is being traced
+
+  [ Stefano Stabellini ]
+  * PCI hotplug: acpiphp: set current_state to D0 in register_slot
+  * xen: set max_pfn_mapped to the last pfn mapped
+
+  [ Len Brown ]
+  * intel_idle: disable NHM/WSM HW C-state auto-demotion
+  * intel_idle: disable Atom/Lincroft HW C-state auto-demotion
+
+  [ Julien Tinnes ]
+  * Prevent rt_sigqueueinfo and rt_tgsigqueueinfo from spoofing the
+    signal code
+
+  [ David Henningsson ]
+  * ALSA: HDA: Fix internal mic on Dell E5420/E5520
+
+  [ Amir Goldstein ]
+  * ext3: skip orphan cleanup on rocompat fs
+
+  [ Richard Weinberger ]
+  * sysctl: restrict write access to dmesg_restrict
+
+  [ Aaro Koskinen ]
+  * procfs: fix /proc/<pid>/maps heap check
+
+  [ Kees Cook ]
+  * proc: protect mm start_code/end_code in /proc/pid/stat
+
+  [ Henry Nestler ]
+  * fbcon: Bugfix soft cursor detection in Tile Blitting
+
+  [ Mi Jinlong ]
+  * nfsd41: modify the members value of nfsd4_op_flags
+
+  [ J. Bruce Fields ]
+  * nfsd4: minor nfs4state.c reshuffling
+  * nfsd4: fix struct file leak
+
+  [ Mi Jinlong ]
+  * nfsd: wrong index used in inner loop
+
+  [ Stephan Lachowsky ]
+  * uvcvideo: Fix uvc_fixup_video_ctrl() format search
+
+  [ Laurent Pinchart ]
+  * uvcvideo: Fix descriptor parsing for video output devices
+
+  [ Phil Edworthy ]
+  * sh: Fix ptrace fpu state initialisation
+
+  [ David Engraf ]
+  * sh: Fix ptrace hw_breakpoint handling
+
+  [ Michal Sojka ]
+  * USB: Do not pass negative length to snoop_urb()
+
+  [ Alan Stern ]
+  * ehci-hcd: Bug fix: don't set a QH's Halt bit
+
+  [ Peter Holik ]
+  * USB: uss720 fixup refcount position
+
+  [ Robert Lukassen ]
+  * USB: Fix 'bad dma' problem on WDM device disconnect
+
+  [ Johan Hovold ]
+  * USB: cdc-acm: fix memory corruption / panic
+  * USB: cdc-acm: fix potential null-pointer dereference
+  * USB: cdc-acm: fix potential null-pointer dereference on disconnect
+
+  [ Jens Axboe ]
+  * fs: assign sb->s_bdi to default_backing_dev_info if the bdi is going
+    away
+
+  [ Olaf Hering ]
+  * Input: xen-kbdfront - advertise either absolute or relative
+    coordinates
+
+  [ Yinghai Lu ]
+  * x86: Cleanup highmap after brk is concluded
+
+  [ Dave Airlie ]
+  * drm: check for modesetting on modeset ioctls
+
+  [ Herton Ronaldo Krzesinski ]
+  * drm/i915: Prevent racy removal of request from client list
+
+  [ Chris Wilson ]
+  * drm: Fix use-after-free in drm_gem_vm_close()
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: prefer legacy pll algo for tv-out
+  * drm/radeon/kms: fix hardcoded EDID handling
+
+  [ Peter Zijlstra ]
+  * perf: Fix tear-down of inherited group events
+
+  [ Trond Myklebust ]
+  * NFS: Fix a hang/infinite loop in nfs_wb_page()
+  * SUNRPC: Never reuse the socket port after an xs_close()
+
+  [ Josef Bacik ]
+  * fs: call security_d_instantiate in d_obtain_alias V2
+
+  [ Stuart Hayes ]
+  * dcdbas: force SMI to happen when expected
+
+  [ Amir Goldstein ]
+  * ext4: skip orphan cleanup if fs has unknown ROCOMPAT features
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.37.6
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 28 Mar 2011 16:04:49 -0700
+
 linux-2.6 (2.6.37-1+vyatta+8) unstable; urgency=low
 
   [ Hans de Goede ]
