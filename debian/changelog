@@ -1,3 +1,27 @@
+linux-2.6 (2.6.35-1+vyatta+31+mendocino8) lucid; urgency=low
+
+  [ Jeremy Fitzhardinge ]
+  * x86/pvclock: Zero last_value on resume
+
+  [ Stefano Stabellini ]
+  * xen: set max_pfn_mapped to the last pfn mapped
+
+  [ françois romieu ]
+  * r8169: fix sleeping while holding spinlock.
+
+  [ Stanislaw Gruszka ]
+  * r8169: disable ASPM
+
+  [ Ivan Vecera ]
+  * r8169: use RxFIFO overflow workaround for 8168c chipset.
+
+  [ Don Skidmore ]
+  * ixgbe: fix for 82599 erratum on Header Splitting
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 05 Apr 2011 14:38:14 -0700
+
 linux-2.6 (2.6.35-1+vyatta+31+mendocino7) lucid; urgency=low
 
   * Fix bug 6918.  Mask XSAVE from guest cpu.  See:
