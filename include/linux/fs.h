@@ -357,6 +357,8 @@ struct inodes_stat_t {
 #define FS_TOPDIR_FL			0x00020000 /* Top of directory hierarchies*/
 #define FS_EXTENT_FL			0x00080000 /* Extents */
 #define FS_DIRECTIO_FL			0x00100000 /* Use direct i/o */
+#define FS_NOCOW_FL			0x00800000 /* Do not cow file */
+#define FS_COW_FL			0x02000000 /* Cow file */
 #define FS_RESERVED_FL			0x80000000 /* reserved for ext2 lib */
 
 #define FS_FL_USER_VISIBLE		0x0003DFFF /* User visible flags */
@@ -610,6 +612,8 @@ struct address_space_operations {
 					unsigned long);
 	int (*error_remove_page)(struct address_space *, struct page *);
 };
+
+extern const struct address_space_operations empty_aops;
 
 /*
  * pagecache_write_begin/pagecache_write_end must be used by general code
