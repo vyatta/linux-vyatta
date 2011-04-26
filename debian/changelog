@@ -1,3 +1,186 @@
+linux-2.6 (2.6.38-1+vyatta+1) UNRELEASED; urgency=low
+
+  * Merge of 2.6.38.4
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 22 Apr 2011 10:30:10 -0700
+
+linux-2.6 (2.6.37-1+vyatta+11) UNRELEASED; urgency=low
+
+  [ Paul Mundt ]
+  * serial: sh-sci: Move SCSCR_INIT in to platform data.
+  * serial: sh-sci: Move SCBRR calculation algo in to platform data.
+  * serial: sh-sci: Kill off unused register accessors.
+  * serial: sh-sci: Convert from old SCSR control flags to common
+    defines.
+  * serial: sh-sci: Kill off more unused defines.
+
+  [ john stultz ]
+  * x86: Make tsc=reliable override boot time stability checks
+
+  [ Jeremy Fitzhardinge ]
+  * xenfs/xenbus: report partial reads/writes correctly
+
+  [ Diego Ongaro ]
+  * xenbus: allow any xenbus command over /proc/xen/xenbus
+
+  [ Daniel De Graaf ]
+  * xenbus: add missing wakeup in concurrent read/write
+  * xenbus: avoid zero returns from read()
+
+  [ Anatolij Gustschin ]
+  * powerpc/5xxx: extend mpc8xxx_gpio driver to support mpc512x gpios
+
+  [ Paul E. McKenney ]
+  * rcu: add priority-inversion testing to rcutorture
+
+  [ Kasper Pedersen ]
+  * time: Compensate for rounding on odd-frequency clocksources
+
+  [ Richard Kennedy ]
+  * timer_list: Remove alignment padding on 64 bit when
+    CONFIG_TIMER_STATS
+
+  [ Changli Gao ]
+  * timer: Initialize the field slack of timer_list
+
+  [ Nikitas Angelinas ]
+  * time: Use ARRAY_SIZE macro in timecompare.c
+
+  [ Phil Carmody ]
+  * timer: Permit statically-declared work with deferrable timers
+
+  [ Namhyung Kim ]
+  * posix-timers: Annotate lock_timer()
+
+  [ Arnaud Patard (Rtp) ]
+  * ASoC: add support for alc562[123] codecs
+  * ASoC: kirkwood: Add audio support to hp t5325 thin clients
+
+  [ Yong Zhang ]
+  * timer: Make try_to_del_timer_sync() the same on SMP and UP
+  * timer: Del_timer_sync() can be used in softirq context
+  * timer: Warn when del_timer_sync() is called in hardirq context
+
+  [ H. Peter Anvin ]
+  * x86-64, asm: Use fxsaveq/fxrestorq in more places
+
+  [ Thomas Gleixner ]
+  * x86: Allow platforms to force enable apic
+  * x86: apic: Move probe_nr_irqs_gsi() into ioapic_init_mappings()
+
+  [ KOSAKI Motohiro ]
+  * sched: Make sched_param argument static in sched_setscheduler()
+    callers
+
+  [ Thomas Gleixner ]
+  * x86: io_apic: Fix CONFIG_X86_IO_APIC=n breakage
+
+  [ Robert Richter ]
+  * mce, amd: Implement mce_threshold_block_init() helper function
+  * mce, amd: Shorten local variables mci_misc_{hi,lo}
+  * mce, amd: Add helper functions to setup APIC
+  * mce, amd: Remove goto in threshold_create_device()
+  * apic, amd: Make firmware bug messages more meaningful
+
+  [ Peter Ujfalusi ]
+  * ASoC: TWL4030: Use usleep_range when appropriate
+
+  [ Julia Lawall ]
+  * drivers/vhost/vhost.c: delete double assignment
+
+  [ Thomas Renninger ]
+  * PNP: Compile all pnp built-in stuff in one module namespace
+  * PNP: Set up pnp_debug via module and not via boot param.
+
+  [ Chris Wilson ]
+  * drm/i915/ringbuffer: Drop the redundant dev from the vfunc interface
+  * drm/i915: Propagate errors from writing to ringbuffer
+  * drm/i915: Move object to GPU domains after dispatching execbuffer
+  * drm/i915: Fix hangcheck to handle multiple rings
+  * drm/i915/debugfs: Include info for the other rings
+  * drm/i915: Remove the confusing global waiting/irq seqno
+  * drm/i915: Propagate error from failing to queue a request
+
+  [ Daniel Vetter ]
+  * drm_mm: add support for range-restricted fair-lru scans
+  * drm/i915: range-restricted eviction support
+  * drm/i915: range-restricted bind_to_gtt
+  * drm/i915: unbind unmappable objects on fault/pin
+  * drm/i915: use the complete gtt
+  * intel-gtt: save PGETBL_CTL later in the setup process
+  * intel-gtt: maximize ggtt size on platforms that support this
+  * drm/i915: add mappable to gem_object_bind tracepoint
+  * drm/i915: add accounting for mappable objects in gtt v2
+
+  [ Chris Wilson ]
+  * drm/i915: Bail early if we try to mmap an object too large to be
+    mapped.
+  * drm/i915: Use the agp_size determined from the GTT
+  * drm/i915: Capture ERROR register on Sandybridge hangs
+  * drm/i915: Use pci_iomap for remapping the MMIO registers.
+  * drm/i915/ringbuffer: Check that we setup the ringbuffer
+
+  [ Mark Brown ]
+  * ASoC: Store DC offset correction for wm_hubs devices in class W mode
+
+  [ Chris Wilson ]
+  * drm/i915: Make the inactive object shrinker per-device
+  * drm/i915: Remove mmap_offset
+  * drm/i915: Eliminate nested get/put pages
+  * drm/i915: Kill GTT mappings when moving from GTT domain
+  * drm/i915: Do not return -1 from shrinker when nr_to_scan == 0
+
+  [ Nicolas Kaiser ]
+  * telephony: fix return value
+
+  [ Chris Wilson ]
+  * drm/i915: Convert BUG_ON(pin_count) from an impossible condition
+  * drm/i915: Only enforce fence limits inside the GTT.
+  * drm/i915: Remove the duplicate domain-change tracepoint for GPU
+    flush
+  * drm/i915/ringbuffer: Disable the ringbuffer on cleanup.
+  * drm/i915: Record BLT engine error state
+  * drm/i915/ringbuffer: Remove duplicate initialisation of ring control
+  * agp/intel: Sandybridge doesn't require GMCH enabling
+  * drm/i915/debugfs: Display the contents of the BLT and BSD status
+    pages
+  * drm/i915: Switch to using pci_iounmap in conjunction with pci_iomap
+  * drm/i915: Check if the GPU hung whilst waiting for the ring to clear
+  * drm/i915/ringbuffer: Use the HEAD auto-reporting mechanism
+  * drm/i915: Record BSD engine error state
+
+  [ Stephen Hemminger ]
+  * beceem: add module information
+  * beceem: remove ifdef's
+  * beceem: remove version ifdef's
+  * beceem: eliminate unused USB stubs
+  * beceem: cleanup debug level infrastructure
+  * beceem: remove bogus network device notifier
+  * beceem: eliminate network registered state variable
+  * beceem: eliminate dead code
+  * beceem: get rid of OS dependent data structure
+  * beceem: cleanup network device setup
+
+  [ Jesper Juhl ]
+  * VIA Chrome camera: remove duplicate includes
+
+  [ Chris Wilson ]
+  * drm/i915: Fix typo from e5281ccd in i915_gem_attach_phys_object()
+  * drm/i915: Evict just the purgeable GTT entries on the first pass
+  * agp/intel: the GMCH is always enabled for integrated processor
+    graphics
+
+  [ David Daney ]
+  * of/net: Move of_get_mac_address() to a common source file.
+
+  [ Chris Wilson ]
+  * drm/i915/debugfs: Report ring in error state
+  * drm/i915: Apply big hammer to serialise buffer access between rings
+  * drm/i915: Move the invalidate|flush information out of the device
+    struct
+
+ -- Chris Wilson <chris@chris-wilson.co.uk>  Fri, 22 Apr 2011 10:28:57 -0700
+
 linux-2.6 (2.6.37-1+vyatta+10) unstable; urgency=low
 
   * Turn of DMA remapping since it hurts performance
