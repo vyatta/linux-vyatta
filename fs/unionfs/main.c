@@ -287,7 +287,7 @@ static int parse_dirs_option(struct super_block *sb, struct unionfs_dentry_info
 	if (options[0] == '\0') {
 		printk(KERN_ERR "unionfs: no branches specified\n");
 		err = -EINVAL;
-		goto out;
+		goto out_return;
 	}
 
 	/*
@@ -303,14 +303,17 @@ static int parse_dirs_option(struct super_block *sb, struct unionfs_dentry_info
 		kcalloc(branches, sizeof(struct unionfs_data), GFP_KERNEL);
 	if (unlikely(!UNIONFS_SB(sb)->data)) {
 		err = -ENOMEM;
-		goto out;
+		goto out_return;
 	}
 
 	lower_root_info->lower_paths =
 		kcalloc(branches, sizeof(struct path), GFP_KERNEL);
 	if (unlikely(!lower_root_info->lower_paths)) {
 		err = -ENOMEM;
-		goto out;
+		/* free the underlying pointer array */
+		kfree(UNIONFS_SB(sb)->data);
+		UNIONFS_SB(sb)->data = NULL;
+		goto out_return;
 	}
 
 	/* now parsing a string such as "b1:b2=rw:b3=ro:b4" */
@@ -427,6 +430,7 @@ out:
 		lower_root_info->lower_paths = NULL;
 		UNIONFS_SB(sb)->data = NULL;
 	}
+out_return:
 	return err;
 }
 
