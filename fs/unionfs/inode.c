@@ -901,6 +901,12 @@ static int unionfs_setattr(struct dentry *dentry, struct iattr *ia)
 	struct inode *lower_inode;
 	int bstart, bend, bindex;
 	loff_t size;
+	struct iattr lower_ia;
+
+	/* check if user has permission to change inode */
+	err = inode_change_ok(dentry->d_inode, ia);
+	if (err)
+		goto out_err;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
 	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);
@@ -988,8 +994,15 @@ static int unionfs_setattr(struct dentry *dentry, struct iattr *ia)
 	 * unlinked (no inode->i_sb and i_ino==0.  This happens if someone
 	 * tries to open(), unlink(), then ftruncate() a file.
 	 */
+	/* prepare our own lower struct iattr (with our own lower file) */
+	memcpy(&lower_ia, ia, sizeof(lower_ia));
+	if (ia->ia_valid & ATTR_FILE) {
+		lower_ia.ia_file = unionfs_lower_file(ia->ia_file);
+		BUG_ON(!lower_ia.ia_file); // XXX?
+	}
+
 	mutex_lock(&lower_dentry->d_inode->i_mutex);
-	err = notify_change(lower_dentry, ia);
+	err = notify_change(lower_dentry, &lower_ia);
 	mutex_unlock(&lower_dentry->d_inode->i_mutex);
 	if (err)
 		goto out;
@@ -1017,7 +1030,7 @@ out:
 	unionfs_unlock_dentry(dentry);
 	unionfs_unlock_parent(dentry, parent);
 	unionfs_read_unlock(dentry->d_sb);
-
+out_err:
 	return err;
 }
 
