@@ -973,6 +973,16 @@ static int unionfs_setattr(struct dentry *dentry, struct iattr *ia)
 		/* get updated lower_dentry/inode after copyup */
 		lower_dentry = unionfs_lower_dentry(dentry);
 		lower_inode = unionfs_lower_inode(inode);
+		/*
+		 * check for whiteouts in writeable branch, and remove them
+		 * if necessary.
+		 */
+		if (lower_dentry) {
+			err = check_unlink_whiteout(dentry, lower_dentry,
+						    bindex);
+			if (err > 0) /* ignore if whiteout found and removed */
+				err = 0;
+		}
 	}
 
 	/*
