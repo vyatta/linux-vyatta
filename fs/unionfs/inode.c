@@ -933,7 +933,12 @@ static int unionfs_setattr(struct dentry *dentry, struct iattr *ia)
 		err = -EINVAL;
 		goto out;
 	}
-	lower_inode = unionfs_lower_inode(inode);
+
+	/*
+	 * Get the lower inode directly from lower dentry, in case ibstart
+	 * is -1 (which happens when the file is open but unlinked.
+	 */
+	lower_inode = lower_dentry->d_inode;
 
 	/* check if user has permission to change lower inode */
 	err = inode_change_ok(lower_inode, ia);
