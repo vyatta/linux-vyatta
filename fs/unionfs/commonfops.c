@@ -506,8 +506,11 @@ static int __open_file(struct inode *inode, struct file *file,
 			for (bindex = bstart - 1; bindex >= 0; bindex--) {
 				err = copyup_file(parent->d_inode, file,
 						  bstart, bindex, size);
-				if (!err)
+				if (!err) {
+					/* only one regular file open */
+					fbend(file) = fbstart(file);
 					break;
+				}
 			}
 			return err;
 		} else {
