@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2010 Erez Zadok
+ * Copyright (c) 2003-2011 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005      Arun M. Krishnakumar
@@ -7,8 +7,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2010 Stony Brook University
- * Copyright (c) 2003-2010 The Research Foundation of SUNY
+ * Copyright (c) 2003-2011 Stony Brook University
+ * Copyright (c) 2003-2011 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -566,9 +566,19 @@ static inline struct dentry *lookup_lck_len(const char *name,
 					    struct dentry *base, int len)
 {
 	struct dentry *d;
+	struct nameidata lower_nd;
+	int err;
+
+	err = init_lower_nd(&lower_nd, LOOKUP_OPEN);
+	if (unlikely(err < 0)) {
+		d = ERR_PTR(err);
+		goto out;
+	}
 	mutex_lock(&base->d_inode->i_mutex);
-	d = lookup_one_len(name, base, len);
+	d = lookup_one_len_nd(name, base, len, &lower_nd);
+	release_lower_nd(&lower_nd, err);
 	mutex_unlock(&base->d_inode->i_mutex);
+out:
 	return d;
 }
 

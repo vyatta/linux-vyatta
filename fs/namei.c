@@ -1896,6 +1896,22 @@ struct dentry *lookup_one_len(const char *name, struct dentry *base, int len)
 	return __lookup_hash(&this, base, NULL);
 }
 
+/* pass nameidata from caller (useful for NFS) */
+struct dentry *lookup_one_len_nd(const char *name, struct dentry *base,
+				 int len, struct nameidata *nd)
+{
+	int err;
+	struct qstr this;
+
+	WARN_ON_ONCE(!mutex_is_locked(&base->d_inode->i_mutex));
+
+	err = __lookup_one_len(name, &this, base, len);
+	if (err)
+		return ERR_PTR(err);
+
+	return __lookup_hash(&this, base, nd);
+}
+
 int user_path_at(int dfd, const char __user *name, unsigned flags,
 		 struct path *path)
 {
@@ -3582,6 +3598,7 @@ EXPORT_SYMBOL(get_write_access); /* binfmt_aout */
 EXPORT_SYMBOL(getname);
 EXPORT_SYMBOL(lock_rename);
 EXPORT_SYMBOL(lookup_one_len);
+EXPORT_SYMBOL(lookup_one_len_nd);
 EXPORT_SYMBOL(page_follow_link_light);
 EXPORT_SYMBOL(page_put_link);
 EXPORT_SYMBOL(page_readlink);

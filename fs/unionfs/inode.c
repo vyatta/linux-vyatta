@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2010 Erez Zadok
+ * Copyright (c) 2003-2011 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005-2006 Junjiro Okajima
@@ -8,8 +8,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2010 Stony Brook University
- * Copyright (c) 2003-2010 The Research Foundation of SUNY
+ * Copyright (c) 2003-2011 Stony Brook University
+ * Copyright (c) 2003-2011 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -789,16 +789,22 @@ static int unionfs_permission(struct inode *inode, int mask, unsigned int flags)
 	struct inode *lower_inode = NULL;
 	int err = 0;
 	int bindex, bstart, bend;
-	const int is_file = !S_ISDIR(inode->i_mode);
+	int is_file;
 	const int write_mask = (mask & MAY_WRITE) && !(mask & MAY_READ);
-	struct inode *inode_grabbed = igrab(inode);
-	struct dentry *dentry = d_find_alias(inode);
+	struct inode *inode_grabbed;
+	struct dentry *dentry;
 
-	if (flags & IPERM_FLAG_RCU)
-		return -ECHILD;
+	if (flags & IPERM_FLAG_RCU) {
+		err = -ECHILD;
+		goto out_nograb;
+	}
 
+	dentry = d_find_alias(inode);
 	if (dentry)
 		unionfs_lock_dentry(dentry, UNIONFS_DMUTEX_CHILD);
+
+	inode_grabbed = igrab(inode);
+	is_file = !S_ISDIR(inode->i_mode);
 
 	if (!UNIONFS_I(inode)->lower_inodes) {
 		if (is_file)	/* dirs can be unlinked but chdir'ed to */
@@ -892,6 +898,7 @@ out:
 		dput(dentry);
 	}
 	iput(inode_grabbed);
+out_nograb:
 	return err;
 }
 
@@ -936,7 +943,12 @@ static int unionfs_setattr(struct dentry *dentry, struct iattr *ia)
 		err = -EINVAL;
 		goto out;
 	}
-	lower_inode = unionfs_lower_inode(inode);
+
+	/*
+	 * Get the lower inode directly from lower dentry, in case ibstart
+	 * is -1 (which happens when the file is open but unlinked.
+	 */
+	lower_inode = lower_dentry->d_inode;
 
 	/* check if user has permission to change lower inode */
 	err = inode_change_ok(lower_inode, ia);
@@ -971,6 +983,16 @@ static int unionfs_setattr(struct dentry *dentry, struct iattr *ia)
 		/* get updated lower_dentry/inode after copyup */
 		lower_dentry = unionfs_lower_dentry(dentry);
 		lower_inode = unionfs_lower_inode(inode);
+		/*
+		 * check for whiteouts in writeable branch, and remove them
+		 * if necessary.
+		 */
+		if (lower_dentry) {
+			err = check_unlink_whiteout(dentry, lower_dentry,
+						    bindex);
+			if (err > 0) /* ignore if whiteout found and removed */
+				err = 0;
+		}
 	}
 
 	/*

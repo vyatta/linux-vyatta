@@ -81,6 +81,8 @@ extern struct file *lookup_instantiate_filp(struct nameidata *nd, struct dentry 
 extern void release_open_intent(struct nameidata *);
 
 extern struct dentry *lookup_one_len(const char *, struct dentry *, int);
+extern struct dentry *lookup_one_len_nd(const char *, struct dentry *, int,
+				      struct nameidata *nd);
 
 extern int follow_down_one(struct path *);
 extern int follow_down(struct path *, bool);

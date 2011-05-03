@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2010 Erez Zadok
+ * Copyright (c) 2003-2011 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005-2006 Junjiro Okajima
@@ -8,8 +8,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2010 Stony Brook University
- * Copyright (c) 2003-2010 The Research Foundation of SUNY
+ * Copyright (c) 2003-2011 Stony Brook University
+ * Copyright (c) 2003-2011 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -192,6 +192,9 @@ validate_lowers:
 	bend = dbend(dentry);
 	BUG_ON(bstart == -1);
 	for (bindex = bstart; bindex <= bend; bindex++) {
+		int err;
+		struct nameidata lower_nd;
+
 		lower_dentry = unionfs_lower_dentry_idx(dentry, bindex);
 		if (!lower_dentry || !lower_dentry->d_op
 		    || !lower_dentry->d_op->d_revalidate)
@@ -204,8 +207,14 @@ validate_lowers:
 		 * invariants).  We will open lower files as and when needed
 		 * later on.
 		 */
-		if (!lower_dentry->d_op->d_revalidate(lower_dentry, NULL))
+		err = init_lower_nd(&lower_nd, LOOKUP_OPEN);
+		if (unlikely(err < 0)) {
 			valid = false;
+			break;
+		}
+		if (!lower_dentry->d_op->d_revalidate(lower_dentry, &lower_nd))
+			valid = false;
+		release_lower_nd(&lower_nd, err);
 	}
 
 	if (!dentry->d_inode ||

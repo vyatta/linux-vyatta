@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2010 Erez Zadok
+ * Copyright (c) 2003-2011 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005-2006 Junjiro Okajima
@@ -8,8 +8,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2010 Stony Brook University
- * Copyright (c) 2003-2010 The Research Foundation of SUNY
+ * Copyright (c) 2003-2011 Stony Brook University
+ * Copyright (c) 2003-2011 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -28,6 +28,7 @@ static int unionfs_refresh_lower_dentry(struct dentry *dentry,
 	struct dentry *lower_dentry;
 	struct dentry *lower_parent;
 	int err = 0;
+	struct nameidata lower_nd;
 
 	verify_locked(dentry);
 
@@ -35,8 +36,12 @@ static int unionfs_refresh_lower_dentry(struct dentry *dentry,
 
 	BUG_ON(!S_ISDIR(lower_parent->d_inode->i_mode));
 
-	lower_dentry = lookup_one_len(dentry->d_name.name, lower_parent,
-				      dentry->d_name.len);
+	err = init_lower_nd(&lower_nd, LOOKUP_OPEN);
+	if (unlikely(err < 0))
+		goto out;
+	lower_dentry = lookup_one_len_nd(dentry->d_name.name, lower_parent,
+					 dentry->d_name.len, &lower_nd);
+	release_lower_nd(&lower_nd, err);
 	if (IS_ERR(lower_dentry)) {
 		err = PTR_ERR(lower_dentry);
 		goto out;

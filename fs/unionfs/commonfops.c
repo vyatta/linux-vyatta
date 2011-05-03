@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2010 Erez Zadok
+ * Copyright (c) 2003-2011 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005-2006 Junjiro Okajima
@@ -8,8 +8,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2010 Stony Brook University
- * Copyright (c) 2003-2010 The Research Foundation of SUNY
+ * Copyright (c) 2003-2011 Stony Brook University
+ * Copyright (c) 2003-2011 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -312,7 +312,7 @@ static int __unionfs_file_revalidate(struct file *file, struct dentry *dentry,
 	 * someone has copied up this file from underneath us, we also need
 	 * to refresh things.
 	 */
-	if (d_deleted(dentry) ||
+	if ((d_deleted(dentry) && dbstart(dentry) >= fbstart(file)) ||
 	    (sbgen <= fgen &&
 	     dbstart(dentry) == fbstart(file) &&
 	     unionfs_lower_file(file)))
@@ -506,8 +506,11 @@ static int __open_file(struct inode *inode, struct file *file,
 			for (bindex = bstart - 1; bindex >= 0; bindex--) {
 				err = copyup_file(parent->d_inode, file,
 						  bstart, bindex, size);
-				if (!err)
+				if (!err) {
+					/* only one regular file open */
+					fbend(file) = fbstart(file);
 					break;
+				}
 			}
 			return err;
 		} else {
@@ -648,7 +651,7 @@ int unionfs_file_release(struct inode *inode, struct file *file)
 	struct dentry *dentry = file->f_path.dentry;
 	struct dentry *parent;
 	int bindex, bstart, bend;
-	int fgen, err = 0;
+	int err = 0;
 
 	/*
 	 * Since mm/memory.c:might_fault() (under PROVE_LOCKING) was
@@ -684,7 +687,6 @@ int unionfs_file_release(struct inode *inode, struct file *file)
 	inodeinfo = UNIONFS_I(inode);
 
 	/* fput all the lower files */
-	fgen = atomic_read(&fileinfo->generation);
 	bstart = fbstart(file);
 	bend = fbend(file);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2010 Erez Zadok
+ * Copyright (c) 2003-2011 Erez Zadok
  * Copyright (c) 2003-2006 Charles P. Wright
  * Copyright (c) 2005-2007 Josef 'Jeff' Sipek
  * Copyright (c) 2005-2006 Junjiro Okajima
@@ -8,8 +8,8 @@
  * Copyright (c) 2003-2004 Mohammad Nayyer Zubair
  * Copyright (c) 2003      Puja Gupta
  * Copyright (c) 2003      Harikesavan Krishnan
- * Copyright (c) 2003-2010 Stony Brook University
- * Copyright (c) 2003-2010 The Research Foundation of SUNY
+ * Copyright (c) 2003-2011 Stony Brook University
+ * Copyright (c) 2003-2011 The Research Foundation of SUNY
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -203,8 +203,8 @@ int unlink_whiteout(struct dentry *wh_dentry)
  * Checks to see if there's a whiteout in @lower_dentry's parent directory,
  * whose name is taken from @dentry.  Then tries to remove that whiteout, if
  * found.  If <dentry,bindex> is a branch marked readonly, return -EROFS.
- * If it finds both a regular file and a whiteout, return -EIO (this should
- * never happen).
+ * If it finds both a regular file and a whiteout, delete whiteout (this
+ * should never happen).
  *
  * Return 0 if no whiteout was found.  Return 1 if one was found and
  * successfully removed.  Therefore a value >= 0 tells the caller that
@@ -234,13 +234,10 @@ int check_unlink_whiteout(struct dentry *dentry, struct dentry *lower_dentry,
 	}
 
 	/* check if regular file and whiteout were both found */
-	if (unlikely(lower_dentry->d_inode)) {
-		err = -EIO;
-		printk(KERN_ERR "unionfs: found both whiteout and regular "
-		       "file in directory %s (branch %d)\n",
+	if (unlikely(lower_dentry->d_inode))
+		printk(KERN_WARNING "unionfs: removing whiteout; regular "
+		       "file exists in directory %s (branch %d)\n",
 		       lower_dir_dentry->d_name.name, bindex);
-		goto out_dput;
-	}
 
 	/* check if branch is writeable */
 	err = is_robranch_super(dentry->d_sb, bindex);
@@ -484,6 +481,7 @@ int is_opaque_dir(struct dentry *dentry, int bindex)
 	struct dentry *wh_lower_dentry;
 	struct inode *lower_inode;
 	struct sioq_args args;
+	struct nameidata lower_nd;
 
 	lower_dentry = unionfs_lower_dentry_idx(dentry, bindex);
 	lower_inode = lower_dentry->d_inode;
@@ -493,9 +491,16 @@ int is_opaque_dir(struct dentry *dentry, int bindex)
 	mutex_lock(&lower_inode->i_mutex);
 
 	if (!inode_permission(lower_inode, MAY_EXEC)) {
+		err = init_lower_nd(&lower_nd, LOOKUP_OPEN);
+		if (unlikely(err < 0)) {
+			mutex_unlock(&lower_inode->i_mutex);
+			goto out;
+		}
 		wh_lower_dentry =
-			lookup_one_len(UNIONFS_DIR_OPAQUE, lower_dentry,
-				       sizeof(UNIONFS_DIR_OPAQUE) - 1);
+			lookup_one_len_nd(UNIONFS_DIR_OPAQUE, lower_dentry,
+					  sizeof(UNIONFS_DIR_OPAQUE) - 1,
+					  &lower_nd);
+		release_lower_nd(&lower_nd, err);
 	} else {
 		args.is_opaque.dentry = lower_dentry;
 		run_sioq(__is_opaque_dir, &args);
@@ -520,9 +525,17 @@ out:
 void __is_opaque_dir(struct work_struct *work)
 {
 	struct sioq_args *args = container_of(work, struct sioq_args, work);
+	struct nameidata lower_nd;
+	int err;
 
-	args->ret = lookup_one_len(UNIONFS_DIR_OPAQUE, args->is_opaque.dentry,
-				   sizeof(UNIONFS_DIR_OPAQUE) - 1);
+	err = init_lower_nd(&lower_nd, LOOKUP_OPEN);
+	if (unlikely(err < 0))
+		return;
+	args->ret = lookup_one_len_nd(UNIONFS_DIR_OPAQUE,
+				      args->is_opaque.dentry,
+				      sizeof(UNIONFS_DIR_OPAQUE) - 1,
+				      &lower_nd);
+	release_lower_nd(&lower_nd, err);
 	complete(&args->comp);
 }
 
@@ -558,8 +571,12 @@ int make_dir_opaque(struct dentry *dentry, int bindex)
 	       !S_ISDIR(lower_dir->i_mode));
 
 	mutex_lock(&lower_dir->i_mutex);
-	diropq = lookup_one_len(UNIONFS_DIR_OPAQUE, lower_dentry,
-				sizeof(UNIONFS_DIR_OPAQUE) - 1);
+	err = init_lower_nd(&nd, LOOKUP_OPEN);
+	if (unlikely(err < 0))
+		goto out;
+	diropq = lookup_one_len_nd(UNIONFS_DIR_OPAQUE, lower_dentry,
+				   sizeof(UNIONFS_DIR_OPAQUE) - 1, &nd);
+	release_lower_nd(&nd, err);
 	if (IS_ERR(diropq)) {
 		err = PTR_ERR(diropq);
 		goto out;
