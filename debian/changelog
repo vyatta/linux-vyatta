@@ -1,8 +1,172 @@
-linux-2.6 (2.6.38-1+vyatta+1) UNRELEASED; urgency=low
+linux-2.6 (2.6.38-1+vyatta+1) unstable; urgency=low
 
+  [ Stephen Hemminger ]
   * Merge of 2.6.38.4
+  * Set config option to use ext4 for ext2/ext3 filesystems
+  * Make Ext4 default on i386
 
- -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 22 Apr 2011 10:30:10 -0700
+  [ Felix Fietkau ]
+  * ath9k_hw: fix stopping rx DMA during resets
+
+  [ amit salecha ]
+  * netxen: limit skb frags for non tso packet
+
+  [ Christian Lamparter ]
+  * ath: add missing regdomain pair 0x5c mapping
+
+  [ Liu Yuan ]
+  * block, blk-sysfs: Fix an err return path in blk_register_queue()
+
+  [ Jason Conti ]
+  * p54: Initialize extra_len in p54_tx_80211
+
+  [ Amit Kumar Salecha ]
+  * qlcnic: limit skb frags for non tso packet
+
+  [ J. Bruce Fields ]
+  * nfsd4: fix struct file leak on delegation
+
+  [ OGAWA Hirofumi ]
+  * nfsd4: Fix filp leak
+
+  [ Amit Shah ]
+  * virtio: Decrement avail idx on buffer detach
+
+  [ Joerg Roedel ]
+  * x86, gart: Set DISTLBWALKPRB bit always
+  * x86, gart: Make sure GART does not map physmem above 1TB
+
+  [ Jan Kiszka ]
+  * intel-iommu: Fix use after release during device attach
+
+  [ Alex Williamson ]
+  * intel-iommu: Unlink domain from iommu
+  * intel-iommu: Fix get_domain_for_dev() error path
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: pll tweaks for r7xx
+
+  [ Marcin Slusarz ]
+  * drm/nouveau: fix notifier memory corruption bug
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: fix bad shift in atom iio table parser
+
+  [ Chris Wilson ]
+  * drm/i915: Sanitize the output registers after resume
+
+  [ Mathew McKernan ]
+  * drm/i915/tv: Remember the detected TV type
+
+  [ Mikhail Kshevetskiy ]
+  * tty/n_gsm: fix bug in CRC calculation for gsm1 mode
+
+  [ Uwe Kleine-König ]
+  * serial/imx: read cts state only after acking cts change irq
+
+  [ Mark Brown ]
+  * ASoC: Fix output PGA enabling in wm_hubs CODECs
+
+  [ Lars-Peter Clausen ]
+  * ASoC: codecs: JZ4740: Fix OOPS
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Add a fix-up for Acer dmic with ALC271x codec
+
+  [ Maxime Bizon ]
+  * ahci: don't enable port irq before handler is registered
+
+  [ Tejun Heo ]
+  * libata: Implement ATA_FLAG_NO_DIPM and apply it to mcp65
+
+  [ Ben Hutchings ]
+  * kconfig: Avoid buffer underrun in choice input
+
+  [ Artem Bityutskiy ]
+  * UBIFS: fix master node recovery
+
+  [ Ike Panhc ]
+  * ideapad: read brightness setting on brightness key notify
+
+  [ Kyle McMartin ]
+  * ACPI battery: fribble sysfs files from a resume notifier
+
+  [ Felix Fietkau ]
+  * ath9k_hw: partially revert "fix dma descriptor rx error bit parsing"
+
+  [ Artem Bityutskiy ]
+  * UBIFS: fix false space checking failure
+
+  [ Carsten Otte ]
+  * kvm-390: Let kernel exit SIE instruction on work
+
+  [ Heiko Carstens ]
+  * pfault: fix token handling
+
+  [ Rafael J. Wysocki ]
+  * ACPI / PM: Avoid infinite recurrence while registering power
+    resources
+
+  [ James Bottomley ]
+  * slub: fix panic with DISCONTIGMEM
+
+  [ David Rientjes ]
+  * set memory ranges in N_NORMAL_MEMORY when onlined
+
+  [ Patrick Boettcher ]
+  * FLEXCOP-PCI: fix __xlate_proc_name-warning for flexcop-pci
+
+  [ Amit Shah ]
+  * virtio: console: Enable call to hvc_remove() on console port remove
+
+  [ KOSAKI Motohiro ]
+  * oom: use pte pages in OOM score
+
+  [ Mel Gorman ]
+  * mm: check if PTE is already allocated during page fault
+
+  [ Andrea Arcangeli ]
+  * mm: thp: fix /dev/zero MAP_PRIVATE and vm_flags cleanups
+
+  [ Michael Schmitz ]
+  * m68k/mm: Set all online nodes in N_NORMAL_MEMORY
+
+  [ Andrew Morton ]
+  * vfs: avoid large kmalloc()s for the fdtable
+
+  [ Jeff Layton ]
+  * nfs: don't lose MS_SYNCHRONOUS on remount of noac mount
+
+  [ Trond Myklebust ]
+  * NFSv4.1: Ensure state manager thread dies on last umount
+
+  [ Richard Weinberger ]
+  * um: mdd support for 64 bit atomic operations
+
+  [ Dave Airlie ]
+  * drm: select FRAMEBUFFER_CONSOLE_PRIMARY if we have
+    FRAMEBUFFER_CONSOLE
+
+  [ Vasiliy Kulikov ]
+  * agp: fix arbitrary kernel memory writes
+  * agp: fix OOM and buffer overflow
+
+  [ Stanislaw Gruszka ]
+  * iwlwifi: do not set tx power when channel is changing
+  * iwl3945: do not deprecate software scan
+  * iwl3945: disable hw scan by default
+  * iwlegacy: fix tx_power initialization
+
+  [ Igor Mammedov ]
+  * Input: xen-kbdfront - fix mouse getting stuck after save/restore
+
+  [ Greg Kroah-Hartman ]
+  * Linux 2.6.38.5
+
+  [ Stephen Hemminger ]
+  * Update to unionfs 2.5.9 version
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 03 May 2011 10:47:25 -0700
 
 linux-2.6 (2.6.37-1+vyatta+11) UNRELEASED; urgency=low
 
