@@ -1,3 +1,27 @@
+linux-2.6 (2.6.37-1+vyatta+13) unstable; urgency=low
+
+  [ Erez Zadok ]
+  * Unionfs: copyright update for 2011
+  * Unionfs: find lower inode of unlinked opened files in setattr
+  * Unionfs: remove whiteout of opened but unlinked file from readonly
+    branch
+  * Unionfs: remove whiteout if regular file also exists
+  * Unionfs: revalidate files which are open but unlinked
+  * Unionfs: force only one open lower file after copyup in open(2)
+
+  [ Stephen Hemminger ]
+  * Update version of unionfs to 2.5.9.1
+
+  [ Patrick McHardy ]
+  * netfilter: nf_ct_sip: validate Content-Length in TCP SIP messages
+  * netfilter: nf_ct_sip: fix SDP parsing in TCP SIP messages for some
+    Cisco phones
+
+  [ Stephen Hemminger ]
+  * Revert "Unionfs: revalidate files which are open but unlinked"
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 24 May 2011 14:29:44 -0700
+
 linux-2.6 (2.6.37-1+vyatta+12) unstable; urgency=low
 
   [ Thomas Jarosch ]
