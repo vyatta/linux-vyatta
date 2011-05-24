@@ -1,3 +1,28 @@
+linux-2.6 (2.6.37-1+vyatta+12) unstable; urgency=low
+
+  [ Thomas Jarosch ]
+  * vmxnet3: Fix inconsistent LRO state after initialization
+
+  [ stephen hemminger ]
+  * bridge: fix RCU races with bridge port
+
+  [ Eric Dumazet ]
+  * bridge: add RCU annotations to bridge port lookup
+
+  [ stephen hemminger ]
+  * bridge: control carrier based on ports online
+  * bridge: skip forwarding delay if not using STP
+
+  [ Stephen Hemminger ]
+  * bridge: add notification over netlink when STP changes state
+
+  [ stephen hemminger ]
+  * bridge: notify applications if address of bridge device changes
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 17 May 2011 11:03:00 -0700
+
 linux-2.6 (2.6.37-1+vyatta+11) unstable; urgency=low
 
   [ Erez Zadok ]

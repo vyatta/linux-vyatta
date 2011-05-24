@@ -86,6 +86,7 @@ void br_stp_enable_port(struct net_bridge_port *p)
 	br_init_port(p);
 	br_port_state_selection(p->br);
 	br_log_state(p);
+	br_ifinfo_notify(RTM_NEWLINK, p);
 }
 
 /* called under bridge lock */
@@ -101,6 +102,8 @@ void br_stp_disable_port(struct net_bridge_port *p)
 	p->state = BR_STATE_DISABLED;
 	p->topology_change_ack = 0;
 	p->config_pending = 0;
+
+	br_ifinfo_notify(RTM_NEWLINK, p);
 
 	del_timer(&p->message_age_timer);
 	del_timer(&p->forward_delay_timer);
@@ -204,7 +207,7 @@ void br_stp_change_bridge_id(struct net_bridge *br, const unsigned char *addr)
 static const unsigned short br_mac_zero_aligned[ETH_ALEN >> 1];
 
 /* called under bridge lock */
-void br_stp_recalculate_bridge_id(struct net_bridge *br)
+bool br_stp_recalculate_bridge_id(struct net_bridge *br)
 {
 	const unsigned char *br_mac_zero =
 			(const unsigned char *)br_mac_zero_aligned;
@@ -222,8 +225,11 @@ void br_stp_recalculate_bridge_id(struct net_bridge *br)
 
 	}
 
-	if (compare_ether_addr(br->bridge_id.addr, addr))
-		br_stp_change_bridge_id(br, addr);
+	if (compare_ether_addr(br->bridge_id.addr, addr) == 0)
+		return false;	/* no change */
+
+	br_stp_change_bridge_id(br, addr);
+	return true;
 }
 
 /* called under bridge lock */
