@@ -312,7 +312,7 @@ static int __unionfs_file_revalidate(struct file *file, struct dentry *dentry,
 	 * someone has copied up this file from underneath us, we also need
 	 * to refresh things.
 	 */
-	if ((d_deleted(dentry) && dbstart(dentry) >= fbstart(file)) ||
+	if (d_deleted(dentry) ||
 	    (sbgen <= fgen &&
 	     dbstart(dentry) == fbstart(file) &&
 	     unionfs_lower_file(file)))
