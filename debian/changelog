@@ -1,3 +1,31 @@
+linux-2.6 (2.6.37-1+vyatta+16) unstable; urgency=low
+
+  * Enable XFRM_STATISTICS kernel config option in all builds.
+
+ -- Bob Gilligan <gilligan@vyatta.com>  Wed, 13 Jul 2011 14:03:23 -0700
+
+linux-2.6 (2.6.37-1+vyatta+15) unstable; urgency=low
+
+  [ Hiroaki SHIMODA ]
+  * xfrm: avoid possible oopse in xfrm_alloc_dst
+
+  [ Bob Gilligan ]
+
+ -- Bob Gilligan <gilligan@vyatta.com>  Wed, 13 Jul 2011 12:23:41 -0700
+
+linux-2.6 (2.6.37-1+vyatta+14) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * bonding: allow vlan on empty bond device
+  * ipv6: generate link local address for GRE tunnel
+
+  [ Dan Siemon ]
+  * net_sched: fix ip_tos2prio
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Wed, 08 Jun 2011 15:41:12 -0700
+
 linux-2.6 (2.6.37-1+vyatta+13) unstable; urgency=low
 
   [ Erez Zadok ]
