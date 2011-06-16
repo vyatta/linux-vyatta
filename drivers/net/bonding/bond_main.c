@@ -4698,19 +4698,12 @@ static void bond_setup(struct net_device *bond_dev)
 	if (bond->params.arp_interval)
 		bond_dev->priv_flags |= IFF_MASTER_ARPMON;
 
-#if 0
-	/* VYATTA: removed because there are very few devices that
-	 * are VLAN challenged and it resolves ordering issues on
-	 * boot when vif is configured on empty bond-group
-	 */
-
 	/* At first, we block adding VLANs. That's the only way to
 	 * prevent problems that occur when adding VLANs over an
 	 * empty bond. The block will be removed once non-challenged
 	 * slaves are enslaved.
 	 */
 	bond_dev->features |= NETIF_F_VLAN_CHALLENGED;
-#endif
 
 	/* don't acquire bond device's netif_tx_lock when
 	 * transmitting */
