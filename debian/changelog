@@ -1,3 +1,25 @@
+linux-2.6 (2.6.37-1+vyatta+16+napa1) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Revert "bonding: allow vlan on empty bond device"
+
+  [ Greg Rose ]
+  * Remove extra struct page member from the buffer info structure
+
+  [ Herbert Xu ]
+  * bd4265fe36 bridge: Only flood unreg groups... breaks DHCP setup
+
+  [ Stephen Hemminger ]
+  * Revert "bd4265fe36 bridge: Only flood unreg groups... breaks DHCP
+    setup"
+
+  [ Bjørn Mork ]
+  * Disable router anycast address for /127 prefixes
+
+  [ Deepti Kulkarni ]
+
+ -- Deepti Kulkarni <deepti@vyatta.com>  Thu, 07 Jul 2011 20:44:56 -0700
+
 linux-2.6 (2.6.37-1+vyatta+16) unstable; urgency=low
 
   * Enable XFRM_STATISTICS kernel config option in all builds.
