@@ -1,3 +1,12 @@
+linux-2.6 (2.6.37-1+vyatta+15) unstable; urgency=low
+
+  [ Hiroaki SHIMODA ]
+  * xfrm: avoid possible oopse in xfrm_alloc_dst
+
+  [ Bob Gilligan ]
+
+ -- Bob Gilligan <gilligan@vyatta.com>  Wed, 13 Jul 2011 12:23:41 -0700
+
 linux-2.6 (2.6.37-1+vyatta+14) unstable; urgency=low
 
   [ Stephen Hemminger ]
