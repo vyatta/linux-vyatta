@@ -1,3 +1,9 @@
+linux-3.0 (3.0.0-1+vyatta+1) unstable; urgency=low
+
+  * Merge 3.0 Linux from upstream
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Fri, 29 Jul 2011 08:38:00 -0700
+
 linux-2.6 (2.6.37-1+vyatta+18) unstable; urgency=low
 
   [ Deepti Kulkarni ]
