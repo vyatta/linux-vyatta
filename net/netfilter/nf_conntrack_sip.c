@@ -707,7 +707,7 @@ static const char *ct_sdp_header_search(const char *dptr, const char *limit,
 }
 
 /* Locate a SDP header (optionally a substring within the header value),
- * optionally stopping at the first occurence of the term header, parse
+ * optionally stopping at the first occurrence of the term header, parse
  * it and return the offset and length of the data we're interested in.
  */
 int ct_sip_get_sdp_header(const struct nf_conn *ct, const char *dptr,
@@ -1440,7 +1440,7 @@ static int sip_help_tcp(struct sk_buff *skb, unsigned int protoff,
 	typeof(nf_nat_sip_seq_adjust_hook) nf_nat_sip_seq_adjust;
 
 	if (ctinfo != IP_CT_ESTABLISHED &&
-	    ctinfo != IP_CT_ESTABLISHED + IP_CT_IS_REPLY)
+	    ctinfo != IP_CT_ESTABLISHED_REPLY)
 		return NF_ACCEPT;
 
 	/* No Data ? */

@@ -436,16 +436,8 @@ do {								\
 #endif /* CONFIG_LOCKDEP */
 
 #ifdef CONFIG_TRACE_IRQFLAGS
-extern void early_boot_irqs_off(void);
-extern void early_boot_irqs_on(void);
 extern void print_irqtrace_events(struct task_struct *curr);
 #else
-static inline void early_boot_irqs_off(void)
-{
-}
-static inline void early_boot_irqs_on(void)
-{
-}
 static inline void print_irqtrace_events(struct task_struct *curr)
 {
 }
@@ -495,12 +487,15 @@ static inline void print_irqtrace_events(struct task_struct *curr)
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 # ifdef CONFIG_PROVE_LOCKING
 #  define mutex_acquire(l, s, t, i)		lock_acquire(l, s, t, 0, 2, NULL, i)
+#  define mutex_acquire_nest(l, s, t, n, i)	lock_acquire(l, s, t, 0, 2, n, i)
 # else
 #  define mutex_acquire(l, s, t, i)		lock_acquire(l, s, t, 0, 1, NULL, i)
+#  define mutex_acquire_nest(l, s, t, n, i)	lock_acquire(l, s, t, 0, 1, n, i)
 # endif
 # define mutex_release(l, n, i)			lock_release(l, n, i)
 #else
 # define mutex_acquire(l, s, t, i)		do { } while (0)
+# define mutex_acquire_nest(l, s, t, n, i)	do { } while (0)
 # define mutex_release(l, n, i)			do { } while (0)
 #endif
 

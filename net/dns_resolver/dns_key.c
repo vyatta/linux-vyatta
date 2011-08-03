@@ -212,10 +212,25 @@ static void dns_resolver_describe(const struct key *key, struct seq_file *m)
 	int err = key->type_data.x[0];
 
 	seq_puts(m, key->description);
-	if (err)
-		seq_printf(m, ": %d", err);
-	else
-		seq_printf(m, ": %u", key->datalen);
+	if (key_is_instantiated(key)) {
+		if (err)
+			seq_printf(m, ": %d", err);
+		else
+			seq_printf(m, ": %u", key->datalen);
+	}
+}
+
+/*
+ * read the DNS data
+ * - the key's semaphore is read-locked
+ */
+static long dns_resolver_read(const struct key *key,
+			      char __user *buffer, size_t buflen)
+{
+	if (key->type_data.x[0])
+		return key->type_data.x[0];
+
+	return user_read(key, buffer, buflen);
 }
 
 /*

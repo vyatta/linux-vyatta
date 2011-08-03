@@ -215,14 +215,14 @@ void unionfs_reinterpose(struct dentry *dentry)
  * 2) it exists
  * 3) is a directory
  */
-int check_branch(struct nameidata *nd)
+int check_branch(const struct path *path)
 {
 	/* XXX: remove in ODF code -- stacking unions allowed there */
-	if (!strcmp(nd->path.dentry->d_sb->s_type->name, UNIONFS_NAME))
+	if (!strcmp(path->dentry->d_sb->s_type->name, UNIONFS_NAME))
 		return -EINVAL;
-	if (!nd->path.dentry->d_inode)
+	if (!path->dentry->d_inode)
 		return -ENOENT;
-	if (!S_ISDIR(nd->path.dentry->d_inode->i_mode))
+	if (!S_ISDIR(path->dentry->d_inode->i_mode))
 		return -ENOTDIR;
 	return 0;
 }
@@ -274,7 +274,7 @@ int parse_branch_mode(const char *name, int *perms)
 static int parse_dirs_option(struct super_block *sb, struct unionfs_dentry_info
 			     *lower_root_info, char *options)
 {
-	struct nameidata nd;
+	struct path path;
 	char *name;
 	int err = 0;
 	int branches = 1;
@@ -350,7 +350,7 @@ static int parse_dirs_option(struct super_block *sb, struct unionfs_dentry_info
 			goto out;
 		}
 
-		err = path_lookup(name, LOOKUP_FOLLOW, &nd);
+		err = kern_path(name, LOOKUP_FOLLOW, &path);
 		if (err) {
 			printk(KERN_ERR "unionfs: error accessing "
 			       "lower directory '%s' (error %d)\n",
@@ -358,16 +358,16 @@ static int parse_dirs_option(struct super_block *sb, struct unionfs_dentry_info
 			goto out;
 		}
 
-		err = check_branch(&nd);
+		err = check_branch(&path);
 		if (err) {
 			printk(KERN_ERR "unionfs: lower directory "
 			       "'%s' is not a valid branch\n", name);
-			path_put(&nd.path);
+			path_put(&path);
 			goto out;
 		}
 
-		lower_root_info->lower_paths[bindex].dentry = nd.path.dentry;
-		lower_root_info->lower_paths[bindex].mnt = nd.path.mnt;
+		lower_root_info->lower_paths[bindex].dentry = path.dentry;
+		lower_root_info->lower_paths[bindex].mnt = path.mnt;
 
 		set_branchperms(sb, bindex, perms);
 		set_branch_count(sb, bindex, 0);
@@ -693,22 +693,23 @@ out:
 	return err;
 }
 
-static int unionfs_get_sb(struct file_system_type *fs_type,
-			  int flags, const char *dev_name,
-			  void *raw_data, struct vfsmount *mnt)
+static struct dentry *unionfs_mount(struct file_system_type *fs_type,
+				    int flags, const char *dev_name,
+				    void *raw_data)
 {
-	int err;
-	err = get_sb_nodev(fs_type, flags, raw_data, unionfs_read_super, mnt);
-	if (!err)
-		UNIONFS_SB(mnt->mnt_sb)->dev_name =
+	struct dentry *dentry;
+
+	dentry = mount_nodev(fs_type, flags, raw_data, unionfs_read_super);
+	if (!PTR_ERR(dentry))
+		UNIONFS_SB(dentry->d_sb)->dev_name =
 			kstrdup(dev_name, GFP_KERNEL);
-	return err;
+	return dentry;
 }
 
 static struct file_system_type unionfs_fs_type = {
 	.owner		= THIS_MODULE,
 	.name		= UNIONFS_NAME,
-	.get_sb		= unionfs_get_sb,
+	.mount		= unionfs_mount,
 	.kill_sb	= generic_shutdown_super,
 	.fs_flags	= FS_REVAL_DOT,
 };

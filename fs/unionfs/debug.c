@@ -442,6 +442,22 @@ void __unionfs_check_nd(const struct nameidata *nd,
 	}
 }
 
+static unsigned int __mnt_get_count(struct vfsmount *mnt)
+{
+#ifdef CONFIG_SMP
+	unsigned int count = 0;
+	int cpu;
+
+	for_each_possible_cpu(cpu) {
+		count += per_cpu_ptr(mnt->mnt_pcp, cpu)->mnt_count;
+	}
+
+	return count;
+#else
+	return mnt->mnt_count;
+#endif
+}
+
 /* useful to track vfsmount leaks that could cause EBUSY on unmount */
 void __show_branch_counts(const struct super_block *sb,
 			  const char *file, const char *fxn, int line)
@@ -456,7 +472,7 @@ void __show_branch_counts(const struct super_block *sb,
 		else
 			mnt = NULL;
 		printk(KERN_CONT "%d:",
-		       (mnt ? atomic_read(&mnt->mnt_count) : -99));
+		       (mnt ? __mnt_get_count(mnt) : -99));
 	}
 	printk(KERN_CONT "%s:%s:%d\n", file, fxn, line);
 }

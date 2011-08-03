@@ -382,10 +382,9 @@ static void mx1_camera_init_videobuf(struct videobuf_queue *q,
 	struct mx1_camera_dev *pcdev = ici->priv;
 
 	videobuf_queue_dma_contig_init(q, &mx1_videobuf_ops, icd->dev.parent,
-					&pcdev->lock,
-					V4L2_BUF_TYPE_VIDEO_CAPTURE,
-					V4L2_FIELD_NONE,
-					sizeof(struct mx1_buffer), icd, NULL);
+				&pcdev->lock, V4L2_BUF_TYPE_VIDEO_CAPTURE,
+				V4L2_FIELD_NONE,
+				sizeof(struct mx1_buffer), icd, &icd->video_lock);
 }
 
 static int mclk_get_divisor(struct mx1_camera_dev *pcdev)
@@ -445,12 +444,9 @@ static int mx1_camera_add_device(struct soc_camera_device *icd)
 {
 	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
 	struct mx1_camera_dev *pcdev = ici->priv;
-	int ret;
 
-	if (pcdev->icd) {
-		ret = -EBUSY;
-		goto ebusy;
-	}
+	if (pcdev->icd)
+		return -EBUSY;
 
 	dev_info(icd->dev.parent, "MX1 Camera driver attached to camera %d\n",
 		 icd->devnum);
@@ -459,8 +455,7 @@ static int mx1_camera_add_device(struct soc_camera_device *icd)
 
 	pcdev->icd = icd;
 
-ebusy:
-	return ret;
+	return 0;
 }
 
 static void mx1_camera_remove_device(struct soc_camera_device *icd)

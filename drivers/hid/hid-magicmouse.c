@@ -12,6 +12,8 @@
  * any later version.
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/device.h>
 #include <linux/hid.h>
 #include <linux/module.h>
@@ -74,7 +76,7 @@ MODULE_PARM_DESC(report_undeciphered, "Report undeciphered multi-touch state fie
  * This is true when single_touch_id is equal to NO_TOUCHES. If multiple touches
  * are down and the touch providing for single touch emulation is lifted,
  * single_touch_id is equal to SINGLE_TOUCH_UP. While single touch emulation is
- * occuring, single_touch_id corresponds with the tracking id of the touch used.
+ * occurring, single_touch_id corresponds with the tracking id of the touch used.
  */
 #define NO_TOUCHES -1
 #define SINGLE_TOUCH_UP -2
@@ -416,6 +418,8 @@ static void magicmouse_setup_input(struct input_dev *input, struct hid_device *h
 			input_set_abs_params(input, ABS_MT_POSITION_Y, -2456,
 				2565, 4, 0);
 		}
+
+		input_set_events_per_packet(input, 60);
 	}
 
 	if (report_undeciphered) {
@@ -451,7 +455,7 @@ static int magicmouse_probe(struct hid_device *hdev,
 
 	msc = kzalloc(sizeof(*msc), GFP_KERNEL);
 	if (msc == NULL) {
-		dev_err(&hdev->dev, "can't alloc magicmouse descriptor\n");
+		hid_err(hdev, "can't alloc magicmouse descriptor\n");
 		return -ENOMEM;
 	}
 
@@ -464,13 +468,13 @@ static int magicmouse_probe(struct hid_device *hdev,
 
 	ret = hid_parse(hdev);
 	if (ret) {
-		dev_err(&hdev->dev, "magicmouse hid parse failed\n");
+		hid_err(hdev, "magicmouse hid parse failed\n");
 		goto err_free;
 	}
 
 	ret = hid_hw_start(hdev, HID_CONNECT_DEFAULT);
 	if (ret) {
-		dev_err(&hdev->dev, "magicmouse hw start failed\n");
+		hid_err(hdev, "magicmouse hw start failed\n");
 		goto err_free;
 	}
 
@@ -491,7 +495,7 @@ static int magicmouse_probe(struct hid_device *hdev,
 	}
 
 	if (!report) {
-		dev_err(&hdev->dev, "unable to register touch report\n");
+		hid_err(hdev, "unable to register touch report\n");
 		ret = -ENOMEM;
 		goto err_stop_hw;
 	}
@@ -500,8 +504,7 @@ static int magicmouse_probe(struct hid_device *hdev,
 	ret = hdev->hid_output_raw_report(hdev, feature, sizeof(feature),
 			HID_FEATURE_REPORT);
 	if (ret != sizeof(feature)) {
-		dev_err(&hdev->dev, "unable to request touch data (%d)\n",
-				ret);
+		hid_err(hdev, "unable to request touch data (%d)\n", ret);
 		goto err_stop_hw;
 	}
 
@@ -545,7 +548,7 @@ static int __init magicmouse_init(void)
 
 	ret = hid_register_driver(&magicmouse_driver);
 	if (ret)
-		printk(KERN_ERR "can't register magicmouse driver\n");
+		pr_err("can't register magicmouse driver\n");
 
 	return ret;
 }

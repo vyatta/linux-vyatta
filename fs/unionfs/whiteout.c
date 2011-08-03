@@ -481,6 +481,7 @@ int is_opaque_dir(struct dentry *dentry, int bindex)
 	struct dentry *wh_lower_dentry;
 	struct inode *lower_inode;
 	struct sioq_args args;
+	struct nameidata lower_nd;
 
 	lower_dentry = unionfs_lower_dentry_idx(dentry, bindex);
 	lower_inode = lower_dentry->d_inode;
@@ -490,9 +491,16 @@ int is_opaque_dir(struct dentry *dentry, int bindex)
 	mutex_lock(&lower_inode->i_mutex);
 
 	if (!inode_permission(lower_inode, MAY_EXEC)) {
+		err = init_lower_nd(&lower_nd, LOOKUP_OPEN);
+		if (unlikely(err < 0)) {
+			mutex_unlock(&lower_inode->i_mutex);
+			goto out;
+		}
 		wh_lower_dentry =
-			lookup_one_len(UNIONFS_DIR_OPAQUE, lower_dentry,
-				       sizeof(UNIONFS_DIR_OPAQUE) - 1);
+			lookup_one_len_nd(UNIONFS_DIR_OPAQUE, lower_dentry,
+					  sizeof(UNIONFS_DIR_OPAQUE) - 1,
+					  &lower_nd);
+		release_lower_nd(&lower_nd, err);
 	} else {
 		args.is_opaque.dentry = lower_dentry;
 		run_sioq(__is_opaque_dir, &args);
@@ -517,9 +525,17 @@ out:
 void __is_opaque_dir(struct work_struct *work)
 {
 	struct sioq_args *args = container_of(work, struct sioq_args, work);
+	struct nameidata lower_nd;
+	int err;
 
-	args->ret = lookup_one_len(UNIONFS_DIR_OPAQUE, args->is_opaque.dentry,
-				   sizeof(UNIONFS_DIR_OPAQUE) - 1);
+	err = init_lower_nd(&lower_nd, LOOKUP_OPEN);
+	if (unlikely(err < 0))
+		return;
+	args->ret = lookup_one_len_nd(UNIONFS_DIR_OPAQUE,
+				      args->is_opaque.dentry,
+				      sizeof(UNIONFS_DIR_OPAQUE) - 1,
+				      &lower_nd);
+	release_lower_nd(&lower_nd, err);
 	complete(&args->comp);
 }
 
@@ -555,8 +571,12 @@ int make_dir_opaque(struct dentry *dentry, int bindex)
 	       !S_ISDIR(lower_dir->i_mode));
 
 	mutex_lock(&lower_dir->i_mutex);
-	diropq = lookup_one_len(UNIONFS_DIR_OPAQUE, lower_dentry,
-				sizeof(UNIONFS_DIR_OPAQUE) - 1);
+	err = init_lower_nd(&nd, LOOKUP_OPEN);
+	if (unlikely(err < 0))
+		goto out;
+	diropq = lookup_one_len_nd(UNIONFS_DIR_OPAQUE, lower_dentry,
+				   sizeof(UNIONFS_DIR_OPAQUE) - 1, &nd);
+	release_lower_nd(&nd, err);
 	if (IS_ERR(diropq)) {
 		err = PTR_ERR(diropq);
 		goto out;

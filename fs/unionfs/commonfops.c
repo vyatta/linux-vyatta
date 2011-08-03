@@ -651,7 +651,7 @@ int unionfs_file_release(struct inode *inode, struct file *file)
 	struct dentry *dentry = file->f_path.dentry;
 	struct dentry *parent;
 	int bindex, bstart, bend;
-	int fgen, err = 0;
+	int err = 0;
 
 	/*
 	 * Since mm/memory.c:might_fault() (under PROVE_LOCKING) was
@@ -687,7 +687,6 @@ int unionfs_file_release(struct inode *inode, struct file *file)
 	inodeinfo = UNIONFS_I(inode);
 
 	/* fput all the lower files */
-	fgen = atomic_read(&fileinfo->generation);
 	bstart = fbstart(file);
 	bend = fbend(file);
 

@@ -183,7 +183,7 @@ static noinline_for_stack int do_remount_mode_option(
 	int err = -EINVAL;
 	int perms, idx;
 	char *modename = strchr(optarg, '=');
-	struct nameidata nd;
+	struct path path;
 
 	/* by now, optarg contains the branch name */
 	if (!*optarg) {
@@ -210,7 +210,7 @@ static noinline_for_stack int do_remount_mode_option(
 	 * and cache-coherency resolved, we'll address the branch-path
 	 * uniqueness.
 	 */
-	err = path_lookup(optarg, LOOKUP_FOLLOW, &nd);
+	err = kern_path(optarg, LOOKUP_FOLLOW, &path);
 	if (err) {
 		printk(KERN_ERR "unionfs: error accessing "
 		       "lower directory \"%s\" (error %d)\n",
@@ -218,10 +218,10 @@ static noinline_for_stack int do_remount_mode_option(
 		goto out;
 	}
 	for (idx = 0; idx < cur_branches; idx++)
-		if (nd.path.mnt == new_lower_paths[idx].mnt &&
-		    nd.path.dentry == new_lower_paths[idx].dentry)
+		if (path.mnt == new_lower_paths[idx].mnt &&
+		    path.dentry == new_lower_paths[idx].dentry)
 			break;
-	path_put(&nd.path);	/* no longer needed */
+	path_put(&path);	/* no longer needed */
 	if (idx == cur_branches) {
 		err = -ENOENT;	/* err may have been reset above */
 		printk(KERN_ERR "unionfs: branch \"%s\" "
@@ -244,7 +244,7 @@ static noinline_for_stack int do_remount_del_option(
 {
 	int err = -EINVAL;
 	int idx;
-	struct nameidata nd;
+	struct path path;
 
 	/* optarg contains the branch name to delete */
 
@@ -254,7 +254,7 @@ static noinline_for_stack int do_remount_del_option(
 	 * and cache-coherency resolved, we'll address the branch-path
 	 * uniqueness.
 	 */
-	err = path_lookup(optarg, LOOKUP_FOLLOW, &nd);
+	err = kern_path(optarg, LOOKUP_FOLLOW, &path);
 	if (err) {
 		printk(KERN_ERR "unionfs: error accessing "
 		       "lower directory \"%s\" (error %d)\n",
@@ -262,10 +262,10 @@ static noinline_for_stack int do_remount_del_option(
 		goto out;
 	}
 	for (idx = 0; idx < cur_branches; idx++)
-		if (nd.path.mnt == new_lower_paths[idx].mnt &&
-		    nd.path.dentry == new_lower_paths[idx].dentry)
+		if (path.mnt == new_lower_paths[idx].mnt &&
+		    path.dentry == new_lower_paths[idx].dentry)
 			break;
-	path_put(&nd.path);	/* no longer needed */
+	path_put(&path);	/* no longer needed */
 	if (idx == cur_branches) {
 		printk(KERN_ERR "unionfs: branch \"%s\" "
 		       "not found\n", optarg);
@@ -311,7 +311,7 @@ static noinline_for_stack int do_remount_add_option(
 	int perms;
 	int idx = 0;		/* default: insert at beginning */
 	char *new_branch , *modename = NULL;
-	struct nameidata nd;
+	struct path path;
 
 	/*
 	 * optarg can be of several forms:
@@ -339,7 +339,7 @@ static noinline_for_stack int do_remount_add_option(
 	 * and cache-coherency resolved, we'll address the branch-path
 	 * uniqueness.
 	 */
-	err = path_lookup(optarg, LOOKUP_FOLLOW, &nd);
+	err = kern_path(optarg, LOOKUP_FOLLOW, &path);
 	if (err) {
 		printk(KERN_ERR "unionfs: error accessing "
 		       "lower directory \"%s\" (error %d)\n",
@@ -347,10 +347,10 @@ static noinline_for_stack int do_remount_add_option(
 		goto out;
 	}
 	for (idx = 0; idx < cur_branches; idx++)
-		if (nd.path.mnt == new_lower_paths[idx].mnt &&
-		    nd.path.dentry == new_lower_paths[idx].dentry)
+		if (path.mnt == new_lower_paths[idx].mnt &&
+		    path.dentry == new_lower_paths[idx].dentry)
 			break;
-	path_put(&nd.path);	/* no longer needed */
+	path_put(&path);	/* no longer needed */
 	if (idx == cur_branches) {
 		printk(KERN_ERR "unionfs: branch \"%s\" "
 		       "not found\n", optarg);
@@ -379,7 +379,7 @@ found_insertion_point:
 		       "branch \"%s\"\n", modename, new_branch);
 		goto out;
 	}
-	err = path_lookup(new_branch, LOOKUP_FOLLOW, &nd);
+	err = kern_path(new_branch, LOOKUP_FOLLOW, &path);
 	if (err) {
 		printk(KERN_ERR "unionfs: error accessing "
 		       "lower directory \"%s\" (error %d)\n",
@@ -393,11 +393,11 @@ found_insertion_point:
 	 * because this code base doesn't support stacking unionfs: the ODF
 	 * code base supports that correctly.
 	 */
-	err = check_branch(&nd);
+	err = check_branch(&path);
 	if (err) {
 		printk(KERN_ERR "unionfs: lower directory "
 		       "\"%s\" is not a valid branch\n", optarg);
-		path_put(&nd.path);
+		path_put(&path);
 		goto out;
 	}
 
@@ -414,10 +414,10 @@ found_insertion_point:
 		memmove(&new_lower_paths[idx+1], &new_lower_paths[idx],
 			(cur_branches - idx) * sizeof(struct path));
 	}
-	new_lower_paths[idx].dentry = nd.path.dentry;
-	new_lower_paths[idx].mnt = nd.path.mnt;
+	new_lower_paths[idx].dentry = path.dentry;
+	new_lower_paths[idx].mnt = path.mnt;
 
-	new_data[idx].sb = nd.path.dentry->d_sb;
+	new_data[idx].sb = path.dentry->d_sb;
 	atomic_set(&new_data[idx].open_files, 0);
 	new_data[idx].branchperms = perms;
 	new_data[idx].branch_id = ++*high_branch_id; /* assign new branch ID */
@@ -569,10 +569,10 @@ static int unionfs_remount_fs(struct super_block *sb, int *flags,
 		path_get(&tmp_lower_paths[i]); /* drop refs at end of fxn */
 
 	/*******************************************************************
-	 * For each branch command, do path_lookup on the requested branch,
+	 * For each branch command, do kern_path on the requested branch,
 	 * and apply the change to a temp branch list.  To handle errors, we
 	 * already dup'ed the old arrays (above), and increased the refcnts
-	 * on various f/s objects.  So now we can do all the path_lookups
+	 * on various f/s objects.  So now we can do all the kern_path'ss
 	 * and branch-management commands on the new arrays.  If it fail mid
 	 * way, we free the tmp arrays and *put all objects.  If we succeed,
 	 * then we free old arrays and *put its objects, and then replace
@@ -974,8 +974,9 @@ static int unionfs_show_options(struct seq_file *m, struct vfsmount *mnt)
 	int bindex, bstart, bend;
 	int perms;
 
+	/* to prevent a silly lockdep warning with namespace_sem */
+	lockdep_off();
 	unionfs_read_lock(sb, UNIONFS_SMUTEX_CHILD);
-
 	unionfs_lock_dentry(sb->s_root, UNIONFS_DMUTEX_CHILD);
 
 	tmp_page = (char *) __get_free_page(GFP_KERNEL);
@@ -1010,8 +1011,8 @@ out:
 	free_page((unsigned long) tmp_page);
 
 	unionfs_unlock_dentry(sb->s_root);
-
 	unionfs_read_unlock(sb);
+	lockdep_on();
 
 	return ret;
 }

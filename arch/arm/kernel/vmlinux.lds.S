@@ -64,6 +64,10 @@ SECTIONS
 		__smpalt_end = .;
 #endif
 
+		__pv_table_begin = .;
+			*(.pv_table)
+		__pv_table_end = .;
+
 		INIT_SETUP(16)
 
 		INIT_CALLS
@@ -78,7 +82,7 @@ SECTIONS
 #endif
 	}
 
-	PERCPU(PAGE_SIZE)
+	PERCPU_SECTION(32)
 
 #ifndef CONFIG_XIP_KERNEL
 	. = ALIGN(PAGE_SIZE);
@@ -109,6 +113,7 @@ SECTIONS
 			__exception_text_start = .;
 			*(.exception.text)
 			__exception_text_end = .;
+			IRQENTRY_TEXT
 			TEXT_TEXT
 			SCHED_TEXT
 			LOCK_TEXT
@@ -176,6 +181,7 @@ SECTIONS
 
 		NOSAVE_DATA
 		CACHELINE_ALIGNED_DATA(32)
+		READ_MOSTLY_DATA(32)
 
 		/*
 		 * The exception fixup table (might need resorting at runtime)
@@ -253,6 +259,8 @@ SECTIONS
 		__tcm_end = .;
 	}
 #endif
+
+	NOTES
 
 	BSS_SECTION(0, 0, 0)
 	_end = .;

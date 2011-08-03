@@ -28,6 +28,7 @@ static int unionfs_refresh_lower_dentry(struct dentry *dentry,
 	struct dentry *lower_dentry;
 	struct dentry *lower_parent;
 	int err = 0;
+	struct nameidata lower_nd;
 
 	verify_locked(dentry);
 
@@ -35,8 +36,12 @@ static int unionfs_refresh_lower_dentry(struct dentry *dentry,
 
 	BUG_ON(!S_ISDIR(lower_parent->d_inode->i_mode));
 
-	lower_dentry = lookup_one_len(dentry->d_name.name, lower_parent,
-				      dentry->d_name.len);
+	err = init_lower_nd(&lower_nd, LOOKUP_OPEN);
+	if (unlikely(err < 0))
+		goto out;
+	lower_dentry = lookup_one_len_nd(dentry->d_name.name, lower_parent,
+					 dentry->d_name.len, &lower_nd);
+	release_lower_nd(&lower_nd, err);
 	if (IS_ERR(lower_dentry)) {
 		err = PTR_ERR(lower_dentry);
 		goto out;

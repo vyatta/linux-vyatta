@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+#include <linux/io.h>
 
 #include <linux/delay.h>
 #include <linux/gpio.h>
@@ -38,7 +39,7 @@ struct jz_battery {
 	int irq;
 	int charge_irq;
 
-	struct mfd_cell *cell;
+	const struct mfd_cell *cell;
 
 	int status;
 	long voltage;
@@ -246,13 +247,18 @@ static int __devinit jz_battery_probe(struct platform_device *pdev)
 	struct jz_battery *jz_battery;
 	struct power_supply *battery;
 
+	if (!pdata) {
+		dev_err(&pdev->dev, "No platform_data supplied\n");
+		return -ENXIO;
+	}
+
 	jz_battery = kzalloc(sizeof(*jz_battery), GFP_KERNEL);
 	if (!jz_battery) {
 		dev_err(&pdev->dev, "Failed to allocate driver structure\n");
 		return -ENOMEM;
 	}
 
-	jz_battery->cell = pdev->dev.platform_data;
+	jz_battery->cell = mfd_get_cell(pdev);
 
 	jz_battery->irq = platform_get_irq(pdev, 0);
 	if (jz_battery->irq < 0) {

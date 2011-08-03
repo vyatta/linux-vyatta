@@ -162,7 +162,7 @@ struct unionfs_dir_state *alloc_rdstate(struct inode *inode, int bindex)
 
 static void free_filldir_node(struct filldir_node *node)
 {
-	if (node->namelen >= DNAME_INLINE_LEN_MIN)
+	if (node->namelen >= DNAME_INLINE_LEN)
 		kfree(node->name);
 	kmem_cache_free(unionfs_filldir_cachep, node);
 }
@@ -263,7 +263,7 @@ int add_filldir_node(struct unionfs_dir_state *rdstate, const char *name,
 	new->bindex = bindex;
 	new->whiteout = whiteout;
 
-	if (namelen < DNAME_INLINE_LEN_MIN) {
+	if (namelen < DNAME_INLINE_LEN) {
 		new->name = new->iname;
 	} else {
 		new->name = kmalloc(namelen + 1, GFP_KERNEL);
