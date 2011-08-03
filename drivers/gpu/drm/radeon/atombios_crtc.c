@@ -572,7 +572,6 @@ static u32 atombios_adjust_pll(struct drm_crtc *crtc,
 			if (radeon_encoder->devices & (ATOM_DEVICE_LCD_SUPPORT)) {
 				if (ss_enabled) {
 					if (ss->refdiv) {
-						pll->flags |= RADEON_PLL_PREFER_MINM_OVER_MAXP;
 						pll->flags |= RADEON_PLL_USE_REF_DIV;
 						pll->reference_div = ss->refdiv;
 						if (ASIC_IS_AVIVO(rdev))

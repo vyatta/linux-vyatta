@@ -412,58 +412,6 @@ static void release_lock_stateid(struct nfs4_stateid *stp)
 {
 	struct file *file;
 
-	nfs4_file_put_access(stp->st_file, oflag);
-	put_nfs4_file(stp->st_file);
-	kmem_cache_free(stateid_slab, stp);
-}
-
-static void release_lock_stateid(struct nfs4_stateid *stp)
-{
-	struct file *file;
-
-	unhash_generic_stateid(stp);
-	file = find_any_file(stp->st_file);
-	if (file)
-		locks_remove_posix(file, (fl_owner_t)stp->st_stateowner);
-	free_generic_stateid(stp);
-}
-
-static void unhash_lockowner(struct nfs4_stateowner *sop)
-{
-	struct nfs4_stateid *stp;
-
-	list_del(&sop->so_idhash);
-	list_del(&sop->so_strhash);
-	list_del(&sop->so_perstateid);
-	while (!list_empty(&sop->so_stateids)) {
-		stp = list_first_entry(&sop->so_stateids,
-				struct nfs4_stateid, st_perstateowner);
-		release_lock_stateid(stp);
-	}
-}
-
-static void release_lockowner(struct nfs4_stateowner *sop)
-{
-	unhash_lockowner(sop);
-	nfs4_put_stateowner(sop);
-}
-
-static void
-release_stateid_lockowners(struct nfs4_stateid *open_stp)
-{
-	struct nfs4_stateowner *lock_sop;
-
-	while (!list_empty(&open_stp->st_lockowners)) {
-		lock_sop = list_entry(open_stp->st_lockowners.next,
-				struct nfs4_stateowner, so_perstateid);
-		/* list_del(&open_stp->st_lockowners);  */
-		BUG_ON(lock_sop->so_is_open_owner);
-		release_lockowner(lock_sop);
-	}
-}
-
-static void release_open_stateid(struct nfs4_stateid *stp)
-{
 	unhash_generic_stateid(stp);
 	file = find_any_file(stp->st_file);
 	if (file)

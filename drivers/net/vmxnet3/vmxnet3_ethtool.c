@@ -276,9 +276,6 @@ int vmxnet3_set_features(struct net_device *netdev, u32 features)
 			adapter->shared->devRead.misc.uptFeatures &=
 			~UPT1_F_RXCSUM;
 
-		/* Update private LRO flag */
-		adapter->lro = lro_requested;
-
 		/* update harware LRO capability accordingly */
 		if (features & NETIF_F_LRO)
 			adapter->shared->devRead.misc.uptFeatures |=

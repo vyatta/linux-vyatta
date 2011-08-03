@@ -117,7 +117,6 @@ struct hd_struct {
 #endif
 	atomic_t ref;
 	struct rcu_head rcu_head;
-	struct kref ref;
 };
 
 #define GENHD_FL_REMOVABLE			1

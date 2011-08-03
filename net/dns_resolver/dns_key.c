@@ -233,19 +233,6 @@ static long dns_resolver_read(const struct key *key,
 	return user_read(key, buffer, buflen);
 }
 
-/*
- * read the DNS data
- * - the key's semaphore is read-locked
- */
-static long dns_resolver_read(const struct key *key,
-			      char __user *buffer, size_t buflen)
-{
-	if (key->type_data.x[0])
-		return key->type_data.x[0];
-
-	return user_read(key, buffer, buflen);
-}
-
 struct key_type key_type_dns_resolver = {
 	.name		= "dns_resolver",
 	.instantiate	= dns_resolver_instantiate,

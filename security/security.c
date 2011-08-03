@@ -528,7 +528,6 @@ int security_inode_exec_permission(struct inode *inode, unsigned int flags)
 		return 0;
 	return security_ops->inode_permission(inode, MAY_EXEC, flags);
 }
-EXPORT_SYMBOL(security_inode_permission);
 
 int security_inode_setattr(struct dentry *dentry, struct iattr *attr)
 {

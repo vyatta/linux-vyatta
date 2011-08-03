@@ -986,9 +986,6 @@ static void enqueue_qtds(struct usb_hcd *hcd, struct isp1760_qh *qh)
 				break;
 		}
 	}
-	if (priv->atl_queued <= 1)
-		isp1760_writel(INTERRUPT_ENABLE_MASK,
-				usb_hcd->regs + HC_INTERRUPT_ENABLE);
 }
 
 void schedule_ptds(struct usb_hcd *hcd)

@@ -492,7 +492,6 @@ static inline int d_revalidate(struct dentry *dentry, struct nameidata *nd)
 {
 	return dentry->d_op->d_revalidate(dentry, nd);
 }
-EXPORT_SYMBOL_GPL(release_open_intent);
 
 static struct dentry *
 do_revalidate(struct dentry *dentry, struct nameidata *nd)

@@ -1572,12 +1572,6 @@ static int __init eventpoll_init(void)
 	 */
 	ep_nested_calls_init(&poll_loop_ncalls);
 
-	/*
-	 * Initialize the structure used to perform epoll file descriptor
-	 * inclusion loops checks.
-	 */
-	ep_nested_calls_init(&poll_loop_ncalls);
-
 	/* Initialize the structure used to perform safe poll wait head wake ups */
 	ep_nested_calls_init(&poll_safewake_ncalls);
 

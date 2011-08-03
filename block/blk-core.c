@@ -239,7 +239,7 @@ void blk_start_queue(struct request_queue *q)
 	WARN_ON(!irqs_disabled());
 
 	queue_flag_clear(QUEUE_FLAG_STOPPED, q);
-	__blk_run_queue(q, false);
+	__blk_run_queue(q);
 }
 EXPORT_SYMBOL(blk_start_queue);
 
@@ -292,13 +292,12 @@ EXPORT_SYMBOL(blk_sync_queue);
 /**
  * __blk_run_queue - run a single device queue
  * @q:	The queue to run
- * @force_kblockd: Don't run @q->request_fn directly.  Use kblockd.
  *
  * Description:
  *    See @blk_run_queue. This variant must be called with the queue lock
  *    held and interrupts disabled.
  */
-void __blk_run_queue(struct request_queue *q, bool force_kblockd)
+void __blk_run_queue(struct request_queue *q)
 {
 	if (unlikely(blk_queue_stopped(q)))
 		return;
@@ -337,7 +336,7 @@ void blk_run_queue(struct request_queue *q)
 	unsigned long flags;
 
 	spin_lock_irqsave(q->queue_lock, flags);
-	__blk_run_queue(q, false);
+	__blk_run_queue(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 EXPORT_SYMBOL(blk_run_queue);

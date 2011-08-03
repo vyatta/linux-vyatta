@@ -2859,7 +2859,6 @@ exit_thread:
 	}
 	mutex_unlock(&eli->li_list_mtx);
 	kfree(ext4_li_info);
-	ext4_lazyinit_task = NULL;
 	ext4_li_info = NULL;
 	mutex_unlock(&ext4_li_mtx);
 
