@@ -1,3 +1,9 @@
+linux-3.0 (3.0.0-1+vyatta+2) unstable; urgency=low
+
+  * Revert "Unionfs: revalidate files which are open but unlinked"
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Wed, 03 Aug 2011 13:42:23 -0700
+
 linux-3.0 (3.0.0-1+vyatta+1) unstable; urgency=low
 
   * Merge 3.0 Linux from upstream
