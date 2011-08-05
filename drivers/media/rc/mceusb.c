@@ -558,9 +558,10 @@ static void mceusb_dev_printdata(struct mceusb_dev *ir, char *buf,
 				 inout, data1);
 			break;
 		case MCE_CMD_S_TIMEOUT:
-			/* value is in units of 50us, so x*50/100 or x/2 ms */
+			/* value is in units of 50us, so x*50/1000 ms */
 			dev_info(dev, "%s receive timeout of %d ms\n",
-				 inout, ((data1 << 8) | data2) / 2);
+				 inout,
+				 ((data1 << 8) | data2) * MCE_TIME_UNIT / 1000);
 			break;
 		case MCE_CMD_G_TIMEOUT:
 			dev_info(dev, "Get receive timeout\n");
@@ -691,20 +692,18 @@ static void mce_flush_rx_buffer(struct mceusb_dev *ir, int size)
 }
 
 /* Send data out the IR blaster port(s) */
-static int mceusb_tx_ir(struct rc_dev *dev, int *txbuf, u32 n)
+static int mceusb_tx_ir(struct rc_dev *dev, unsigned *txbuf, unsigned count)
 {
 	struct mceusb_dev *ir = dev->priv;
 	int i, ret = 0;
-	int count, cmdcount = 0;
+	int cmdcount = 0;
 	unsigned char *cmdbuf; /* MCE command buffer */
 	long signal_duration = 0; /* Singnal length in us */
 	struct timeval start_time, end_time;
 
 	do_gettimeofday(&start_time);
 
-	count = n / sizeof(int);
-
-	cmdbuf = kzalloc(sizeof(int) * MCE_CMDBUF_SIZE, GFP_KERNEL);
+	cmdbuf = kzalloc(sizeof(unsigned) * MCE_CMDBUF_SIZE, GFP_KERNEL);
 	if (!cmdbuf)
 		return -ENOMEM;
 
@@ -773,7 +772,7 @@ static int mceusb_tx_ir(struct rc_dev *dev, int *txbuf, u32 n)
 
 out:
 	kfree(cmdbuf);
-	return ret ? ret : n;
+	return ret ? ret : count;
 }
 
 /* Sets active IR outputs -- mce devices typically have two */
@@ -847,7 +846,7 @@ static void mceusb_handle_command(struct mceusb_dev *ir, int index)
 	switch (ir->buf_in[index]) {
 	/* 2-byte return value commands */
 	case MCE_CMD_S_TIMEOUT:
-		ir->rc->timeout = US_TO_NS((hi << 8 | lo) / 2);
+		ir->rc->timeout = US_TO_NS((hi << 8 | lo) * MCE_TIME_UNIT);
 		break;
 
 	/* 1-byte return value commands */
@@ -1078,7 +1077,7 @@ static struct rc_dev *mceusb_init_rc_dev(struct mceusb_dev *ir)
 	rc->priv = ir;
 	rc->driver_type = RC_DRIVER_IR_RAW;
 	rc->allowed_protos = RC_TYPE_ALL;
-	rc->timeout = US_TO_NS(1000);
+	rc->timeout = MS_TO_NS(100);
 	if (!ir->flags.no_tx) {
 		rc->s_tx_mask = mceusb_set_tx_mask;
 		rc->s_tx_carrier = mceusb_set_tx_carrier;
