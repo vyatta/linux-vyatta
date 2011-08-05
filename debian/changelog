@@ -1,3 +1,282 @@
+linux-3.0 (3.0.1-1+vyatta+1) unstable; urgency=low
+
+  [ Wolfgang Denk ]
+  * USB: serial: add IDs for WinChipHead USB->RS232 adapter
+
+  [ Manoj Iyer ]
+  * mmc: Added quirks for Ricoh 1180:e823 lower base clock frequency
+
+  [ Shawn Guo ]
+  * mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not get cleared
+
+  [ stephen hemminger ]
+  * bridge: send proper message_age in config BPDU
+
+  [ Herbert Xu ]
+  * gro: Only reset frag0 when skb can be pulled
+
+  [ Tobias Klauser ]
+  * Staging: usbip: vhci-hcd: Do not kill already dead RX/TX kthread
+
+  [ Larry Finger ]
+  * staging: r8192e_pci: Handle duplicate PCI ID 0x10ec:0x8192 conflict with rtl8192se
+
+  [ Vasiliy Kulikov ]
+  * staging: comedi: fix infoleak to userspace
+
+  [ K. Y. Srinivasan ]
+  * Staging: hv: storvsc: Increase the timeout value in the storvsc driver
+  * Staging: hv: vmbus: Increase the timeout value in the vmbus driver
+  * Staging: hv: netvsc: Increase the timeout value in the netvsc driver
+
+  [ Alan Stern ]
+  * USB: OHCI: fix another regression for NVIDIA controllers
+  * USB: EHCI: go back to using the system clock for QH unlinks
+
+  [ Ajay Kumar Gupta ]
+  * usb: musb: restore INDEX register in resume path
+
+  [ Thomas Gleixner ]
+  * rtc: handle errors correctly in rtc_irq_set_state()
+  * rtc: fix hrtimer deadlock
+  * rtc: limit frequency
+
+  [ Uwe Kleine-König ]
+  * drivers/rtc/rtc-tegra.c: properly initialize spinlock
+
+  [ Igor Grinberg ]
+  * ARM: pxa/cm-x300: fix V3020 RTC functionality
+
+  [ Rajashekhara, Sudhakar ]
+  * ASoC: davinci: add missing break statement
+  * ASoC: davinci: fix codec start and stop functions
+
+  [ Mark Brown ]
+  * ASoC: Mark cache as dirty when suspending
+
+  [ Kalle Valo ]
+  * ath6kl: cache firmware
+  * ath6kl: fix crash when interface is closed but scan is ongoing
+
+  [ Senthil Balasubramanian ]
+  * ath9k_hw: Fix incorrect key_miss handling
+
+  [ Pavel Shilovsky ]
+  * CIFS: Fix oops while mounting with prefixpath
+
+  [ Roland Vossen ]
+  * staging: brcm80211: fix for reported log spam problem
+
+  [ Guo-Fu Tseng ]
+  * jme: Fix unmap error (Causing system freeze)
+
+  [ Ben Hutchings ]
+  * ethtool: Allow zero-length register dumps again
+
+  [ Stefan Richter ]
+  * firewire: cdev: return -ENOTTY for unimplemented ioctls, not -EINVAL
+  * firewire: cdev: prevent race between first get_info ioctl and bus reset event queuing
+
+  [ Bart Van Assche ]
+  * IB/srp: Avoid duplicate devices from LUN scan
+
+  [ Luben Tuikov ]
+  * libsas: remove expander from dev list on error
+
+  [ Larry Finger ]
+  * rtlwifi: rtl8192cu: Fix duplicate if test
+
+  [ Rajkumar Manoharan ]
+  * mac80211: Restart STA timers only on associated state
+
+  [ Peter Zijlstra ]
+  * irq_work, ppc: Fix up arch hooks
+
+  [ David Ahern ]
+  * perf tools, x86: Fix 32-bit compile on 64-bit system
+  * perf tools: Fix endian conversion reading event attr from file header
+
+  [ Len Brown ]
+  * x86, intel, power: Initialize MSR_IA32_ENERGY_PERF_BIAS
+
+  [ Peter Zijlstra ]
+  * perf: Fix software event overflow
+
+  [ Werner Fink ]
+  * Blacklist Traxdata CDR4120 and IOMEGA Zip drive to avoid lock ups.
+
+  [ Kay Sievers ]
+  * sr: check_events() ignore GET_EVENT when TUR says otherwise
+
+  [ Douglas Gilbert ]
+  * ses: requesting a fault indication
+
+  [ James Bottomley ]
+  * fix crash in scsi_dispatch_cmd()
+
+  [ Dan Rosenberg ]
+  * pmcraid: reject negative request size
+
+  [ Stephen M. Cameron ]
+  * hpsa: do not attempt to read from a write-only register
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: fix i2c map for rv250/280
+
+  [ Jerome Glisse ]
+  * drm/radeon/kms: fix DP training for DPEncoderService revision bigger than 1.1
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: add missing vddci setting on NI+
+
+  [ Clemens Ladisch ]
+  * ALSA: virtuoso: fix silent analog output on Xonar Essence ST Deluxe
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Fix duplicated DAC assignments for Realtek
+
+  [ Peng Tao ]
+  * pnfs: save layoutcommit lwb at layout header
+  * pnfs: save layoutcommit cred at layout header init
+  * pnfs: let layoutcommit handle a list of lseg
+  * pnfs: use lwb as layoutcommit length
+
+  [ Huang Ying ]
+  * kexec, x86: Fix incorrect jump back address if not preserving context
+
+  [ Robert Richter ]
+  * oprofile, x86: Fix nmi-unsafe callgraph support
+
+  [ Michael Neuling ]
+  * powerpc/kdump: Fix timeout in crash_kexec_wait_realmode
+
+  [ Peter Zijlstra ]
+  * irq_work, alpha: Fix up arch hooks
+
+  [ Steven Rostedt ]
+  * tracing: Fix bug when reading system filters on module removal
+  * tracing: Have "enable" file use refcounts like the "filter" file
+
+  [ Lasse Collin ]
+  * XZ: Fix missing <linux/kernel.h> include
+
+  [ Chris Wright ]
+  * PCI: ARI is a PCIe v2 feature
+
+  [ Stephen M. Cameron ]
+  * cciss: do not attempt to read from a write-only register
+
+  [ Randy Dunlap ]
+  * drivers/firmware/sigma.c needs MODULE_LICENSE
+
+  [ Philip A. Prindeville ]
+  * geode: reflect mfgpt dependency on mfd
+
+  [ Benjamin Herrenschmidt ]
+  * mm/futex: fix futex writes on archs with SW tracking of dirty & young
+
+  [ Peter Zijlstra ]
+  * mm/backing-dev.c: reset bdi min_ratio in bdi_unregister()
+
+  [ Dan Rosenberg ]
+  * xtensa: prevent arbitrary read in ptrace
+
+  [ Maxim Patlasov ]
+  * ext4: fix i_blocks/quota accounting when extent insertion fails
+
+  [ Jiaying Zhang ]
+  * ext4: free allocated and pre-allocated blocks when check_eofblocks_fl fails
+
+  [ Jan Kara ]
+  * ext3: Fix oops in ext3_try_to_allocate_with_rsv()
+
+  [ Thieu Le ]
+  * ecryptfs: Make inode bdi consistent with superblock bdi
+
+  [ Tyler Hicks ]
+  * eCryptfs: Unlock keys needed by ecryptfsd
+
+  [ Casey Bodley ]
+  * nfsd: don't break lease on CLAIM_DELEGATE_CUR
+
+  [ J. Bruce Fields ]
+  * nfsd4: remember to put RW access on stateid destruction
+  * nfsd4: fix file leak on open_downgrade
+  * svcrpc: fix list-corrupting race on nfsd shutdown
+
+  [ Trond Myklebust ]
+  * NFSv4: Don't use the delegation->inode in nfs_mark_return_delegation()
+  * NFS: Fix spurious readdir cookie loop messages
+
+  [ Vasiliy Kulikov ]
+  * proc: fix a race in do_io_accounting()
+
+  [ Du, Alek ]
+  * n_gsm: fix the wrong FCS handling
+
+  [ Sergei Shtylyov ]
+  * EHCI: only power off port if over-current is active
+
+  [ Alan Stern ]
+  * EHCI: fix direction handling for interrupt data toggles
+
+  [ Sven Neumann ]
+  * cfg80211: really ignore the regulatory request
+
+  [ Daisuke Nishimura ]
+  * memcg: fix behavior of mem_cgroup_resize_limit()
+
+  [ Stephen Warren ]
+  * tty/serial: Fix XSCALE serial ports, e.g. ce4100
+
+  [ Ralf Baechle ]
+  * SERIAL: SC26xx: Fix link error.
+
+  [ Anton Blanchard ]
+  * powerpc/pseries/hvconsole: Fix dropped console output
+
+  [ Hendrik Brueckner ]
+  * hvc_console: Improve tty/console put_chars handling
+
+  [ Manfred Spraul ]
+  * ipc/sem.c: fix race with concurrent semtimedop() timeouts and IPC_RMID
+
+  [ John Johansen ]
+  * AppArmor: Fix reference to rcu protected pointer outside of rcu_read_lock
+  * AppArmor: Fix masking of capabilities in complain mode
+
+  [ Oleg Nesterov ]
+  * oom: task->mm == NULL doesn't mean the memory was freed
+
+  [ Gertjan van Wingerde ]
+  * rt2x00: Add device ID for RT539F device.
+
+  [ Steven Whitehouse ]
+  * GFS2: Fix mount hang caused by certain access pattern to sysfs files
+
+  [ David Engraf ]
+  * watchdog: shwdt: fix usage of mod_timer
+
+  [ Julia Lawall ]
+  * ALSA: sound/core/pcm_compat.c: adjust array index
+
+  [ Mikulas Patocka ]
+  * dm io: flush cpu cache with vmapped io
+  * dm snapshot: flush disk cache when merging
+
+  [ Mike Snitzer ]
+  * dm mpath: fix potential NULL pointer in feature arg processing
+
+  [ Alasdair G Kergon ]
+  * dm: fix idr leak on module removal
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.1
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Fri, 05 Aug 2011 14:58:27 -0700
+
 linux-3.0 (3.0.0-1+vyatta+3) unstable; urgency=low
 
   * 3.0.0-1+vyatta+2
