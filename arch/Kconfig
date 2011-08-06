@@ -177,6 +177,9 @@ config HAVE_ARCH_JUMP_LABEL
 	bool
 
 config HAVE_ARCH_MUTEX_CPU_RELAX
+       bool
+
+config HAVE_CPUSETS_NO_HZ
 	bool
 
 config HAVE_RCU_TABLE_FREE

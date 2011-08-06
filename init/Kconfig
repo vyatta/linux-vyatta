@@ -638,6 +638,14 @@ config PROC_PID_CPUSET
 	depends on CPUSETS
 	default y
 
+config CPUSETS_NO_HZ
+       bool "Tickless cpusets"
+       depends on CPUSETS && HAVE_CPUSETS_NO_HZ
+       help
+         This options let you apply a nohz property to a cpuset such
+	 that the periodic timer tick tries to be avoided when possible on
+	 the concerned CPUs.
+
 config CGROUP_CPUACCT
 	bool "Simple CPU accounting cgroup subsystem"
 	help
