@@ -20,6 +20,7 @@
 #include <linux/profile.h>
 #include <linux/sched.h>
 #include <linux/module.h>
+#include <linux/cpuset.h>
 
 #include <asm/irq_regs.h>
 
@@ -782,6 +783,45 @@ void tick_check_idle(int cpu)
 	tick_check_nohz(cpu);
 }
 
+#ifdef CONFIG_CPUSETS_NO_HZ
+
+/*
+ * Take the timer duty if nobody is taking care of it.
+ * If a CPU already does and and it's in a nohz cpuset,
+ * then take the charge so that it can switch to nohz mode.
+ */
+static void tick_do_timer_check_handler(int cpu)
+{
+	int handler = tick_do_timer_cpu;
+
+	if (unlikely(handler == TICK_DO_TIMER_NONE)) {
+		tick_do_timer_cpu = cpu;
+	} else {
+		if (!cpuset_adaptive_nohz() &&
+		    cpuset_cpu_adaptive_nohz(handler))
+			tick_do_timer_cpu = cpu;
+	}
+}
+
+#else
+
+static void tick_do_timer_check_handler(int cpu)
+{
+#ifdef CONFIG_NO_HZ
+	/*
+	 * Check if the do_timer duty was dropped. We don't care about
+	 * concurrency: This happens only when the cpu in charge went
+	 * into a long sleep. If two cpus happen to assign themself to
+	 * this duty, then the jiffies update is still serialized by
+	 * xtime_lock.
+	 */
+	if (unlikely(tick_do_timer_cpu == TICK_DO_TIMER_NONE))
+		tick_do_timer_cpu = cpu;
+#endif
+}
+
+#endif /* CONFIG_CPUSETS_NO_HZ */
+
 /*
  * High resolution timer specific code
  */
@@ -798,17 +838,7 @@ static enum hrtimer_restart tick_sched_timer(struct hrtimer *timer)
 	ktime_t now = ktime_get();
 	int cpu = smp_processor_id();
 
-#ifdef CONFIG_NO_HZ
-	/*
-	 * Check if the do_timer duty was dropped. We don't care about
-	 * concurrency: This happens only when the cpu in charge went
-	 * into a long sleep. If two cpus happen to assign themself to
-	 * this duty, then the jiffies update is still serialized by
-	 * xtime_lock.
-	 */
-	if (unlikely(tick_do_timer_cpu == TICK_DO_TIMER_NONE))
-		tick_do_timer_cpu = cpu;
-#endif
+	tick_do_timer_check_handler(cpu);
 
 	/* Check, if the jiffies need an update */
 	if (tick_do_timer_cpu == cpu)
