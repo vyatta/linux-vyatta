@@ -1,3 +1,9 @@
+linux-3.0 (3.0.1-1+vyatta+2) unstable; urgency=low
+
+  * Restore missing link_filter from 3.0 merge
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Sun, 07 Aug 2011 20:30:50 -0700
+
 linux-3.0 (3.0.1-1+vyatta+1) unstable; urgency=low
 
   [ Wolfgang Denk ]
