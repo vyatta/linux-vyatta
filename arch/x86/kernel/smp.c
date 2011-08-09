@@ -23,6 +23,7 @@
 #include <linux/interrupt.h>
 #include <linux/cpu.h>
 #include <linux/gfp.h>
+#include <linux/tick.h>
 
 #include <asm/mtrr.h>
 #include <asm/tlbflush.h>
@@ -283,6 +284,7 @@ void smp_cpuset_update_nohz_interrupt(struct pt_regs *regs)
 {
 	ack_APIC_irq();
 	irq_enter();
+	tick_nohz_check_adaptive();
 	inc_irq_stat(irq_call_count);
 	irq_exit();
 }

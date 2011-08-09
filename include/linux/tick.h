@@ -124,11 +124,12 @@ static inline int tick_oneshot_mode_active(void) { return 0; }
 # ifdef CONFIG_NO_HZ
 extern void tick_nohz_idle_enter(void);
 extern void tick_nohz_idle_exit(void);
+extern void tick_nohz_restart_sched_tick(void);
 extern void tick_nohz_irq_exit(void);
 extern ktime_t tick_nohz_get_sleep_length(void);
 extern u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time);
 extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
-# else
+# else /* !NO_HZ */
 static inline void tick_nohz_idle_enter(void) { }
 static inline void tick_nohz_idle_exit(void) { }
 
@@ -141,5 +142,13 @@ static inline ktime_t tick_nohz_get_sleep_length(void)
 static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
 static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
 # endif /* !NO_HZ */
+
+#ifdef CONFIG_CPUSETS_NO_HZ
+extern void tick_nohz_check_adaptive(void);
+extern void tick_nohz_post_schedule(void);
+#else /* !CPUSETS_NO_HZ */
+static inline void tick_nohz_check_adaptive(void) { }
+static inline void tick_nohz_post_schedule(void) { }
+#endif /* CPUSETS_NO_HZ */
 
 #endif

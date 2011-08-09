@@ -1323,6 +1323,27 @@ static void update_avg(u64 *avg, u64 sample)
 }
 #endif
 
+#ifdef CONFIG_CPUSETS_NO_HZ
+bool sched_can_stop_tick(void)
+{
+	struct rq *rq;
+
+	rq = this_rq();
+
+	/*
+	 * Ensure nr_running updates are visible
+	 * FIXME: the barrier is probably not enough to ensure
+	 * the updates are visible right away.
+	 */
+	smp_rmb();
+	/* More than one running task need preemption */
+	if (rq->nr_running > 1)
+		return false;
+
+	return true;
+}
+#endif
+
 static void
 ttwu_stat(struct task_struct *p, int cpu, int wake_flags)
 {
@@ -2059,6 +2080,7 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	 * frame will be invalid.
 	 */
 	finish_task_switch(this_rq(), prev);
+	tick_nohz_post_schedule();
 }
 
 /*
