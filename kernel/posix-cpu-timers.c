@@ -6,6 +6,7 @@
 #include <linux/posix-timers.h>
 #include <linux/errno.h>
 #include <linux/math64.h>
+#include <linux/cpuset.h>
 #include <asm/uaccess.h>
 #include <linux/kernel_stat.h>
 #include <trace/events/timer.h>
@@ -1272,6 +1273,17 @@ static inline int fastpath_timer_check(struct task_struct *tsk)
 	}
 
 	return 0;
+}
+
+bool posix_cpu_timers_running(struct task_struct *tsk)
+{
+	if (!task_cputime_zero(&tsk->cputime_expires))
+		return true;
+
+	if (tsk->signal->cputimer.running)
+		return true;
+
+	return false;
 }
 
 /*
