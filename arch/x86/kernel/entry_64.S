@@ -1002,6 +1002,10 @@ apicinterrupt CALL_FUNCTION_VECTOR \
 	call_function_interrupt smp_call_function_interrupt
 apicinterrupt RESCHEDULE_VECTOR \
 	reschedule_interrupt smp_reschedule_interrupt
+#ifdef CONFIG_CPUSETS_NO_HZ
+apicinterrupt CPUSET_UPDATE_NOHZ_VECTOR \
+	cpuset_update_nohz_interrupt smp_cpuset_update_nohz_interrupt
+#endif
 #endif
 
 apicinterrupt ERROR_APIC_VECTOR \

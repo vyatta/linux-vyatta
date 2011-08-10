@@ -172,6 +172,10 @@ static void __init smp_intr_init(void)
 	 */
 	alloc_intr_gate(RESCHEDULE_VECTOR, reschedule_interrupt);
 
+#ifdef CONFIG_CPUSETS_NO_HZ
+	alloc_intr_gate(CPUSET_UPDATE_NOHZ_VECTOR, cpuset_update_nohz_interrupt);
+#endif
+
 	/* IPIs for invalidation */
 #define ALLOC_INVTLB_VEC(NR) \
 	alloc_intr_gate(INVALIDATE_TLB_VECTOR_START+NR, \

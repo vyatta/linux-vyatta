@@ -123,6 +123,17 @@ static void native_smp_send_reschedule(int cpu)
 	apic->send_IPI_mask(cpumask_of(cpu), RESCHEDULE_VECTOR);
 }
 
+#ifdef CONFIG_CPUSETS_NO_HZ
+static void native_smp_cpuset_update_nohz(int cpu)
+{
+	if (unlikely(cpu_is_offline(cpu))) {
+		WARN_ON(1);
+		return;
+	}
+	apic->send_IPI_mask(cpumask_of(cpu), CPUSET_UPDATE_NOHZ_VECTOR);
+}
+#endif
+
 void native_send_call_func_single_ipi(int cpu)
 {
 	apic->send_IPI_mask(cpumask_of(cpu), CALL_FUNCTION_SINGLE_VECTOR);
@@ -267,6 +278,16 @@ void smp_reschedule_interrupt(struct pt_regs *regs)
 	 */
 }
 
+#ifdef CONFIG_CPUSETS_NO_HZ
+void smp_cpuset_update_nohz_interrupt(struct pt_regs *regs)
+{
+	ack_APIC_irq();
+	irq_enter();
+	inc_irq_stat(irq_call_count);
+	irq_exit();
+}
+#endif
+
 void smp_call_function_interrupt(struct pt_regs *regs)
 {
 	ack_APIC_irq();
@@ -300,6 +321,9 @@ struct smp_ops smp_ops = {
 
 	.stop_other_cpus	= native_nmi_stop_other_cpus,
 	.smp_send_reschedule	= native_smp_send_reschedule,
+#ifdef CONFIG_CPUSETS_NO_HZ
+	.smp_cpuset_update_nohz = native_smp_cpuset_update_nohz,
+#endif
 
 	.cpu_up			= native_cpu_up,
 	.cpu_die		= native_cpu_die,

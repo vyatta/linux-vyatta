@@ -70,6 +70,10 @@ struct smp_ops {
 	void (*stop_other_cpus)(int wait);
 	void (*smp_send_reschedule)(int cpu);
 
+#ifdef CONFIG_CPUSETS_NO_HZ
+	void (*smp_cpuset_update_nohz)(int cpu);
+#endif
+
 	int (*cpu_up)(unsigned cpu);
 	int (*cpu_disable)(void);
 	void (*cpu_die)(unsigned int cpu);
@@ -136,6 +140,13 @@ static inline void play_dead(void)
 static inline void smp_send_reschedule(int cpu)
 {
 	smp_ops.smp_send_reschedule(cpu);
+}
+
+static inline void smp_cpuset_update_nohz(int cpu)
+{
+#ifdef CONFIG_CPUSETS_NO_HZ
+	smp_ops.smp_cpuset_update_nohz(cpu);
+#endif
 }
 
 static inline void arch_send_call_function_single_ipi(int cpu)

@@ -10,6 +10,9 @@
  * through the ICC by us (IPIs)
  */
 #ifdef CONFIG_SMP
+#ifdef CONFIG_CPUSETS_NO_HZ
+BUILD_INTERRUPT(cpuset_update_nohz_interrupt,CPUSET_UPDATE_NOHZ_VECTOR)
+#endif
 BUILD_INTERRUPT(reschedule_interrupt,RESCHEDULE_VECTOR)
 BUILD_INTERRUPT(call_function_interrupt,CALL_FUNCTION_VECTOR)
 BUILD_INTERRUPT(call_function_single_interrupt,CALL_FUNCTION_SINGLE_VECTOR)
