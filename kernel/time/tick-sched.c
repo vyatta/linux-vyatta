@@ -506,9 +506,21 @@ void tick_nohz_idle_enter(void)
 	local_irq_enable();
 }
 
+#ifdef CONFIG_CPUSETS_NO_HZ
+static bool can_stop_adaptive_tick(void)
+{
+	if (!sched_can_stop_tick())
+		return false;
+
+	/* Is there a grace period to complete ? */
+	if (rcu_pending(smp_processor_id()))
+		return false;
+
+	return true;
+}
+
 static void tick_nohz_cpuset_stop_tick(struct tick_sched *ts)
 {
-#ifdef CONFIG_CPUSETS_NO_HZ
 	int cpu = smp_processor_id();
 
 	if (!cpuset_adaptive_nohz() || is_idle_task(current))
@@ -517,12 +529,14 @@ static void tick_nohz_cpuset_stop_tick(struct tick_sched *ts)
 	if (!ts->tick_stopped && ts->nohz_mode == NOHZ_MODE_INACTIVE)
 		return;
 
-	if (!sched_can_stop_tick())
+	if (!can_stop_adaptive_tick())
 		return;
 
 	tick_nohz_stop_sched_tick(ts, ktime_get(), cpu);
-#endif
 }
+#else
+static void tick_nohz_cpuset_stop_tick(struct tick_sched *ts) { }
+#endif
 
 /**
  * tick_nohz_irq_exit - update next tick event from interrupt exit
@@ -852,7 +866,7 @@ void tick_nohz_check_adaptive(void)
 	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
 
 	if (ts->tick_stopped && !is_idle_task(current)) {
-		if (!sched_can_stop_tick())
+		if (!can_stop_adaptive_tick())
 			tick_nohz_restart_sched_tick();
 	}
 }
