@@ -576,7 +576,7 @@ unlock:
  * account when the CPU goes back to idle and evaluates the timer
  * wheel for the next timer event.
  */
-void wake_up_idle_cpu(int cpu)
+static void wake_up_idle_cpu(int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
 
@@ -604,6 +604,28 @@ void wake_up_idle_cpu(int cpu)
 	smp_mb();
 	if (!tsk_is_polling(rq->idle))
 		smp_send_reschedule(cpu);
+}
+
+static bool wake_up_cpuset_nohz_cpu(int cpu)
+{
+#ifdef CONFIG_CPUSETS_NO_HZ
+	/*
+	 * FIXME: We need to ensure that updates
+	 * on cpu_adaptive_nohz_ref are visible right
+	 * away.
+	 */
+	if (cpuset_cpu_adaptive_nohz(cpu)) {
+		smp_cpuset_update_nohz(cpu);
+		return true;
+	}
+#endif
+	return false;
+}
+
+void wake_up_nohz_cpu(int cpu)
+{
+	if (!wake_up_cpuset_nohz_cpu(cpu))
+		wake_up_idle_cpu(cpu);
 }
 
 static inline bool got_nohz_idle_kick(void)
