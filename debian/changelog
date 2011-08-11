@@ -1,3 +1,18 @@
+linux-2.6 (2.6.37-1+vyatta+16+napa3) unstable; urgency=low
+
+  [ Balaji G ]
+  * bridge: Fix compilation warning in function br_stp_recalculate_bridge_id()
+
+  [ Stephen Hemminger ]
+  * bridge: send proper message_age in config BPDU
+
+  [ Herbert Xu ]
+  * gro: Only reset frag0 when skb can be pulled
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Thu, 11 Aug 2011 08:35:14 -0700
+
 linux-2.6 (2.6.37-1+vyatta+16+napa2) unstable; urgency=low
 
   [ Balaji G ]
