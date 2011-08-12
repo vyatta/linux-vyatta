@@ -875,6 +875,14 @@ void tick_nohz_check_adaptive(void)
 	}
 }
 
+void cpuset_exit_nohz_interrupt(void *unused)
+{
+	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
+
+	if (ts->tick_stopped && !is_idle_task(current))
+		tick_nohz_restart_adaptive();
+}
+
 void tick_nohz_post_schedule(void)
 {
 	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
