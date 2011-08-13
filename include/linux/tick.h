@@ -153,11 +153,23 @@ static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
 # endif /* !NO_HZ */
 
 #ifdef CONFIG_CPUSETS_NO_HZ
+extern void tick_nohz_enter_kernel(void);
+extern void tick_nohz_exit_kernel(void);
+extern void tick_nohz_enter_exception(struct pt_regs *regs);
+extern void tick_nohz_exit_exception(struct pt_regs *regs);
 extern void tick_nohz_check_adaptive(void);
+extern void tick_nohz_pre_schedule(void);
 extern void tick_nohz_post_schedule(void);
+extern bool tick_nohz_account_tick(void);
 #else /* !CPUSETS_NO_HZ */
+static inline void tick_nohz_enter_kernel(void) { }
+static inline void tick_nohz_exit_kernel(void) { }
+static inline void tick_nohz_enter_exception(struct pt_regs *regs) { }
+static inline void tick_nohz_exit_exception(struct pt_regs *regs) { }
 static inline void tick_nohz_check_adaptive(void) { }
+static inline void tick_nohz_pre_schedule(void) { }
 static inline void tick_nohz_post_schedule(void) { }
+static inline bool tick_nohz_account_tick(void) { return false; }
 #endif /* CPUSETS_NO_HZ */
 
 #endif

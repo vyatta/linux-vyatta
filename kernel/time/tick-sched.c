@@ -526,7 +526,13 @@ static bool can_stop_adaptive_tick(void)
 
 static void tick_nohz_cpuset_stop_tick(struct tick_sched *ts)
 {
+	struct pt_regs *regs = get_irq_regs();
 	int cpu = smp_processor_id();
+	int was_stopped;
+	int user = 0;
+
+	if (regs)
+		user = user_mode(regs);
 
 	if (!cpuset_adaptive_nohz() || is_idle_task(current))
 		return;
@@ -537,7 +543,36 @@ static void tick_nohz_cpuset_stop_tick(struct tick_sched *ts)
 	if (!can_stop_adaptive_tick())
 		return;
 
+	/*
+	 * If we stop the tick between the syscall exit hook and the actual
+	 * return to userspace, we'll think we are in system space (due to
+	 * user_mode() thinking so). And since we passed the syscall exit hook
+	 * already we won't realize we are in userspace. So the time spent
+	 * tickless would be spuriously accounted as belonging to system.
+	 *
+	 * To avoid this kind of problem, we only stop the tick from userspace
+	 * (until we find a better solution).
+	 * We can later enter the kernel and keep the tick stopped. But the place
+	 * where we stop the tick must be userspace.
+	 * We make an exception for kernel threads since they always execute in
+	 * kernel space.
+	 */
+	if (!user && current->mm)
+		return;
+
+	was_stopped = ts->tick_stopped;
 	tick_nohz_stop_sched_tick(ts, ktime_get(), cpu);
+
+	if (!was_stopped && ts->tick_stopped) {
+		WARN_ON_ONCE(ts->saved_jiffies_whence != JIFFIES_SAVED_NONE);
+		if (user)
+			ts->saved_jiffies_whence = JIFFIES_SAVED_USER;
+		else if (!current->mm)
+			ts->saved_jiffies_whence = JIFFIES_SAVED_SYS;
+
+		ts->saved_jiffies = jiffies;
+		set_thread_flag(TIF_NOHZ);
+	}
 }
 #else
 static void tick_nohz_cpuset_stop_tick(struct tick_sched *ts) { }
@@ -862,6 +897,70 @@ void tick_check_idle(int cpu)
 }
 
 #ifdef CONFIG_CPUSETS_NO_HZ
+void tick_nohz_exit_kernel(void)
+{
+	unsigned long flags;
+	struct tick_sched *ts;
+	unsigned long delta_jiffies;
+
+	local_irq_save(flags);
+
+	ts = &__get_cpu_var(tick_cpu_sched);
+
+	if (!ts->tick_stopped) {
+		local_irq_restore(flags);
+		return;
+	}
+
+	WARN_ON_ONCE(ts->saved_jiffies_whence != JIFFIES_SAVED_SYS);
+
+	delta_jiffies = jiffies - ts->saved_jiffies;
+	account_system_ticks(current, delta_jiffies);
+
+	ts->saved_jiffies = jiffies;
+	ts->saved_jiffies_whence = JIFFIES_SAVED_USER;
+
+	local_irq_restore(flags);
+}
+
+void tick_nohz_enter_kernel(void)
+{
+	unsigned long flags;
+	struct tick_sched *ts;
+	unsigned long delta_jiffies;
+
+	local_irq_save(flags);
+
+	ts = &__get_cpu_var(tick_cpu_sched);
+
+	if (!ts->tick_stopped) {
+		local_irq_restore(flags);
+		return;
+	}
+
+	WARN_ON_ONCE(ts->saved_jiffies_whence != JIFFIES_SAVED_USER);
+
+	delta_jiffies = jiffies - ts->saved_jiffies;
+	account_user_ticks(current, delta_jiffies);
+
+	ts->saved_jiffies = jiffies;
+	ts->saved_jiffies_whence = JIFFIES_SAVED_SYS;
+
+	local_irq_restore(flags);
+}
+
+void tick_nohz_enter_exception(struct pt_regs *regs)
+{
+	if (user_mode(regs))
+		tick_nohz_enter_kernel();
+}
+
+void tick_nohz_exit_exception(struct pt_regs *regs)
+{
+	if (user_mode(regs))
+		tick_nohz_exit_kernel();
+}
+
 /*
  * Take the timer duty if nobody is taking care of it.
  * If a CPU already does and and it's in a nohz cpuset,
@@ -880,13 +979,22 @@ static void tick_do_timer_check_handler(int cpu)
 	}
 }
 
+static void tick_nohz_restart_adaptive(void)
+{
+	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
+
+	tick_nohz_account_ticks(ts);
+	tick_nohz_restart_sched_tick();
+	clear_thread_flag(TIF_NOHZ);
+}
+
 void tick_nohz_check_adaptive(void)
 {
 	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
 
 	if (ts->tick_stopped && !is_idle_task(current)) {
 		if (!can_stop_adaptive_tick())
-			tick_nohz_restart_sched_tick();
+			tick_nohz_restart_adaptive();
 	}
 }
 
@@ -896,6 +1004,26 @@ void cpuset_exit_nohz_interrupt(void *unused)
 
 	if (ts->tick_stopped && !is_idle_task(current))
 		tick_nohz_restart_adaptive();
+}
+
+/*
+ * Flush cputime and clear hooks before context switch in case we
+ * haven't yet received the IPI that should take care of that.
+ */
+void tick_nohz_pre_schedule(void)
+{
+	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
+
+	/*
+	 * We are holding the rq lock and if we restart the tick now
+	 * we could deadlock by acquiring the lock twice. Instead
+	 * we do that on post schedule time. For now do the cleanups
+	 * on the prev task.
+	 */
+	if (ts->tick_stopped) {
+		tick_nohz_account_ticks(ts);
+		clear_thread_flag(TIF_NOHZ);
+	}
 }
 
 void tick_nohz_post_schedule(void)
@@ -910,7 +1038,6 @@ void tick_nohz_post_schedule(void)
 	if (ts->tick_stopped)
 		tick_nohz_restart_sched_tick();
 }
-
 #else
 
 static void tick_do_timer_check_handler(int cpu)
