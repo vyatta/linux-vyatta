@@ -45,6 +45,7 @@
 #include <linux/syscalls.h>
 #include <linux/kprobes.h>
 #include <linux/user_namespace.h>
+#include <linux/cpuset.h>
 
 #include <linux/kmsg_dump.h>
 /* Move somewhere else to avoid recompiling? */
@@ -950,6 +951,8 @@ void do_sys_times(struct tms *tms)
 {
 	cputime_t tgutime, tgstime, cutime, cstime;
 
+	cpuset_nohz_flush_cputimes();
+
 	spin_lock_irq(&current->sighand->siglock);
 	thread_group_times(current, &tgutime, &tgstime);
 	cutime = current->signal->cutime;
@@ -1613,6 +1616,9 @@ static void k_getrusage(struct task_struct *p, int who, struct rusage *r)
 		maxrss = p->signal->maxrss;
 		goto out;
 	}
+
+	/* For thread_group_times */
+	cpuset_nohz_flush_cputimes();
 
 	if (!lock_task_sighand(p, &flags))
 		return;
