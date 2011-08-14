@@ -703,7 +703,6 @@ static void tick_nohz_account_ticks(struct tick_sched *ts)
 			WARN_ON_ONCE(1);
 		}
 	}
-	ts->saved_jiffies_whence = JIFFIES_SAVED_NONE;
 }
 
 /**
@@ -737,6 +736,7 @@ void tick_nohz_idle_exit(void)
 		__tick_nohz_restart_sched_tick(ts, now);
 #ifndef CONFIG_VIRT_CPU_ACCOUNTING
 		tick_nohz_account_ticks(ts);
+		ts->saved_jiffies_whence = JIFFIES_SAVED_NONE;
 #endif
 	}
 
@@ -981,9 +981,7 @@ static void tick_do_timer_check_handler(int cpu)
 
 static void tick_nohz_restart_adaptive(void)
 {
-	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
-
-	tick_nohz_account_ticks(ts);
+	tick_nohz_flush_current_times(true);
 	tick_nohz_restart_sched_tick();
 	clear_thread_flag(TIF_NOHZ);
 }
@@ -1021,7 +1019,7 @@ void tick_nohz_pre_schedule(void)
 	 * on the prev task.
 	 */
 	if (ts->tick_stopped) {
-		tick_nohz_account_ticks(ts);
+		tick_nohz_flush_current_times(true);
 		clear_thread_flag(TIF_NOHZ);
 	}
 }
@@ -1037,6 +1035,19 @@ void tick_nohz_post_schedule(void)
 	 */
 	if (ts->tick_stopped)
 		tick_nohz_restart_sched_tick();
+}
+
+void tick_nohz_flush_current_times(bool restart_tick)
+{
+	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
+
+	if (ts->tick_stopped) {
+		tick_nohz_account_ticks(ts);
+		if (restart_tick)
+			ts->saved_jiffies_whence = JIFFIES_SAVED_NONE;
+		else
+			ts->saved_jiffies = jiffies;
+	}
 }
 #else
 

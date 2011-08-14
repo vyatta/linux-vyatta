@@ -59,6 +59,7 @@
 #include <linux/mutex.h>
 #include <linux/workqueue.h>
 #include <linux/cgroup.h>
+#include <linux/tick.h>
 
 /*
  * Workqueue for cpuset related tasks.
@@ -1221,6 +1222,23 @@ static void cpuset_change_flag(struct task_struct *tsk,
 
 DEFINE_PER_CPU(int, cpu_adaptive_nohz_ref);
 
+static cpumask_t nohz_cpuset_mask;
+
+static void flush_cputime_interrupt(void *unused)
+{
+	tick_nohz_flush_current_times(false);
+}
+
+void cpuset_nohz_flush_cputimes(void)
+{
+	preempt_disable();
+	smp_call_function_many(&nohz_cpuset_mask, flush_cputime_interrupt,
+			       NULL, true);
+	preempt_enable();
+	/* Make the utime/stime updates visible */
+	smp_mb();
+}
+
 static void cpu_exit_nohz(int cpu)
 {
 	preempt_disable();
@@ -1245,7 +1263,15 @@ static void update_nohz_cpus(struct cpuset *old_cs, struct cpuset *cs)
 
 		val = per_cpu(cpu_adaptive_nohz_ref, cpu);
 
-		if (!val) {
+		if (val == 1) {
+			cpumask_set_cpu(cpu, &nohz_cpuset_mask);
+			/*
+			 * The mask update needs to be visible right away
+			 * so that this CPU is part of the cputime IPI
+			 * update right now.
+			 */
+			 smp_mb();
+		} else if (!val) {
 			/*
 			 * The update to cpu_adaptive_nohz_ref must be
 			 * visible right away. So that once we restart the tick
@@ -1256,6 +1282,12 @@ static void update_nohz_cpus(struct cpuset *old_cs, struct cpuset *cs)
 			 */
 			smp_mb();
 			cpu_exit_nohz(cpu);
+			/*
+			 * Now that the tick has been restarted and cputimes
+			 * flushed, we don't need anymore to be part of the
+			 * cputime flush IPI.
+			 */
+			cpumask_clear_cpu(cpu, &nohz_cpuset_mask);
 		}
 	}
 }
