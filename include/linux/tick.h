@@ -153,6 +153,8 @@ static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
 # endif /* !NO_HZ */
 
 #ifdef CONFIG_CPUSETS_NO_HZ
+DECLARE_PER_CPU(int, nohz_task_ext_qs);
+
 extern void tick_nohz_enter_kernel(void);
 extern void tick_nohz_exit_kernel(void);
 extern void tick_nohz_enter_exception(struct pt_regs *regs);
@@ -160,6 +162,7 @@ extern void tick_nohz_exit_exception(struct pt_regs *regs);
 extern void tick_nohz_check_adaptive(void);
 extern void tick_nohz_pre_schedule(void);
 extern void tick_nohz_post_schedule(void);
+extern void tick_nohz_cpu_exit_qs(void);
 extern bool tick_nohz_account_tick(void);
 extern void tick_nohz_flush_current_times(bool restart_tick);
 #else /* !CPUSETS_NO_HZ */
