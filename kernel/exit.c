@@ -52,6 +52,7 @@
 #include <linux/hw_breakpoint.h>
 #include <linux/oom.h>
 #include <linux/writeback.h>
+#include <linux/cpuset.h>
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -1711,6 +1712,13 @@ repeat:
 	if ((wo->wo_type < PIDTYPE_MAX) &&
 	   (!wo->wo_pid || hlist_empty(&wo->wo_pid->tasks[wo->wo_type])))
 		goto notask;
+
+	/*
+	 * For cputime in sub-threads before adding them.
+	 * Must be called outside tasklist_lock lock because write lock
+	 * can be acquired under irqs disabled.
+	 */
+	cpuset_nohz_flush_cputimes();
 
 	set_current_state(TASK_INTERRUPTIBLE);
 	read_lock(&tasklist_lock);
