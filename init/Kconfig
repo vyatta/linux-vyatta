@@ -640,7 +640,7 @@ config PROC_PID_CPUSET
 
 config CPUSETS_NO_HZ
        bool "Tickless cpusets"
-       depends on CPUSETS && HAVE_CPUSETS_NO_HZ && NO_HZ && HIGH_RES_TIMERS
+       depends on CPUSETS && HAVE_CPUSETS_NO_HZ && NO_HZ && HIGH_RES_TIMERS && !IRQ_TIME_ACCOUNTING
        help
          This options let you apply a nohz property to a cpuset such
 	 that the periodic timer tick tries to be avoided when possible on
