@@ -1,3 +1,219 @@
+linux-3.0 (3.0.2-1+vyatta+1) unstable; urgency=low
+
+  [ WANG Cong ]
+  * cris: fix a build error in kernel/fork.c
+  * cris: fix a build error in sync_serial_open()
+  * cris: fix the prototype of sync_serial_ioctl()
+  * cris: add missing declaration of kgdb_init() and breakpoint()
+
+  [ Shawn Bohrer ]
+  * futex: Fix regression with read only mappings
+
+  [ James Bottomley ]
+  * wire up sendmmsg syscall
+
+  [ Carlos O'Donell ]
+  * Fix futex support
+
+  [ John David Anglin ]
+  * fix return type of __atomic64_add_return
+
+  [ Stanislaw Gruszka ]
+  * rt2x00: rt2800: fix zeroing skb structure
+  * rt2x00: fix usage of NULL queue
+
+  [ Larry Finger ]
+  * rtlwifi: Fix kernel oops on ARM SOC
+
+  [ Stanislaw Gruszka ]
+  * iwlegacy: set tx power after rxon_assoc
+
+  [ Felix Fietkau ]
+  * ath9k: initialize tx chainmask before testing channel tx power values
+
+  [ Stanislaw Gruszka ]
+  * ath9k: skip ->config_pci_powersave() if PCIe port has ASPM disabled
+
+  [ Anton Blanchard ]
+  * net: sendmmsg should only return an error if no messages were sent
+  * net: Cap number of elements for sendmmsg
+
+  [ Tetsuo Handa ]
+  * net: Fix security_socket_sendmsg() bypass problem.
+
+  [ Jeremy Fitzhardinge ]
+  * xen: allow enable use of VGA console on dom0
+
+  [ Thomas Reim ]
+  * drm: Separate EDID Header Check from EDID Block Check
+  * drm/radeon: Extended DDC Probing for Connectors with Improperly Wired DDC Lines (here: Asus M2A-VM HDMI)
+  * drm/radeon: Extended DDC Probing for ECS A740GM-M DVI-D Connector
+  * drm/radeon: Log Subsystem Vendor and Device Information
+
+  [ Adam Jackson ]
+  * drm/i915/pch: Fix integer math bugs in panel fitting
+
+  [ Jesse Barnes ]
+  * drm/i915: load the LUT before pipe enable on ILK+
+
+  [ Ole Henrik Jahren ]
+  * drm/i915: Fix typo in DRM_I915_OVERLAY_PUT_IMAGE ioctl define
+
+  [ Keith Packard ]
+  * drm/i915: Initialize RCS ring status page address in intel_render_ring_init_dri
+  * drm/i915: Hold mode_config->mutex during hotplug processing
+  * drm/i915: Fixup for 'Hold mode_config->mutex during hotplug'
+
+  [ David S. Miller ]
+  * crypto: Move md5_transform to lib/md5.c
+  * net: Compute protocol sequence numbers and fragment IDs using MD5.
+
+  [ Corentin Chary ]
+  * asus-wmi: fix hwmon/pwm1
+  * asus-wmi: return proper value in store_cpufv()
+
+  [ Pavel Shilovsky ]
+  * CIFS: Fix missing a decrement of inFlight value
+
+  [ Jeff Layton ]
+  * cifs: cope with negative dentries in cifs_get_root
+  * cifs: convert prefixpath delimiters in cifs_build_path_to_root
+
+  [ Wolfram Sang ]
+  * ASoC: sgtl5000: fix cache handling
+
+  [ Takashi Iwai ]
+  * ALSA: timer - Fix Oops at closing slave timer
+
+  [ Daniel Mack ]
+  * ALSA: snd-usb-caiaq: Fix keymap for RigKontrol3
+
+  [ Nicolai Krakowiak ]
+  * ALSA: snd-usb: avoid dividing by zero on invalid input
+
+  [ Daniel Mack ]
+  * ALSA: snd-usb: operate on given mixer interface only
+
+  [ Clemens Ladisch ]
+  * ALSA: snd-usb: Accept UAC2 FORMAT_TYPE descriptors with bLength > 6
+
+  [ Eric Dumazet ]
+  * ipv6: make fragment identifications less predictable
+
+  [ David S. Miller ]
+  * icmp: Fix regression in nexthop resolution during replies.
+
+  [ Bill Sommerfeld ]
+  * ipv4: Constrain UFO fragment sizes to multiples of 8 bytes
+
+  [ Julian Anastasov ]
+  * ipv4: fix the reusing of routing cache entries
+
+  [ Simon Horman ]
+  * IPVS: Free resources on module removal
+
+  [ Julia Lawall ]
+  * net: adjust array index
+  * drivers/net/niu.c: adjust array index
+
+  [ Eric Dumazet ]
+  * sch_sfq: fix sfq_enqueue()
+
+  [ Zoltan Kiss ]
+  * IPv4: Send gratuitous ARP for secondary IP addresses also
+
+  [ Neil Horman ]
+  * net: add IFF_SKB_TX_SHARED flag to priv_flags
+  * net: Audit drivers to identify those needing IFF_TX_SKB_SHARING cleared
+
+  [ Andy Gospodarek ]
+  * bonding: fix string comparison errors
+
+  [ Chris Clayton ]
+  * Fix cdc-phonet build
+
+  [ Tushar Gohad ]
+  * xfrm: Fix key lengths for rfc3686(ctr(aes))
+
+  [ Klement Fish ]
+  * sis190: Rx filter init is needed for MAC address change.
+
+  [ Lennart Sorensen ]
+  * r8169: Add support for D-Link 530T rev C1 (Kernel Bug 38862)
+
+  [ stephen hemminger ]
+  * net: allow netif_carrier to be called safely from IRQ
+
+  [ Julian Anastasov ]
+  * ipv4: use RT_TOS after some rt_tos conversions
+
+  [ xeb@mail.ru ]
+  * gre: fix improper error handling
+
+  [ Wey-Yi Guy ]
+  * iwlagn: 5000 do not support idle mode
+
+  [ Kashyap, Desai ]
+  * mpt2sas: Fixed Big Indian Issues on 32 bit PPC
+
+  [ David S. Miller ]
+  * sparc: Don't leave sparc_pmu_type NULL on sun4v.
+  * sparc: Add T3 sun4v cpu type and hypervisor group defines.
+  * sparc: Don't do expensive hypervisor PCR write unless necessary.
+  * sparc: Detect and handle UltraSPARC-T3 cpu types.
+  * sparc: Sanitize cpu feature detection and reporting.
+  * sparc: Minor tweaks to Niagara page copy/clear.
+  * sparc: Use popc if possible for hweight routines.
+  * sparc: Use hweight64() in popc emulation.
+  * sparc: Add some missing hypervisor API groups.
+  * sparc: Set reboot-cmd using reboot data hypervisor call if available.
+  * sparc: Use popc when possible for ffs/__ffs/ffz.
+  * sparc: Access kernel TSB using physical addressing when possible.
+  * sparc: Size mondo queues more sanely.
+  * sparc: Fix build with DEBUG_PAGEALLOC enabled.
+
+  [ John Johansen ]
+  * Ecryptfs: Add mount option to check uid of device being mounted = expect uid
+
+  [ Tyler Hicks ]
+  * eCryptfs: Return error when lower file pointer is NULL
+
+  [ Anton Blanchard ]
+  * powerpc/pseries: Fix kexec on recent firmware versions
+  * powerpc: Fix device tree claim code
+  * powerpc: pseries: Fix kexec on machines with more than 4TB of RAM
+
+  [ Eric Sandeen ]
+  * ext3: Properly count journal credits for long symlinks
+  * ext4: Properly count journal credits for long symlinks
+
+  [ Bruce Allan ]
+  * e1000e: alternate MAC address does not work on device id 0x1060
+
+  [ Richard Cochran ]
+  * gianfar: fix fiper alignment after resetting the time
+  * dp83640: increase receive time stamp buffer size
+
+  [ Rajkumar Manoharan ]
+  * ath9k_hw: Fix incorrect Tx control power in AR9003 template
+
+  [ Alex Hacker ]
+  * ath9k: fix a misprint which leads to incorrect calibration
+
+  [ David S. Miller ]
+  * sparc: Don't do hypervisor calls on non-sun4v in DS driver.
+
+  [ Peter Zijlstra ]
+  * mm: Fix fixup_user_fault() for MMU=n
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.2
+
+  [ Stephen Hemminger ]
+  * Change kernel config
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Tue, 16 Aug 2011 09:04:44 -0700
+
 linux-3.0 (3.0.1-1+vyatta+2) unstable; urgency=low
 
   * Restore missing link_filter from 3.0 merge
