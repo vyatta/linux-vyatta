@@ -1,3 +1,78 @@
+linux-3.0 (3.0.3-1+vyatta+1) unstable; urgency=low
+
+  [ Stefan Lippers-Hollmann ]
+  * staging: rtl8192u: declare MODULE_FIRMWARE
+
+  [ JiSheng Zhang ]
+  * USB: xhci: fix OS want to own HC
+
+  [ Sarah Sharp ]
+  * xhci: Don't submit commands or URBs to halted hosts.
+
+  [ Sebastian Andrzej Siewior ]
+  * usb/config: use proper endian access for wMaxPacketSize
+
+  [ John Stultz ]
+  * usb: musb: fix oops on musb_gadget_pullup
+
+  [ Maxim Nikulin ]
+  * USB: assign instead of equal in usbtmc.c
+
+  [ Ionut Nicu ]
+  * USB: ftdi_sio: fix minor typo in get_ftdi_divisor
+
+  [ Nick Bowler ]
+  * USB: usb-storage: unusual_devs entry for ARM V2M motherboard.
+
+  [ Vijay Chavan ]
+  * USB: Serial: Added device ID for Qualcomm Modem in Sagemcom's HiLo3G
+
+  [ Andrew Bird ]
+  * USB: option driver: add PID for Vodafone-Huawei K3770
+  * USB: option driver: add PID for Vodafone-Huawei K3771
+  * USB: option driver: add PID for Vodafone-Huawei K4510
+  * USB: option driver: add PID for Vodafone-Huawei K4511
+
+  [ Chas Williams ]
+  * atm: br2864: sent packets truncated in VC routed mode
+
+  [ Julia Lawall ]
+  * hwmon: (ibmaem) add missing kfree
+
+  [ Daniel Mack ]
+  * ALSA: snd-usb-caiaq: Correct offset fields of outbound iso_frame_desc
+
+  [ Mark Brown ]
+  * ASoC: Fix binding of WM8750 on Jive
+
+  [ Stephen Warren ]
+  * ASoC: Tegra: tegra_pcm_deallocate_dma_buffer: Don't OOPS
+  * ASoC: Tegra: wm8903 machine driver: Allow re-insertion of module
+
+  [ Bob Copeland ]
+  * ath5k: fix error handling in ath5k_beacon_send
+
+  [ Clemens Ladisch ]
+  * mm: fix wrong vmap address calculations with odd NR_CPUS values
+
+  [ Rusty Russell ]
+  * lguest: allow booting guest with CONFIG_RELOCATABLE=y
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: don't enable connectors that are off in the hotplug handler
+  * drm/radeon/kms: fix regression is handling >2 heads on cedar/caicos
+  * drm/radeon/kms: don't try to be smart in the hpd handler
+
+  [ Jonathan Nieder ]
+  * perf tools: do not look at ./config for configuration
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.3
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Wed, 17 Aug 2011 21:03:45 -0700
+
 linux-3.0 (3.0.2-1+vyatta+1) unstable; urgency=low
 
   [ WANG Cong ]
