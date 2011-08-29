@@ -1,3 +1,111 @@
+linux-3.0 (3.0.4-1+vyatta+1) unstable; urgency=low
+
+  [ jhbird.choi@samsung.com ]
+  * genirq: Fix wrong bit operation
+
+  [ Jeff Layton ]
+  * cifs: demote cERROR in build_path_from_dentry to cFYI
+
+  [ Timo Warns ]
+  * befs: Validate length of long symbolic links.
+
+  [ Mathias Krause ]
+  * i7core_edac: fixed typo in error count calculation
+
+  [ Steve French ]
+  * possible memory corruption on mount
+
+  [ Len Brown ]
+  * x86, intel, power: Correct the MSR_IA32_ENERGY_PERF_BIAS message
+
+  [ Boaz Harrosh ]
+  * pnfs-obj: Fix the comp_index != 0 case
+  * pnfs-obj: Bug when we are running out of bio
+
+  [ Trond Myklebust ]
+  * NFSv4.1: Fix the callback 'highest_used_slotid' behaviour
+  * NFSv4.1: Return NFS4ERR_BADSESSION to callbacks during session resets
+
+  [ Suresh Siddha ]
+  * x86, mtrr: lock stop machine during MTRR rendezvous sequence
+
+  [ Josef Bacik ]
+  * Btrfs: detect wether a device supports discard
+
+  [ Kay Sievers ]
+  * loop: fix deadlock when sysfs and LOOP_CLR_FD race against each other
+
+  [ liubo ]
+  * Btrfs: fix an oops of log replay
+
+  [ Takashi Iwai ]
+  * ALSA: usb-audio - Fix missing mixer dB information
+
+  [ Daniel Mack ]
+  * ALSA: snd_usb_caiaq: track submitted output urbs
+
+  [ Daniel T Chen ]
+  * ALSA: ac97: Add HP Compaq dc5100 SFF(PT003AW) to Headphone Jack Sense whitelist
+
+  [ Curt Wohlgemuth ]
+  * ext4: Fix ext4_should_writeback_data() for no-journal mode
+
+  [ Jiaying Zhang ]
+  * ext4: call ext4_ioend_wait and ext4_flush_completed_IO in ext4_evict_inode
+
+  [ Tao Ma ]
+  * ext4: Resolve the hang of direct i/o read in handling EXT4_IO_END_UNWRITTEN.
+
+  [ Theodore Ts'o ]
+  * ext4: fix nomblk_io_submit option so it correctly converts uninit blocks
+
+  [ Stefan Bader ]
+  * xen-blkfront: Drop name and minor adjustments for emulated scsi devices
+  * xen-blkfront: Fix one off warning about name clash
+
+  [ Jan Beulich ]
+  * xen/x86: replace order-based range checking of M2P table by linear one
+
+  [ Stefano Stabellini ]
+  * xen: Do not enable PV IPIs when vector callback not present
+
+  [ Paul Fox ]
+  * x86, olpc: Wait for last byte of EC command to be accepted
+
+  [ H. Peter Anvin ]
+  * x86-32, vdso: On system call restart after SYSENTER, use int $0x80
+
+  [ Jack Steiner ]
+  * x86, UV: Remove UV delay in starting slave cpus
+
+  [ Marcin Slusarz ]
+  * drm/ttm: fix ttm_bo_add_ttm(user) failure path
+
+  [ Thomas Reim ]
+  * drm/radeon: Extended DDC Probing for Toshiba L300D Radeon Mobility X1100 HDMI-A Connector
+
+  [ Miklos Szeredi ]
+  * fuse: check size of FUSE_NOTIFY_INVAL_ENTRY message
+
+  [ Stanislaw Gruszka ]
+  * rt2x00: fix order of entry flags modification
+
+  [ Aaron Lu ]
+  * mmc: sdhci: fix retuning timer wrongly deleted in sdhci_tasklet_finish
+
+  [ Carolyn Wyborny ]
+  * igb: Fix lack of flush after register write and before delay
+
+  [ Andi Kleen ]
+  * Add a personality to report 2.6.x version numbers
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.4
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 29 Aug 2011 14:58:26 -0700
+
 linux-3.0 (3.0.3-1+vyatta+2) unstable; urgency=low
 
   * Re-enable FUSION MPT drivers
