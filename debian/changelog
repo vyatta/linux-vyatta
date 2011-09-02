@@ -1,3 +1,9 @@
+linux-3.0 (3.0.4-1+vyatta+2) unstable; urgency=low
+
+  * bridge: set flags in RTM_NEWNEIGH message correctly
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Thu, 01 Sep 2011 17:21:12 -0700
+
 linux-3.0 (3.0.4-1+vyatta+1) unstable; urgency=low
 
   [ jhbird.choi@samsung.com ]
