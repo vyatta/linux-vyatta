@@ -311,7 +311,8 @@ struct dentry *unionfs_lookup_full(struct dentry *dentry,
 	verify_locked(parent);
 
 	/* must initialize dentry operations */
-	dentry->d_op = &unionfs_dops;
+	if (lookupmode == INTERPOSE_LOOKUP)
+		d_set_d_op(dentry, &unionfs_dops);
 
 	/* We never partial lookup the root directory. */
 	if (IS_ROOT(dentry))
