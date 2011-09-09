@@ -362,12 +362,13 @@ void __unionfs_check_file(const struct file *file,
 		pr_debug(" CF0: file/dentry=%p:%p fstart/end=%d:%d\n",
 			 file, dentry, fstart, fend);
 	}
-	if (unlikely(fstart != dstart)) {
+	/* d_deleted dentries can be ignored for this test */
+	if (unlikely(fstart != dstart) && !d_deleted(dentry)) {
 		PRINT_CALLER(fname, fxn, line);
 		pr_debug(" CF1: file/dentry=%p:%p fstart=%d dstart=%d\n",
 			 file, dentry, fstart, dstart);
 	}
-	if (unlikely(fend != dend)) {
+	if (unlikely(fend != dend) && !d_deleted(dentry)) {
 		PRINT_CALLER(fname, fxn, line);
 		pr_debug(" CF2: file/dentry=%p:%p fend=%d dend=%d\n",
 			 file, dentry, fend, dend);

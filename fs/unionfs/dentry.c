@@ -315,11 +315,14 @@ bool is_newer_lower(const struct dentry *dentry)
 }
 
 static int unionfs_d_revalidate(struct dentry *dentry,
-				struct nameidata *nd_unused)
+				struct nameidata *nd)
 {
 	bool valid = true;
 	int err = 1;		/* 1 means valid for the VFS */
 	struct dentry *parent;
+
+	if (nd && nd->flags & LOOKUP_RCU)
+		return -ECHILD;
 
 	unionfs_read_lock(dentry->d_sb, UNIONFS_SMUTEX_CHILD);
 	parent = unionfs_lock_parent(dentry, UNIONFS_DMUTEX_PARENT);

@@ -145,7 +145,7 @@ skip:
 			 * properly.  Finally we must return this new
 			 * dentry.
 			 */
-			spliced->d_op = &unionfs_dops;
+			d_set_d_op(spliced, &unionfs_dops);
 			spliced->d_fsdata = dentry->d_fsdata;
 			dentry->d_fsdata = NULL;
 			dentry = spliced;
@@ -543,7 +543,7 @@ static struct dentry *unionfs_d_alloc_root(struct super_block *sb)
 
 		ret = d_alloc(NULL, &name);
 		if (likely(ret)) {
-			ret->d_op = &unionfs_dops;
+			d_set_d_op(ret, &unionfs_dops);
 			ret->d_sb = sb;
 			ret->d_parent = ret;
 		}
