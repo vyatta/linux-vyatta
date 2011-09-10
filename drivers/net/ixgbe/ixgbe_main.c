@@ -2880,6 +2880,7 @@ static void ixgbe_configure_tx(struct ixgbe_adapter *adapter)
 static void ixgbe_configure_srrctl(struct ixgbe_adapter *adapter,
 				   struct ixgbe_ring *rx_ring)
 {
+	struct ixgbe_hw *hw = &adapter->hw;
 	u32 srrctl;
 	u8 reg_idx = rx_ring->reg_idx;
 
@@ -2900,7 +2901,21 @@ static void ixgbe_configure_srrctl(struct ixgbe_adapter *adapter,
 
 	srrctl &= ~IXGBE_SRRCTL_BSIZEHDR_MASK;
 	srrctl &= ~IXGBE_SRRCTL_BSIZEPKT_MASK;
-	if (adapter->num_vfs)
+
+	/*
+	 * We should set the drop enable bit if:
+	 *  SR-IOV is enabled
+	 *   or
+	 *  Flow Control is disabled and number of RX queues > 1
+	 *
+	 *  This allows us to avoid head of line blocking for security
+	 *  and performance reasons.
+	 */
+	if (adapter->num_vfs ||
+	    (adapter->num_rx_queues > 1 &&
+	     (hw->fc.disable_fc_autoneg ||
+	      hw->fc.requested_mode == ixgbe_fc_none||
+	      hw->fc.requested_mode == ixgbe_fc_rx_pause)))
 		srrctl |= IXGBE_SRRCTL_DROP_EN;
 
 	srrctl |= (IXGBE_RX_HDR_SIZE << IXGBE_SRRCTL_BSIZEHDRSIZE_SHIFT) &
