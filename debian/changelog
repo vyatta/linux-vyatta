@@ -1,3 +1,16 @@
+linux-3.0 (3.0.4-1+vyatta+3) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Unionfs 2.5.10
+  * ixgbe: set drop enabled if flow control disabled
+
+  [ Lionel Elie Mamane ]
+  * sit tunnels: propagate IPv6 transport class to IPv4 Type of Service
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 12 Sep 2011 08:57:01 -0700
+
 linux-3.0 (3.0.4-1+vyatta+2) unstable; urgency=low
 
   * bridge: set flags in RTM_NEWNEIGH message correctly
