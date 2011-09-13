@@ -1,3 +1,15 @@
+linux-3.0 (3.0.4-1+vyatta+4) unstable; urgency=low
+
+  [ Lionel Elie Mamane ]
+  * sit tunnels: propagate IPv6 transport class to IPv4 Type of Service
+
+  [ Stephen Hemminger ]
+  * ixgbe: set drop enabled if flow control disabled
+  * Unionfs 2.5.10
+  * cleanup merge debris
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Tue, 13 Sep 2011 09:19:07 -0700
+
 linux-3.0 (3.0.4-1+vyatta+3) unstable; urgency=low
 
   [ Stephen Hemminger ]
