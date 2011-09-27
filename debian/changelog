@@ -1,3 +1,10 @@
+linux-3.0 (3.0.4-1+vyatta+5) unstable; urgency=low
+
+  * sky2: handle irq better on single port card
+  * skge: handle irq better on single port card
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Tue, 27 Sep 2011 10:27:40 -0700
+
 linux-3.0 (3.0.4-1+vyatta+4) unstable; urgency=low
 
   [ Lionel Elie Mamane ]
