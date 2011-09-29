@@ -1,3 +1,10 @@
+linux-3.0 (3.0.4-1+vyatta+6) unstable; urgency=low
+
+  * bridge: fix ordering of NEWLINK and NEWNEIGH events
+  * bridge: allow updating existing fdb entries
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Thu, 29 Sep 2011 08:49:04 -0700
+
 linux-3.0 (3.0.4-1+vyatta+5) unstable; urgency=low
 
   * sky2: handle irq better on single port card
