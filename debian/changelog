@@ -1,3 +1,639 @@
+linux-3.0 (3.0.6-1+vyatta+1) unstable; urgency=low
+
+  [ Nishanth Aravamudan ]
+  * kernel/printk: do not turn off bootconsole in printk_late_init() if keep_bootcon
+
+  [ Alexandre Bounine ]
+  * rapidio: fix use of non-compatible registers
+
+  [ Liu Gang-B34182 ]
+  * arch/powerpc/sysdev/fsl_rio.c: correct IECSR register clear value
+
+  [ Axel Lin ]
+  * ASoC: soc-jack: Fix checking return value of request_any_context_irq
+
+  [ Scott Jiang ]
+  * ASoC: ad193x: fix registers definition
+  * ASoC: ad193x: fix dac word len setting
+
+  [ Nick Pelly ]
+  * omap-serial: Allow IXON and IXOFF to be disabled.
+
+  [ Bjorn Helgaas ]
+  * serial: 8250_pnp: add Intermec CV60 touchscreen device
+
+  [ Eric Smith ]
+  * 8250_pci: add support for Rosewill RC-305 4x serial port card
+
+  [ Al Cooper ]
+  * 8250: Fix race condition in serial8250_backup_timeout().
+
+  [ Axel Lin ]
+  * tty: Add "spi:" prefix for spi modalias
+
+  [ Jiri Slaby ]
+  * TTY: pty, fix pty counting
+
+  [ Jean-Christophe PLAGNIOL-VILLARD ]
+  * USB: ftdi_sio: add Calao reference board support
+
+  [ Yulgon Kim ]
+  * usb: s5p-ehci: fix a NULL pointer deference
+
+  [ Andrew Bird ]
+  * USB option driver add PID of Huawei Vodafone K3806
+  * USB option driver add PID of Huawei Vodafone K4605
+
+  [ Gavin.zhu ]
+  * USB: option: add YUGA device id to driver
+
+  [ Andrew Bird ]
+  * USB option driver K3765/K4505 avoid CDC_DATA interface
+
+  [ Per Forlin ]
+  * usb: musb: cppi: fix build errors due to DBG and missing musb variable
+
+  [ Wang Zhi ]
+  * USB: EHCI: Do not rely on PORT_SUSPEND to stop USB resuming in ehci_bus_resume().
+
+  [ Andiry Xu ]
+  * xHCI: fix port U3 status check condition
+  * xHCI: report USB2 port in resuming as suspend
+
+  [ Sarah Sharp ]
+  * xhci: Fix memory leak during failed enqueue.
+  * xhci: Fix failed enqueue in the middle of isoch TD.
+  * xhci: Remove TDs from TD lists when URBs are canceled.
+  * xhci: Handle zero-length isochronous packets.
+
+  [ Mathieu Desnoyers ]
+  * sendmmsg/sendmsg: fix unsafe user pointer access
+
+  [ Mohammed Shafi Shajakhan ]
+  * ath9k: Fix PS wrappers in ath9k_set_coverage_class
+
+  [ Anton Blanchard ]
+  * ibmveth: Fix leak when recycling skb and hypervisor returns error
+
+  [ Alexey Khoroshilov ]
+  * carl9170: Fix mismatch in carl9170_op_set_key mutex lock-unlock
+
+  [ Senthil Balasubramanian ]
+  * ath9k_hw: Fix STA (AR9485) bringup issue due to incorrect MAC address
+
+  [ Stanislaw Gruszka ]
+  * rt2x00: do not drop usb dev reference counter on suspend
+
+  [ John Stanley ]
+  * savagedb: Fix typo causing regression in savage4 series video chip detection
+
+  [ Tejun Heo ]
+  * pata_via: disable ATAPI DMA on AVERATEC 3200
+
+  [ Daniel Schwierzeck ]
+  * atm: br2684: Fix oops due to skb->dev being NULL
+
+  [ Stanislaw Gruszka ]
+  * rt2x00: fix crash in rt2800usb_write_tx_desc
+  * rt2x00: fix crash in rt2800usb_get_txwi
+
+  [ Mikael Pettersson ]
+  * sparc64: remove unnecessary macros from spinlock_64.h
+  * sparc32: unbreak arch_write_unlock()
+
+  [ David S. Miller ]
+  * sparc: Allow handling signals when stack is corrupted.
+  * sparc64: Set HAVE_C_RECORDMCOUNT
+
+  [ Ian Campbell ]
+  * sparc: fix array bounds error setting up PCIC NMI trap
+
+  [ Kjetil Oftedal ]
+  * sparc32,sun4d: Change IPI IRQ level to prevent collision between IPI and timer interrupt
+
+  [ Axel Lin ]
+  * regulator: tps65910: Add missing breaks in switch/case
+
+  [ David S. Miller ]
+  * sparc64: Only Panther cheetah+ chips have POPC.
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: add s/r quirk for Compaq Presario V5245EU
+
+  [ Jerome Glisse ]
+  * drm/radeon/kms: evergreen & ni reset SPI block on CP resume
+
+  [ Srinivas Kandagatla ]
+  * ARM: 7014/1: cache-l2x0: Fix L2 Cache size calculation.
+
+  [ NeilBrown ]
+  * md/linear: avoid corrupting structure while waiting for rcu_free to complete.
+
+  [ Dave Airlie ]
+  * drm/radeon/kms: set a default max_pixel_clock
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: make sure pci max read request size is valid on evergreen+ (v2)
+
+  [ Mel Gorman ]
+  * mm: page allocator: initialise ZLC for first zone eligible for zone_reclaim
+  * mm: page allocator: reconsider zones for allocation after direct reclaim
+
+  [ Carolyn Wyborny ]
+  * igb: fix WOL on second port of i350 device
+
+  [ Troy Kisky ]
+  * MXC: iomux-v3: correct NO_PAD_CTRL definition
+
+  [ John Stultz ]
+  * alarmtimers: Avoid possible null pointer traversal
+  * alarmtimers: Memset itimerspec passed into alarm_timer_get
+  * alarmtimers: Avoid possible denial of service with high freq periodic timers
+  * rtc: Fix RTC PIE frequency limit
+
+  [ Thomas Gleixner ]
+  * sched: Separate the scheduler entry for preemption
+  * sched: Move blk_schedule_flush_plug() out of __schedule()
+
+  [ WANG Cong ]
+  * sched: Fix a memory leak in __sdt_free()
+
+  [ Andrey Vagin ]
+  * x86, perf: Check that current->mm is alive before getting user callchain
+
+  [ Mika Westerberg ]
+  * mmc: rename mmc_host_clk_{ungate|gate} to mmc_host_clk_{hold|release}
+  * mmc: core: prevent aggressive clock gating racing with ios updates
+  * mmc: core: use non-reentrant workqueue for clock gating
+
+  [ Girish K S ]
+  * mmc: sdhci-s3c: Fix mmc card I/O problem
+
+  [ Igor Mammedov ]
+  * xen: x86_32: do not enable iterrupts when returning from exception in interrupt context
+
+  [ Konrad Rzeszutek Wilk ]
+  * xen/smp: Warn user why they keel over - nosmp or noapic and what to use instead.
+
+  [ Guenter Roeck ]
+  * hwmon: (max16065) Fix current calculation
+
+  [ Linus Walleij ]
+  * ARM: 7081/1: mach-integrator: fix the clocksource
+
+  [ Sudhakar Rajashekhara ]
+  * ARM: davinci: da850 EVM: read mac address from SPI flash
+
+  [ Linus Walleij ]
+  * ARM: davinci: fix cache flush build error
+
+  [ Marcin Slusarz ]
+  * drm/nouveau: properly handle allocation failure in nouveau_sgdma_populate
+
+  [ NeilBrown ]
+  * Avoid dereferencing a 'request_queue' after last close.
+  * md: Fix handling for devices from 2TB to 4TB in 0.90 metadata.
+
+  [ Jarod Wilson ]
+  * nuvoton-cir: simplify raw IR sample handling
+
+  [ Florian Mickler ]
+  * vp7045: fix buffer setup
+
+  [ Eric Van Hensbergen ]
+  * net/9p: fix client code to fail more gracefully on protocol error
+
+  [ jvrao ]
+  * Fix the size of receive buffer packing onto VirtIO ring.
+  * VirtIO can transfer VIRTQUEUE_NUM of pages.
+
+  [ Aneesh Kumar K.V ]
+  * fs/9p: Fid is not valid after a failed clunk.
+  * fs/9p: When doing inode lookup compare qid details and inode mode bits.
+
+  [ Prem Karat ]
+  * fs/9p: Fix invalid mount options/args
+
+  [ Aneesh Kumar K.V ]
+  * fs/9p: Always ask new inode in create
+
+  [ Venkateswararao Jujjuri (JV) ]
+  * net/9p: Fix the msize calculation.
+
+  [ Al Viro ]
+  * 9p: close ACL leaks
+
+  [ Randy Dunlap ]
+  * irda: fix smsc-ircc2 section mismatch warning
+
+  [ Joerg Roedel ]
+  * iommu/amd: Don't take domain->lock recursivly
+  * iommu/amd: Make sure iommu->need_sync contains correct value
+
+  [ Fenghua Yu ]
+  * ACPICA: Do not repair _TSS return package if _PSS is present
+
+  [ Aneesh Kumar K.V ]
+  * fs/9p: Add fid before dentry instantiation
+  * fs/9p: Don't update file type when updating file attributes
+  * fs/9p: Add OS dependent open flags in 9p protocol
+  * net/9p: Fix kernel crash with msize 512K
+  * fs/9p: Always ask new inode in lookup for cache mode disabled
+
+  [ Jim Garlick ]
+  * fs/9p: Use protocol-defined value for lock/getlock 'type' field.
+
+  [ Dan Williams ]
+  * isci: fix sata response handling
+  * isci: fix 32-bit operation when CONFIG_HIGHMEM64G=n
+
+  [ Timur Tabi ]
+  * ASoC: MPC5200: replace of_device with platform_device
+
+  [ Stephen M. Cameron ]
+  * hpsa: fix problem that OBDR devices are not detected
+  * hpsa: fix physical device lun and target numbering problem
+
+  [ Andrew Vasquez ]
+  * qla2xxx: Correct inadvertent loop state transitions during port-update handling.
+
+  [ Stanislaw Gruszka ]
+  * iwlegacy: fix BUG_ON(info->control.rates[0].idx < 0)
+
+  [ Len Brown ]
+  * acpica: ACPI_MAX_SLEEP should be 2 sec, not 20
+
+  [ Felix Fietkau ]
+  * ath9k_hw: fix calibration on 5 ghz
+
+  [ Jeff Kirsher ]
+  * e1000: Fix driver to be used on PA RISC C8000 workstations
+
+  [ Mark Brown ]
+  * ASoC: Fix reporting of partial jack updates
+
+  [ Lars-Peter Clausen ]
+  * ASoC: Blackfin: bf5xx-ad193x: Fix codec device name
+
+  [ Mark Brown ]
+  * mfd: Fix value of WM8994_CONFIGURE_GPIO
+
+  [ Johan Hovold ]
+  * mfd: Fix initialisation of tps65910 interrupts
+
+  [ Anand Gadiyar ]
+  * mfd: Make omap-usb-host TLL mode work again
+
+  [ Geert Uytterhoeven ]
+  * genirq: Make irq_shutdown() symmetric vs. irq_startup again
+
+  [ George ]
+  * rtlwifi: rtl8192su: Fix problem connecting to HT-enabled AP
+  * rtlwifi: Fix problem when switching connections
+
+  [ Johannes Berg ]
+  * mac80211: fix missing sta_lock in __sta_info_destroy
+
+  [ Thomas Gleixner ]
+  * x86, iommu: Mark DMAR IRQ as non-threaded
+
+  [ David Henningsson ]
+  * ALSA: HDA: Cirrus - fix "Surround Speaker" volume control name
+
+  [ Michel Dänzer ]
+  * drm/radeon: Don't read from CP ring write pointer registers.
+
+  [ Al Viro ]
+  * restore pinning the victim dentry in vfs_rmdir()/vfs_rename_dir()
+
+  [ David Vrabel ]
+  * mm: sync vmalloc address space page tables in alloc_vm_area()
+
+  [ Johan Hovold ]
+  * drivers/leds/ledtrig-timer.c: fix broken sysfs delay handling
+
+  [ Naga Chumbalkar ]
+  * drivers/cpufreq/pcc-cpufreq.c: avoid NULL pointer dereference
+
+  [ Thomas Tuttle ]
+  * workqueue: lock cwq access in drain_workqueue
+
+  [ Arjan van de Ven ]
+  * ALSA: pcm - fix race condition in wait_for_avail()
+
+  [ Brian King ]
+  * ibmveth: Fix DMA unmap error
+
+  [ Anton Blanchard ]
+  * ibmveth: Fix issue with DMA mapping failure
+  * ibmveth: Checksum offload is always disabled
+
+  [ Ming Lei ]
+  * firewire: ohci: add no MSI quirk for O2Micro controller
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: Make GPU/CPU page size handling consistent in blit code (v2)
+
+  [ Sarah Sharp ]
+  * USB: xhci: Set change bit when warm reset change is set.
+
+  [ Johannes Berg ]
+  * iwlagn: fix command queue timeout
+
+  [ Takashi Iwai ]
+  * ALSA: hda/realtek - Fix auto-mute with HP+LO configuration
+
+  [ Jeff Layton ]
+  * cifs: fix possible memory corruption in CIFSFindNext
+
+  [ Steve French ]
+  * Fix the conflict between rwpidforward and rw mount options
+
+  [ Nicolas Pitre ]
+  * ARM: Dove: fix second SPI initialization call
+
+  [ Carsten Emde ]
+  * floppy: use del_timer_sync() in init cleanup
+
+  [ Manual Munz ]
+  * b43: Fix beacon problem in ad-hoc mode
+
+  [ Jesse Brandeburg ]
+  * ixgbe: fix possible null buffer error
+
+  [ Lasse Collin ]
+  * XZ: Fix incorrect XZ_BUF_ERROR
+
+  [ Larry Finger ]
+  * rt2800pci: Fix compiler error on PowerPC
+
+  [ Dave Hansen ]
+  * make /proc/$pid/numa_maps gather_stats() take variable page size
+  * break out numa_maps gather_pte_stats() checks
+  * teach /proc/$pid/numa_maps about transparent hugepages
+
+  [ David Vrabel ]
+  * xen: use maximum reservation to limit amount of usable RAM
+  * xen/e820: if there is no dom0_mem=, don't tweak extra_pages.
+
+  [ Rajkumar Manoharan ]
+  * wireless: Reset beacon_found while updating regulatory
+
+  [ Larry Finger ]
+  * rtl2800usb: Fix incorrect storage of MAC address on big-endian platforms
+
+  [ Don Fry ]
+  * iwlagn: workaround bug crashing some APs
+
+  [ Wanlong Gao ]
+  * blk-cgroup: be able to remove the record of unplugged device
+
+  [ Mike Christie ]
+  * iscsi_tcp: fix locking around iscsi sk user data
+
+  [ Matt Carlson ]
+  * tg3: Fix io failures after chip reset
+
+  [ Jiri Slaby ]
+  * ipc/mqueue.c: refactor failure handling
+  * ipc/mqueue.c: fix mq_open() return value
+
+  [ Wu Fengguang ]
+  * writeback: introduce .tagged_writepages for the WB_SYNC_NONE sync stage
+  * writeback: update dirtied_when for synced inode to prevent livelock
+
+  [ Jan Glauber ]
+  * qdio: clear shared DSCI before scheduling the queue handler
+
+  [ Matt Carlson ]
+  * tg3: Add 5719 and 5720 to EEE_CAP list
+  * tg3: Fix int selftest for recent devices.
+
+  [ Anisse Astier ]
+  * ehci: refactor pci quirk to use standard dmi_check_system method
+  * ehci: add pci quirk for Ordissimo and RM Slate 100 too
+
+  [ Michal Sroczynski ]
+  * USB: PL2303: correctly handle baudrates above 115200
+
+  [ Marek Vasut ]
+  * ASIX: Add AX88772B USB ID
+
+  [ Giuseppe Scrivano ]
+  * cdc_ncm: fix endianness problem.
+
+  [ Kiran Patil ]
+  * libfc: Enhancement to RPORT state machine applicable only for VN2VN mode
+  * fcoe: Unable to select the exchangeID from offload pool for storage targets
+
+  [ Kashyap, Desai ]
+  * mpt2sas: Added DID_NO_CONNECT return when driver remove and avoid shutdown call
+  * mpt2sas: Adding support for customer specific branding
+
+  [ Youquan Song ]
+  * perf, x86: Add model 45 SandyBridge support
+
+  [ Eric Dumazet ]
+  * arp: fix rcu lockdep splat in arp_process()
+  * bridge: fix a possible net_device leak
+
+  [ Gao feng ]
+  * fib:fix BUG_ON in fib_nl_newrule when add new fib rule
+
+  [ Julian Anastasov ]
+  * ipv4: some rt_iif -> rt_route_iif conversions
+
+  [ Daniel Baluta ]
+  * ipv6: Fix ipv6_getsockopt for IPV6_2292PKTOPTIONS
+
+  [ Yan, Zheng ]
+  * mcast: Fix source address selection for multicast listener report
+
+  [ Julian Anastasov ]
+  * netfilter: TCP and raw fix for ip_route_me_harder
+
+  [ Florian Westphal ]
+  * net_sched: prio: use qdisc_dequeue_peeked
+
+  [ Ben Hutchings ]
+  * Revert "sfc: Use write-combining to reduce TX latency" and follow-ups
+
+  [ Tim Chen ]
+  * scm: Capture the full credentials of the scm sender
+
+  [ Zheng Yan ]
+  * tcp: fix validation of D-SACK
+
+  [ Mike Waychison ]
+  * tcp: initialize variable ecn_ok in syncookies path
+
+  [ Jiri Pirko ]
+  * vlan: reset headers on accel emulation path
+
+  [ Steffen Klassert ]
+  * xfrm: Perform a replay check after return from async codepaths
+
+  [ Yan, Zheng ]
+  * bridge: Pseudo-header required for the checksum of ICMPv6
+
+  [ Eric Dumazet ]
+  * bridge: fix a possible use after free
+
+  [ Geert Uytterhoeven ]
+  * zorro: Defer device_register() until all devices have been identified
+
+  [ Peter Huewe ]
+  * TPM: Call tpm_transmit with correct size
+  * TPM: Zero buffer after copying to userspace
+
+  [ James Smart ]
+  * lpfc 8.3.25: T10 DIF Fixes
+  * lpfc 8.3.25: Miscellaneous Bug fixes and code cleanup
+  * lpfc 8.3.25: Adapter Interface fixes and changes
+  * lpfc 8.3.25: Fabric and Target Discovery Fixes
+  * lpfc 8.3.25: PCI and SR-IOV Fixes
+
+  [ Marcin Tomczak ]
+  * isci: change sas phy timeouts from 54us to 59us
+
+  [ Jeff Skirvin ]
+  * isci: Leave requests alone if already terminating.
+
+  [ Dan Williams ]
+  * isci: fix event-get pointer increment
+
+  [ Seth Heasley ]
+  * ahci: RAID-mode SATA patch for Intel Panther Point DeviceIDs
+
+  [ Oliver Neukum ]
+  * Bluetooth: Fix timeout on scanning for the second time
+
+  [ Mike Christie ]
+  * libiscsi_tcp: fix LLD data allocation
+
+  [ Arnaud Lacombe ]
+  * usb/host/pci-quirks.c: correct annotation of `ehci_dmi_nohandoff_table'
+
+  [ Anton Blanchard ]
+  * perf symbols: Fix ppc64 SEGV in dso__load_sym with debuginfo files
+
+  [ Thomas Pfaff ]
+  * ALSA: usb-audio - clear chip->probing on error exit
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: fix DDIA enable on some rs690 systems
+
+  [ Ben Hutchings ]
+  * ALSA: fm801: Fix double free in case of error in tuner detection
+  * ALSA: fm801: Gracefully handle failure of tuner auto-detect
+
+  [ Hidetoshi Seto ]
+  * btrfs: fix d_off in the first dirent
+
+  [ Michael Chan ]
+  * cnic: Fix interrupt logic
+  * cnic: Fix race conditions with firmware
+
+  [ Eddie Wai ]
+  * cnic: Randomize initial TCP port for iSCSI connections
+
+  [ Michael Chan ]
+  * cnic: Improve NETDEV_UP event handling
+  * cnic, bnx2: Check iSCSI support early in bnx2_init_one()
+
+  [ Bhanu Prakash Gollapudi ]
+  * bnx2fc: Fix kernel panic when deleting NPIV ports
+  * bnx2fc: scsi_dma_unmap() not invoked on IO completions
+
+  [ Roland Stigge ]
+  * hwmon: (ds620) Fix handling of negative temperatures
+
+  [ Russell King ]
+  * ARM: dma-mapping: free allocated page if unable to map
+
+  [ Will Deacon ]
+  * ARM: 7091/1: errata: D-cache line maintenance operation by MVA may not succeed
+  * ARM: 7099/1: futex: preserve oldval in SMP __futex_atomic_op
+
+  [ Linus Torvalds ]
+  * firmware loader: allow builtin firmware load even if usermodehelper is disabled
+
+  [ Jarkko Nikula ]
+  * ASoC: omap-mcbsp: Do not attempt to change DAI sysclk if stream is active
+
+  [ Lars-Peter Clausen ]
+  * ASoC: ssm2602: Re-enable oscillator after suspend
+
+  [ Takashi Iwai ]
+  * ALSA: hda/realtek - Avoid bogus HP-pin assignment
+
+  [ David Henningsson ]
+  * ALSA: HDA: No power nids on 92HD93
+
+  [ Thomas Pfaff ]
+  * ALSA: usb-audio: Check for possible chip NULL pointer before clearing probing flag
+
+  [ KAMEZAWA Hiroyuki ]
+  * memcg: fix vmscan count in small memcgs
+
+  [ Neil Horman ]
+  * cxgb3i: convert cdev->l2opt to use rcu to prevent NULL dereference
+
+  [ James Bottomley ]
+  * 3w-9xxx: fix iommu_iova leak
+
+  [ Vasily Averin ]
+  * aacraid: reset should disable MSI interrupt
+
+  [ Mark Salyzyn ]
+  * libsas: fix failure to revalidate domain for anything but the first expander child.
+
+  [ Randy Dunlap ]
+  * scsi: qla4xxx needs libiscsi.o
+
+  [ Jouni Malinen ]
+  * cfg80211: Fix validation of AKM suites
+
+  [ Rajkumar Manoharan ]
+  * ath9k_hw: Fix Rx DMA stuck for AR9003 chips
+
+  [ Stanislaw Gruszka ]
+  * iwlegacy: fix command queue timeout
+
+  [ Larry Finger ]
+  * rtlwifi: rtl8192cu: Fix unitialized struct
+
+  [ Stanislaw Gruszka ]
+  * iwlegacy: do not use interruptible waits
+
+  [ Johannes Berg ]
+  * iwlagn: fix dangling scan request
+
+  [ Dmitry Kravkov ]
+  * bnx2x: fix hw attention handling
+
+  [ Shmulik Ravid ]
+  * bnx2x: add missing break in bnx2x_dcbnl_get_cap
+
+  [ Hannes Reinecke ]
+  * block: Free queue resources at blk_release_queue()
+
+  [ David Henningsson ]
+  * ALSA: HDA: Add support for IDT 92HD93
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.5
+
+  [ Dave Airlie ]
+  * Revert "drm/radeon/kms: fix typo in r100_blit_copy"
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.6
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Tue, 04 Oct 2011 08:48:47 -0700
+
 linux-3.0 (3.0.4-1+vyatta+6) unstable; urgency=low
 
   * bridge: fix ordering of NEWLINK and NEWNEIGH events
