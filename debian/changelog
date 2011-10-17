@@ -1,3 +1,9 @@
+linux-3.0 (3.0.6-1+vyatta+2) unstable; urgency=low
+
+  * bridge: implement NTF_USE
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 17 Oct 2011 14:20:40 -0700
+
 linux-3.0 (3.0.6-1+vyatta+1) unstable; urgency=low
 
   [ Nishanth Aravamudan ]
