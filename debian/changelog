@@ -1,3 +1,96 @@
+linux-3.0 (3.0.7-1+vyatta+3) unstable; urgency=low
+
+  [ David S. Miller ]
+  * sparc64: Force the execute bit in OpenFirmware's translation entries.
+
+  [ Shawn Bohrer ]
+  * sched/rt: Migrate equal priority tasks to available CPUs
+
+  [ Simon Kirby ]
+  * sched: Fix up wchan borkage
+
+  [ Borislav Petkov ]
+  * ide-disk: Fix request requeuing
+
+  [ Peter Zijlstra ]
+  * posix-cpu-timers: Cure SMP wobbles
+
+  [ Takashi Iwai ]
+  * lis3: fix regression of HP DriveGuard with 8bit chip
+
+  [ Arnd Bergmann ]
+  * ASoC: use a valid device for dev_err() in Zylonite
+
+  [ Axel Lin ]
+  * ASoC: Fix setting update bits for WM8753_LADC and WM8753_RADC
+
+  [ Michel Dänzer ]
+  * drm/radeon: Update AVIVO cursor coordinate origin before x/yorigin calculation.
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: Fix logic error in DP HPD handler
+  * drm/radeon/kms: fix regression in DP aux defer handling
+  * drm/radeon/kms: add retry limits for native DP aux defer
+  * drm/radeon/kms: fix channel_remap setup (v2)
+
+  [ Richard Cochran ]
+  * ptp: fix L2 event message recognition
+
+  [ Gertjan van Wingerde ]
+  * rt2x00: Serialize TX operations on a queue.
+
+  [ Paul Menzel ]
+  * x86/PCI: use host bridge _CRS info on ASUS M2V-MX SE
+
+  [ Roland Dreier ]
+  * qla2xxx: Fix crash in qla2x00_abort_all_cmds() on unload
+
+  [ Mark Salyzyn ]
+  * libsas: fix panic when single phy is disabled on a wide port
+
+  [ NeilBrown ]
+  * md: Avoid waking up a thread after it has been freed.
+
+  [ Mike Snitzer ]
+  * dm table: avoid crash if integrity profile changes
+
+  [ Koen Beel ]
+  * mmc: mxs-mmc: fix clock rate setting
+
+  [ Tetsuo Handa ]
+  * exec: do not call request_module() twice from search_binary_handler()
+
+  [ srinidhi kasagar ]
+  * ARM: mach-ux500: enable fix for ARM errata 754322
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: retry aux transactions if there are status flags
+  * drm/radeon/kms: use hardcoded dig encoder to transmitter mapping for DCE4.1
+
+  [ Jason Wang ]
+  * ipv6: fix NULL dereference in udp6_ufo_fragment()
+
+  [ Mark Nelson ]
+  * ahci: Enable SB600 64bit DMA on Asus M3A
+
+  [ Rafael J. Wysocki ]
+  * MIPS: PM: Use struct syscore_ops instead of sysdevs for PM (v2)
+
+  [ Steven Rostedt ]
+  * ftrace: Fix regression of :mod:module function enabling
+  * ftrace: Fix regression where ftrace breaks when modules are loaded
+  * ftrace: Fix warning when CONFIG_FUNCTION_TRACER is not defined
+
+  [ Bruce Allan ]
+  * e1000e: workaround for packet drop on 82579 at 100Mbps
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.7
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 17 Oct 2011 14:21:55 -0700
+
 linux-3.0 (3.0.6-1+vyatta+2) unstable; urgency=low
 
   * bridge: implement NTF_USE
