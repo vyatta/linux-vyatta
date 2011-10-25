@@ -1,3 +1,97 @@
+linux-3.0 (3.0.8-1+vyatta+1) unstable; urgency=low
+
+  [ Linus Walleij ]
+  * ARM: 7113/1: mm: Align bank start to MAX_ORDER_NR_PAGES
+
+  [ Will Deacon ]
+  * ARM: 7117/1: perf: fix HW_CACHE_* events on Cortex-A9
+
+  [ Jeremiah Matthey ]
+  * HID: usbhid: Add support for SiGma Micro chip
+
+  [ Jean Delvare ]
+  * hwmon: (w83627ehf) Properly report thermal diode sensors
+
+  [ Linus Torvalds ]
+  * Avoid using variable-length arrays in kernel/sys.c
+
+  [ Alex Deucher ]
+  * drm/radeon/kms/atom: fix handling of FB scratch indices
+
+  [ Peter Zijlstra ]
+  * cputimer: Cure lock inversion
+
+  [ Miklos Szeredi ]
+  * fuse: fix memory leak
+
+  [ Thomas Courbon ]
+  * Platform: fix samsung-laptop DMI identification for
+    N150/N210/220/N230
+
+  [ Jiri Kosina ]
+  * HID: magicmouse: ignore 'ivalid report id' while switching modes, v2
+
+  [ Laurent Pinchart ]
+  * uvcvideo: Fix crash when linking entities
+
+  [ Seth Forshee ]
+  * hfsplus: ensure bio requests are not smaller than the hardware
+    sectors
+
+  [ Ben Skeggs ]
+  * drm/ttm: ensure ttm for new node is bound before calling
+    move_notify()
+  * drm/ttm: unbind ttm before destroying node in accel move cleanup
+
+  [ Pavel Shilovsky ]
+  * CIFS: Fix ERR_PTR dereference in cifs_get_root
+
+  [ Christoph Hellwig ]
+  * xfs: start periodic workers later
+
+  [ Dave Chinner ]
+  * xfs: use a cursor for bulk AIL insertion
+
+  [ Christoph Hellwig ]
+  * xfs: do not update xa_last_pushed_lsn for locked items
+  * xfs: force the log if we encounter pinned buffers in .iop_pushbuf
+  * xfs: revert to using a kthread for AIL pushing
+
+  [ Chris Boot ]
+  * firewire: sbp2: fix panic after rmmod with slow targets
+
+  [ Takashi Iwai ]
+  * x86: Fix S4 regression
+
+  [ Jean Delvare ]
+  * hwmon: (w83627ehf) Fix negative 8-bit temperature values
+
+  [ Hugh Dickins ]
+  * mm: fix race between mremap and removing migration entry
+
+  [ Matthew Daley ]
+  * x25: Prevent skb overreads when checking call user data
+
+  [ Nick Bowler ]
+  * crypto: ghash - Avoid null pointer dereference if no key is set
+
+  [ Daniel Suchy ]
+  * ALSA: HDA: conexant support for Lenovo T520/W520
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Add position_fix quirk for Dell Inspiron 1010
+
+  [ Seth Forshee ]
+  * hfsplus: Fix kfree of wrong pointers in hfsplus_fill_super() error
+    path
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.8
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 25 Oct 2011 08:01:58 +0200
+
 linux-3.0 (3.0.7-1+vyatta+4) unstable; urgency=low
 
   * mm: mark huge pages in /proc numa_maps
