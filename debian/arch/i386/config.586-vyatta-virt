@@ -1,6 +1,6 @@
 #
 # Automatically generated make config: don't edit
-# Linux/i386 3.0.2 Kernel Configuration
+# Linux/i386 3.0.8 Kernel Configuration
 #
 # CONFIG_64BIT is not set
 CONFIG_X86_32=y
@@ -1367,8 +1367,7 @@ CONFIG_MISC_DEVICES=y
 # CONFIG_PHANTOM is not set
 # CONFIG_INTEL_MID_PTI is not set
 # CONFIG_SGI_IOC4 is not set
-CONFIG_TIFM_CORE=m
-CONFIG_TIFM_7XX1=m
+# CONFIG_TIFM_CORE is not set
 # CONFIG_ICS932S401 is not set
 # CONFIG_ENCLOSURE_SERVICES is not set
 # CONFIG_CS5535_MFGPT is not set
@@ -1383,7 +1382,7 @@ CONFIG_TIFM_7XX1=m
 # CONFIG_HMC6352 is not set
 # CONFIG_DS1682 is not set
 # CONFIG_TI_DAC7512 is not set
-# CONFIG_VMWARE_BALLOON is not set
+CONFIG_VMWARE_BALLOON=m
 # CONFIG_BMP085 is not set
 # CONFIG_PCH_PHUB is not set
 # CONFIG_C2PORT is not set
@@ -3870,7 +3869,6 @@ CONFIG_SECURITY_PATH=y
 # CONFIG_SECURITY_TOMOYO is not set
 # CONFIG_SECURITY_APPARMOR is not set
 # CONFIG_IMA is not set
-# CONFIG_DEFAULT_SECURITY_SELINUX is not set
 CONFIG_DEFAULT_SECURITY_DAC=y
 CONFIG_DEFAULT_SECURITY=""
 CONFIG_XOR_BLOCKS=m
