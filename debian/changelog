@@ -1,3 +1,15 @@
+linux-3.0 (3.0.8-1+vyatta+3) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Change x86-64 config
+
+  [ stephen hemminger ]
+  * macvlan: receive multicast with local address
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 07 Nov 2011 11:32:55 -0800
+
 linux-3.0 (3.0.8-1+vyatta+2) unstable; urgency=low
 
   * Remove a few unused drivers from amd64 configs
