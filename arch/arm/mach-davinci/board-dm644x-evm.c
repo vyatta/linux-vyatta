@@ -23,6 +23,7 @@
 #include <linux/phy.h>
 #include <linux/clk.h>
 #include <linux/videodev2.h>
+#include <linux/export.h>
 
 #include <media/tvp514x.h>
 
@@ -712,7 +713,7 @@ static __init void davinci_evm_init(void)
 
 MACHINE_START(DAVINCI_EVM, "DaVinci DM644x EVM")
 	/* Maintainer: MontaVista Software <source@mvista.com> */
-	.boot_params  = (DAVINCI_DDR_BASE + 0x100),
+	.atag_offset  = 0x100,
 	.map_io	      = davinci_evm_map_io,
 	.init_irq     = davinci_irq_init,
 	.timer	      = &davinci_timer,

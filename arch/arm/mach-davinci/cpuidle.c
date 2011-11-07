@@ -16,10 +16,11 @@
 #include <linux/platform_device.h>
 #include <linux/cpuidle.h>
 #include <linux/io.h>
+#include <linux/export.h>
 #include <asm/proc-fns.h>
 
 #include <mach/cpuidle.h>
-#include <mach/memory.h>
+#include <mach/ddr2.h>
 
 #define DAVINCI_CPUIDLE_MAX_STATES	2
 

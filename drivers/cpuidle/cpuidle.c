@@ -12,11 +12,12 @@
 #include <linux/mutex.h>
 #include <linux/sched.h>
 #include <linux/notifier.h>
-#include <linux/pm_qos_params.h>
+#include <linux/pm_qos.h>
 #include <linux/cpu.h>
 #include <linux/cpuidle.h>
 #include <linux/ktime.h>
 #include <linux/hrtimer.h>
+#include <linux/module.h>
 #include <trace/events/power.h>
 
 #include "cpuidle.h"
