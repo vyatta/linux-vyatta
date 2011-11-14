@@ -1,3 +1,712 @@
+linux-3.0 (3.0.9-1+vyatta+1) unstable; urgency=low
+
+  [ Pavel Shilovsky ]
+  * CIFS: Fix incorrect max RFC1002 write size value
+  * CIFS: Fix DFS handling in cifs_get_file_info
+
+  [ WANG Cong ]
+  * cris: fix a build error in drivers/tty/serial/crisv10.c
+
+  [ Jiri Slaby ]
+  * TTY: drop driver reference in tty_open fail path
+  * TTY: make tty_add_file non-failing
+  * TTY: pty, release tty in all ptmx_open fail paths
+
+  [ Jim Wylder ]
+  * USB: for usb_autopm_get_interface_async -EINPROGRESS is not an error
+
+  [ Bill Pemberton ]
+  * staging: serqt_usb2: remove ssu100 from supported devices
+
+  [ Kautuk Consul ]
+  * staging: quatech_usb2: Potential lost wakeup scenario in TIOCMIWAIT
+
+  [ Mike Sterling ]
+  * Staging: hv: Add support for >2 TB LUN in storage driver.
+
+  [ Richard Hartmann ]
+  * USB: qcserial: Add support for Sierra Wireless MC8355/Gobi 3000
+
+  [ Rigbert Hamisch ]
+  * USB: qcserial: add device ID for "HP un2430 Mobile Broadband Module"
+
+  [ Marcus Folkesson ]
+  * serial: pxa: work around for errata #20
+
+  [ Ning Jiang ]
+  * serial-core: power up uart port early before we do set_termios when resuming
+
+  [ Matthieu CASTET ]
+  * EHCI : introduce a common ehci_setup
+
+  [ Harro Haan ]
+  * USB: fix ehci alignment error
+
+  [ Alan Stern ]
+  * EHCI: workaround for MosChip controller bug
+
+  [ Kautuk Consul ]
+  * xhci-mem.c: Check for ring->first_seg != NULL
+
+  [ Andiry Xu ]
+  * xHCI: AMD isoc link TRB chain bit quirk
+
+  [ Keith Packard ]
+  * drm/i915: Wrap DP EDID fetch functions to enable eDP panel power
+
+  [ Takashi Iwai ]
+  * drm/i915/panel: Always record the backlight level again (but cleverly)
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: bail early in dvi_detect for digital only connectors
+  * drm/radeon/kms: handle !force case in connector detect more gracefully
+
+  [ Jean Delvare ]
+  * drm/radeon/kms: Fix I2C mask definitions
+
+  [ Ulf Hansson ]
+  * mmc: core: Fix hangs related to insert/remove of cards
+
+  [ Andrei Warkentin ]
+  * mmc: core: ext_csd.raw_* used in comparison but never set
+
+  [ Josh Boyer ]
+  * PCI quirk: mmc: Always check for lower base frequency quirk for Ricoh 1180:e823
+
+  [ adam radford ]
+  * megaraid_sas: Fix instance access in megasas_reset_timer
+
+  [ Anton Blanchard ]
+  * ipr: Always initiate hard reset in kdump kernel
+
+  [ Jack Wang ]
+  * libsas: set sas_address and device type of rphy
+
+  [ Dan Williams ]
+  * isci: fix support for large smp requests
+
+  [ Jeff Skirvin ]
+  * isci: fix missed unlock in apc_agent_timeout()
+
+  [ Charles Chin ]
+  * ALSA: hda - Remove bad code for IDT 92HD83 family patch
+
+  [ David Henningsson ]
+  * ALSA: HDA: Add new revision for ALC662
+
+  [ Nicholas Bellinger ]
+  * target: Fix REPORT TARGET PORT GROUPS handling with small allocation length
+
+  [ Jack Steiner ]
+  * x86: uv2: Workaround for UV2 Hub bug (system global address format)
+
+  [ Josh Stone ]
+  * x86: Fix compilation bug in kprobes' twobyte_is_boostable
+
+  [ Nelson Elhage ]
+  * epoll: fix spurious lockdep warnings
+
+  [ Antonio Ospite ]
+  * leds: save the delay values after a successful call to blink_set()
+  * leds: turn the blink_timer off before starting to blink
+
+  [ Johannes Stezenbach ]
+  * usbmon vs. tcpdump: fix dropped packet count
+
+  [ Luben Tuikov ]
+  * USB: storage: Use normalized sense when emulating autosense
+
+  [ Matthew Garrett ]
+  * USB: Fix runtime wakeup on OHCI
+
+  [ Fabian Godehardt ]
+  * USB: g_printer: fix bug in unregistration
+
+  [ Matthias Dellweg ]
+  * usb/core/devio.c: Check for printer class specific request
+
+  [ Serge Hallyn ]
+  * USB: pid_ns: ensure pid is not freed during kill_pid_info_as_uid
+
+  [ Denis Pershin ]
+  * usb: cdc-acm: Owen SI-30 support
+
+  [ Oliver Neukum ]
+  * USB: add RESET_RESUME for webcams shown to be quirky
+
+  [ Jon Levell ]
+  * USB: add quirk for Logitech C300 web cam
+
+  [ Eric Benoit ]
+  * USB: pl2303: add id for SMART device
+
+  [ Hakan Kvist ]
+  * USB: ftdi_sio: add PID for Sony Ericsson Urban
+
+  [ Peter Stuge ]
+  * USB: ftdi_sio: Support TI/Luminary Micro Stellaris BD-ICDI Board
+
+  [ Dan Williams ]
+  * USB: option: convert interface blacklisting to bitfields
+  * USB: option: convert Huawei K3765, K4505, K4605 reservered interface to blacklist
+  * USB: option: add ZTE product 0x0037 to sendsetup blacklist
+  * USB: option: add various ZTE device network interfaces to the blacklist
+
+  [ Luis R. Rodriguez ]
+  * MAINTANERS: update Qualcomm Atheros addresses
+
+  [ Rajkumar Manoharan ]
+  * ath9k_hw: Fix descriptor status of TxOpExceeded
+  * ath9k_hw: Fix magnitude/phase coeff correction
+
+  [ Luis R. Rodriguez ]
+  * ath9k_htc: add AVM FRITZ!WLAN 11N v2 support
+
+  [ Mohammed Shafi Shajakhan ]
+  * ath9k_hw: Fix number of GPIO pins for AR9287/9300
+
+  [ Felix Fietkau ]
+  * ath9k: disable unnecessary PHY error reporting
+
+  [ Sergei Kolzun ]
+  * HID: ACRUX - fix enabling force feedback support
+
+  [ Jerry Huang ]
+  * QE/FHCI: fixed the CONTROL bug
+
+  [ Josh Boyer ]
+  * Update email address for stable patch submission
+
+  [ Konrad Rzeszutek Wilk ]
+  * xen-pcifront: Update warning comment to use 'e820_host' option.
+  * xen-swiotlb: Fix wrong panic.
+
+  [ Milan Broz ]
+  * kobj_uevent: Ignore if some listeners cannot handle message
+
+  [ David Woodhouse ]
+  * caif: Fix BUG() with network namespaces
+
+  [ Stefan Beller ]
+  * platform: samsung_laptop: add dmi information for Samsung R700 laptops
+
+  [ Tommaso Massimi ]
+  * Platform: samsung_laptop: add support for X520 machines.
+
+  [ Smelov Andrey ]
+  * Platform: samsung_laptop: samsung backlight for R528/R728
+
+  [ Jason Stubbs ]
+  * platform: samsung_laptop: fix samsung brightness min/max calculations
+
+  [ David Herrmann ]
+  * Platform: Fix error path in samsung-laptop init
+
+  [ Jiri Kosina ]
+  * kmod: prevent kmod_loop_msg overflow in __request_module()
+
+  [ Trond Myklebust ]
+  * Revert "NFS: Ensure that writeback_single_inode() calls write_inode() when syncing"
+
+  [ Jeff Layton ]
+  * nfs: don't redirty inode when ncommit == 0 in nfs_commit_unstable_pages
+
+  [ Ming Lei ]
+  * ata_piix: make DVD Drive recognisable on systems with Intel Sandybridge chipsets(v2)
+
+  [ Eric W. Biederman ]
+  * rtnetlink: Add missing manual netlink notification in dev_change_net_namespaces
+
+  [ Richard Cochran ]
+  * dp83640: free packet queues on remove
+
+  [ Johannes Berg ]
+  * mac80211: fix offchannel TX cookie matching
+
+  [ Richard Cochran ]
+  * net: hold sock reference while processing tx timestamps
+
+  [ Luciano Coelho ]
+  * wl12xx: fix forced passive scans
+
+  [ hank ]
+  * time: Change jiffies_to_clock_t() argument type to unsigned long
+
+  [ Jan Beulich ]
+  * apic, i386/bigsmp: Fix false warnings regarding logical APIC ID mismatches
+
+  [ NeilBrown ]
+  * md/raid5: fix bug that could result in reads from a failed device.
+
+  [ Masami Hiramatsu ]
+  * perf probe: Fix to show correct error string
+
+  [ Steven Rostedt ]
+  * tracing: Fix returning of duplicate data after EOF in trace_pipe_raw
+
+  [ Ian Campbell ]
+  * genirq: Add IRQF_RESUME_EARLY and resume such IRQs earlier
+
+  [ Jeff Layton ]
+  * nfs: don't try to migrate pages with active requests
+
+  [ Bernd Schubert ]
+  * nfsd4: Remove check for a 32-bit cookie in nfsd4_readdir()
+
+  [ J. Bruce Fields ]
+  * nfsd4: stop using nfserr_resource for transitory errors
+  * nfsd4: fix seqid_mutating_error
+  * nfsd4: permit read opens of executable-only files
+  * nfsd4: fix open downgrade, again
+  * nfsd4: ignore WANT bits in open downgrade
+
+  [ Al Viro ]
+  * hppfs: missing include
+
+  [ Bryan Schumaker ]
+  * vfs: add "device" tag to /proc/self/mountstats
+
+  [ Daniel Vetter ]
+  * io-mapping: ensure io_mapping_map_atomic _is_ atomic
+
+  [ Axel Lin ]
+  * ASoC: wm8940: Properly set codec->dapm.bias_level
+  * ASoC: wm8741: Fix setting interface format for DSP modes
+
+  [ Kuninori Morimoto ]
+  * ASoC: ak4642: fixup cache register table
+
+  [ Axel Lin ]
+  * ASoC: ak4535: fixup cache register table
+  * ASoC: wm8994: Use SND_SOC_DAPM_AIF_OUT for AIF3 Capture
+
+  [ Mark Brown ]
+  * ASoC: Remove direct register cache accesses from WM8962 driver
+
+  [ Susan Gao ]
+  * ASoC: Fix a bug in WM8962 DSP_A and DSP_B settings
+
+  [ Carsten Otte ]
+  * KVM: s390: check cpu_id prior to using it
+
+  [ Martin Schwidefsky ]
+  * user per registers vs. ptrace single stepping
+  * memory leak with RCU_TABLE_FREE
+
+  [ Sebastian Ott ]
+  * ccwgroup: move attributes to attribute group
+
+  [ Dmitry Torokhov ]
+  * WMI: properly cleanup devices to avoid crashes
+
+  [ Joerg Roedel ]
+  * iommu/amd: Fix wrong shift direction
+
+  [ Jean Delvare ]
+  * carminefb: Fix module parameters permissions
+
+  [ Herton Ronaldo Krzesinski ]
+  * fb: avoid possible deadlock caused by fb_set_suspend
+
+  [ Bruno Prémont ]
+  * fb: sh-mobile: Fix deadlock risk between lock_fb_info() and console_lock()
+
+  [ Florian Tobias Schandinat ]
+  * viafb: use display information in info not in var for panning
+  * viafb: improve pitch handling
+
+  [ Ming Lei ]
+  * uvcvideo: Set alternate setting 0 on resume if the bus has been reset
+
+  [ Patrick Boettcher ]
+  * DiBcom: protect the I2C bufer access
+
+  [ Olivier Grenie ]
+  * dib0700: protect the dib0700 buffer access
+
+  [ Mauro Carvalho Chehab ]
+  * tuner_xc2028: Allow selection of the frequency adjustment code for XC3028
+
+  [ Andrew Morton ]
+  * /proc/self/numa_maps: restore "huge" tag for hugetlb vmas
+
+  [ Paul Fertser ]
+  * plat-mxc: iomux-v3.h: implicitly enable pull-up/down when that's desired
+
+  [ Linus Walleij ]
+  * ARM: mach-ux500: unlock I&D l2x0 caches before init
+
+  [ Mitsuo Hayasaka ]
+  * mm: avoid null pointer access in vm_struct via /proc/vmallocinfo
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Fix ADC input-amp handling for Cx20549 codec
+
+  [ Richard Weinberger ]
+  * um: fix ubd cow size
+
+  [ Andy Whitcroft ]
+  * readlinkat: ensure we return ENOENT for the empty pathname for normal lookups
+
+  [ David Howells ]
+  * VFS: Fix automount for negative autofs dentries
+
+  [ Miklos Szeredi ]
+  * vfs: automount should ignore LOOKUP_FOLLOW
+
+  [ Trond Myklebust ]
+  * VFS: Fix the remaining automounter semantics regressions
+
+  [ Linus Torvalds ]
+  * vfs pathname lookup: Add LOOKUP_AUTOMOUNT flag
+
+  [ Oleg Nesterov ]
+  * ptrace: don't clear GROUP_STOP_SIGMASK on double-stop
+
+  [ Thadeu Lima de Souza Cascardo ]
+  * jsm: remove buggy write queue
+
+  [ Mitsuo Hayasaka ]
+  * bonding: use local function pointer of bond->recv_probe in bond_handle_frame
+
+  [ stephen hemminger ]
+  * bridge: fix hang on removal of bridge via netlink
+
+  [ Oliver Hartkopp ]
+  * can bcm: fix tx_setup off-by-one errors
+
+  [ Yan, Zheng ]
+  * ipv4: fix ipsec forward performance regression
+
+  [ Eric Dumazet ]
+  * l2tp: fix a potential skb leak in l2tp_xmit_skb()
+
+  [ David Ward ]
+  * macvlan/macvtap: Fix unicast between macvtap interfaces in bridge mode
+
+  [ Gao feng ]
+  * netconsole: enable netconsole can make net_device refcnt incorrent
+
+  [ Yan, Zheng ]
+  * tcp: properly handle md5sig_pool references
+  * tcp: properly update lost_cnt_hint during shifting
+
+  [ Jiri Pirko ]
+  * tg3: negate USE_PHYLIB flag check
+
+  [ Yan, Zheng ]
+  * ipv6: nullify ipv6_ac_list and ipv6_fl_list when creating new socket
+
+  [ Willem de Bruijn ]
+  * make PACKET_STATISTICS getsockopt report consistently between ring and non-ring
+
+  [ David Vrabel ]
+  * net: xen-netback: correctly restart Tx after a VM restore/migrate
+
+  [ Andrea Arcangeli ]
+  * mm: thp: tail page refcounting fix
+
+  [ Jiri Kosina ]
+  * binfmt_elf: fix PIE execution with randomization disabled
+
+  [ Linus Torvalds ]
+  * vfs: show O_CLOEXE bit properly in /proc/<pid>/fdinfo/<fd> files
+
+  [ Johannes Berg ]
+  * iwlagn: do not use interruptible waits
+
+  [ Alexandre Bounine ]
+  * drivers/net/rionet.c: fix ethernet address macros for LE platforms
+
+  [ Juan Gutierrez ]
+  * hwspinlock/core: use a mutex to protect the radix tree
+
+  [ Clifton Barnes ]
+  * drivers/power/ds2780_battery.c: create central point for calling w1 interface
+  * drivers/power/ds2780_battery.c: add a nolock function to w1 interface
+  * drivers/power/ds2780_battery.c: fix deadlock upon insertion and removal
+
+  [ Theodore Ts'o ]
+  * ext2,ext3,ext4: don't inherit APPEND_FL or IMMUTABLE_FL for new inodes
+
+  [ Darrick J. Wong ]
+  * ext4: ext4_rename should dirty dir_bh with the correct directory
+  * ext4: ext4_mkdir should dirty dir_block with newly created directory inode
+
+  [ Theodore Ts'o ]
+  * ext4: call ext4_handle_dirty_metadata with correct inode in ext4_dx_add_entry
+
+  [ Eric Sandeen ]
+  * ext4: fix race in xattr block allocation path
+
+  [ Vasanthy Kolluri ]
+  * enic: Bug Fix: Fix hardware transmit queue indexing in enic_poll_controller
+
+  [ huajun li ]
+  * rtl8150: rtl8150_disconnect(...) does not need tasklet_disable(...)
+
+  [ Boris Todorov ]
+  * USB: EHCI: Fix test mode sequence
+
+  [ Arvid Brodin ]
+  * usb/isp1760: Added missing call to usb_hcd_check_unlink_urb() during unlink
+
+  [ Florian Echtler ]
+  * USB: Serial: Add device ID for Sierra Wireless MC8305
+
+  [ Artur Zimmer ]
+  * USB: Serial: Add PID(0xF7C0) to FTDI SIO driver for a zeitcontrol-device
+
+  [ Josh Boyer ]
+  * usbnet/cdc_ncm: Don't use stack variables for DMA
+
+  [ Sarah Sharp ]
+  * USB: Avoid NULL pointer deref in usb_hcd_alloc_bandwidth.
+
+  [ Kavan Smith ]
+  * ipheth: iPhone 4 Verizon CDMA USB Product ID add
+
+  [ Andiry Xu ]
+  * USB: xHCI: prevent infinite loop when processing MSE event
+
+  [ Marek Vasut ]
+  * ASIX: Simplify condition in rx_fixup()
+  * ASIX: Use only 11 bits of header for data size
+
+  [ Pieter-Augustijn Van Malleghem ]
+  * Bluetooth: Add MacBookAir4,1 support
+
+  [ Ricardo Mendoza ]
+  * Bluetooth: Add Toshiba laptops AR30XX device ID
+
+  [ Steven.Li ]
+  * Bluetooth: Add Atheros AR3012 one PID/VID supported
+
+  [ Jurgen Kramer ]
+  * Bluetooth: add support for 2011 mac mini
+
+  [ Oliver Neukum ]
+  * btusb: add device entry for Broadcom SoftSailing
+
+  [ Seth Forshee ]
+  * usb_storage: Don't freeze in usb-stor-scan
+
+  [ Sarah Sharp ]
+  * xhci: If no endpoints changed, don't issue BW command.
+
+  [ Andiry Xu ]
+  * xHCI: test and clear RWC bit
+  * xHCI: Clear PLC for USB2 root hub ports
+
+  [ Oliver Hartkopp ]
+  * can bcm: fix incomplete tx_setup fix
+
+  [ Andrea Arcangeli ]
+  * powerpc: remove superfluous PageTail checks on the pte gup_fast
+  * powerpc: get_hugepte() don't put_page() the wrong page
+  * powerpc: gup_hugepte() avoid freeing the head page too many times
+  * powerpc: gup_hugepte() support THP based tail recounting
+  * powerpc: gup_huge_pmd() return 0 if pte changes
+  * s390: gup_huge_pmd() support THP tail recounting
+  * s390: gup_huge_pmd() return 0 if pte changes
+  * thp: share get_huge_page_tail()
+
+  [ stephen hemminger ]
+  * bridge: leave carrier on for empty bridge
+
+  [ Thomas Gleixner ]
+  * net: Unlock sock before calling sk_free()
+
+  [ Clemens Ladisch ]
+  * ALSA: ua101: fix crash when unplugging
+
+  [ Charles Chin ]
+  * ALSA: hda - Disable power-widget control for IDT 92HD83/93 as default
+  * ALSA: hda - Add support for 92HD65 / 92HD66 family of codecs
+
+  [ Takashi Iwai ]
+  * ALSA: hda/realtek - Skip invalid digital out pins
+
+  [ Jerome Glisse ]
+  * drm/radeon: avoid bouncing connector status btw disconnected & unknown
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: split MSI check into a separate function
+  * drm/radeon/kms: Add MSI quirk for HP RS690
+
+  [ Jerome Glisse ]
+  * drm/radeon: set hpd polarity at init time so hotplug detect works
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: properly set panel mode for eDP
+  * drm/radeon/kms: Add MSI quirk for Dell RS690
+  * drm/radeon/kms: add MSI module parameter
+  * drm/radeon/kms: set HPD polarity in hpd_init()
+
+  [ Srinivas Kandagatla ]
+  * kbuild: Fix help text not displayed in choice option.
+
+  [ Alan Stern ]
+  * PM / Runtime: Automatically retry failed autosuspends
+  * USB: Update last_busy time after autosuspend fails
+
+  [ Mike Miller ]
+  * cciss: add small delay when using PCI Power Management to reset for kump
+
+  [ Jean Delvare ]
+  * hwmon: (coretemp) Fix for non-SMP builds
+  * hwmon: (w83627ehf) Properly report PECI and AMD-SI sensor types
+
+  [ Guenter Roeck ]
+  * hwmon: (w83627ehf) Fix broken driver init
+
+  [ Nicholas Bellinger ]
+  * tcm_loop: Add explict read buffer memset for SCF_SCSI_CONTROL_SG_IO_CDB
+
+  [ Petr Uzel ]
+  * st: fix race in st_scsi_execute_end
+
+  [ Moger, Babu ]
+  * scsi_dh: check queuedata pointer before proceeding further
+
+  [ Bart Van Assche ]
+  * Make scsi_free_queue() kill pending SCSI commands
+
+  [ Anton Blanchard ]
+  * Fix block queue and elevator memory leak in scsi_alloc_sdev
+
+  [ nagalakshmi.nandigama@lsi.com ]
+  * mpt2sas: Fix for system hang when discovery in progress
+
+  [ Axel Lin ]
+  * ASoC: wm8711: Fix wrong mask for setting input audio data bit length select
+  * ASoC: Leave input audio data bit length settings untouched in wm8711_set_dai_fmt
+
+  [ Hong Xu ]
+  * ASoC: WM8904: Set `invert' bit for Capture Switch
+
+  [ Mark Brown ]
+  * ASoC: Ensure WM8962 PLL registers are reset
+  * ASoC: Ensure the WM8962 oscillator and PLLs start up disabled
+
+  [ NeilBrown ]
+  * NFS/sunrpc: don't use a credential with extra groups.
+
+  [ Tejun Heo ]
+  * block: make gendisk hold a reference to its queue
+
+  [ Konrad Rzeszutek Wilk ]
+  * xen/blkback: Report VBD_WSECT (wr_sect) properly.
+
+  [ Dan McGee ]
+  * VFS: fix statfs() automounter semantics regression
+
+  [ Mike Miller ]
+  * hpsa: add small delay when using PCI Power Management to reset for kump
+
+  [ Al Viro ]
+  * VFS: we need to set LOOKUP_JUMPED on mountpoint crossing
+
+  [ Anton Blanchard ]
+  * powerpc/numa: Remove double of_node_put in hot_add_node_scn_to_nid
+  * powerpc: Fix oops when echoing bad values to /sys/devices/system/memory/probe
+  * powerpc/pseries: Avoid spurious error during hotplug CPU add
+
+  [ Thadeu Lima de Souza Cascardo ]
+  * powerpc/eeh: Fix /proc/ppc64/eeh creation
+
+  [ Anton Blanchard ]
+  * powerpc: Fix deadlock in icswx code
+
+  [ Luck, Tony ]
+  * ACPI atomicio: Convert width in bits to bytes in __acpi_ioremap_fast()
+
+  [ Johannes Berg ]
+  * netlink: validate NLA_MSECS length
+
+  [ Rajkumar Manoharan ]
+  * ath9k_hw: Update AR9485 initvals to fix system hang issue
+
+  [ Eliad Peller ]
+  * mac80211: fix remain_off_channel regression
+  * mac80211: config hw when going back on-channel
+
+  [ Johannes Berg ]
+  * mac80211: disable powersave for broken APs
+
+  [ Peter Wippich ]
+  * mtd: mtdchar: add missing initializer on raw write
+
+  [ Andres Salomon ]
+  * mtd: provide an alias for the redboot module name
+
+  [ Lei Wen ]
+  * mtd: pxa3xx_nand: fix nand detection issue
+
+  [ Daniel Mack ]
+  * mtd: pxa3xx_nand: Fix blank page ECC mismatch
+
+  [ Jiaying Zhang ]
+  * ext4: remove i_mutex lock in ext4_evict_inode to fix lockdep complaining
+
+  [ David Ward ]
+  * net: Align AF-specific flowi structs to long
+
+  [ dpward ]
+  * net: Handle different key sizes between address families in flow cache
+
+  [ Dan Carpenter ]
+  * PM / Suspend: Off by one in pm_suspend()
+
+  [ Herbert Xu ]
+  * crypto: cryptd - Use subsys_initcall to prevent races with aesni
+
+  [ Richard Cochran ]
+  * dp83640: use proper function to free transmit time stamping packets
+
+  [ Rajkumar Manoharan ]
+  * ath9k_hw: Fix regression of register offset for AR9003 chips
+
+  [ THOMSON, Adam (Adam) ]
+  * mtd: nand_base: always initialise oob_poi before writing OOB data
+
+  [ Dan Bastone ]
+  * HID: add support for new revision of Apple aluminum keyboard
+
+  [ Clemens Werther ]
+  * HID: add support for HuiJia USB Gamepad connector
+
+  [ Joshua V. Dillon ]
+  * HID: add support for MacBookAir4,2 keyboard.
+
+  [ Jeff Brown ]
+  * HID: hid-multitouch: Add LG Display Multitouch device.
+
+  [ Jiri Kosina ]
+  * HID: add MacBookAir4,2 to hid_have_special_driver[]
+
+  [ Nobuhiro Iwamatsu ]
+  * HID: Add support MacbookAir 4,1 keyboard
+
+  [ Gökçen Eraslan ]
+  * HID: Add device IDs for Macbook Pro 8 keyboards
+
+  [ Andreas Krist ]
+  * HID: hid-apple: add device ID of another wireless aluminium
+
+  [ Jiri Kosina ]
+  * HID: consolidate MacbookAir 4,1 mappings
+
+  [ Linus Torvalds ]
+  * hid/apple: modern macbook airs use the standard apple function key translations
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.9
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 14 Nov 2011 11:19:26 -0800
+
 linux-3.0 (3.0.8-1+vyatta+3) unstable; urgency=low
 
   [ Stephen Hemminger ]
