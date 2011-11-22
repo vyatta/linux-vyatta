@@ -1,3 +1,86 @@
+linux-3.0 (3.0.10-1+vyatta+2) unstable; urgency=low
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Don't add elements of other codecs to vmaster slave
+
+  [ Michael S. Tsirkin ]
+  * virtio-pci: fix use after free
+
+  [ Mark Brown ]
+  * ASoC: Don't use wm8994->control_data in wm8994_readable_register()
+
+  [ Nobuhiro Iwamatsu ]
+  * sh: Fix cached/uncaced address calculation in 29bit mode
+
+  [ Eric Anholt ]
+  * drm/i915: Fix object refcount leak on mmappable size limit error path.
+
+  [ Marcin Slusarz ]
+  * drm/nouveau: initialize chan->fence.lock before use
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: make an aux failure debug only
+
+  [ Takashi Iwai ]
+  * ALSA: usb-audio - Check the dB-range validity in the later read, too
+  * ALSA: usb-audio - Fix the missing volume quirks at delayed init
+
+  [ David Howells ]
+  * KEYS: Fix a NULL pointer deref in the user-defined key type
+
+  [ Dan Carpenter ]
+  * hfs: add sanity check for file name length
+
+  [ Johan Hovold ]
+  * Revert "leds: save the delay values after a successful call to blink_set()"
+
+  [ Alex Deucher ]
+  * drm/radeon: add some missing FireMV pci ids
+
+  [ Jesse Barnes ]
+  * drm/i915: enable ring freq scaling, RC6 and graphics turbo on Ivy Bridge v3
+
+  [ Kirill A. Shutemov ]
+  * sfi: table irq 0xFF means 'no interrupt'
+
+  [ Mika Westerberg ]
+  * x86, mrst: use a temporary variable for SFI irq
+
+  [ Rafał Miłecki ]
+  * b43: refuse to load unsupported firmware
+
+  [ NeilBrown ]
+  * md/raid5: abort any pending parity operations when array fails.
+
+  [ Thomas Weber ]
+  * mfd: Fix twl4030 dependencies for audio codec
+
+  [ Zhenzhong Duan ]
+  * xen:pvhvm: enable PVHVM VCPU placement when using more than 32 CPUs.
+
+  [ Dan Carpenter ]
+  * xen-gntalloc: integer overflow in gntalloc_ioctl_alloc()
+  * xen-gntalloc: signedness bug in add_grefs()
+
+  [ Geoff Levand ]
+  * powerpc/ps3: Fix lost SMP IPIs
+
+  [ Anton Blanchard ]
+  * powerpc: Copy down exception vectors after feature fixups
+
+  [ Rabin Vincent ]
+  * backing-dev: ensure wakeup_timer is deleted
+
+  [ Ben Hutchings ]
+  * block: Always check length of all iov entries in blk_rq_map_user_iov()
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.10
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 21 Nov 2011 16:58:03 -0800
+
 linux-3.0 (3.0.9-1+vyatta+1) unstable; urgency=low
 
   [ Pavel Shilovsky ]
