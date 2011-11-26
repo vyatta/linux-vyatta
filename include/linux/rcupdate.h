@@ -191,6 +191,11 @@ extern void rcu_idle_exit(void);
 extern void rcu_irq_enter(void);
 extern void rcu_irq_exit(void);
 
+#ifdef CONFIG_CPUSETS_NO_HZ
+void rcu_user_enter(void);
+void rcu_user_exit(void);
+#endif
+
 /*
  * Infrastructure to implement the synchronize_() primitives in
  * TREE_RCU and rcu_barrier_() primitives in TINY_RCU.
