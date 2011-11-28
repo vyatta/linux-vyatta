@@ -194,6 +194,8 @@ extern void rcu_irq_exit(void);
 #ifdef CONFIG_CPUSETS_NO_HZ
 void rcu_user_enter(void);
 void rcu_user_exit(void);
+void rcu_user_enter_irq(void);
+void rcu_user_exit_irq(void);
 #endif
 
 /*

@@ -429,6 +429,18 @@ void rcu_user_enter(void)
 	__rcu_idle_enter();
 }
 
+void rcu_user_enter_irq(void)
+{
+	unsigned long flags;
+	struct rcu_dynticks *rdtp;
+
+	local_irq_save(flags);
+	rdtp = &__get_cpu_var(rcu_dynticks);
+	WARN_ON_ONCE(rdtp->dynticks_nesting == 1);
+	rdtp->dynticks_nesting = 1;
+	local_irq_restore(flags);
+}
+
 /**
  * rcu_irq_exit - inform RCU that current CPU is exiting irq towards idle
  *
@@ -540,6 +552,18 @@ void rcu_user_exit(void)
 	local_irq_save(flags);
 	rdtp = &__get_cpu_var(rcu_dynticks);
 	 __rcu_idle_exit(rdtp);
+	local_irq_restore(flags);
+}
+
+void rcu_user_exit_irq(void)
+{
+	unsigned long flags;
+	struct rcu_dynticks *rdtp;
+
+	local_irq_save(flags);
+	rdtp = &__get_cpu_var(rcu_dynticks);
+	WARN_ON_ONCE(rdtp->dynticks_nesting == 0);
+	rdtp->dynticks_nesting = (LLONG_MAX / 2) + 1;
 	local_irq_restore(flags);
 }
 
