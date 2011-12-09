@@ -1,3 +1,374 @@
+linux-3.0 (3.0.13-1+vyatta+1) unstable; urgency=low
+
+  [ Edward Donovan ]
+  * genirq: Fix irqfixup, irqpoll regression
+
+  [ James Bottomley ]
+  * fix WARNING: at drivers/scsi/scsi_lib.c:1704
+
+  [ Matthew Garrett ]
+  * hpsa: Disable ASPM
+
+  [ Vasily Averin ]
+  * aacraid: controller hangs if kernel uses non-default ASPM policy
+
+  [ Tony Jago ]
+  * saa7164: Add support for another HVR2200 hardware revision
+
+  [ Adam Jackson ]
+  * drm/i915/pch: Save/restore PCH_PORT_HOTPLUG across suspend
+
+  [ Catalin Marinas ]
+  * ARM: 7150/1: Allow kernel unaligned accesses on ARMv6+ processors
+
+  [ Jesper Juhl ]
+  * Net, libertas: Resolve memory leak in if_spi_host_to_card()
+
+  [ Gertjan van Wingerde ]
+  * rt2x00: Fix sleep-while-atomic bug in powersaving code.
+
+  [ Johannes Berg ]
+  * mac80211: fix NULL dereference in radiotap code
+  * mac80211: fix bug in ieee80211_build_probe_req
+  * nl80211: fix HT capability attribute validation
+
+  [ Luis R. Rodriguez ]
+  * cfg80211: fix bug on regulatory core exit on access to last_request
+
+  [ Josh Boyer ]
+  * ip6_tunnel: copy parms.name after register_netdevice
+
+  [ Peter Chen ]
+  * PM / driver core: disable device's runtime PM during shutdown
+
+  [ Tomoya MORINAGA ]
+  * pch_phub: Support new device LAPIS Semiconductor ML7831 IOH
+  * pch_phub: Fix MAC address writing issue for LAPIS ML7831
+  * pch_uart: Fix hw-flow control issue
+  * pch_uart: Fix DMA resource leak issue
+  * pch_uart: Support new device LAPIS Semiconductor ML7831 IOH
+
+  [ Stephen Boyd ]
+  * tty: hvc_dcc: Fix duplicate character inputs
+
+  [ Jiri Slaby ]
+  * TTY: ldisc, allow waiting for ldisc arbitrarily long
+  * TTY: ldisc, move wait idle to caller
+  * TTY: ldisc, wait for ldisc infinitely in hangup
+
+  [ Jeff Layton ]
+  * nfs: when attempting to open a directory, fall back on normal lookup (try #5)
+
+  [ Axel Lin ]
+  * pcie-gadget-spear: Add "platform:" prefix for platform modalias
+
+  [ Claudio Scordino ]
+  * drivers/base/node.c: fix compilation error with older versions of gcc
+
+  [ Sarah Sharp ]
+  * xhci: Set slot and ep0 flags for address command.
+
+  [ Don Zickus ]
+  * usb, xhci: Clear warm reset change event during init
+  * usb, xhci: fix lockdep warning on endpoint timeout
+
+  [ Alan Stern ]
+  * USB: XHCI: resume root hubs when the controller resumes
+
+  [ zheng.zhijian@zte.com.cn ]
+  * USB: option: release new PID for ZTE 3G modem
+
+  [ Ferenc Wagner ]
+  * USB: option: add PID of Huawei E173s 3G modem
+
+  [ wangyanqing ]
+  * USB: serial: pl2303: rm duplicate id
+
+  [ Havard Skinnemoen ]
+  * USB: cdc-acm: Fix disconnect() vs close() race
+
+  [ Alan Stern ]
+  * USB: workaround for bug in old version of GCC
+
+  [ Bart Hartgers ]
+  * USB: ark3116 initialisation fix
+
+  [ Andrew Worsley ]
+  * USB: Fix Corruption issue in USB ftdi driver ftdi_sio.c
+
+  [ Alan Stern ]
+  * usb-storage: Accept 8020i-protocol commands longer than 12 bytes
+
+  [ Thomas Poussevin ]
+  * USB: EHCI: fix HUB TT scheduling issue with iso transfer
+
+  [ Josh Boyer ]
+  * USB: add quirk for Logitech C600 web cam
+
+  [ sordna ]
+  * USB: quirks: adding more quirky webcams to avoid squeaky audio
+
+  [ Christoph Hellwig ]
+  * xfs: fix error handling for synchronous writes
+  * xfs: fix xfs_mark_inode_dirty during umount
+
+  [ Dave Chinner ]
+  * xfs: dont serialise direct IO reads on page cache
+
+  [ Christoph Hellwig ]
+  * xfs: avoid direct I/O write vs buffered I/O race
+
+  [ Mitsuo Hayasaka ]
+  * xfs: Return -EIO when xfs_vn_getattr() failed
+
+  [ Christoph Hellwig ]
+  * xfs: fix buffer flushing during unmount
+
+  [ Carlos Maiolino ]
+  * xfs: Fix possible memory corruption in xfs_readlink
+
+  [ Mitsuo Hayasaka ]
+  * xfs: use doalloc flag in xfs_qm_dqattach_one()
+
+  [ Christoph Hellwig ]
+  * xfs: fix ->write_inode return values
+
+  [ Jesse Barnes ]
+  * drm/i915: fix IVB cursor support
+  * drm/i915: always set FDI composite sync bit
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.11
+  * Revert "USB: EHCI: fix HUB TT scheduling issue with iso transfer"
+  * Linux 3.0.12
+
+  [ Tyler Hicks ]
+  * eCryptfs: Flush file in vma close
+
+  [ Jeffrey (Sheng-Hui) Chu ]
+  * i2c-algo-bit: Generate correct i2c address sequence for 10-bit target
+
+  [ Tyler Hicks ]
+  * eCryptfs: Extend array bounds for all filename chars
+
+  [ Phil Sutter ]
+  * crypto: mv_cesa - fix hashing of chunks > 1920 bytes
+
+  [ Xi Wang ]
+  * drm: integer overflow in drm_mode_dirtyfb_ioctl()
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: fix up gpio i2c mask bits for r4xx for real
+
+  [ Daniel Vetter ]
+  * drm/i915: Ivybridge still has fences!
+
+  [ Eric Anholt ]
+  * drm/i915: Turn on a required 3D clock gating bit on Sandybridge.
+  * drm/i915: Turn on another required clock gating bit on gen6.
+
+  [ Ben Skeggs ]
+  * drm/ttm: request zeroed system memory pages for new TT buffer objects
+
+  [ Jesse Barnes ]
+  * drm/i915: fix CB tuning check for ILK+
+
+  [ Bjorn Helgaas ]
+  * PCI hotplug: shpchp: don't blindly claim non-AMD 0x7450 device IDs
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: fix up gpio i2c mask bits for r4xx
+
+  [ Daniel Drake ]
+  * viafb: correct sync polarity for OLPC DCON
+
+  [ Haojian Zhuang ]
+  * ARM: pxa: fix inconsistent CONFIG_USB_PXA27X
+
+  [ Wolfram Sang ]
+  * arm: mx28: fix bit operation in clock setting
+
+  [ Felipe Balbi ]
+  * ARM: OMAP: smartreflex: fix IRQ handling bug
+
+  [ Ming Lei ]
+  * ARM: OMAP2: select ARM_AMBA if OMAP3_EMU is defined
+
+  [ Will Deacon ]
+  * ARM: 7161/1: errata: no automatic store buffer drain
+
+  [ Tim Blechmann ]
+  * ALSA: lx6464es - fix device communication via command bus
+
+  [ Timur Tabi ]
+  * ASoC: fsl_ssi: properly initialize the sysfs attribute object
+
+  [ Timo Juhani Lindfors ]
+  * ASoC: wm8753: Skip noop reconfiguration of DAI mode
+
+  [ Mark Brown ]
+  * ASoC: Ensure WM8731 register cache is synced when resuming from disabled
+
+  [ Trond Myklebust ]
+  * SUNRPC: Ensure we return EAGAIN in xs_nospace if congestion is cleared
+
+  [ Edward Donovan ]
+  * genirq: fix regression in irqfixup, irqpoll
+
+  [ Michal Hocko ]
+  * cgroup_freezer: fix freezing groups with stopped tasks
+
+  [ Hector Palacios ]
+  * timekeeping: add arch_offset hook to ktime_get functions
+
+  [ Jeff Ohlstein ]
+  * hrtimer: Fix extra wakeups from __remove_hrtimer()
+
+  [ Michael Büsch ]
+  * p54spi: Add missing spin_lock_init
+  * p54spi: Fix workqueue deadlock
+
+  [ Gertjan van Wingerde ]
+  * rt2x00: Fix efuse EEPROM reading on PPC32.
+
+  [ Eliad Peller ]
+  * nl80211: fix MAC address validation
+
+  [ Johannes Berg ]
+  * cfg80211: fix regulatory NULL dereference
+  * mac80211: don't stop a single aggregation session twice
+
+  [ Emmanuel Grumbach ]
+  * mac80211: fix race between the AGG SM and the Tx data path
+
+  [ Jean Delvare ]
+  * hwmon: (coretemp) Fix oops on driver load
+
+  [ Greg Kroah-Hartman ]
+  * revert "mfd: Fix twl4030 dependencies for audio codec"
+
+  [ Hannes Reinecke ]
+  * SCSI: Silencing 'killing requests for dead queue'
+
+  [ Hillf Danton ]
+  * hugetlb: release pages in the error path of hugetlb_cow()
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: add some new pci ids
+  * drm/radeon/kms: add some loop timeouts in pageflip code
+
+  [ Lars-Peter Clausen ]
+  * firmware: Sigma: Prevent out of bounds memory access
+  * firmware: Sigma: Skip header during CRC generation
+  * firmware: Sigma: Fix endianess issues
+
+  [ Bart Westgeest ]
+  * staging: usbip: bugfix for deadlock
+
+  [ Bernd Porr ]
+  * staging: comedi: fix oops for USB DAQ devices.
+
+  [ Federico Vaga ]
+  * Staging: comedi: fix mmap_count
+  * Staging: comedi: fix signal handling in read and write
+
+  [ Dan Carpenter ]
+  * USB: whci-hcd: fix endian conversion in qset_clear()
+
+  [ Benjamin Tissoires ]
+  * HID: Correct General touch PID
+
+  [ Marcin Kościelnicki ]
+  * usb: ftdi_sio: add PID for Propox ISPcable III
+
+  [ Dirk Nehring ]
+  * usb: option: add Huawei E353 controlling interfaces
+
+  [ Veli-Pekka Peltola ]
+  * usb: option: add SIMCom SIM5218
+
+  [ Qinglin Ye ]
+  * USB: usb-storage: unusual_devs entry for Kingston DT 101 G2
+
+  [ Thomas Poussevin ]
+  * USB: EHCI: fix HUB TT scheduling issue with iso transfer
+
+  [ Matthieu CASTET ]
+  * EHCI : Fix a regression in the ISO scheduler
+
+  [ Andiry Xu ]
+  * xHCI: fix bug in xhci_clear_command_ring()
+
+  [ Salman Qazi ]
+  * sched, x86: Avoid unnecessary overflow in sched_clock
+
+  [ Bjorn Helgaas ]
+  * x86/mpparse: Account for bus types other than ISA and PCI
+
+  [ Peter Chubb ]
+  * x86: Fix "Acer Aspire 1" reboot hang
+
+  [ Konrad Rzeszutek Wilk ]
+  * x86/paravirt: PTE updates in k(un)map_atomic need to be synchronous, regardless of lazy_mmu mode
+
+  [ Peter Zijlstra ]
+  * perf/x86: Fix PEBS instruction unwind
+
+  [ Robert Richter ]
+  * oprofile, x86: Fix crash when unloading module (nmi timer mode)
+
+  [ Martin Schwidefsky ]
+  * add missing .set function for NT_S390_LAST_BREAK regset
+
+  [ Luis R. Rodriguez ]
+  * cfg80211: fix race on init and driver registration
+  * cfg80211: amend regulatory NULL dereference fix
+
+  [ Ido Yariv ]
+  * genirq: Fix race condition when stopping the irq thread
+
+  [ Trond Myklebust ]
+  * NFS: Prevent 3.0 from crashing if it receives a partial layout
+
+  [ Christoph Hellwig ]
+  * xfs: validate acl count
+  * xfs: force buffer writeback before blocking on the ilock in inode reclaim
+  * xfs: fix attr2 vs large data fork assert
+
+  [ Tejun Heo ]
+  * trace_events_filter: Use rcu_assign_pointer() when setting ftrace_event_call->filter
+
+  [ Rabin Vincent ]
+  * rtc: Disable the alarm in the hardware
+
+  [ Ilya Dryomov ]
+  * tracing: fix event_subsystem ref counting
+
+  [ Thomas Gleixner ]
+  * tick-broadcast: Stop active broadcast device when replacing it
+
+  [ Steven Rostedt ]
+  * perf: Fix parsing of __print_flags() in TP_printk()
+
+  [ Gleb Natapov ]
+  * jump_label: jump_label_inc may return before the code is patched
+
+  [ Robert Richter ]
+  * oprofile: Fix crash when unloading module (hr timer mode)
+
+  [ Yang Honggang (Joseph) ]
+  * clocksource: Fix bug with max_deferment margin calculation
+
+  [ Thomas Gleixner ]
+  * clockevents: Set noop handler in clockevents_exchange_device()
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.13
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Fri, 09 Dec 2011 09:09:59 -0800
+
 linux-3.0 (3.0.10-1+vyatta+2) unstable; urgency=low
 
   [ Takashi Iwai ]
