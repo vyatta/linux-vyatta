@@ -1,3 +1,15 @@
+linux-3.0 (3.0.13-1+vyatta+2) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * netlink: wake up netlink listeners sooner
+
+  [ Linus Torvalds ]
+  * linux/log2.h: Fix rounddown_pow_of_two(1)
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Tue, 13 Dec 2011 17:50:32 -0800
+
 linux-3.0 (3.0.13-1+vyatta+1) unstable; urgency=low
 
   [ Edward Donovan ]
