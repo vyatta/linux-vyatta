@@ -1,3 +1,140 @@
+linux-3.0 (3.0.14-1+vyatta+1) unstable; urgency=low
+
+  [ David Dillow ]
+  * ALSA: sis7019 - give slow codecs more time to reset
+
+  [ Takashi Iwai ]
+  * ALSA: hda/realtek - Fix Oops in alc_mux_select()
+
+  [ Thomas Gleixner ]
+  * alarmtimers: Fix time comparison
+
+  [ Manjunathappa, Prakash ]
+  * ARM: davinci: da850 evm: change audio edma event queue to EVENTQ_0
+
+  [ Wolfram Sang ]
+  * arm: mx23: recognise stmp378x as mx23
+
+  [ Jean-Christophe PLAGNIOL-VILLARD ]
+  * ARM: at91: fix clock conid for atmel_tcb.1 on 9260/9g20
+
+  [ Hans Verkuil ]
+  * ARM: davinci: dm646x evm: wrong register used in setup_vpif_input_channel_mode
+
+  [ Mark Brown ]
+  * ASoC: Provide a more complete DMA driver stub
+
+  [ Claudio Scordino ]
+  * fs/proc/meminfo.c: fix compilation error
+
+  [ Youquan Song ]
+  * thp: add compound tail page _mapcount when mapped
+  * thp: set compound tail page _count to zero
+
+  [ Thomas Gleixner ]
+  * ptp: Fix clock_getres() implementation
+
+  [ Michal Hocko ]
+  * mm: Ensure that pfn_valid() is called once per pageblock when reserving pageblocks
+
+  [ Mel Gorman ]
+  * mm: vmalloc: check for page allocation failure before vmlist insertion
+
+  [ Al Viro ]
+  * fix apparmor dereferencing potentially freed dentry, sanitize __d_path() API
+
+  [ Roland Dreier ]
+  * target: Handle 0 correctly in transport_get_sectors_6()
+
+  [ Allen Kay ]
+  * intel-iommu: fix return value of iommu_unmap() API
+  * intel-iommu: set iommu_superpage on VM domains to lowest common denominator
+  * intel-iommu: fix superpage support in pfn_to_dma_pte()
+
+  [ Tejun Heo ]
+  * percpu: fix chunk range calculation
+
+  [ Wey-Yi Guy ]
+  * iwlwifi: do not re-configure HT40 after associated
+
+  [ Nikolay Martynov ]
+  * mac80211: fix race condition caused by late addBA response
+
+  [ Linus Torvalds ]
+  * linux/log2.h: Fix rounddown_pow_of_two(1)
+
+  [ Axel Lin ]
+  * hwmon: (jz4740) fix signedness bug
+
+  [ Sascha Hauer ]
+  * mmc: mxcmmc: fix falling back to PIO
+
+  [ Mark Langsdorf ]
+  * x86, hpet: Immediately disable HPET timer 1 if rtc irq is masked
+
+  [ Eryu Guan ]
+  * jbd/jbd2: validate sb->s_first in journal_get_superblock()
+
+  [ Linus Torvalds ]
+  * Make TASKSTATS require root access
+
+  [ Phillip Lougher ]
+  * hfs: fix hfs_find_init() sb->ext_tree NULL ptr oops
+
+  [ Jean Delvare ]
+  * hwmon: (coretemp) Fix oops on CPU offlining
+
+  [ Christoph Hellwig ]
+  * xfs: fix nfs export of 64-bit inodes numbers on 32-bit kernels
+  * xfs: avoid synchronous transactions when deleting attr blocks
+
+  [ NeilBrown ]
+  * md/raid5: fix bug that could result in reads from a failed device.
+
+  [ Ian Campbell ]
+  * xen: only limit memory map to maximum reservation for domain 0.
+
+  [ Theodore Ts'o ]
+  * ext4: display the correct mount option in /proc/mounts for [no]init_itable
+
+  [ Andrea Arcangeli ]
+  * ext4: avoid hangs in ext4_da_should_update_i_disksize()
+
+  [ Yongqiang Yang ]
+  * ext4: avoid potential hang in mpage_submit_io() when blocksize < pagesize
+  * ext4: handle EOF correctly in ext4_bio_write_page()
+
+  [ Miklos Szeredi ]
+  * fuse: fix fuse_retrieve
+
+  [ Larry Finger ]
+  * staging: r8712u: Add new USB ID
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: add some new pci ids
+
+  [ Yinghai Lu ]
+  * ibft: Fix finding IBFT ACPI table on UEFI
+
+  [ Krzysztof Hałasa ]
+  * USB: cdc-acm: add IDs for Motorola H24 HSPA USB module.
+
+  [ Alex Hermann ]
+  * usb: option: Add Huawei E398 controlling interfaces
+
+  [ Bjørn Mork ]
+  * USB: option: Removing one bogus and adding some new Huawei combinations
+
+  [ Stephen Warren ]
+  * ASoC: core: Don't schedule deferred_resume_work twice
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.14
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Tue, 27 Dec 2011 20:50:43 -0800
+
 linux-3.0 (3.0.13-1+vyatta+2) unstable; urgency=low
 
   [ Stephen Hemminger ]
