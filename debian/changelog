@@ -1,3 +1,12 @@
+linux-3.0 (3.0.14-1+vyatta+2) unstable; urgency=low
+
+  [ stephen hemminger ]
+  * bonding: fix error handling if slave is busy (v2)
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Tue, 03 Jan 2012 10:31:08 -0800
+
 linux-3.0 (3.0.14-1+vyatta+1) unstable; urgency=low
 
   [ David Dillow ]
