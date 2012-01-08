@@ -1,3 +1,211 @@
+linux-3.0 (3.0.16-1+vyatta+1) unstable; urgency=low
+
+  [ Linus Torvalds ]
+  * Revert "clockevents: Set noop handler in clockevents_exchange_device()"
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.15
+
+  [ Felipe Contreras ]
+  * ARM: OMAP: rx51: fix USB
+
+  [ Ted Feng ]
+  * ipip, sit: copy parms.name after register_netdevice
+
+  [ John Stultz ]
+  * rtc: m41t80: Workaround broken alarm functionality
+
+  [ Eugeni Dodonov ]
+  * drm/i915: prevent division by zero when asking for chipset power
+
+  [ majianpeng ]
+  * cfq-iosched: free cic_index if blkio_alloc_blkg_stats fails
+
+  [ Yasuaki Ishimatsu ]
+  * cfq-iosched: fix cfq_cic_link() race confition
+
+  [ Steffen Maier ]
+  * SCSI: zfcp: return early from slave_destroy if slave_alloc returned early
+
+  [ Anton Blanchard ]
+  * SCSI: mpt2sas: _scsih_smart_predicted_fault uses GFP_KERNEL in interrupt context
+
+  [ Thomas Gleixner ]
+  * SCSI: fcoe: Fix preempt count leak in fcoe_filter_frames()
+
+  [ Johannes Berg ]
+  * mac80211: fix another race in aggregation start
+
+  [ Mike Snitzer ]
+  * block: initialize request_queue's numa node during
+
+  [ Hauke Mehrtens ]
+  * ssb: fix init regression with SoCs
+
+  [ Jason Chen ]
+  * MXC PWM: should active during DOZE/WAIT/DBG mode
+
+  [ Dmitry Torokhov ]
+  * Input: synaptics - fix touchpad not working after S2R on Vostro V13
+
+  [ Eugene Surovegin ]
+  * percpu: fix per_cpu_ptr_to_phys() handling of non-page-aligned addresses
+
+  [ Michel Lespinasse ]
+  * binary_sysctl(): fix memory leak
+
+  [ Frantisek Hrbata ]
+  * oom: fix integer overflow of points in oom_badness
+
+  [ Robert Richter ]
+  * oprofile: Fix uninitialized memory access when writing to writing to oprofilefs
+
+  [ Trond Myklebust ]
+  * NFSv4.1: Ensure that we handle _all_ SEQUENCE status bits.
+
+  [ David Howells ]
+  * SELinux: Fix RCU deref check warning in sel_netport_insert()
+
+  [ Thomas Meyer ]
+  * nilfs2: unbreak compat ioctl
+
+  [ Rusty Russell ]
+  * mmc: vub300: fix type of firmware_rom_wait_states module parameter
+
+  [ Mandeep Singh Baines ]
+  * cgroups: fix a css_set not found bug in cgroup_attach_proc
+
+  [ Ilya Yanok ]
+  * mfd: Fix twl-core oops while calling twl_i2c_* for unbound driver
+
+  [ Dave Kleikamp ]
+  * vfs: __read_cache_page should use gfp argument rather than GFP_KERNEL
+
+  [ Sylwester Nawrocki ]
+  * media: s5p-fimc: Use correct fourcc for RGB565 colour format
+
+  [ Rajkumar Manoharan ]
+  * ath9k: fix max phy rate at rate control init
+
+  [ Wey-Yi Guy ]
+  * iwlwifi: do not set the sequence control bit is not needed
+  * iwlwifi: allow to switch to HT40 if not associated
+
+  [ Hillf Danton ]
+  * memcg: keep root group unchanged if creation fails
+
+  [ Srivatsa S. Bhat ]
+  * VFS: Fix race between CPU hotplug and lglocks
+
+  [ Jason Chen ]
+  * ARM:imx:fix pwm period value
+
+  [ Ulf Hansson ]
+  * ARM: 7214/1: mmc: mmci: Fixup handling of MCI_STARTBITERR
+  * ARM: 7220/1: mmc: mmci: Fixup error handling for dma
+
+  [ Vladimir Zapolskiy ]
+  * oprofile, arm/sh: Fix oprofile_arch_exit() linkage issue
+
+  [ Hugh Dickins ]
+  * futex: Fix uninterruptible loop due to gate_area
+
+  [ Mingarelli, Thomas ]
+  * watchdog: hpwdt: Changes to handle NX secure bit in 32bit path
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: bail on BTC parts if MC ucode is missing
+
+  [ Hillf Danton ]
+  * mm: hugetlb: fix non-atomic enqueue of huge page
+
+  [ Nagalakshmi Nandigama ]
+  * mpt2sas: fix non-x86 crash on shutdown
+
+  [ David S. Miller ]
+  * sparc64: Fix MSIQ HV call ordering in pci_sun4v_msiq_build_irq().
+  * sparc32: Be less strict in matching %lo part of relocation.
+  * sparc64: Patch sun4v code sequences properly on module load.
+  * sparc: Kill custom io_remap_pfn_range().
+  * sparc32: Remove non-kernel code from memcpy implementation.
+  * sparc32: Remove uses of %g7 in memcpy implementation.
+  * sparc32: Correct the return value of memcpy.
+  * sparc64: Fix masking and shifting in VIS fpcmp emulation.
+  * sparc: Fix handling of orig_i0 wrt. debugging when restarting syscalls.
+
+  [ Markus Kötter ]
+  * net: bpf_jit: fix an off-one bug in x86_64 cond jump target
+
+  [ Djalal Harouni ]
+  * ppp: fix pptp double release_sock in pptp_bind()
+
+  [ Alex Juncu ]
+  * llc: llc_cmsg_rcv was getting called after sk_eat_skb.
+
+  [ Thomas Graf ]
+  * mqprio: Avoid panic if no options are provided
+
+  [ Gerlando Falauto ]
+  * net: have ipconfig not wait if no dev is available
+
+  [ Eric Dumazet ]
+  * sch_gred: should not use GFP_KERNEL while holding a spinlock
+
+  [ Xi Wang ]
+  * sctp: fix incorrect overflow check on autoclose
+
+  [ Thomas Graf ]
+  * sctp: Do not account for sizeof(struct sk_buff) in estimated rwnd
+
+  [ Weiping Pan ]
+  * ipv4: flush route cache after change accept_local
+
+  [ Eric Dumazet ]
+  * ipv4: reintroduce route cache garbage collector
+
+  [ Stephen Rothwell ]
+  * ipv4: using prefetch requires including prefetch.h
+
+  [ Emmanuel Grumbach ]
+  * iwlwifi: update SCD BC table for all SCD queues
+
+  [ Sanjeev Premi ]
+  * mfd: Fix mismatch in twl4030 mutex lock-unlock
+
+  [ Kyle Manna ]
+  * mfd: Copy the device pointer to the twl4030-madc structure
+  * mfd: Check for twl4030-madc NULL pointer
+  * mfd: Turn on the twl4030-madc MADC clock
+
+  [ Konrad Rzeszutek Wilk ]
+  * xen/swiotlb: Use page alignment for early buffer allocation.
+
+  [ Christoph Hellwig ]
+  * xfs: log the inode in ->write_inode calls for kupdate
+  * xfs: log all dirty inodes in xfs_fs_sync_fs
+
+  [ Alexander Müller ]
+  * drm/radeon/kms/atom: fix possible segfault in pm setup
+
+  [ Mandeep Singh Baines ]
+  * hung_task: fix false positive during vfork
+
+  [ Linus Torvalds ]
+  * Revert "rtc: Disable the alarm in the hardware"
+
+  [ Oleg Nesterov ]
+  * ptrace: partially fix the do_wait(WEXITED) vs EXIT_DEAD->EXIT_ZOMBIE race
+
+  [ Mohammed Shafi Shajakhan ]
+  * ath9k: Fix kernel panic in AR2427 in AP mode
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.16
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Sun, 08 Jan 2012 10:02:16 -0800
+
 linux-3.0 (3.0.14-1+vyatta+2) unstable; urgency=low
 
   [ stephen hemminger ]
