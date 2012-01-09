@@ -1,3 +1,9 @@
+linux-3.0 (3.0.16-1+vyatta+2) unstable; urgency=low
+
+  * Unify virt and non-virt config
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 09 Jan 2012 11:57:19 -0800
+
 linux-3.0 (3.0.16-1+vyatta+1) unstable; urgency=low
 
   [ Linus Torvalds ]
