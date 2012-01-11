@@ -1,3 +1,9 @@
+linux-3.0 (3.0.16-1+vyatta+3) unstable; urgency=low
+
+  * Enable SCTP
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Wed, 11 Jan 2012 09:41:46 -0800
+
 linux-3.0 (3.0.16-1+vyatta+2) unstable; urgency=low
 
   * Unify virt and non-virt config
