@@ -1,3 +1,126 @@
+linux-3.0 (3.0.17-1+vyatta+1) unstable; urgency=low
+
+  [ Joe Perches ]
+  * MAINTAINERS: stable: Update address
+  * Documentation: Update stable address
+
+  [ Neil Horman ]
+  * firmware: Fix an oops on reading fw_priv->fw in sysfs loading file
+
+  [ Larry Finger ]
+  * rt2800usb: Move ID out of unknown
+
+  [ Benjamin Herrenschmidt ]
+  * offb: Fix setting of the pseudo-palette for >8bpp
+  * offb: Fix bug in calculating requested vram size
+
+  [ Pontus Fuchs ]
+  * wl12xx: Validate FEM index from ini file and FW
+  * wl12xx: Check buffer bound when processing nvs data
+
+  [ Anton Blanchard ]
+  * powerpc/time: Handle wrapping of decrementer
+
+  [ Li Zhong ]
+  * powerpc: Fix unpaired probe_hcall_entry and probe_hcall_exit
+
+  [ Aurelien Jacobs ]
+  * asix: new device id
+
+  [ Ram Vepa ]
+  * IB/qib: Fix a possible data corruption when receiving packets
+
+  [ Steven Rostedt ]
+  * perf: Fix parsing of __print_flags() in TP_printk()
+
+  [ Jan Kara ]
+  * reiserfs: Fix quota mount option parsing
+
+  [ Jeff Mahoney ]
+  * reiserfs: Force inode evictions before umount to avoid crash
+
+  [ Jan Kara ]
+  * ext3: Don't warn from writepage when readonly inode is spotted after error
+
+  [ Alan Stern ]
+  * USB: update documentation for usbmon
+
+  [ Claudio Scordino ]
+  * atmel_serial: fix spinlock lockup in RS485 code
+
+  [ Li Zefan ]
+  * cgroup: fix to allow mounting a hierarchy by name
+
+  [ Jan Kara ]
+  * udf: Fix deadlock when converting file from in-ICB one to normal one
+
+  [ Julia Lawall ]
+  * drivers/usb/class/cdc-acm.c: clear dangling pointer
+
+  [ Greg Kroah-Hartman ]
+  * USB: isight: fix kernel bug when loading firmware
+
+  [ Huajun Li ]
+  * usb: usb-storage doesn't support dynamic id currently, the patch disables the feature to fix an oops
+
+  [ Oliver Neukum ]
+  * USB: add quirk for another camera
+
+  [ Felipe Contreras ]
+  * usb: musb: fix pm_runtime mismatch
+
+  [ Johan Hovold ]
+  * USB: omninet: fix write_room
+
+  [ Malte Schröder ]
+  * USB: Add USB-ID for Multiplex RC serial adapter to cp210x.c
+
+  [ Clemens Ladisch ]
+  * usb: fix number of mapped SG DMA entries
+
+  [ Hans de Goede ]
+  * xhci: Properly handle COMP_2ND_BW_ERR
+
+  [ VU Tuan Duc ]
+  * USB: option: add id for 3G dongle Model VT1000 of Viettel
+
+  [ Janne Snabb ]
+  * usb: option: add ZD Incorporated HSPA modem
+
+  [ Felipe Balbi ]
+  * usb: ch9: fix up MaxStreams helper
+
+  [ Alan Stern ]
+  * OHCI: final fix for NVIDIA problems (I hope)
+
+  [ Ben Hutchings ]
+  * igmp: Avoid zero delay when receiving odd mixture of IGMP queries
+
+  [ Aurelien Jacobs ]
+  * asix: fix infinite loop in rx_fixup()
+
+  [ stephen hemminger ]
+  * bonding: fix error handling if slave is busy (v2)
+
+  [ Srivatsa S. Bhat ]
+  * PM / Sleep: Fix race between CPU hotplug and freezer
+
+  [ kashyap.desai@lsi.com ]
+  * SCSI: mpt2sas: Added missing mpt2sas_base_detach call from scsih_remove context
+
+  [ Thilo-Alexander Ginkel ]
+  * usb: cdc-acm: Fix acm_tty_hangup() vs. acm_tty_close() race
+
+  [ Xi Wang ]
+  * xfs: fix acl count validation in xfs_acl_from_disk()
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.17
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Thu, 12 Jan 2012 15:37:49 -0800
+
 linux-3.0 (3.0.16-1+vyatta+3) unstable; urgency=low
 
   * Enable SCTP
