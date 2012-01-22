@@ -962,10 +962,13 @@ void tick_nohz_enter_kernel(void)
 	local_irq_restore(flags);
 }
 
-void tick_nohz_cpu_exit_qs(void)
+void tick_nohz_cpu_exit_qs(bool irq)
 {
 	if (__get_cpu_var(nohz_task_ext_qs)) {
-		rcu_user_exit_irq();
+		if (irq)
+			rcu_user_exit_irq();
+		else
+			rcu_user_exit();
 		__get_cpu_var(nohz_task_ext_qs) = 0;
 	}
 }
@@ -1005,7 +1008,7 @@ static void tick_nohz_restart_adaptive(void)
 	tick_nohz_flush_current_times(true);
 	tick_nohz_restart_sched_tick();
 	clear_thread_flag(TIF_NOHZ);
-	tick_nohz_cpu_exit_qs();
+	tick_nohz_cpu_exit_qs(true);
 }
 
 void tick_nohz_check_adaptive(void)

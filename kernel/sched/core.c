@@ -3358,6 +3358,20 @@ int mutex_spin_on_owner(struct mutex *lock, struct task_struct *owner)
 }
 #endif
 
+asmlinkage void __sched schedule_user(void)
+{
+	/*
+	 * We may arrive here before resuming userspace.
+	 * If we are running tickless, RCU may be in idle
+	 * mode. We need to reenable RCU for the next task
+	 * and also in case schedule() make use of RCU itself.
+	 */
+	preempt_disable();
+	tick_nohz_cpu_exit_qs(false);
+	preempt_enable_no_resched();
+	schedule();
+}
+
 #ifdef CONFIG_PREEMPT
 /*
  * this is the entry point to schedule() from in-kernel preemption
