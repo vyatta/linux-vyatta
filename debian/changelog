@@ -1,3 +1,248 @@
+linux-3.0 (3.0.18-1+vyatta+1) unstable; urgency=low
+
+  [ Roman Tereshonkov ]
+  * mtdoops: fix the oops_page_used array size
+  * mtd: mtdoops: skip reading initially bad blocks
+
+  [ Brian Norris ]
+  * mtd: mtd_blkdevs: don't increase 'open' count on error path
+
+  [ Wolfram Sang ]
+  * mtd: tests: stresstest: bail out if device has not enough eraseblocks
+
+  [ Ben Hutchings ]
+  * drivers/rtc/interface.c: fix alarm rollover when day or month is out-of-range
+
+  [ Xi Wang ]
+  * ext4: fix undefined behavior in ext4_fill_flex_info()
+
+  [ Karsten Wiese ]
+  * ALSA: snd-usb-us122l: Delete calls to preempt_disable
+
+  [ Pavel Hofman ]
+  * ALSA: ice1724 - Check for ac97 to avoid kernel oops
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Return the error from get_wcaps_type() for invalid NIDs
+
+  [ Rafał Miłecki ]
+  * drm/radeon/kms: workaround invalid AVI infoframe checksum issue
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: disable writeback on pre-R300 asics
+
+  [ Michel Dänzer ]
+  * radeon: Fix disabling PCI bus mastering on big endian hosts.
+
+  [ Chuck Lever ]
+  * NFS: Retry mounting NFSROOT
+
+  [ Andy Adamson ]
+  * NFSv4.1: fix backchannel slotid off-by-one bug
+
+  [ Jeff Layton ]
+  * nfs: fix regression in handling of context= option in NFSv4
+
+  [ Chase Douglas ]
+  * HID: bump maximum global item tag report size to 96 bytes
+
+  [ Bhavesh Parekh ]
+  * UBI: fix missing scrub when there is a bit-flip
+
+  [ Artem Bityutskiy ]
+  * UBI: fix use-after-free on error path
+
+  [ Alex Williamson ]
+  * PCI: Fix PCI_EXP_TYPE_RC_EC value
+
+  [ Eric W. Biederman ]
+  * PCI: msi: Disable msi interrupts when we initialize a pci device
+
+  [ Gary Hade ]
+  * x86/PCI: Ignore CPU non-addressable _CRS reserved memory resources
+
+  [ Bjorn Helgaas ]
+  * x86/PCI: amd: factor out MMCONFIG discovery
+  * x86/PCI: build amd_bus.o only when CONFIG_AMD_NB=y
+
+  [ nagalakshmi.nandigama@lsi.com ]
+  * SCSI: mpt2sas: Release spinlock for the raid device list before blocking it
+  * SCSI: mpt2sas : Fix for memory allocation error for large host credits
+
+  [ Ian Campbell ]
+  * xen/xenbus: Reject replies with payload > XENSTORE_PAYLOAD_MAX.
+
+  [ Roberto Sassu ]
+  * ima: free duplicate measurement memory
+  * ima: fix invalid memory reference
+
+  [ Bjorn Helgaas ]
+  * PNP: work around Dell 1536/1546 BIOS MMCONFIG bug that breaks USB
+
+  [ Larry Finger ]
+  * rtl8192se: Fix BUG caused by failure to check skb allocation
+
+  [ Stanislaw Gruszka ]
+  * mac80211: fix rx->key NULL pointer dereference in promiscuous mode
+
+  [ KAMEZAWA Hiroyuki ]
+  * memcg: add mem_cgroup_replace_page_cache() to fix LRU issue
+
+  [ Ludwig Nussel ]
+  * x86: Fix mmap random address range
+
+  [ Richard Weinberger ]
+  * UBI: fix nameless volumes handling
+
+  [ Artem Bityutskiy ]
+  * UBI: fix debugging messages
+  * UBIFS: fix debugging messages
+
+  [ Jean Delvare ]
+  * i2c: Fix error value returned by several bus drivers
+
+  [ Girish K S ]
+  * mmc: core: Fix voltage select in DDR mode
+
+  [ Aaron Lu ]
+  * mmc: sdhci: Fix tuning timer incorrect setting when suspending host
+
+  [ Alexander Elbs ]
+  * mmc: sd: Fix SDR12 timing regression
+
+  [ Dan Carpenter ]
+  * V4L/DVB: v4l2-ioctl: integer overflow in video_usercopy()
+
+  [ Steven Rostedt ]
+  * kconfig/streamline-config.pl: Simplify backslash line concatination
+  * kconfig/streamline-config.pl: Fix parsing Makefile with variables
+
+  [ J. Bruce Fields ]
+  * svcrpc: fix double-free on shutdown of nfsd after changing pool mode
+  * svcrpc: destroy server sockets all at once
+  * svcrpc: avoid memory-corruption on pool shutdown
+
+  [ Sasha Levin ]
+  * nfsd: Fix oops when parsing a 0 length export
+
+  [ Miklos Szeredi ]
+  * fsnotify: don't BUG in fsnotify_destroy_mark()
+
+  [ Jack Steiner ]
+  * x86, UV: Update Boot messages for SGI UV2 platform
+
+  [ David Daney ]
+  * recordmcount: Fix handling of elf64 big-endian objects.
+
+  [ Haogang Chen ]
+  * uvcvideo: Fix integer overflow in uvc_ioctl_ctrl_map()
+
+  [ Miklos Szeredi ]
+  * fix shrink_dcache_parent() livelock
+
+  [ Nick Bowler ]
+  * ah: Correctly pass error codes in ahash output callback.
+  * ah: Read nexthdr value before overwriting it in ahash input callback.
+
+  [ Chris Bagwell ]
+  * HID: hid-multitouch - add another eGalax id
+
+  [ Benjamin Tissoires ]
+  * HID: multitouch: cleanup with eGalax PID definitions
+
+  [ Marek Vasut ]
+  * HID: multitouch: Add egalax ID for Acer Iconia W500
+
+  [ Benjamin Tissoires ]
+  * HID: multitouch: add support for the MSI Windpad 110W
+  * HID: multitouch: add support for 3M 32"
+
+  [ Martin Schwidefsky ]
+  * fix cputime overflow in uptime_proc_show
+
+  [ Paolo Bonzini ]
+  * block: add and use scsi_blk_cmd_ioctl
+  * block: fail SCSI passthrough ioctls on partition devices
+  * dm: do not forward ioctls from logical volumes to the underlying device
+
+  [ Linus Torvalds ]
+  * proc: clean up and fix /proc/<pid>/mem handling
+
+  [ Clemens Ladisch ]
+  * ALSA: virtuoso: Xonar DS: fix polarity of front output
+
+  [ David Henningsson ]
+  * ALSA: HDA: Fix internal microphone on Dell Studio 16 XPS 1645
+
+  [ Thomas Renninger ]
+  * intel idle: Make idle driver more robust
+
+  [ Shaohua Li ]
+  * intel_idle: fix API misuse
+
+  [ Kurt Garloff ]
+  * ACPI: Store SRAT table revision
+  * ACPI, x86: Use SRAT table rev to use 8bit or 32bit PXM fields (x86/x86-64)
+  * ACPI, ia64: Use SRAT table rev to use 8bit or 16/32bit PXM fields (ia64)
+
+  [ Lin Ming ]
+  * ACPICA: Put back the call to acpi_os_validate_address
+  * ACPI: processor: fix acpi_get_cpuid for UP processor
+
+  [ Stratos Psomadakis ]
+  * sym53c8xx: Fix NULL pointer dereference in slave_destroy
+
+  [ Roland Dreier ]
+  * target: Set response format in INQUIRY response
+  * target: Set additional sense length field in sense data
+
+  [ Alexander Aring ]
+  * I2C: OMAP: correct SYSC register offset for OMAP4
+
+  [ Cliff Wickman ]
+  * x86/UV2: Fix BAU destination timeout initialization
+
+  [ Stanislaw Gruszka ]
+  * rt2800pci: fix spurious interrupts generation
+
+  [ Boaz Harrosh ]
+  * pnfs-obj: pNFS errors are communicated on iodata->pnfs_error
+  * pnfs-obj: Must return layout on IO error
+
+  [ Dirk Eibach ]
+  * net: Fix driver name for mdio-gpio.c
+
+  [ Toshiharu Okada ]
+  * i2c-eg20t: modified the setting of transfer rate.
+
+  [ Dan Rosenberg ]
+  * score: fix off-by-one index into syscall table
+
+  [ Ananth N Mavinakayanahalli ]
+  * kprobes: initialize before using a hlist
+
+  [ Will Deacon ]
+  * proc: clear_refs: do not clear reserved pages
+
+  [ Michal Hocko ]
+  * mm: fix NULL ptr dereference in __count_immobile_pages
+
+  [ Wey-Yi Guy ]
+  * iwlagn: check for SMPS mode
+
+  [ Stanislaw Gruszka ]
+  * iwlegacy: 3945: fix hw passive scan on radar channels
+
+  [ Artem Bityutskiy ]
+  * UBIFS: make debugging messages light again
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.18
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Wed, 25 Jan 2012 20:50:43 -0800
+
 linux-3.0 (3.0.17-1+vyatta+2) unstable; urgency=low
 
   * bna: back port from 3.2.1
