@@ -1,3 +1,9 @@
+linux-3.0 (3.0.17-1+vyatta+2) unstable; urgency=low
+
+  * bna: back port from 3.2.1
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Wed, 25 Jan 2012 16:26:13 -0800
+
 linux-3.0 (3.0.17-1+vyatta+1) unstable; urgency=low
 
   [ Joe Perches ]
