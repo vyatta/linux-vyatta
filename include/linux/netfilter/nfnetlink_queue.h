@@ -41,6 +41,8 @@ enum nfqnl_attr_type {
 	NFQA_IFINDEX_PHYSOUTDEV,	/* __u32 ifindex */
 	NFQA_HWADDR,			/* nfqnl_msg_packet_hw */
 	NFQA_PAYLOAD,			/* opaque data payload */
+	NFQA_CT,			/* nf_conntrack_netlink.h */
+	NFQA_CT_INFO,			/* enum ip_conntrack_info */
 
 	__NFQA_MAX
 };
@@ -77,12 +79,17 @@ struct nfqnl_msg_config_params {
 	__u8	copy_mode;	/* enum nfqnl_config_mode */
 } __attribute__ ((packed));
 
+enum nfqnl_flags {
+	NFQNL_F_NONE		= 0,
+	NFQNL_F_CONNTRACK	= (1 << 0),
+};
 
 enum nfqnl_attr_config {
 	NFQA_CFG_UNSPEC,
 	NFQA_CFG_CMD,			/* nfqnl_msg_config_cmd */
 	NFQA_CFG_PARAMS,		/* nfqnl_msg_config_params */
 	NFQA_CFG_QUEUE_MAXLEN,		/* __u32 */
+	NFQA_CFG_FLAGS,			/* __u32 */
 	__NFQA_CFG_MAX
 };
 #define NFQA_CFG_MAX (__NFQA_CFG_MAX-1)
