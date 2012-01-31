@@ -1566,6 +1566,150 @@ ctnetlink_new_conntrack(struct sock *ctnl, struct sk_buff *skb,
 	return err;
 }
 
+#if defined(CONFIG_NETFILTER_NETLINK_QUEUE) ||	\
+    defined(CONFIG_NETFILTER_NETLINK_QUEUE_MODULE)
+static size_t
+ctnetlink_nfqueue_build_size(const struct nf_conn *ct)
+{
+	return 3 * nla_total_size(0) /* CTA_TUPLE_ORIG|REPL|MASTER */
+	       + 3 * nla_total_size(0) /* CTA_TUPLE_IP */
+	       + 3 * nla_total_size(0) /* CTA_TUPLE_PROTO */
+	       + 3 * nla_total_size(sizeof(u_int8_t)) /* CTA_PROTO_NUM */
+	       + nla_total_size(sizeof(u_int32_t)) /* CTA_ID */
+	       + nla_total_size(sizeof(u_int32_t)) /* CTA_STATUS */
+	       + nla_total_size(sizeof(u_int32_t)) /* CTA_TIMEOUT */
+	       + nla_total_size(0) /* CTA_PROTOINFO */
+	       + nla_total_size(0) /* CTA_HELP */
+	       + nla_total_size(NF_CT_HELPER_NAME_LEN) /* CTA_HELP_NAME */
+	       + ctnetlink_secctx_size(ct)
+#ifdef CONFIG_NF_NAT_NEEDED
+	       + 2 * nla_total_size(0) /* CTA_NAT_SEQ_ADJ_ORIG|REPL */
+	       + 6 * nla_total_size(sizeof(u_int32_t)) /* CTA_NAT_SEQ_OFFSET */
+#endif
+#ifdef CONFIG_NF_CONNTRACK_MARK
+	       + nla_total_size(sizeof(u_int32_t)) /* CTA_MARK */
+#endif
+	       + ctnetlink_proto_size(ct)
+	       ;
+}
+
+static int
+ctnetlink_nfqueue_build(struct sk_buff *skb, struct nf_conn *ct)
+{
+	struct nlattr *nest_parms;
+
+	rcu_read_lock();
+	nest_parms = nla_nest_start(skb, CTA_TUPLE_ORIG | NLA_F_NESTED);
+	if (!nest_parms)
+		goto nla_put_failure;
+	if (ctnetlink_dump_tuples(skb, nf_ct_tuple(ct, IP_CT_DIR_ORIGINAL)) < 0)
+		goto nla_put_failure;
+	nla_nest_end(skb, nest_parms);
+
+	nest_parms = nla_nest_start(skb, CTA_TUPLE_REPLY | NLA_F_NESTED);
+	if (!nest_parms)
+		goto nla_put_failure;
+	if (ctnetlink_dump_tuples(skb, nf_ct_tuple(ct, IP_CT_DIR_REPLY)) < 0)
+		goto nla_put_failure;
+	nla_nest_end(skb, nest_parms);
+
+	if (nf_ct_zone(ct))
+		NLA_PUT_BE16(skb, CTA_ZONE, htons(nf_ct_zone(ct)));
+
+	if (ctnetlink_dump_id(skb, ct) < 0)
+		goto nla_put_failure;
+
+	if (ctnetlink_dump_status(skb, ct) < 0)
+		goto nla_put_failure;
+
+	if (ctnetlink_dump_timeout(skb, ct) < 0)
+		goto nla_put_failure;
+
+	if (ctnetlink_dump_protoinfo(skb, ct) < 0)
+		goto nla_put_failure;
+
+	if (ctnetlink_dump_helpinfo(skb, ct) < 0)
+		goto nla_put_failure;
+
+#ifdef CONFIG_NF_CONNTRACK_SECMARK
+	if (ct->secmark && ctnetlink_dump_secctx(skb, ct) < 0)
+		goto nla_put_failure;
+#endif
+	if (ct->master && ctnetlink_dump_master(skb, ct) < 0)
+		goto nla_put_failure;
+
+	if ((ct->status & IPS_SEQ_ADJUST) &&
+	    ctnetlink_dump_nat_seq_adj(skb, ct) < 0)
+		goto nla_put_failure;
+
+#ifdef CONFIG_NF_CONNTRACK_MARK
+	if (ct->mark && ctnetlink_dump_mark(skb, ct) < 0)
+		goto nla_put_failure;
+#endif
+	rcu_read_unlock();
+	return 0;
+
+nla_put_failure:
+	rcu_read_unlock();
+	return -ENOSPC;
+}
+
+static int
+ctnetlink_nfqueue_parse(const struct nlattr *attr, struct nf_conn *ct)
+{
+	const struct nlattr * const cda[CTA_MAX+1];
+	struct nf_conntrack_tuple otuple, rtuple;
+	u16 u3 = nf_ct_l3num(ct);
+	int err;
+
+	nla_parse_nested((struct nlattr **)cda, CTA_MAX, attr, ct_nla_policy);
+
+	if (cda[CTA_TUPLE_ORIG]) {
+		err = ctnetlink_parse_tuple(cda, &otuple, CTA_TUPLE_ORIG, u3);
+		if (err < 0)
+			return err;
+	}
+	if (cda[CTA_TUPLE_REPLY]) {
+		err = ctnetlink_parse_tuple(cda, &rtuple, CTA_TUPLE_REPLY, u3);
+		if (err < 0)
+			return err;
+	}
+	if (cda[CTA_TIMEOUT]) {
+		err = ctnetlink_change_timeout(ct, cda);
+		if (err < 0)
+			return err;
+	}
+	if (cda[CTA_STATUS]) {
+		err = ctnetlink_change_status(ct, cda);
+		if (err < 0)
+			return err;
+	}
+	if (cda[CTA_PROTOINFO]) {
+		err = ctnetlink_change_protoinfo(ct, cda);
+		if (err < 0)
+			return err;
+	}
+#if defined(CONFIG_NF_CONNTRACK_MARK)
+	if (cda[CTA_MARK])
+		ct->mark = ntohl(nla_get_be32(cda[CTA_MARK]));
+#endif
+#ifdef CONFIG_NF_NAT_NEEDED
+	if (cda[CTA_NAT_SEQ_ADJ_ORIG] || cda[CTA_NAT_SEQ_ADJ_REPLY]) {
+		err = ctnetlink_change_nat_seq_adj(ct, cda);
+		if (err < 0)
+			return err;
+	}
+#endif
+	return 0;
+}
+
+static struct nfq_ct_hook ctnetlink_nfqueue_hook = {
+	.build_size	= ctnetlink_nfqueue_build_size,
+	.build		= ctnetlink_nfqueue_build,
+	.parse		= ctnetlink_nfqueue_parse,
+};
+#endif /* CONFIG_NETFILTER_NETLINK_QUEUE */
+
 /***********************************************************************
  * EXPECT
  ***********************************************************************/
@@ -2347,7 +2491,12 @@ static int __init ctnetlink_init(void)
 		pr_err("ctnetlink_init: cannot register pernet operations\n");
 		goto err_unreg_exp_subsys;
 	}
-
+#if defined(CONFIG_NETFILTER_NETLINK_QUEUE) ||	\
+    defined(CONFIG_NETFILTER_NETLINK_QUEUE_MODULE)
+	/* setup interaction between nf_queue and nf_conntrack_netlink. */
+	RCU_INIT_POINTER(nfq_ct_hook, &ctnetlink_nfqueue_hook);
+	printk("registering nf_queue and ctnetlink interaction\n");
+#endif
 	return 0;
 
 err_unreg_exp_subsys:
@@ -2365,6 +2514,11 @@ static void __exit ctnetlink_exit(void)
 	unregister_pernet_subsys(&ctnetlink_net_ops);
 	nfnetlink_subsys_unregister(&ctnl_exp_subsys);
 	nfnetlink_subsys_unregister(&ctnl_subsys);
+#if defined(CONFIG_NETFILTER_NETLINK_QUEUE) ||	\
+    defined(CONFIG_NETFILTER_NETLINK_QUEUE_MODULE)
+	RCU_INIT_POINTER(nfq_ct_hook, NULL);
+	printk("unregistering nf_queue and ctnetlink interaction\n");
+#endif
 }
 
 module_init(ctnetlink_init);
