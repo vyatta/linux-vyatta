@@ -1,3 +1,179 @@
+linux-3.0 (3.0.19-1+vyatta+1) unstable; urgency=low
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Fix silent outputs from docking-station jacks of Dell laptops
+
+  [ Tyler Hicks ]
+  * eCryptfs: Sanitize write counts of /dev/ecryptfs
+
+  [ Tim Gardner ]
+  * ecryptfs: Improve metadata read failure logging
+
+  [ Tyler Hicks ]
+  * eCryptfs: Make truncate path killable
+  * eCryptfs: Check inode changes in setattr
+  * eCryptfs: Fix oops when printing debug info in extent crypto functions
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: Add an MSI quirk for Dell RS690
+
+  [ Thomas Hellstrom ]
+  * drm: Fix authentication kernel crash
+
+  [ Jan Kara ]
+  * xfs: Fix missing xfs_iunlock() on error recovery path in xfs_readlink()
+
+  [ Alexey Dobriyan ]
+  * crypto: sha512 - make it work, undo percpu message schedule
+  * crypto: sha512 - reduce stack usage to safe number
+
+  [ Steven Rostedt ]
+  * ftrace: Balance records when updating the hash
+  * ftrace: Update filter when tracing enabled in set_ftrace_filter()
+
+  [ Jiri Olsa ]
+  * ftrace: Fix unregister ftrace_ops accounting
+
+  [ Nick Bowler ]
+  * ah: Don't return NET_XMIT_DROP on input.
+
+  [ Dave Chinner ]
+  * xfs: fix endian conversion issue in discard code
+
+  [ Russ Anderson ]
+  * x86/uv: Fix uv_gpa_to_soc_phys_ram() shift
+
+  [ Andreas Herrmann ]
+  * x86/microcode_amd: Add support for CPU family specific container files
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Fix silent output on ASUS A6Rp
+  * ALSA: hda - Fix silent output on Haier W18 laptop
+
+  [ Paulo Zanoni ]
+  * drm/i915/sdvo: always set positive sync polarity
+
+  [ Jonathan Nieder ]
+  * cap_syslog: don't use WARN_ONCE for CAP_SYS_ADMIN deprecation warning
+
+  [ Srinidhi KASAGAR ]
+  * mach-ux500: enable ARM errata 764369
+
+  [ Will Deacon ]
+  * ARM: 7296/1: proc-v7.S: remove HARVARD_CACHE preprocessor guards
+
+  [ Kentaro Matsuyama ]
+  * USB: option: Add LG docomo L-02C
+
+  [ Johan Hovold ]
+  * USB: ftdi_sio: fix TIOCSSERIAL baud_base handling
+  * USB: ftdi_sio: fix initial baud rate
+
+  [ Peter Korsgaard ]
+  * USB: ftdi_sio: add PID for TI XDS100v2 / BeagleBone A3
+
+  [ Peter Naulls ]
+  * USB: serial: ftdi additional IDs
+
+  [ Alan Cox ]
+  * USB: ftdi_sio: Add more identifiers
+
+  [ Bjørn Mork ]
+  * USB: cdc-wdm: updating desc->length must be protected by spin_lock
+  * USB: cdc-wdm: use two mutexes to allow simultaneous read and write
+
+  [ Dan Williams ]
+  * qcaux: add more Pantech UML190 and UML290 ports
+
+  [ Eric W. Biederman ]
+  * usb: io_ti: Make edge_remove_sysfs_attrs the port_remove method.
+
+  [ Jiri Slaby ]
+  * TTY: fix UV serial console regression
+
+  [ Rabin Vincent ]
+  * serial: amba-pl011: lock console writes against interrupts
+
+  [ Lucas Kannebley Tavares ]
+  * jsm: Fixed EEH recovery error
+
+  [ Ryan Mallon ]
+  * vmwgfx: Fix assignment in vmw_framebuffer_create_handle
+
+  [ Harrison Metzger ]
+  * USB: usbsevseg: fix max length
+
+  [ Julia Lawall ]
+  * drivers/usb/host/ehci-fsl.c: add missing iounmap
+
+  [ Sarah Sharp ]
+  * xhci: Fix USB 3.0 device restart on resume.
+
+  [ Andiry Xu ]
+  * xHCI: Cleanup isoc transfer ring when TD length mismatch found
+
+  [ Jean Delvare ]
+  * hwmon: (f71805f) Fix clamping of temperature limits
+
+  [ Guenter Roeck ]
+  * hwmon: (w83627ehf) Disable setting DC mode for pwm2, pwm3 on NCT6776F
+
+  [ Vivien Didelot ]
+  * hwmon: (sht15) fix bad error code
+
+  [ Bjørn Mork ]
+  * USB: cdc-wdm: call wake_up_all to allow driver to shutdown on device removal
+  * USB: cdc-wdm: better allocate a buffer that is at least as big as we tell the USB core
+  * USB: cdc-wdm: Avoid hanging on interface with no USB_CDC_DMM_TYPE
+
+  [ Eric Dumazet ]
+  * netns: fix net_alloc_generic()
+
+  [ Eric W. Biederman ]
+  * netns: Fail conspicously if someone uses net_generic at an inappropriate time.
+  * net caif: Register properly as a pernet subsystem.
+
+  [ Jiri Bohac ]
+  * bonding: fix enslaving in alb mode when link down
+
+  [ James Chapman ]
+  * l2tp: l2tp_ip - fix possible oops on packet receive
+
+  [ Eric Dumazet ]
+  * net: bpf_jit: fix divide by 0 generation
+
+  [ David S. Miller ]
+  * rds: Make rds_sock_lock BH rather than IRQ safe.
+
+  [ Neal Cardwell ]
+  * tcp: fix tcp_trim_head() to adjust segment count with skb MSS
+
+  [ shawnlu ]
+  * tcp: md5: using remote adress for md5 lookup in rst packet
+
+  [ Renato Caldas ]
+  * USB: serial: CP210x: Added USB-ID for the Link Instruments MSO-19
+
+  [ Johan Hovold ]
+  * USB: cp210x: call generic open last in open
+
+  [ Preston Fick ]
+  * USB: cp210x: fix CP2104 baudrate usage
+
+  [ Johan Hovold ]
+  * USB: cp210x: do not map baud rates to B0
+  * USB: cp210x: fix up set_termios variables
+  * USB: cp210x: clean up, refactor and document speed handling
+  * USB: cp210x: initialise baud rate at open
+  * USB: cp210x: allow more baud rates above 1Mbaud
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.19
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Sun, 05 Feb 2012 12:44:46 -0800
+
 linux-3.0 (3.0.18-1+vyatta+1) unstable; urgency=low
 
   [ Roman Tereshonkov ]
