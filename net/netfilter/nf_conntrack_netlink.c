@@ -1998,6 +1998,7 @@ ctnetlink_create_expect(struct net *net, u16 zone,
 	struct nf_conntrack_expect *exp;
 	struct nf_conn *ct;
 	struct nf_conn_help *help;
+	struct nf_conntrack_helper *helper = NULL;
 	int err = 0;
 
 	/* caller guarantees that those three CTA_EXPECT_* exist */
@@ -2016,6 +2017,28 @@ ctnetlink_create_expect(struct net *net, u16 zone,
 	if (!h)
 		return -ENOENT;
 	ct = nf_ct_tuplehash_to_ctrack(h);
+
+	/* Look for helper of this expectation */
+	if (cda[CTA_EXPECT_HELP_NAME]) {
+		const char *helpname = nla_data(cda[CTA_EXPECT_HELP_NAME]);
+
+		helper = __nf_conntrack_helper_find(helpname, nf_ct_l3num(ct),
+						    nf_ct_protonum(ct));
+		if (helper == NULL) {
+#ifdef CONFIG_MODULES
+			if (request_module("nfct-helper-%s", helpname) < 0)
+				return -EOPNOTSUPP;
+
+			helper = __nf_conntrack_helper_find(helpname,
+							    nf_ct_l3num(ct),
+							    nf_ct_protonum(ct));
+			if (helper)
+				return -EAGAIN;
+#endif
+			return -EOPNOTSUPP;
+		}
+	}
+
 	exp = nf_ct_expect_alloc(ct);
 	if (!exp) {
 		err = -ENOMEM;
@@ -2046,7 +2069,7 @@ ctnetlink_create_expect(struct net *net, u16 zone,
 	exp->class = 0;
 	exp->expectfn = NULL;
 	exp->master = ct;
-	exp->helper = NULL;
+	exp->helper = helper;
 	memcpy(&exp->tuple, &tuple, sizeof(struct nf_conntrack_tuple));
 	memcpy(&exp->mask.src.u3, &mask.src.u3, sizeof(exp->mask.src.u3));
 	exp->mask.src.u.all = mask.src.u.all;
