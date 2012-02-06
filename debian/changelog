@@ -1,3 +1,15 @@
+linux-3.0 (3.0.20-1+vyatta+1) unstable; urgency=low
+
+  [ Matthew Garrett ]
+  * PCI: Rework ASPM disable code
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.20
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 06 Feb 2012 10:53:46 -0800
+
 linux-3.0 (3.0.19-1+vyatta+1) unstable; urgency=low
 
   [ Takashi Iwai ]
