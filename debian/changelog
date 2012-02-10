@@ -1,3 +1,9 @@
+linux-3.0 (3.0.20-1+vyatta+2) unstable; urgency=low
+
+  * unionfs: update to 2.5.11 version
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Fri, 10 Feb 2012 15:45:33 -0800
+
 linux-3.0 (3.0.20-1+vyatta+1) unstable; urgency=low
 
   [ Matthew Garrett ]
