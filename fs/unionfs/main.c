@@ -700,7 +700,7 @@ static struct dentry *unionfs_mount(struct file_system_type *fs_type,
 	struct dentry *dentry;
 
 	dentry = mount_nodev(fs_type, flags, raw_data, unionfs_read_super);
-	if (!PTR_ERR(dentry))
+	if (!IS_ERR(dentry))
 		UNIONFS_SB(dentry->d_sb)->dev_name =
 			kstrdup(dev_name, GFP_KERNEL);
 	return dentry;
