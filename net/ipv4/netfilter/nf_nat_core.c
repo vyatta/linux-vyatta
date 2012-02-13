@@ -716,6 +716,11 @@ static struct pernet_operations nf_nat_net_ops = {
 	.exit = nf_nat_net_exit,
 };
 
+static struct nf_ct_helper_expectfn follow_master_nat = {
+	.name		= "nat-follow-master",
+	.expectfn	= nf_nat_follow_master,
+};
+
 static int __init nf_nat_init(void)
 {
 	size_t i;
@@ -747,6 +752,8 @@ static int __init nf_nat_init(void)
 
 	l3proto = nf_ct_l3proto_find_get((u_int16_t)AF_INET);
 
+	nf_ct_helper_expectfn_register(&follow_master_nat);
+
 	BUG_ON(nf_nat_seq_adjust_hook != NULL);
 	rcu_assign_pointer(nf_nat_seq_adjust_hook, nf_nat_seq_adjust);
 	BUG_ON(nfnetlink_parse_nat_setup_hook != NULL);
@@ -766,9 +773,10 @@ static void __exit nf_nat_cleanup(void)
 	unregister_pernet_subsys(&nf_nat_net_ops);
 	nf_ct_l3proto_put(l3proto);
 	nf_ct_extend_unregister(&nat_extend);
-	rcu_assign_pointer(nf_nat_seq_adjust_hook, NULL);
-	rcu_assign_pointer(nfnetlink_parse_nat_setup_hook, NULL);
-	rcu_assign_pointer(nf_ct_nat_offset, NULL);
+	nf_ct_helper_expectfn_unregister(&follow_master_nat);
+	RCU_INIT_POINTER(nf_nat_seq_adjust_hook, NULL);
+	RCU_INIT_POINTER(nfnetlink_parse_nat_setup_hook, NULL);
+	RCU_INIT_POINTER(nf_ct_nat_offset, NULL);
 	synchronize_net();
 }
 
