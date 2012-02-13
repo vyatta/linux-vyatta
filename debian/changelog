@@ -1,3 +1,163 @@
+linux-3.0 (3.0.21-1+vyatta+1) unstable; urgency=low
+
+  [ Shaohua Li ]
+  * readahead: fix pipeline break caused by block plug
+
+  [ David Henningsson ]
+  * ALSA: HDA: Fix duplicated output to more than one codec
+
+  [ Mark Brown ]
+  * ASoC: wm_hubs: Enable line out VMID buffer for single ended line outputs
+
+  [ UK KIM ]
+  * ASoC: wm_hubs: fix wrong bits for LINEOUT2 N/P mixer
+
+  [ Will Deacon ]
+  * ARM: 7306/1: vfp: flush thread hwstate before restoring context from sigframe
+
+  [ Dave Martin ]
+  * ARM: 7307/1: vfp: fix ptrace regset modification race
+
+  [ Will Deacon ]
+  * ARM: 7308/1: vfp: flush thread hwstate before copying ptrace registers
+
+  [ Yegor Yefremov ]
+  * ARM: OMAP2+: GPMC: fix device size setup
+
+  [ Samuel Thibault ]
+  * drivers/tty/vt/vt_ioctl.c: fix KDFONTOP 32bit compatibility layer
+
+  [ Oleg Nesterov ]
+  * proc: mem_release() should check mm != NULL
+  * proc: unify mem_read() and mem_write()
+  * proc: make sure mem_open() doesn't pin the target's memory
+
+  [ Clemens Ladisch ]
+  * firewire: ohci: add reset packet quirk for SB Audigy
+
+  [ Stefan Richter ]
+  * firewire: ohci: disable MSI on Ricoh controllers
+
+  [ Jack Morgenstein ]
+  * IB/mlx4: pass SMP vendor-specific attribute MADs to firmware
+
+  [ Jiang Liu ]
+  * kprobes: fix a memory leak in function pre_handler_kretprobe()
+
+  [ Nikolaus Voss ]
+  * at_hdmac: bugfix for enabling channel irq
+
+  [ Carsten Otte ]
+  * mm/filemap_xip.c: fix race condition in xip_file_fault()
+
+  [ Mel Gorman ]
+  * mm: compaction: check pfn_valid when entering a new MAX_ORDER_NR_PAGES block during isolation for migration
+
+  [ Michel Dänzer ]
+  * drm/radeon: Set DESKTOP_HEIGHT register to the framebuffer (not mode) height.
+
+  [ Ben Skeggs ]
+  * drm/nouveau/gem: fix fence_sync race / oops
+
+  [ Seth Forshee ]
+  * drm/radeon/kms: disable output polling when suspended
+
+  [ Chanho Min ]
+  * sched/rt: Fix task stack corruption under __ARCH_WANT_INTERRUPTS_ON_CTXSW
+
+  [ Mark Brown ]
+  * ASoC: Ensure we generate a driver name
+
+  [ Jan Kara ]
+  * udf: Mark LVID buffer as uptodate before marking it dirty
+
+  [ Wu Fengguang ]
+  * drm/i915: HDMI hot remove notification to audio driver
+  * drm/i915: DisplayPort hot remove notification to audio driver
+
+  [ Daniel Vetter ]
+  * drm/i915: check ACTHD of all rings
+
+  [ Rodrigo Vivi ]
+  * drm/i915: Fix TV Out refresh rate.
+
+  [ Eugeni Dodonov ]
+  * drm/i915: handle 3rd pipe
+
+  [ Li Wang ]
+  * eCryptfs: Infinite loop due to overflow in ecryptfs_write()
+
+  [ Shirish Pargaonkar ]
+  * cifs: Fix oops in session setup code for null user mounts
+
+  [ Hubert Feurstein ]
+  * atmel_lcdfb: fix usage of CONTRAST_CTR in suspend/resume
+
+  [ Peter Zijlstra ]
+  * lockdep, bug: Exclude TAINT_FIRMWARE_WORKAROUND from disabling lockdep
+
+  [ Guenter Roeck ]
+  * hwmon: (w83627ehf) Fix number of fans for NCT6776F
+
+  [ Mark Brown ]
+  * ASoC: wm_hubs: Fix routing of input PGAs to line output mixer
+  * ASoC: wm_hubs: Correct line input to line output 2 paths
+
+  [ Susan Gao ]
+  * ASoC: wm8962: Fix word length configuration
+
+  [ Russell King ]
+  * pcmcia: fix socket refcount decrementing on each resume
+
+  [ Mel Gorman ]
+  * mm: compaction: check for overlapping nodes during isolation for migration
+
+  [ Hugh Dickins ]
+  * mm: fix UP THP spin_is_locked BUGs
+
+  [ Marco Sanvido ]
+  * target: Use correct preempted registration sense code
+  * target: Allow PERSISTENT RESERVE IN for non-reservation holder
+
+  [ Roland Dreier ]
+  * target: Correct sense key for INVALID FIELD IN {PARAMETER LIST,CDB}
+
+  [ Pekka Paalanen ]
+  * Staging: asus_oled: fix image processing
+  * Staging: asus_oled: fix NULL-ptr crash on unloading
+
+  [ Larry Finger ]
+  * staging: r8712u: Add new Sitecom UsB ID
+
+  [ Timo Juhani Lindfors ]
+  * usb: gadget: zero: fix bug in loopback autoresume handling
+
+  [ Jayachandran C ]
+  * usb: Skip PCI USB quirk handling for Netlogic XLP
+
+  [ Milan Kocian ]
+  * USB: usbserial: add new PID number (0xa951) to the ftdi driver
+
+  [ Rui li ]
+  * USB: add new zte 3g-dongle's pid to option.c
+
+  [ Axel Lin ]
+  * mmc: cb710 core: Add missing spin_lock_init for irq_lock of struct cb710_chip
+
+  [ Andreas Herrmann ]
+  * powernow-k8: Avoid Pstate MSR accesses on systems supporting CPB
+  * powernow-k8: Fix indexing issue
+
+  [ Eric Dumazet ]
+  * net: fix NULL dereferences in check_peer_redir()
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.21
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 13 Feb 2012 15:25:16 -0800
+
 linux-3.0 (3.0.20-1+vyatta+3) unstable; urgency=low
 
   [ Gaurav ]
