@@ -1,3 +1,17 @@
+linux-3.0 (3.0.20-1+vyatta+3) unstable; urgency=low
+
+  [ Gaurav ]
+  * netfilter: ctnetlink: allow to set helper for new expectations
+
+  [ Pablo Neira Ayuso ]
+  * netfilter: ctnetlink: allow to set expectation class
+  * netfilter: ctnetlink: add NAT support for expectations
+
+  [ Gaurav ]
+  * Netfilter changes for supporting NAT with Expect table sync
+
+ -- Gaurav <gaurav.sinha@vyatta.com>  Mon, 13 Feb 2012 14:29:41 -0800
+
 linux-3.0 (3.0.20-1+vyatta+2) unstable; urgency=low
 
   * unionfs: update to 2.5.11 version
