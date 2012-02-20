@@ -1,3 +1,58 @@
+linux-3.0 (3.0.22-1+vyatta+1) unstable; urgency=low
+
+  [ Naveen N. Rao ]
+  * perf evsel: Fix an issue where perf report fails to show the proper percentage
+
+  [ Jiri Olsa ]
+  * perf tools: Fix perf stack to non executable on x86_64
+
+  [ Daniel Vetter ]
+  * drm/i915: no lvds quirk for AOpen MP45
+
+  [ Nikolaus Schulz ]
+  * hwmon: (f75375s) Fix bit shifting in f75375_write16
+
+  [ Wu Fengguang ]
+  * lib: proportion: lower PROP_MAX_SHIFT to 32 on 64-bit kernel
+
+  [ Dan Carpenter ]
+  * relay: prevent integer overflow in relay_open()
+
+  [ Eliad Peller ]
+  * mac80211: timeout a single frame in the rx reorder buffer
+
+  [ Wu Fengguang ]
+  * writeback: fix dereferencing NULL bdi->dev on trace_writeback_queue
+
+  [ David Jander ]
+  * gpio/pca953x: Fix warning of enabled interrupts in handler
+
+  [ Nikolaus Schulz ]
+  * hwmon: (f75375s) Fix automatic pwm mode setting for F75373 & F75375
+
+  [ Herbert Xu ]
+  * crypto: sha512 - Use binary and instead of modulus
+  * crypto: sha512 - Avoid stack bloat on i386
+
+  [ Daniel T Chen ]
+  * ALSA: intel8x0: Fix default inaudible sound on Gateway M520
+
+  [ Stefano Stabellini ]
+  * xen pvhvm: do not remap pirqs onto evtchns if !xen_have_vector_callback
+
+  [ Eric Dumazet ]
+  * slub: fix a possible memleak in __slab_alloc()
+
+  [ Alexey Dobriyan ]
+  * crypto: sha512 - use standard ror64()
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.22
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 20 Feb 2012 14:16:32 -0800
+
 linux-3.0 (3.0.21-1+vyatta+1) unstable; urgency=low
 
   [ Shaohua Li ]
