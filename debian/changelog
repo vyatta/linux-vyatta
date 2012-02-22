@@ -1,3 +1,18 @@
+linux-3.0 (3.0.22-1+vyatta+2) unstable; urgency=low
+
+  [ Jason Wang ]
+  * virtio_net: introduce VIRTIO_NET_HDR_F_DATA_VALID
+
+  [ stephen hemminger ]
+  * virtio-net: per cpu 64 bit stats (v2)
+
+  [ Krishna Kumar ]
+  * virtio_net: Fix panic in virtnet_remove
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Tue, 21 Feb 2012 21:42:53 -0800
+
 linux-3.0 (3.0.22-1+vyatta+1) unstable; urgency=low
 
   [ Naveen N. Rao ]
