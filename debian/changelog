@@ -1,3 +1,189 @@
+linux-3.0 (3.0.23-1+vyatta+1) unstable; urgency=low
+
+  [ Mark Brown ]
+  * ASoC: wm8962: Fix sidetone enumeration texts
+
+  [ David Howells ]
+  * NOMMU: Lock i_mmap_mutex for access to the VMA prio list
+
+  [ Chris D Schimp ]
+  * hwmon: (max6639) Fix FAN_FROM_REG calculation
+  * hwmon: (max6639) Fix PPR register initialization to set both channels
+
+  [ Guenter Roeck ]
+  * hwmon: (ads1015) Fix file leak in probe function
+
+  [ Anton Blanchard ]
+  * powerpc/perf: power_pmu_start restores incorrect values, breaking frequency events
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: fix MSI re-arm on rv370+
+
+  [ Yinghai Lu ]
+  * PCI: workaround hard-wired bus number V2
+
+  [ Mohammed Shafi Shajakhan ]
+  * mac80211: Fix a rwlock bad magic bug
+
+  [ Tim Gardner ]
+  * ipheth: Add iPhone 4S
+
+  [ Tyler Hicks ]
+  * eCryptfs: Copy up lower inode attrs after setting lower xattr
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Fix redundant jack creations for cx5051
+
+  [ Johan Rudholm ]
+  * mmc: core: check for zero length ioctl data
+
+  [ Trond Myklebust ]
+  * NFSv4: Ensure we throw out bad delegation stateids on NFS4ERR_BAD_STATEID
+
+  [ Stephen Boyd ]
+  * ARM: 7321/1: cache-v7: Disable preemption when reading CCSIDR
+
+  [ Rabin Vincent ]
+  * ARM: 7325/1: fix v7 boot with lockdep enabled
+
+  [ David S. Miller ]
+  * net: Make qdisc_skb_cb upper size bound explicit.
+
+  [ Roland Dreier ]
+  * IPoIB: Stop lying about hard_header_len and use skb->cb to stash LL addresses
+
+  [ Eric Dumazet ]
+  * gro: more generic L2 header check
+
+  [ Thomas Graf ]
+  * veth: Enforce minimum size of VETH_INFO_PEER
+
+  [ Eric Dumazet ]
+  * 3c59x: shorten timer period for slave devices
+
+  [ Ben Greear ]
+  * ipv6-multicast: Fix memory leak in input path.
+  * ipv6-multicast: Fix memory leak in IPv6 multicast.
+
+  [ Li Wei ]
+  * ipv4: fix for ip_options_rcv_srr() daddr update.
+  * ipv4: Save nexthop address of LSRR/SSRR option to IPCB.
+  * ipv4: Fix wrong order of ip_rt_get_source() and update iph->daddr.
+
+  [ Julian Anastasov ]
+  * ipv4: reset flowi parameters on route connect
+
+  [ Thomas Graf ]
+  * net: Don't proxy arp respond if iif == rt->dst.dev if private VLAN is disabled
+
+  [ Eric Dumazet ]
+  * netpoll: netpoll_poll_dev() should access dev->flags
+
+  [ Hagen Paul Pfeifer ]
+  * net_sched: Bug in netem reordering
+  * via-velocity: S3 resume fix.
+
+  [ Shawn Lu ]
+  * tcp_v4_send_reset: binding oif to iif in no sock case
+
+  [ Neal Cardwell ]
+  * tcp: allow tcp_sacktag_one() to tag ranges not aligned with skbs
+  * tcp: fix range tcp_shifted_skb() passes to tcp_sacktag_one()
+  * tcp: fix tcp_shifted_skb() adjustment of lost_cnt_hint for FACK
+
+  [ Flavio Leitner ]
+  * route: fix ICMP redirect validation
+
+  [ Eric Dumazet ]
+  * ipv4: fix redirect handling
+
+  [ Bruno Thomsen ]
+  * USB: Added Kamstrup VID/PIDs to cp210x serial driver.
+
+  [ Rui li ]
+  * USB: option: cleanup zte 3g-dongle's pid in option.c
+
+  [ Andrew Lunn ]
+  * USB: Serial: ti_usb_3410_5052: Add Abbot Diabetes Care cable id
+
+  [ Sarah Sharp ]
+  * USB: Remove duplicate USB 3.0 hub feature #defines.
+  * USB: Fix handoff when BIOS disables host PCI device.
+  * xhci: Fix oops caused by more USB2 ports than USB3 ports.
+  * xhci: Fix encoding for HS bulk/control NAK rate.
+
+  [ Elric Fu ]
+  * USB: Set hub depth after USB3 hub reset
+
+  [ Linus Torvalds ]
+  * i387: math_state_restore() isn't called from asm
+  * i387: make irq_fpu_usable() tests more robust
+  * i387: fix sense of sanity check
+  * i387: fix x86-64 preemption-unsafe user stack save/restore
+  * i387: move TS_USEDFPU clearing out of __save_init_fpu and into callers
+  * i387: don't ever touch TS_USEDFPU directly, use helper functions
+  * i387: do not preload FPU state at task switch time
+  * i387: move AMD K7/K8 fpu fxsave/fxrstor workaround from save to restore
+  * i387: move TS_USEDFPU flag from thread_info to task_struct
+  * i387: re-introduce FPU state preloading at context switch time
+
+  [ Alan Stern ]
+  * usb-storage: fix freezing of the scanning thread
+
+  [ Sarah Sharp ]
+  * USB: Don't fail USB3 probe on missing legacy PCI IRQ.
+
+  [ Andreas Herrmann ]
+  * x86/amd: Fix L1i and L2 cache sharing information for AMD family 15h processors
+
+  [ Pavel Roskin ]
+  * ath9k: stop on rates with idx -1 in ath9k rate control's .tx_status
+
+  [ Thomas Gleixner ]
+  * genirq: Unmask oneshot irqs when thread was not woken
+  * genirq: Handle pending irqs in irq_startup()
+
+  [ Huajun Li ]
+  * scsi_scan: Fix 'Poison overwritten' warning caused by using freed 'shost'
+
+  [ Alan Stern ]
+  * scsi_pm: Fix bug in the SCSI power management handler
+
+  [ Simon Horman ]
+  * ipvs: fix matching of fwmark templates during scheduling
+
+  [ Guo-Fu Tseng ]
+  * jme: Fix FIFO flush issue
+
+  [ Christian Riesch ]
+  * davinci_emac: Do not free all rx dma descriptors during init
+
+  [ Ben Hutchings ]
+  * builddeb: Don't create files in /tmp with predictable names
+
+  [ Janne Grunau ]
+  * hdpvr: fix race conditon during start of streaming
+
+  [ Nikolaus Schulz ]
+  * hwmon: (f75375s) Fix register write order when setting fans to full speed
+
+  [ Oleg Nesterov ]
+  * epoll: introduce POLLFREE to flush ->signalfd_wqh before kfree()
+  * epoll: ep_unregister_pollwait() can use the freed pwq->whead
+
+  [ Jason Baron ]
+  * epoll: limit paths
+
+  [ Dan Carpenter ]
+  * cdrom: use copy_to_user() without the underscores
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.23
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Wed, 29 Feb 2012 20:37:57 -0800
+
 linux-3.0 (3.0.22-1+vyatta+2) unstable; urgency=low
 
   [ Jason Wang ]
