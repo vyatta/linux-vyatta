@@ -1,3 +1,10 @@
+linux-3.3 (3.3.0-1+vyatta+2) unstable; urgency=low
+
+  * Merge to upstream 3.3-rc6
+  * Fix build issues (debian/compat) and EXTRAVERSION
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Tue, 06 Mar 2012 14:00:03 -0800
+
 linux-3.3 (3.3.0-1+vyatta+1) unstable; urgency=low
 
   * Manual merge of upstream 3.3-rc5 and unionfs patch with Oxnard
