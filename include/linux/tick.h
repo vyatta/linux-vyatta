@@ -27,25 +27,33 @@ enum tick_nohz_mode {
 	NOHZ_MODE_HIGHRES,
 };
 
+enum tick_saved_jiffies {
+	JIFFIES_SAVED_NONE,
+	JIFFIES_SAVED_IDLE,
+	JIFFIES_SAVED_USER,
+	JIFFIES_SAVED_SYS,
+};
+
 /**
  * struct tick_sched - sched tick emulation and no idle tick control/stats
- * @sched_timer:	hrtimer to schedule the periodic tick in high
- *			resolution mode
- * @last_tick:		Store the last tick expiry time when the tick
- *			timer is modified for nohz sleeps. This is necessary
- *			to resume the tick timer operation in the timeline
- *			when the CPU returns from nohz sleep.
- * @tick_stopped:	Indicator that the idle tick has been stopped
- * @idle_jiffies:	jiffies at the entry to idle for idle time accounting
- * @idle_calls:		Total number of idle calls
- * @idle_sleeps:	Number of idle calls, where the sched tick was stopped
- * @idle_entrytime:	Time when the idle call was entered
- * @idle_waketime:	Time when the idle was interrupted
- * @idle_exittime:	Time when the idle state was left
- * @idle_sleeptime:	Sum of the time slept in idle with sched tick stopped
- * @iowait_sleeptime:	Sum of the time slept in idle with sched tick stopped, with IO outstanding
- * @sleep_length:	Duration of the current idle sleep
- * @do_timer_lst:	CPU was the last one doing do_timer before going idle
+ * @sched_timer:		hrtimer to schedule the periodic tick in high
+ *				resolution mode
+ * @last_tick:			Store the last tick expiry time when the tick
+ *				timer is modified for nohz sleeps. This is necessary
+ *				to resume the tick timer operation in the timeline
+ *				when the CPU returns from nohz sleep.
+ * @tick_stopped:		Indicator that the idle tick has been stopped
+ * @idle_calls:			Total number of idle calls
+ * @idle_sleeps:		Number of idle calls, where the sched tick was stopped
+ * @idle_entrytime:		Time when the idle call was entered
+ * @idle_waketime:		Time when the idle was interrupted
+ * @idle_exittime:		Time when the idle state was left
+ * @idle_sleeptime:		Sum of the time slept in idle with sched tick stopped
+ * @saved_jiffies:		Jiffies snapshot on tick stop for cpu time accounting
+ * @saved_jiffies_whence:	Area where we saved @saved_jiffies
+ * @iowait_sleeptime:		Sum of the time slept in idle with sched tick stopped, with IO outstanding
+ * @sleep_length:		Duration of the current idle sleep
+ * @do_timer_lst:		CPU was the last one doing do_timer before going idle
  */
 struct tick_sched {
 	struct hrtimer			sched_timer;
@@ -54,7 +62,6 @@ struct tick_sched {
 	ktime_t				last_tick;
 	int				inidle;
 	int				tick_stopped;
-	unsigned long			idle_jiffies;
 	unsigned long			idle_calls;
 	unsigned long			idle_sleeps;
 	int				idle_active;
@@ -62,6 +69,8 @@ struct tick_sched {
 	ktime_t				idle_waketime;
 	ktime_t				idle_exittime;
 	ktime_t				idle_sleeptime;
+	enum tick_saved_jiffies		saved_jiffies_whence;
+	unsigned long			saved_jiffies;
 	ktime_t				iowait_sleeptime;
 	ktime_t				sleep_length;
 	unsigned long			last_jiffies;

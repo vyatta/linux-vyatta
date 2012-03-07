@@ -169,7 +169,8 @@ static void print_cpu(struct seq_file *m, int cpu, u64 now)
 		P(nohz_mode);
 		P_ns(last_tick);
 		P(tick_stopped);
-		P(idle_jiffies);
+		/* CHECKME: Do we want saved_jiffies_whence as well? */
+		P(saved_jiffies);
 		P(idle_calls);
 		P(idle_sleeps);
 		P_ns(idle_entrytime);

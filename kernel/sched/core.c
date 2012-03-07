@@ -2693,6 +2693,17 @@ void account_user_time(struct task_struct *p, cputime_t cputime,
 	acct_update_integrals(p);
 }
 
+void account_user_ticks(struct task_struct *p, unsigned long ticks)
+{
+	cputime_t delta_cputime, delta_scaled;
+
+	if (ticks) {
+		delta_cputime = jiffies_to_cputime(ticks);
+		delta_scaled = cputime_to_scaled(ticks);
+		account_user_time(p, delta_cputime, delta_scaled);
+	}
+}
+
 /*
  * Account guest cpu time to a process.
  * @p: the process that the cpu time gets accounted to
@@ -2768,6 +2779,17 @@ void account_system_time(struct task_struct *p, int hardirq_offset,
 		index = CPUTIME_SYSTEM;
 
 	__account_system_time(p, cputime, cputime_scaled, index);
+}
+
+void account_system_ticks(struct task_struct *p, unsigned long ticks)
+{
+	cputime_t delta_cputime, delta_scaled;
+
+	if (ticks) {
+		delta_cputime = jiffies_to_cputime(ticks);
+		delta_scaled = cputime_to_scaled(ticks);
+		account_system_time(p, 0, delta_cputime, delta_scaled);
+	}
 }
 
 /*

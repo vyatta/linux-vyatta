@@ -461,7 +461,8 @@ static void __tick_nohz_idle_enter(struct tick_sched *ts)
 		}
 
 		if (!was_stopped && ts->tick_stopped) {
-			ts->idle_jiffies = ts->last_jiffies;
+			ts->saved_jiffies = ts->last_jiffies;
+			ts->saved_jiffies_whence = JIFFIES_SAVED_IDLE;
 			select_nohz_load_balancer(1);
 		}
 	}
@@ -640,22 +641,34 @@ void tick_nohz_restart_sched_tick(void)
 }
 
 
-static void tick_nohz_account_idle_ticks(struct tick_sched *ts)
+static void tick_nohz_account_ticks(struct tick_sched *ts)
 {
-#ifndef CONFIG_VIRT_CPU_ACCOUNTING
 	unsigned long ticks;
 	/*
-	 * We stopped the tick in idle. Update process times would miss the
-	 * time we slept as update_process_times does only a 1 tick
-	 * accounting. Enforce that this is accounted to idle !
+	 * We stopped the tick. Update process times would miss the
+	 * time we ran tickless as update_process_times does only a 1 tick
+	 * accounting. Enforce that this is accounted to nohz timeslices.
 	 */
-	ticks = jiffies - ts->idle_jiffies;
+	ticks = jiffies - ts->saved_jiffies;
 	/*
 	 * We might be one off. Do not randomly account a huge number of ticks!
 	 */
-	if (ticks && ticks < LONG_MAX)
-		account_idle_ticks(ticks);
-#endif
+	if (ticks && ticks < LONG_MAX) {
+		switch (ts->saved_jiffies_whence) {
+		case JIFFIES_SAVED_IDLE:
+			account_idle_ticks(ticks);
+			break;
+		case JIFFIES_SAVED_USER:
+			account_user_ticks(current, ticks);
+			break;
+		case JIFFIES_SAVED_SYS:
+			account_system_ticks(current, ticks);
+			break;
+		default:
+			WARN_ON_ONCE(1);
+		}
+	}
+	ts->saved_jiffies_whence = JIFFIES_SAVED_NONE;
 }
 
 /**
@@ -687,7 +700,9 @@ void tick_nohz_idle_exit(void)
 	if (ts->tick_stopped) {
 		select_nohz_load_balancer(0);
 		__tick_nohz_restart_sched_tick(ts, now);
-		tick_nohz_account_idle_ticks(ts);
+#ifndef CONFIG_VIRT_CPU_ACCOUNTING
+		tick_nohz_account_ticks(ts);
+#endif
 	}
 
 	local_irq_enable();
@@ -735,7 +750,7 @@ static void tick_nohz_handler(struct clock_event_device *dev)
 	 */
 	if (ts->tick_stopped) {
 		touch_softlockup_watchdog();
-		ts->idle_jiffies++;
+		ts->saved_jiffies++;
 	}
 
 	update_process_times(user_mode(regs));
@@ -944,17 +959,17 @@ static enum hrtimer_restart tick_sched_timer(struct hrtimer *timer)
 	if (regs) {
 		int user = user_mode(regs);
 		/*
-		 * When we are idle and the tick is stopped, we have to touch
-		 * the watchdog as we might not schedule for a really long
-		 * time. This happens on complete idle SMP systems while
-		 * waiting on the login prompt. We also increment the "start of
-		 * idle" jiffy stamp so the idle accounting adjustment we do
-		 * when we go busy again does not account too much ticks.
+		 * When the tick is stopped, we have to touch the watchdog
+		 * as we might not schedule for a really long time. This
+		 * happens on complete idle SMP systems while waiting on
+		 * the login prompt. We also increment the last jiffy stamp
+		 * recorded when we stopped the tick so the cpu time accounting
+		 * adjustment does not account too much ticks when we flush them.
 		 */
 		if (ts->tick_stopped) {
+			/* CHECKME: may be this is only needed in idle */
 			touch_softlockup_watchdog();
-			if (idle_cpu(cpu))
-				ts->idle_jiffies++;
+			ts->saved_jiffies++;
 		}
 		update_process_times(user);
 		profile_tick(CPU_PROFILING);
