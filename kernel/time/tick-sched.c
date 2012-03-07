@@ -1027,14 +1027,18 @@ void tick_nohz_pre_schedule(void)
 void tick_nohz_post_schedule(void)
 {
 	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
+	unsigned long flags;
 
-	/*
-	 * No need to disable irqs here. The worst that can happen
-	 * is an irq that comes and restart the tick before us.
-	 * tick_nohz_restart_sched_tick() is irq safe.
-	 */
-	if (ts->tick_stopped)
-		tick_nohz_restart_sched_tick();
+	local_irq_save(flags);
+	if (ts->tick_stopped) {
+		if (is_idle_task(current)) {
+			ts->saved_jiffies = jiffies;
+			ts->saved_jiffies_whence = JIFFIES_SAVED_IDLE;
+		} else {
+			tick_nohz_restart_sched_tick();
+		}
+	}
+	local_irq_restore(flags);
 }
 
 void tick_nohz_flush_current_times(bool restart_tick)
