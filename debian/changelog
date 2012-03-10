@@ -1,3 +1,18 @@
+linux-3.0 (3.0.23-1+vyatta+2) unstable; urgency=low
+
+  [ Pablo Neira Ayuso ]
+  * netfilter: nf_ct_udp[lite]: convert UDP[lite] timeouts to array
+  * netfilter: nf_ct_tcp: move retransmission and unacknowledged timeout
+    to array
+  * netfilter: nf_ct_gre: add unsigned int array to define timeouts
+  * netfilter: nf_conntrack: pass timeout array to l4->new and l4-
+    >packet
+
+  [ Gaurav ]
+  * integrating netfilter connection tracking timeout kernel changes
+
+ -- Gaurav <gaurav.sinha@vyatta.com>  Fri, 09 Mar 2012 16:22:07 -0800
+
 linux-3.0 (3.0.23-1+vyatta+1) unstable; urgency=low
 
   [ Mark Brown ]
