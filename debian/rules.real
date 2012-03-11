@@ -78,7 +78,7 @@ source-subarch: $(STAMPS_DIR)/source-$(ARCH)-$(SUBARCH)
 $(BUILD_DIR)/config.$(ARCH)-$(SUBARCH)-$(FLAVOUR): $(foreach t,$(KCONFIG),debian/arch/$(t))
 	python debian/bin/kconfig.py '$@' $(KCONFIG)
 
-$(STAMPS_DIR)/source: SOURCE_FILES = $(filter-out debian .git, $(wildcard * .[^.]*))
+$(STAMPS_DIR)/source: SOURCE_FILES = $(filter-out debian .git .gitignore, $(wildcard * .[^.]*))
 $(STAMPS_DIR)/source: DIR = $(BUILD_DIR)/source
 $(STAMPS_DIR)/source:
 	rm -rf '$(DIR)'
