@@ -1,3 +1,9 @@
+linux-3.0 (3.0.23-1+vyatta+4) unstable; urgency=low
+
+  * floppy: remove unnecessary warning
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Sun, 11 Mar 2012 09:42:53 -0700
+
 linux-3.0 (3.0.23-1+vyatta+3) unstable; urgency=low
 
   [ Pablo Neira Ayuso ]
