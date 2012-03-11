@@ -1,3 +1,9 @@
+linux-3.3 (3.3.0-1+vyatta+3) unstable; urgency=low
+
+  * Merge of upstream 3.3-rc7
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Sat, 10 Mar 2012 18:21:06 -0800
+
 linux-3.3 (3.3.0-1+vyatta+2) unstable; urgency=low
 
   * Merge to upstream 3.3-rc6
