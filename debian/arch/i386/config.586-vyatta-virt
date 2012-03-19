@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/i386 3.3.0-rc5 Kernel Configuration
+# Linux/i386 3.3.0 Kernel Configuration
 #
 # CONFIG_64BIT is not set
 CONFIG_X86_32=y
@@ -3554,6 +3554,8 @@ CONFIG_ACERHDF=m
 # CONFIG_DELL_WMI is not set
 # CONFIG_DELL_WMI_AIO is not set
 # CONFIG_FUJITSU_LAPTOP is not set
+# CONFIG_FUJITSU_TABLET is not set
+# CONFIG_AMILO_RFKILL is not set
 CONFIG_TC1100_WMI=m
 # CONFIG_HP_ACCEL is not set
 # CONFIG_HP_WMI is not set
