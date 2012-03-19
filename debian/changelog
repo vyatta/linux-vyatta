@@ -1,3 +1,274 @@
+linux-3.3 (3.3.0-1+vyatta+4) unstable; urgency=low
+
+  [ Tejun Heo ]
+  * block: replace icq->changed with icq->flags
+  * block: simplify ioc_release_fn()
+  * block: exit_io_context() should call elevator_exit_icq_fn()
+
+  [ Laurent Pinchart ]
+  * [media] [FOR,v3.3] uvcvideo: Avoid division by 0 in timestamp calculation
+
+  [ Henrique Camargo ]
+  * [media] media: davinci: added module.h to resolve unresolved macros
+
+  [ Mauro Carvalho Chehab ]
+  * [media] smsusb: fix the default delivery system setting
+
+  [ Jun'ichi Nomura ]
+  * block: Fix NULL pointer dereference in sd_revalidate_disk
+
+  [ Muthukumar R ]
+  * block: Fix setting bio flags in drivers (sd_dif/floppy)
+
+  [ Stanislaw Gruszka ]
+  * block: fix __blkdev_get and add_disk race condition
+
+  [ Danny Kukawka ]
+  * drivers/block/DAC960: fix DAC960_V2_IOCTL_Opcode_T -Wenum-compare warning
+  * drivers/block/DAC960: fix -Wuninitialized warning
+
+  [ Alan Stern ]
+  * Block: use a freezable workqueue for disk-event polling
+
+  [ Dan Carpenter ]
+  * block, sx8: fix pointer math issue getting fw version
+
+  [ Alan Cox ]
+  * drm/gma500: Fix Cedarview boot failures in 3.3-rc
+
+  [ Santosh Nayak ]
+  * cifs: possible memory leak in xattr.
+
+  [ Pavel Shilovsky ]
+  * CIFS: Do not kmalloc under the flocks spinlock
+
+  [ Phil Edworthy ]
+  * sh: Fix sh2a vbr table for more than 255 irqs
+
+  [ Shimoda, Yoshihiro ]
+  * sh: add parameter for RSPI in clock-sh7757
+
+  [ Thomas Schwinge ]
+  * sh: fix up the ubc clock definition for sh7785.
+
+  [ Phil Edworthy ]
+  * ARM: mach-shmobile: Fix bonito compile breakage
+
+  [ Laurent Pinchart ]
+  * ARM: mach-shmobile: Fix ag5evm compilation by including linux/videodev2.h
+  * ARM: mach-shmobile: mackerel: Reserve DMA memory for the frame buffer
+
+  [ Kuninori Morimoto ]
+  * ARM: mach-shmobile: ap4evb: fixup fsi2_ak4643_info typo
+
+  [ Jesse Barnes ]
+  * drm/i915: fix color order for BGR formats on SNB
+  * drm/i915: support 32 bit BGR formats in sprite planes
+
+  [ Matthew Garrett ]
+  * PCI: ignore pre-1.1 ASPM quirking when ASPM is disabled
+
+  [ Gianluca Gennari ]
+  * [media] smsdvb: fix get_frontend
+
+  [ Rafael J. Wysocki ]
+  * sh-sci / PM: Avoid deadlocking runtime PM
+
+  [ Tyler Hicks ]
+  * vfs: Correctly set the dir i_mutex lockdep class
+
+  [ Jan Kara ]
+  * udf: Fix deadlock in udf_release_file()
+
+  [ Miklos Szeredi ]
+  * vfs: fix double put after complete_walk()
+  * vfs: fix return value from do_last()
+
+  [ Al Viro ]
+  * restore smp_mb() in unlock_new_inode()
+
+  [ Axel Lin ]
+  * regulator: Fix setting selector in tps6524x set_voltage function
+  * regulator: Set n_voltages for da9052 regulators
+  * regulator: da9052: Ensure the selected voltage falls within the specified range
+
+  [ Joerg Neikes ]
+  * usb: asix: Patch for Sitecom LN-031
+
+  [ Eric Dumazet ]
+  * tcp: fix syncookie regression
+
+  [ Tom Herbert ]
+  * dql: Fix undefined jiffies
+
+  [ Ben Hutchings ]
+  * x86: Add amilo-rfkill driver for some Fujitsu-Siemens Amilo laptops
+
+  [ Robert Gerlach ]
+  * Fujitsu tablet extras driver
+
+  [ Ike Panhc ]
+  * acer-wmi: No wifi rfkill on Lenovo machines
+
+  [ Xi Wang ]
+  * panasonic-laptop: avoid overflow in acpi_pcc_hotkey_add()
+
+  [ Guenter Roeck ]
+  * hwmon: (w83627ehf) Fix writing into fan_stop_time for NCT6775F/NCT6776F
+
+  [ Stanislaw Gruszka ]
+  * iwl3945: fix possible il->txq NULL pointer dereference in delayed works
+  * rt2x00: fix random stalls
+
+  [ Chris Metcalf ]
+  * arch/tile: Fix up from commit 8a25a2fd126c621f44f3aeaef80d51f00fc11639
+  * arch/tile: sync up the defconfig files to the tip
+
+  [ roel ]
+  * arch/tile: misplaced parens near likely
+
+  [ Guenter Roeck ]
+  * hwmon: (w83627ehf) Fix memory leak in probe function
+
+  [ Peter Zijlstra ]
+  * perf/x86: Fix local vs remote memory events for NHM/WSM
+
+  [ Yuval Mintz ]
+  * bnx2x: pfc statistics counts pfc events twice
+
+  [ Ariel Elior ]
+  * bnx2x: added cpu_to_le16 when preparing ramrod's data
+
+  [ Yuval Mintz ]
+  * bnx2x: dcb bit indices flags used as bits
+  * bnx2x: FCoE statistics id fixed
+
+  [ Stanislav Kinsbursky ]
+  * tun: don't hold network namespace by tun sockets
+
+  [ Jean Delvare ]
+  * hwmon: (w83627ehf) Fix temp2 source for W83627UHG
+
+  [ Guenter Roeck ]
+  * hwmon: (w83627ehf) Describe undocumented pwm attributes
+
+  [ Stephane Eranian ]
+  * perf record: Fix buffer overrun bug in tracepoint_id_to_path()
+
+  [ Matt Fleming ]
+  * tile: Use set_current_blocked() and block_sigmask()
+
+  [ David S. Miller ]
+  * sparc32: Add -Av8 to assembler command line.
+
+  [ Nicholas Bellinger ]
+  * target: Fix compatible reservation handling (CRH=1) with legacy RESERVE/RELEASE
+  * iscsi-target: Fix reservation conflict -EBUSY response handling bug
+
+  [ Xiaotian Feng ]
+  * block: fix ioc leak in put_io_context
+
+  [ Anton Blanchard ]
+  * perf tools: Incorrect use of snprintf results in SEGV
+
+  [ Arnaldo Carvalho de Melo ]
+  * perf tools: Use scnprintf where applicable
+
+  [ Ingo Molnar ]
+  * perf tools, x86: Build perf on older user-space as well
+
+  [ Guenter Roeck ]
+  * hwmon: (zl6100) Enable interval between chip accesses for all chips
+
+  [ Chris Metcalf ]
+  * arch/tile/configs: convert to minimal configs via "make savedefconfig"
+
+  [ Marek Szyprowski ]
+  * drm/exynos: use correct 'exynos-drm' name for platform device
+  * drm/exynos: fix runtime_pm fimd device state on probe
+
+  [ Laurent Pinchart ]
+  * drm/exynos: Fix fb_videomode <-> drm_mode_modeinfo conversion
+
+  [ Sascha Hauer ]
+  * drm exynos: use drm_fb_helper_set_par directly
+
+  [ Wolfram Sang ]
+  * i2c-core: Comment says "transmitted" but means "received"
+
+  [ Ville Syrjala ]
+  * i2c-algo-bit: Fix spurious SCL timeouts under heavy load
+
+  [ Hugh Dickins ]
+  * memcg: free mem_cgroup by RCU to fix oops
+
+  [ Viresh Kumar ]
+  * MAINTAINERS: update ST's Mailing list for SPEAr
+
+  [ Alexandre Bounine ]
+  * rapidio/tsi721: fix bug in register offset definitions
+
+  [ Cyrill Gorcunov ]
+  * prctl: use CAP_SYS_RESOURCE for PR_SET_MM option
+
+  [ Gustavo Padovan ]
+  * MAINTAINERS: Gustavo has moved
+
+  [ Johan Hedberg ]
+  * MAINTAINERS: add Johan to Bluetooth maintainers
+  * MAINTAINERS: fix link to Gustavo Padovans tree
+
+  [ Donghwa Lee ]
+  * MAINTAINERS: add entry for exynos mipi display drivers
+
+  [ Dan Carpenter ]
+  * drivers/video/backlight/s6e63m0.c: fix corruption storing gamma mode
+
+  [ James Morris ]
+  * MAINTAINERS: Add Serge as maintainer of capabilities
+
+  [ Eric Dumazet ]
+  * ipv6: fix icmp6_dst_alloc()
+  * sch_sfq: revert dont put new flow at the end of flows
+
+  [ Michal Schmidt ]
+  * bnx2x: fix a crash on corrupt firmware file
+  * bnx2x: fix memory leak in bnx2x_init_firmware()
+
+  [ Eric Dumazet ]
+  * net/usbnet: reserve headroom on rx skbs
+  * net/hyperv: fix erroneous NETDEV_TX_BUSY use
+  * wimax/i2400m: fix erroneous NETDEV_TX_BUSY use
+
+  [ Mark Salter ]
+  * C6X: remove dead code from entry.S
+
+  [ Anton Blanchard ]
+  * afs: Read of file returns EBADMSG
+  * afs: Remote abort can cause BUG in rxrpc code
+
+  [ Haogang Chen ]
+  * nilfs2: clamp ns_r_segments_percentage to [1, 99]
+
+  [ Ryusuke Konishi ]
+  * nilfs2: fix NULL pointer dereference in nilfs_load_super_block()
+
+  [ RongQing.Li ]
+  * ipv6: Don't dev_hold(dev) in ip6_mc_find_dev_rcu.
+
+  [ Pablo Neira Ayuso ]
+  * netfilter: ctnetlink: fix race between delete and timeout expiration
+
+  [ Jason Baron ]
+  * Don't limit non-nested epoll paths
+
+  [ Linus Torvalds ]
+  * Linux 3.3
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 19 Mar 2012 08:53:19 -0700
+
 linux-3.3 (3.3.0-1+vyatta+3) unstable; urgency=low
 
   * Merge of upstream 3.3-rc7
