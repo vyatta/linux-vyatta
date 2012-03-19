@@ -1,3 +1,9 @@
+linux-3.3 (3.3.0-1+vyatta+5) unstable; urgency=low
+
+  * Update 32-bit kernel config for 3.3
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 19 Mar 2012 11:54:41 -0700
+
 linux-3.3 (3.3.0-1+vyatta+4) unstable; urgency=low
 
   [ Tejun Heo ]
