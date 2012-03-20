@@ -1,3 +1,9 @@
+linux-3.3 (3.3.0-1+vyatta+6) unstable; urgency=low
+
+  * gre: propagate state of link back
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 19 Mar 2012 19:57:49 -0700
+
 linux-3.3 (3.3.0-1+vyatta+5) unstable; urgency=low
 
   * Update 32-bit kernel config for 3.3
