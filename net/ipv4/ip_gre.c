@@ -961,6 +961,7 @@ static int ipgre_tunnel_bind_dev(struct net_device *dev)
 	if (tdev) {
 		hlen = tdev->hard_header_len + tdev->needed_headroom;
 		mtu = tdev->mtu;
+		netif_stacked_transfer_operstate(tdev, dev);
 	}
 	dev->iflink = tunnel->parms.link;
 
@@ -1545,6 +1546,7 @@ static int ipgre_newlink(struct net *src_net, struct net_device *dev, struct nla
 
 	dev_hold(dev);
 	ipgre_tunnel_link(ign, nt);
+	linkwatch_fire_event(dev); /* _MUST_ call rfc2863_policy() */
 
 out:
 	return err;
@@ -1701,6 +1703,34 @@ static struct rtnl_link_ops ipgre_tap_ops __read_mostly = {
 	.fill_info	= ipgre_fill_info,
 };
 
+/* If lower device changes state, reflect that to the tunnel. */
+static int ipgre_notify(struct notifier_block *unused,
+			unsigned long event, void *ptr)
+{
+	struct net_device *dev = ptr;
+	struct net *net = dev_net(dev);
+	struct ipgre_net *ign = net_generic(net, ipgre_net_id);
+	unsigned int i, h;
+	struct ip_tunnel *t;
+
+	if (event == NETDEV_CHANGE)
+		return NOTIFY_DONE;
+
+	for (i = 0; i < 4; i++)
+		for (h = 0; h < HASH_SIZE; h++)
+			for(t = ign->tunnels[i][h]; t; t = t->next) {
+				if (dev->ifindex != t->dev->iflink)
+					continue;
+				netif_stacked_transfer_operstate(dev, t->dev);
+			}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block ipgre_notifier = {
+	.notifier_call = ipgre_notify,
+};
+
 /*
  *	And now the modules code and kernel interface.
  */
@@ -1729,9 +1759,15 @@ static int __init ipgre_init(void)
 	if (err < 0)
 		goto tap_ops_failed;
 
+	err = register_netdevice_notifier(&ipgre_notifier);
+	if (err < 0)
+		goto notify_failed;
+
 out:
 	return err;
 
+notify_failed:
+	rtnl_link_unregister(&ipgre_tap_ops);
 tap_ops_failed:
 	rtnl_link_unregister(&ipgre_link_ops);
 rtnl_link_failed:
@@ -1743,6 +1779,7 @@ add_proto_failed:
 
 static void __exit ipgre_fini(void)
 {
+	unregister_netdevice_notifier(&ipgre_notifier);
 	rtnl_link_unregister(&ipgre_tap_ops);
 	rtnl_link_unregister(&ipgre_link_ops);
 	if (gre_del_protocol(&ipgre_protocol, GREPROTO_CISCO) < 0)
