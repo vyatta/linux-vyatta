@@ -967,7 +967,8 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 	/* Decide what timeout policy we want to apply to this flow. */
 	if (tmpl) {
 	        timeout_ext = nf_ct_timeout_find(tmpl);
-		if (timeout_ext)
+		if (timeout_ext &&
+		    timeout_ext->timeout->l4num == l4proto->l4proto)
 			timeouts = NF_CT_TIMEOUT_EXT_DATA(timeout_ext);
 		else
 			timeouts = l4proto->get_timeouts(net);
