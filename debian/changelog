@@ -1,3 +1,9 @@
+linux-3.0 (3.0.23-1+vyatta+6) unstable; urgency=low
+
+  * fixing version mismatch
+
+ -- Gaurav <gaurav.sinha@vyatta.com>  Tue, 20 Mar 2012 21:43:35 -0700
+
 linux-3.0 (3.0.23-1+vyatta+5) unstable; urgency=low
 
   [ Jozsef Kadlecsik ]
