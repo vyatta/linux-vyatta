@@ -1,3 +1,19 @@
+linux-3.0 (3.0.23-1+vyatta+5) unstable; urgency=low
+
+  [ Jozsef Kadlecsik ]
+  * netfilter: ctnetlink: fix soft lockup when netlink adds new entries
+    (v2)
+
+  [ Pablo Neira Ayuso ]
+  * netfilter: ctnetlink: remove incorrect spin_[un]lock_bh on NAT
+    module autoload
+  * netfilter: ctnetlink: fix race between delete and timeout expiration
+
+  [ Gaurav ]
+  * CT timeout patch and suggested probable fix patches for bug 6825
+
+ -- Gaurav <gaurav.sinha@vyatta.com>  Tue, 20 Mar 2012 19:15:17 -0700
+
 linux-3.0 (3.0.23-1+vyatta+4) unstable; urgency=low
 
   * floppy: remove unnecessary warning
