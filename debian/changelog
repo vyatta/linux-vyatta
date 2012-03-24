@@ -1,3 +1,9 @@
+linux-3.0 (3.0.23-1+vyatta+8) unstable; urgency=low
+
+  * Fix Bug 7802 - call traces during boot, xenserver guest/domU
+
+ -- Robert Bays <robert@vyatta.com>  Fri, 23 Mar 2012 11:04:06 -0700
+
 linux-3.0 (3.0.23-1+vyatta+7) unstable; urgency=low
 
   * fixing version mismatch
