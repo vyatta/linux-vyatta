@@ -1,3 +1,13 @@
+linux-3.0 (3.0.23-1+vyatta+9) unstable; urgency=low
+
+  [ Pablo Neira Ayuso ]
+  * netfilter: nf_conntrack: fix early_drop with reliable event delivery
+
+  [ Gaurav ]
+  * CT timeout patch for icmp timeout problem
+
+ -- Gaurav <gaurav.sinha@vyatta.com>  Fri, 23 Mar 2012 18:26:40 -0700
+
 linux-3.0 (3.0.23-1+vyatta+8) unstable; urgency=low
 
   * Fix Bug 7802 - call traces during boot, xenserver guest/domU
