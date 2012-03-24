@@ -26,13 +26,17 @@ struct nf_conn_timeout {
 #define NF_CT_TIMEOUT_EXT_DATA(__t) (unsigned int *) &((__t)->timeout->data)
 
 static inline
-struct nf_conn_timeout *nf_ct_timeout_find(const struct nf_conn *ct)
+struct nf_conn_timeout *nf_ct_timeout_find(const struct nf_conn *ct,
+					   u_int8_t protonum)
 {
 #ifdef CONFIG_NF_CONNTRACK_TIMEOUT
-	return nf_ct_ext_find(ct, NF_CT_EXT_TIMEOUT);
-#else
-	return NULL;
+	struct nf_conn_timeout *timeout_ext;
+
+	timeout_ext = nf_ct_ext_find(ct, NF_CT_EXT_TIMEOUT);
+	if (timeout_ext && timeout_ext->timeout->l4num == protonum)
+		return timeout_ext;
 #endif
+	return NULL;
 }
 
 static inline

@@ -325,7 +325,7 @@ static void xt_ct_tg_destroy_v1(const struct xt_tgdtor_param *par)
 		timeout_put = rcu_dereference(nf_ct_timeout_put_hook);
 
 		if (timeout_put) {
-			timeout_ext = nf_ct_timeout_find(ct);
+			timeout_ext = nf_ct_ext_find(ct, NF_CT_EXT_TIMEOUT);
 			if (timeout_ext)
 				timeout_put(timeout_ext->timeout);
 		}
