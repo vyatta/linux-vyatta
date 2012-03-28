@@ -1,3 +1,11 @@
+linux-3.3 (3.3.0-1+vyatta+9) unstable; urgency=low
+
+  * CT timeout patch and suggested probable fix patches for bug 6825
+  * CT timeout patch for icmp timeout problem
+  * CT timeout patches and build issue
+
+ -- Gaurav <gaurav.sinha@vyatta.com>  Wed, 28 Mar 2012 16:43:56 -0700
+
 linux-3.3 (3.3.0-1+vyatta+8) unstable; urgency=low
 
   [ Pablo Neira Ayuso ]
