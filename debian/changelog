@@ -1,3 +1,21 @@
+linux-3.3 (3.3.0-1+vyatta+8) unstable; urgency=low
+
+  [ Pablo Neira Ayuso ]
+  * netfilter: nf_ct_udp[lite]: convert UDP[lite] timeouts to array
+  * netfilter: nf_ct_tcp: move retransmission and unacknowledged timeout
+    to array
+  * netfilter: nf_ct_gre: add unsigned int array to define timeouts
+  * netfilter: nf_conntrack: pass timeout array to l4->new and l4-
+    >packet
+  * netfilter: add cttimeout infrastructure for fine timeout tuning
+  * netfilter: nf_ct_ext: add timeout extension
+  * netfilter: xt_CT: allow to attach timeout policy + glue code
+
+  [ Gaurav ]
+  * CT timeout first patch.
+
+ -- Gaurav <gaurav.sinha@vyatta.com>  Wed, 28 Mar 2012 15:26:04 -0700
+
 linux-3.3 (3.3.0-1+vyatta+7) unstable; urgency=low
 
   * Fix Bug 7802 - call traces during boot, xenserver guest/domU
