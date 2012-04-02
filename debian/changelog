@@ -1,3 +1,469 @@
+linux-3.3 (3.3.1-1+vyatta+1) unstable; urgency=low
+
+  [ Meng Zhang ]
+  * USB: option: Add MediaTek MT6276M modem&app interfaces
+
+  [ Daniele Palmas ]
+  * USB: option driver: adding support for Telit CC864-SINGLE, CC864-DUAL and DE910-DUAL modems
+
+  [ Bjørn Mork ]
+  * USB: option: make interface blacklist work again
+  * USB: option: add ZTE MF820D
+
+  [ Paul E. McKenney ]
+  * staging: android/lowmemorykiller: Don't unregister notifier from atomic context
+
+  [ Andrea Righi ]
+  * staging: zcache: avoid AB-BA deadlock condition
+
+  [ David Daney ]
+  * staging/octeon: Fix PHY binding in octeon-ethernet driver.
+
+  [ Greg Kroah-Hartman ]
+  * USB: ftdi_sio: fix problem when the manufacture is a NULL string
+
+  [ Peter Korsgaard ]
+  * USB: ftdi_sio: add support for BeagleBone rev A5+
+
+  [ Bruno Thomsen ]
+  * USB: Microchip VID mislabeled as Hornby VID in ftdi_sio.
+
+  [ Michał Wróbel ]
+  * USB: ftdi_sio: new PID: Distortec JTAG-lock-pick
+
+  [ Jim Paris ]
+  * USB: ftdi_sio: add support for FT-X series devices
+
+  [ Michał Wróbel ]
+  * USB: ftdi_sio: new PID: LUMEL PD12
+
+  [ Shengzhou Liu ]
+  * powerpc/usb: fix bug of kernel hang when initializing usb
+
+  [ Larry Finger ]
+  * staging: r8712u: Fix regression introduced by commit a5ee652
+  * staging: r8712u: Fix regression in signal level after commit c6dc001
+
+  [ Dan Carpenter ]
+  * usb: dwc3: make dwc3_get_device_id() return the id
+
+  [ Paul Zimmerman ]
+  * usb: dwc3: gadget: don't wrap around the TRB poll on non-ISOC
+  * usb: dwc3: fix bogus test in dwc3_gadget_start_isoc
+
+  [ Anton Tikhomirov ]
+  * usb: dwc3: use proper function for setting endpoint name
+
+  [ Gerard Snitselaar ]
+  * staging: vme: fix section mismatches in linux-next 20120314
+
+  [ Supriya Karanth ]
+  * usb: musb: Reselect index reg in interrupt context
+
+  [ Ido Shayevitz ]
+  * usb: gadget: Clear usb_endpoint_descriptor inside the struct usb_ep on disable
+
+  [ Kuninori Morimoto ]
+  * usb: renesas_usbhs: bugfix: add .release function to gpriv->gadget.dev
+
+  [ Thomas Faber ]
+  * usb: gadgetfs: return number of bytes on ep0 read request
+
+  [ Orjan Friberg ]
+  * USB: gadget: Make g_hid device class conform to spec.
+
+  [ Thomas Gleixner ]
+  * futex: Cover all PI opcodes with cmpxchg enabled check
+
+  [ Masami Ichikawa ]
+  * sysfs: Fix memory leak in sysfs_sd_setsecdata().
+
+  [ Cousson, Benoit ]
+  * tty: serial: OMAP: Fix oops due to NULL pdata in DT boot
+
+  [ Dan Carpenter ]
+  * tty: moxa: fix bit test in moxa_start()
+
+  [ Liz Clark ]
+  * TTY: Wrong unicode value copied in con_set_unimap()
+
+  [ Johan Hovold ]
+  * USB: serial: fix console error reporting
+
+  [ Ben Hutchings ]
+  * cdc-wdm: Fix more races on the read path
+  * cdc-wdm: Don't clear WDM_READ unless entire read buffer is emptied
+
+  [ Peter Chen ]
+  * usb: fsl_udc_core: Fix scheduling while atomic dump message
+  * usb: Fix build error due to dma_mask is not at pdev_archdata at ARM
+
+  [ Josh Boyer ]
+  * USB: ums_realtek: do not use stack memory for DMA in __do_config_autodelink
+
+  [ Dan Williams ]
+  * USB: qcserial: don't grab QMI port on Gobi 1000 devices
+
+  [ Scott Dial ]
+  * usb-serial: Add support for the Sealevel SeaLINK+8 2038-ROHS device
+
+  [ Preston Fick ]
+  * usb: cp210x: Update to support CP2105 and multiple interface devices
+
+  [ Donald Lee ]
+  * USB: serial: mos7840: Fixed MCS7820 device attach problem
+
+  [ Gertjan van Wingerde ]
+  * rt2x00: Add support for D-Link DWA-127 to rt2800usb.
+
+  [ Larry Finger ]
+  * rtlwifi: rtl8192c_common: rtl8192de: Check for allocation failures
+
+  [ Simon Graham ]
+  * rtlwifi: Handle previous allocation failures when freeing device memory
+
+  [ Larry Finger ]
+  * rtlwifi: rtl8192c: Prevent sleeping from invalid context in rtl8192cu
+
+  [ Jingjun Wu ]
+  * rtlwifi: rtl8192ce: Fix loss of receive performance
+
+  [ Johannes Berg ]
+  * iwlwifi: always monitor for stuck queues
+
+  [ Felix Fietkau ]
+  * ath9k: fix going to full-sleep on PS idle
+
+  [ Sasha Levin ]
+  * math: Introduce div64_long
+  * ntp: Fix integer overflow when setting time
+
+  [ Andrew Vagin ]
+  * uevent: send events in correct order according to seqnum (v3)
+
+  [ Russell King ]
+  * genirq: Fix long-term regression in genirq irq_set_irq_type() handling
+
+  [ Alexander Gordeev ]
+  * genirq: Fix incorrect check for forced IRQ thread handler
+
+  [ Rabin Vincent ]
+  * rtc: Disable the alarm in the hardware (v2)
+
+  [ Max Filippov ]
+  * p54spi: Release GPIO lines and IRQ on error in p54spi_probe
+
+  [ Greg Rose ]
+  * rtnetlink: Fix VF IFLA policy
+
+  [ Or Gerlitz ]
+  * IB/iser: Post initial receive buffers before sending the final login request
+
+  [ Roland Dreier ]
+  * mlx4_core: Fix one more static exported function
+
+  [ Fabio Estevam ]
+  * ima: fix Kconfig dependencies
+
+  [ Suresh Siddha ]
+  * x86/ioapic: Add register level checks to detect bogus io-apic entries
+
+  [ Andrea Arcangeli ]
+  * mm: thp: fix pmd_bad() triggering in code paths holding mmap_sem read mode
+
+  [ Tim Gardner ]
+  * TPM: Zero buffer whole after copying to userspace
+
+  [ Rafael J. Wysocki ]
+  * PM / Domains: Fix handling of wakeup devices during system resume
+
+  [ Nishanth Aravamudan ]
+  * bootmem/sparsemem: remove limit constraint in alloc_bootmem_section
+
+  [ Aneesh Kumar K.V ]
+  * hugetlbfs: avoid taking i_mutex from hugetlbfs_read()
+
+  [ Timur Tabi ]
+  * ASoC: fsl: p1022ds: tell the WM8776 codec driver that it's the master
+
+  [ Daniel Mack ]
+  * ASoC: pxa-ssp: atomically set stream active masks
+
+  [ Roland Dreier ]
+  * tcm_loop: Set residual field for SCSI commands
+
+  [ Mike Christie ]
+  * SCSI: iscsi: fix setting of pid from netlink skb
+
+  [ Nicholas Bellinger ]
+  * iscsi-target: Fix iscsit_alloc_buffs() failure cases
+  * iscsi-target: Fix dynamic -> explict NodeACL pointer reference
+
+  [ Anssi Hannula ]
+  * ALSA: hda - fix printing of high HDMI sample rates
+
+  [ Lothar Waßmann ]
+  * usb gadget: fix a section mismatch when compiling g_ffs with CONFIG_USB_FUNCTIONFS_ETH
+
+  [ Yoichi Yuasa ]
+  * gma500: Fix mmap frambuffer
+
+  [ Kay Sievers ]
+  * udlfb: remove sysfs framebuffer device with USB .disconnect()
+
+  [ Nicholas Bellinger ]
+  * tcm_fc: Fix fc_exch memory leak in ft_send_resp_status
+  * ib_srpt: Fix srpt_handle_cmd send_ioctx->ioctx_kref leak on exception
+
+  [ NeilBrown ]
+  * md/bitmap: ensure to load bitmap when creating via sysfs.
+  * md: don't set md arrays to readonly on shutdown.
+  * md/raid1,raid10: avoid deadlock during resync/recovery.
+  * md: fix clearing of the 'changed' flags for the bad blocks list.
+
+  [ Chris Wilson ]
+  * drm/i915: Only clear the GPU domains upon a successful finish
+
+  [ Michel Dänzer ]
+  * drm/radeon: Restrict offset for legacy hardware cursor.
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: fix analog load detection on DVI-I connectors
+  * drm/radeon/kms: add connector quirk for Fujitsu D3003-S2 board
+
+  [ Roland Dreier ]
+  * target: Fix up handling of short INQUIRY buffers
+  * target: Set peripheral device type consistently in INQUIRY response
+  * target: Don't set WBUS16 or SYNC bits in INQUIRY response
+
+  [ Jörn Engel ]
+  * target: fix use after free in target_report_luns
+  * target: prevent NULL pointer dereference in target_report_luns
+
+  [ Roland Dreier ]
+  * target: Fix 16-bit target ports for SET TARGET PORT GROUPS emulation
+
+  [ Keng-Yu Lin ]
+  * Bluetooth: Add AR30XX device ID on Asus laptops
+  * HID: add extra hotkeys in Asus AIO keyboards
+  * HID: add more hotkeys in Asus AIO keyboards
+
+  [ Brian Norris ]
+  * ahci: add AHCI_HFLAG_DELAY_ENGINE host flag
+  * ahci: move AHCI_HFLAGS() macro to ahci.h
+  * ahci_platform: add STRICT_AHCI platform type
+
+  [ Sergei Shtylyov ]
+  * pata_legacy: correctly mask recovery field for HT6560B
+
+  [ Clemens Ladisch ]
+  * firewire: ohci: fix too-early completion of IR multichannel buffers
+
+  [ Mel Gorman ]
+  * mm: vmscan: forcibly scan highmem if there are too many buffer_heads pinning highmem
+
+  [ Trond Myklebust ]
+  * NFS: Properly handle the case where the delegation is revoked
+  * NFSv4: Return the delegation if the server returns NFS4ERR_OPENMODE
+
+  [ Dave Chinner ]
+  * xfs: fix inode lookup race
+
+  [ Pavel Shilovsky ]
+  * CIFS: Respect negotiated MaxMpxCount
+
+  [ Jeff Layton ]
+  * cifs: fix issue mounting of DFS ROOT when redirecting from one domain controller to the next
+
+  [ Pavel Shilovsky ]
+  * CIFS: Fix a spurious error in cifs_push_posix_locks
+
+  [ Richard Weinberger ]
+  * UBI: fix error handling in ubi_scan()
+
+  [ Artem Bityutskiy ]
+  * UBI: fix eraseblock picking criteria
+
+  [ Trond Myklebust ]
+  * SUNRPC: We must not use list_for_each_entry_safe() in rpc_wake_up()
+
+  [ tom.leiming@gmail.com ]
+  * usbnet: increase URB reference count before usb_unlink_urb
+  * usbnet: don't clear urb->dev in tx_complete
+
+  [ Thierry Reding ]
+  * x86-32: Fix typo for mq_getsetattr in syscall table
+
+  [ Dmitry Adamushko ]
+  * x86-32: Fix endless loop when processing signals for kernel tasks
+
+  [ Pravin B Shelar ]
+  * proc-ns: use d_set_d_op() API to set dentry ops in proc_ns_instantiate().
+
+  [ Steffen Persvold ]
+  * iommu/amd: Fix section warning for prealloc_protection_domains
+
+  [ Joerg Roedel ]
+  * iommu/amd: Make sure IOMMU interrupts are re-enabled on resume
+
+  [ Lucas De Marchi ]
+  * sysctl: protect poll() in entries that may go away
+
+  [ Andreas Herrmann ]
+  * hwmon: (fam15h_power) Correct sign extension of running_avg_capture
+
+  [ Xi Wang ]
+  * lgdt330x: fix signedness error in i2c_read_demod_bytes()
+
+  [ Gianluca Gennari ]
+  * as102: add __packed attribute to structs defined inside packed structs
+
+  [ Antti Palosaari ]
+  * tda10071: fix the delivery system
+
+  [ Michael Krufky ]
+  * au8522: bug-fix: enable modulation AFTER tune (instead of before tuning)
+  * pvrusb2: fix 7MHz & 8MHz DVB-T tuner support for HVR1900 rev D1F5
+  * mxl111sf: fix error on stream stop in mxl111sf_ep6_streaming_ctrl()
+
+  [ Rafael J. Wysocki ]
+  * PM / Domains: Fix hibernation restore of devices, v2
+  * PM / Domains: Check domain status during hibernation restore of devices
+  * PM / Domains: Introduce "always on" device flag
+  * PM / shmobile: Make TMU driver use pm_genpd_dev_always_on()
+  * PM / shmobile: Make CMT driver use pm_genpd_dev_always_on()
+  * PM / shmobile: Make MTU2 driver use pm_genpd_dev_always_on()
+
+  [ Larry Finger ]
+  * rtlwifi: Convert to asynchronous firmware load
+  * staging: r8712u: Add missing initialization and remove configuration parameter CONFIG_R8712_AP
+
+  [ Trond Myklebust ]
+  * NFSv4: Rate limit the state manager warning messages
+
+  [ Srivatsa S. Bhat ]
+  * PM / Hibernate: Enable usermodehelpers in hibernate() error path
+
+  [ Eric Sandeen ]
+  * jbd2: clear BH_Delay & BH_Unwritten in journal_unmap_buffer
+
+  [ Lukas Czerner ]
+  * ext4: ignore EXT4_INODE_JOURNAL_DATA flag with delalloc
+
+  [ Jeff Moyer ]
+  * ext4: fix race between unwritten extent conversion and truncate
+  * ext4: fix race between sync and completed io work
+
+  [ Theodore Ts'o ]
+  * ext4: check for zero length extent
+
+  [ Michel Lespinasse ]
+  * vfs: fix d_ancestor() case in d_materialize_unique
+
+  [ Stephen Warren ]
+  * ARM: tegra: select required CPU and L2 errata options
+
+  [ Tarun Kanti DebBarma ]
+  * gpio/omap: fix _set_gpio_irqenable implementation
+
+  [ Sekhar Nori ]
+  * gpio/davinci: fix oops on unbanked gpio irq request
+  * gpio/davinci: fix enabling unbanked GPIO IRQs
+
+  [ Mark Brown ]
+  * mfd: Test for jack detection when deciding if wm8994 should suspend
+
+  [ Alex Deucher ]
+  * drm/radeon/kms/atom: force bpc to 8 for now
+
+  [ Mikulas Patocka ]
+  * dm crypt: fix mempool deadlock
+  * dm crypt: add missing error handling
+
+  [ Andrei Warkentin ]
+  * dm exception store: fix init error path
+
+  [ Joe Thornber ]
+  * dm persistent data: fix btree rebalancing after remove
+  * dm thin: fix stacked bi_next usage
+
+  [ Masanari Iida ]
+  * backlight: fix typo in tosa_lcd.c
+
+  [ Jan Kara ]
+  * xfs: Fix oops on IO error during xlog_recover_process_iunlinks()
+
+  [ Christoph Lameter ]
+  * slub: Do not hold slub_lock when calling sysfs_slab_add()
+
+  [ Trond Myklebust ]
+  * NFSv4: Fix two infinite loops in the mount code
+  * NFSv4.1: Fix layoutcommit error handling
+
+  [ Sasha Levin ]
+  * module: Remove module size limit
+
+  [ Dave Airlie ]
+  * drm/i915: suspend fbdev device around suspend/hibernate
+
+  [ Eric Dumazet ]
+  * net: bpf_jit: fix BPF_S_LDX_B_MSH compilation
+
+  [ Gao feng ]
+  * ipv6: fix incorrent ipv6 ipsec packet fragment
+
+  [ Dave Jones ]
+  * Remove printk from rds_sendmsg
+
+  [ Benjamin LaHaise ]
+  * Fix pppol2tp getsockname()
+
+  [ Eric Dumazet ]
+  * net: fix napi_reuse_skb() skb reserve
+
+  [ stephen hemminger ]
+  * sky2: override for PCI legacy power management
+
+  [ Steffen Klassert ]
+  * xfrm: Access the replay notify functions via the registered callbacks
+
+  [ Eric Dumazet ]
+  * net: fix a potential rcu_read_lock() imbalance in rt6_fill_node()
+
+  [ NeilBrown ]
+  * lockd: fix arg parsing for grace_period and timeout.
+
+  [ Alok Kataria ]
+  * x86, tsc: Skip refined tsc calibration on systems with reliable TSC
+
+  [ Dan Carpenter ]
+  * x86, tls: Off by one limit check
+
+  [ Chris Metcalf ]
+  * compat: use sys_sendfile64() implementation for sendfile syscall
+
+  [ John Stultz ]
+  * rtc: Provide flag for rtc devices that don't support UIE
+
+  [ Dan Carpenter ]
+  * nfsd: don't allow zero length strings in cache_parse()
+
+  [ Stephen Warren ]
+  * ARM: tegra: Fix device tree AUXDATA for USB/EHCI
+
+  [ Yoshii Takashi ]
+  * serial: sh-sci: fix a race of DMA submit_tx on transfer
+
+  [ Matthew Garrett ]
+  * ASPM: Fix pcie devices with non-pcie children
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.3.1
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Mon, 02 Apr 2012 16:08:05 -0700
+
 linux-3.3 (3.3.0-1+vyatta+9) unstable; urgency=low
 
   * CT timeout patch and suggested probable fix patches for bug 6825
