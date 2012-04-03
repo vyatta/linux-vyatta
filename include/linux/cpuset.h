@@ -244,4 +244,33 @@ static inline void put_mems_allowed(void)
 
 #endif /* !CONFIG_CPUSETS */
 
+#ifdef CONFIG_CPUSETS_NO_HZ
+
+DECLARE_PER_CPU(int, cpu_adaptive_nohz_ref);
+
+static inline bool cpuset_cpu_adaptive_nohz(int cpu)
+{
+	if (per_cpu(cpu_adaptive_nohz_ref, cpu) > 0)
+		return true;
+
+	return false;
+}
+
+static inline bool cpuset_adaptive_nohz(void)
+{
+	if (__get_cpu_var(cpu_adaptive_nohz_ref) > 0)
+		return true;
+
+	return false;
+}
+
+extern void cpuset_exit_nohz_interrupt(void *unused);
+extern void cpuset_nohz_flush_cputimes(void);
+#else
+static inline bool cpuset_cpu_adaptive_nohz(int cpu) { return false; }
+static inline bool cpuset_adaptive_nohz(void) { return false; }
+static inline void cpuset_nohz_flush_cputimes(void) { }
+
+#endif /* CONFIG_CPUSETS_NO_HZ */
+
 #endif /* _LINUX_CPUSET_H */

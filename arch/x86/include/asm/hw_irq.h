@@ -35,6 +35,10 @@ extern void spurious_interrupt(void);
 extern void thermal_interrupt(void);
 extern void reschedule_interrupt(void);
 
+#ifdef CONFIG_CPUSETS_NO_HZ
+extern void cpuset_update_nohz_interrupt(void);
+#endif
+
 extern void invalidate_interrupt(void);
 extern void invalidate_interrupt0(void);
 extern void invalidate_interrupt1(void);
@@ -152,6 +156,9 @@ extern asmlinkage void smp_irq_move_cleanup_interrupt(void);
 #endif
 #ifdef CONFIG_SMP
 extern void smp_reschedule_interrupt(struct pt_regs *);
+#ifdef CONFIG_CPUSETS_NO_HZ
+extern void smp_cpuset_update_nohz_interrupt(struct pt_regs *);
+#endif
 extern void smp_call_function_interrupt(struct pt_regs *);
 extern void smp_call_function_single_interrupt(struct pt_regs *);
 #ifdef CONFIG_X86_32

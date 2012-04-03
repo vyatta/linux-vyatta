@@ -50,6 +50,7 @@
 #include <linux/wait.h>
 #include <linux/kthread.h>
 #include <linux/prefetch.h>
+#include <linux/cpuset.h>
 
 #include "rcutree.h"
 #include <trace/events/rcu.h>
@@ -212,7 +213,6 @@ int rcu_cpu_stall_suppress __read_mostly;
 module_param(rcu_cpu_stall_suppress, int, 0644);
 
 static void force_quiescent_state(struct rcu_state *rsp, int relaxed);
-static int rcu_pending(int cpu);
 
 /*
  * Return the number of RCU-sched batches processed thus far for debug & stats.
@@ -303,6 +303,20 @@ static struct rcu_node *rcu_get_root(struct rcu_state *rsp)
 
 #ifdef CONFIG_SMP
 
+static void cpuset_update_rcu_cpu(int cpu)
+{
+#ifdef CONFIG_CPUSETS_NO_HZ
+	unsigned long flags;
+
+	local_irq_save(flags);
+
+	if (cpuset_cpu_adaptive_nohz(cpu))
+		smp_cpuset_update_nohz(cpu);
+
+	local_irq_restore(flags);
+#endif
+}
+
 /*
  * If the specified CPU is offline, tell the caller that it is in
  * a quiescent state.  Otherwise, whack it with a reschedule IPI.
@@ -326,6 +340,8 @@ static int rcu_implicit_offline_qs(struct rcu_data *rdp)
 		return 1;
 	}
 
+	cpuset_update_rcu_cpu(rdp->cpu);
+
 	/*
 	 * The CPU is online, so send it a reschedule IPI.  This forces
 	 * it through the scheduler, and (inefficiently) also handles cases
@@ -341,6 +357,19 @@ static int rcu_implicit_offline_qs(struct rcu_data *rdp)
 
 #endif /* #ifdef CONFIG_SMP */
 
+static void rcu_check_idle_enter(long long oldval)
+{
+	if (!is_idle_task(current)) {
+		struct task_struct *idle = idle_task(smp_processor_id());
+
+		trace_rcu_dyntick("Error on entry: not idle task", oldval, 0);
+		ftrace_dump(DUMP_ALL);
+		WARN_ONCE(1, "Current pid: %d comm: %s / Idle pid: %d comm: %s",
+			  current->pid, current->comm,
+			  idle->pid, idle->comm); /* must be idle task! */
+	}
+}
+
 /*
  * rcu_idle_enter_common - inform RCU that current CPU is moving towards idle
  *
@@ -351,21 +380,28 @@ static int rcu_implicit_offline_qs(struct rcu_data *rdp)
 static void rcu_idle_enter_common(struct rcu_dynticks *rdtp, long long oldval)
 {
 	trace_rcu_dyntick("Start", oldval, 0);
-	if (!is_idle_task(current)) {
-		struct task_struct *idle = idle_task(smp_processor_id());
-
-		trace_rcu_dyntick("Error on entry: not idle task", oldval, 0);
-		ftrace_dump(DUMP_ALL);
-		WARN_ONCE(1, "Current pid: %d comm: %s / Idle pid: %d comm: %s",
-			  current->pid, current->comm,
-			  idle->pid, idle->comm); /* must be idle task! */
-	}
 	rcu_prepare_for_idle(smp_processor_id());
 	/* CPUs seeing atomic_inc() must see prior RCU read-side crit sects */
 	smp_mb__before_atomic_inc();  /* See above. */
 	atomic_inc(&rdtp->dynticks);
 	smp_mb__after_atomic_inc();  /* Force ordering with next sojourn. */
 	WARN_ON_ONCE(atomic_read(&rdtp->dynticks) & 0x1);
+}
+
+static long long __rcu_idle_enter(void)
+{
+	unsigned long flags;
+	long long oldval;
+	struct rcu_dynticks *rdtp;
+
+	local_irq_save(flags);
+	rdtp = &__get_cpu_var(rcu_dynticks);
+	oldval = rdtp->dynticks_nesting;
+	rdtp->dynticks_nesting = 0;
+	rcu_idle_enter_common(rdtp, oldval);
+	local_irq_restore(flags);
+
+	return oldval;
 }
 
 /**
@@ -382,15 +418,26 @@ static void rcu_idle_enter_common(struct rcu_dynticks *rdtp, long long oldval)
  */
 void rcu_idle_enter(void)
 {
-	unsigned long flags;
 	long long oldval;
+
+	oldval = __rcu_idle_enter();
+	rcu_check_idle_enter(oldval);
+}
+
+void rcu_user_enter(void)
+{
+	__rcu_idle_enter();
+}
+
+void rcu_user_enter_irq(void)
+{
+	unsigned long flags;
 	struct rcu_dynticks *rdtp;
 
 	local_irq_save(flags);
 	rdtp = &__get_cpu_var(rcu_dynticks);
-	oldval = rdtp->dynticks_nesting;
-	rdtp->dynticks_nesting = 0;
-	rcu_idle_enter_common(rdtp, oldval);
+	WARN_ON_ONCE(rdtp->dynticks_nesting == 1);
+	rdtp->dynticks_nesting = 1;
 	local_irq_restore(flags);
 }
 
@@ -421,11 +468,26 @@ void rcu_irq_exit(void)
 	oldval = rdtp->dynticks_nesting;
 	rdtp->dynticks_nesting--;
 	WARN_ON_ONCE(rdtp->dynticks_nesting < 0);
+
 	if (rdtp->dynticks_nesting)
 		trace_rcu_dyntick("--=", oldval, rdtp->dynticks_nesting);
 	else
 		rcu_idle_enter_common(rdtp, oldval);
 	local_irq_restore(flags);
+}
+
+static void rcu_check_idle_exit(struct rcu_dynticks *rdtp, long long oldval)
+{
+	if (!is_idle_task(current)) {
+		struct task_struct *idle = idle_task(smp_processor_id());
+
+		trace_rcu_dyntick("Error on exit: not idle task",
+				  oldval, rdtp->dynticks_nesting);
+		ftrace_dump(DUMP_ALL);
+		WARN_ONCE(1, "Current pid: %d comm: %s / Idle pid: %d comm: %s",
+			  current->pid, current->comm,
+			  idle->pid, idle->comm); /* must be idle task! */
+	}
 }
 
 /*
@@ -444,16 +506,18 @@ static void rcu_idle_exit_common(struct rcu_dynticks *rdtp, long long oldval)
 	WARN_ON_ONCE(!(atomic_read(&rdtp->dynticks) & 0x1));
 	rcu_cleanup_after_idle(smp_processor_id());
 	trace_rcu_dyntick("End", oldval, rdtp->dynticks_nesting);
-	if (!is_idle_task(current)) {
-		struct task_struct *idle = idle_task(smp_processor_id());
+}
 
-		trace_rcu_dyntick("Error on exit: not idle task",
-				  oldval, rdtp->dynticks_nesting);
-		ftrace_dump(DUMP_ALL);
-		WARN_ONCE(1, "Current pid: %d comm: %s / Idle pid: %d comm: %s",
-			  current->pid, current->comm,
-			  idle->pid, idle->comm); /* must be idle task! */
-	}
+static long long __rcu_idle_exit(struct rcu_dynticks *rdtp)
+{
+	long long oldval;
+
+	oldval = rdtp->dynticks_nesting;
+	WARN_ON_ONCE(oldval != 0);
+	rdtp->dynticks_nesting = LLONG_MAX / 2;
+	rcu_idle_exit_common(rdtp, oldval);
+
+	return oldval;
 }
 
 /**
@@ -469,16 +533,37 @@ static void rcu_idle_exit_common(struct rcu_dynticks *rdtp, long long oldval)
  */
 void rcu_idle_exit(void)
 {
-	unsigned long flags;
-	struct rcu_dynticks *rdtp;
 	long long oldval;
+	struct rcu_dynticks *rdtp;
+	unsigned long flags;
 
 	local_irq_save(flags);
 	rdtp = &__get_cpu_var(rcu_dynticks);
-	oldval = rdtp->dynticks_nesting;
-	WARN_ON_ONCE(oldval != 0);
-	rdtp->dynticks_nesting = DYNTICK_TASK_NESTING;
-	rcu_idle_exit_common(rdtp, oldval);
+	oldval = __rcu_idle_exit(rdtp);
+	rcu_check_idle_exit(rdtp, oldval);
+	local_irq_restore(flags);
+}
+
+void rcu_user_exit(void)
+{
+	struct rcu_dynticks *rdtp;
+	unsigned long flags;
+
+	local_irq_save(flags);
+	rdtp = &__get_cpu_var(rcu_dynticks);
+	 __rcu_idle_exit(rdtp);
+	local_irq_restore(flags);
+}
+
+void rcu_user_exit_irq(void)
+{
+	unsigned long flags;
+	struct rcu_dynticks *rdtp;
+
+	local_irq_save(flags);
+	rdtp = &__get_cpu_var(rcu_dynticks);
+	WARN_ON_ONCE(rdtp->dynticks_nesting == 0);
+	rdtp->dynticks_nesting = (LLONG_MAX / 2) + 1;
 	local_irq_restore(flags);
 }
 
@@ -1733,6 +1818,13 @@ __call_rcu(struct rcu_head *head, void (*func)(struct rcu_head *rcu),
 	else
 		trace_rcu_callback(rsp->name, head, rdp->qlen);
 
+	/* Restart the timer if needed to handle the callbacks */
+	if (cpuset_adaptive_nohz()) {
+		/* Make updates on nxtlist visible to self IPI */
+		barrier();
+		smp_cpuset_update_nohz(smp_processor_id());
+	}
+
 	/* If interrupts were disabled, don't dive into RCU core. */
 	if (irqs_disabled_flags(flags)) {
 		local_irq_restore(flags);
@@ -1915,7 +2007,7 @@ static int __rcu_pending(struct rcu_state *rsp, struct rcu_data *rdp)
  * by the current CPU, returning 1 if so.  This function is part of the
  * RCU implementation; it is -not- an exported member of the RCU API.
  */
-static int rcu_pending(int cpu)
+int rcu_pending(int cpu)
 {
 	return __rcu_pending(&rcu_sched_state, &per_cpu(rcu_sched_data, cpu)) ||
 	       __rcu_pending(&rcu_bh_state, &per_cpu(rcu_bh_data, cpu)) ||

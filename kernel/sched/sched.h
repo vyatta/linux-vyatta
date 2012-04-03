@@ -1,6 +1,7 @@
 
 #include <linux/sched.h>
 #include <linux/mutex.h>
+#include <linux/cpuset.h>
 #include <linux/spinlock.h>
 #include <linux/stop_machine.h>
 
@@ -925,6 +926,28 @@ static inline void cpuacct_charge(struct task_struct *tsk, u64 cputime) {}
 static inline void inc_nr_running(struct rq *rq)
 {
 	rq->nr_running++;
+
+	if (rq->nr_running == 2) {
+		/*
+		 * Make rq->nr_running update visible right away so that
+		 * remote CPU knows that it must restart the tick.
+		 * FIXME: This is probably not enough to ensure the update is visible
+		 */
+		smp_wmb();
+		/*
+		 * Make updates to cpu_adaptive_nohz_ref visible right now.
+		 * If the CPU is not yet in a nohz cpuset then it will see
+		 * the value on rq->nr_running later on the first time it
+		 * tries to shutdown the tick. Otherwise we must send it
+		 * it an IPI. But the ordering must be strict to ensure
+		 * the first case.
+		 * FIXME: That too is probably not enough to ensure the
+		 * update is visible.
+		 */
+		smp_rmb();
+		if (cpuset_cpu_adaptive_nohz(rq->cpu))
+			smp_cpuset_update_nohz(rq->cpu);
+	}
 }
 
 static inline void dec_nr_running(struct rq *rq)

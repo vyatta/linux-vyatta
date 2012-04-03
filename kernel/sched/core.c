@@ -576,7 +576,7 @@ unlock:
  * account when the CPU goes back to idle and evaluates the timer
  * wheel for the next timer event.
  */
-void wake_up_idle_cpu(int cpu)
+static void wake_up_idle_cpu(int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
 
@@ -604,6 +604,28 @@ void wake_up_idle_cpu(int cpu)
 	smp_mb();
 	if (!tsk_is_polling(rq->idle))
 		smp_send_reschedule(cpu);
+}
+
+static bool wake_up_cpuset_nohz_cpu(int cpu)
+{
+#ifdef CONFIG_CPUSETS_NO_HZ
+	/*
+	 * FIXME: We need to ensure that updates
+	 * on cpu_adaptive_nohz_ref are visible right
+	 * away.
+	 */
+	if (cpuset_cpu_adaptive_nohz(cpu)) {
+		smp_cpuset_update_nohz(cpu);
+		return true;
+	}
+#endif
+	return false;
+}
+
+void wake_up_nohz_cpu(int cpu)
+{
+	if (!wake_up_cpuset_nohz_cpu(cpu))
+		wake_up_idle_cpu(cpu);
 }
 
 static inline bool got_nohz_idle_kick(void)
@@ -1323,6 +1345,27 @@ static void update_avg(u64 *avg, u64 sample)
 }
 #endif
 
+#ifdef CONFIG_CPUSETS_NO_HZ
+bool sched_can_stop_tick(void)
+{
+	struct rq *rq;
+
+	rq = this_rq();
+
+	/*
+	 * Ensure nr_running updates are visible
+	 * FIXME: the barrier is probably not enough to ensure
+	 * the updates are visible right away.
+	 */
+	smp_rmb();
+	/* More than one running task need preemption */
+	if (rq->nr_running > 1)
+		return false;
+
+	return true;
+}
+#endif
+
 static void
 ttwu_stat(struct task_struct *p, int cpu, int wake_flags)
 {
@@ -1880,6 +1923,7 @@ static inline void
 prepare_task_switch(struct rq *rq, struct task_struct *prev,
 		    struct task_struct *next)
 {
+	tick_nohz_pre_schedule();
 	sched_info_switch(prev, next);
 	perf_event_task_sched_out(prev, next);
 	fire_sched_out_preempt_notifiers(prev, next);
@@ -2059,6 +2103,7 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	 * frame will be invalid.
 	 */
 	finish_task_switch(this_rq(), prev);
+	tick_nohz_post_schedule();
 }
 
 /*
@@ -2649,6 +2694,17 @@ void account_user_time(struct task_struct *p, cputime_t cputime,
 	acct_update_integrals(p);
 }
 
+void account_user_ticks(struct task_struct *p, unsigned long ticks)
+{
+	cputime_t delta_cputime, delta_scaled;
+
+	if (ticks) {
+		delta_cputime = jiffies_to_cputime(ticks);
+		delta_scaled = cputime_to_scaled(ticks);
+		account_user_time(p, delta_cputime, delta_scaled);
+	}
+}
+
 /*
  * Account guest cpu time to a process.
  * @p: the process that the cpu time gets accounted to
@@ -2724,6 +2780,17 @@ void account_system_time(struct task_struct *p, int hardirq_offset,
 		index = CPUTIME_SYSTEM;
 
 	__account_system_time(p, cputime, cputime_scaled, index);
+}
+
+void account_system_ticks(struct task_struct *p, unsigned long ticks)
+{
+	cputime_t delta_cputime, delta_scaled;
+
+	if (ticks) {
+		delta_cputime = jiffies_to_cputime(ticks);
+		delta_scaled = cputime_to_scaled(ticks);
+		account_system_time(p, 0, delta_cputime, delta_scaled);
+	}
 }
 
 /*
@@ -3290,6 +3357,20 @@ int mutex_spin_on_owner(struct mutex *lock, struct task_struct *owner)
 	return lock->owner == NULL;
 }
 #endif
+
+asmlinkage void __sched schedule_user(void)
+{
+	/*
+	 * We may arrive here before resuming userspace.
+	 * If we are running tickless, RCU may be in idle
+	 * mode. We need to reenable RCU for the next task
+	 * and also in case schedule() make use of RCU itself.
+	 */
+	preempt_disable();
+	tick_nohz_cpu_exit_qs(false);
+	preempt_enable_no_resched();
+	schedule();
+}
 
 #ifdef CONFIG_PREEMPT
 /*

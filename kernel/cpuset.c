@@ -59,6 +59,7 @@
 #include <linux/mutex.h>
 #include <linux/workqueue.h>
 #include <linux/cgroup.h>
+#include <linux/tick.h>
 
 /*
  * Workqueue for cpuset related tasks.
@@ -145,6 +146,7 @@ typedef enum {
 	CS_SCHED_LOAD_BALANCE,
 	CS_SPREAD_PAGE,
 	CS_SPREAD_SLAB,
+	CS_ADAPTIVE_NOHZ,
 } cpuset_flagbits_t;
 
 /* convenient tests for these bits */
@@ -181,6 +183,11 @@ static inline int is_spread_page(const struct cpuset *cs)
 static inline int is_spread_slab(const struct cpuset *cs)
 {
 	return test_bit(CS_SPREAD_SLAB, &cs->flags);
+}
+
+static inline int is_adaptive_nohz(const struct cpuset *cs)
+{
+	return test_bit(CS_ADAPTIVE_NOHZ, &cs->flags);
 }
 
 static struct cpuset top_cpuset = {
@@ -1211,6 +1218,85 @@ static void cpuset_change_flag(struct task_struct *tsk,
 	cpuset_update_task_spread_flag(cgroup_cs(scan->cg), tsk);
 }
 
+#ifdef CONFIG_CPUSETS_NO_HZ
+
+DEFINE_PER_CPU(int, cpu_adaptive_nohz_ref);
+
+static cpumask_t nohz_cpuset_mask;
+
+static void flush_cputime_interrupt(void *unused)
+{
+	tick_nohz_flush_current_times(false);
+}
+
+void cpuset_nohz_flush_cputimes(void)
+{
+	preempt_disable();
+	smp_call_function_many(&nohz_cpuset_mask, flush_cputime_interrupt,
+			       NULL, true);
+	preempt_enable();
+	/* Make the utime/stime updates visible */
+	smp_mb();
+}
+
+static void cpu_exit_nohz(int cpu)
+{
+	preempt_disable();
+	smp_call_function_single(cpu, cpuset_exit_nohz_interrupt,
+				 NULL, true);
+	preempt_enable();
+}
+
+static void update_nohz_cpus(struct cpuset *old_cs, struct cpuset *cs)
+{
+	int cpu;
+	int val;
+
+	if (is_adaptive_nohz(old_cs) == is_adaptive_nohz(cs))
+		return;
+
+	for_each_cpu(cpu, cs->cpus_allowed) {
+		if (is_adaptive_nohz(cs))
+			per_cpu(cpu_adaptive_nohz_ref, cpu) += 1;
+		else
+			per_cpu(cpu_adaptive_nohz_ref, cpu) -= 1;
+
+		val = per_cpu(cpu_adaptive_nohz_ref, cpu);
+
+		if (val == 1) {
+			cpumask_set_cpu(cpu, &nohz_cpuset_mask);
+			/*
+			 * The mask update needs to be visible right away
+			 * so that this CPU is part of the cputime IPI
+			 * update right now.
+			 */
+			 smp_mb();
+		} else if (!val) {
+			/*
+			 * The update to cpu_adaptive_nohz_ref must be
+			 * visible right away. So that once we restart the tick
+			 * from the IPI, it won't be stopped again due to cache
+			 * update lag.
+			 * FIXME: We probably need more to ensure this value is really
+			 * visible right away.
+			 */
+			smp_mb();
+			cpu_exit_nohz(cpu);
+			/*
+			 * Now that the tick has been restarted and cputimes
+			 * flushed, we don't need anymore to be part of the
+			 * cputime flush IPI.
+			 */
+			cpumask_clear_cpu(cpu, &nohz_cpuset_mask);
+		}
+	}
+}
+#else
+static inline void update_nohz_cpus(struct cpuset *old_cs, struct cpuset *cs)
+{
+}
+#endif
+
 /*
  * update_tasks_flags - update the spread flags of tasks in the cpuset.
  * @cs: the cpuset in which each task's spread flags needs to be changed
@@ -1275,6 +1361,8 @@ static int update_flag(cpuset_flagbits_t bit, struct cpuset *cs,
 
 	spread_flag_changed = ((is_spread_slab(cs) != is_spread_slab(trialcs))
 			|| (is_spread_page(cs) != is_spread_page(trialcs)));
+
+	update_nohz_cpus(cs, trialcs);
 
 	mutex_lock(&callback_mutex);
 	cs->flags = trialcs->flags;
@@ -1488,6 +1576,7 @@ typedef enum {
 	FILE_MEMORY_PRESSURE,
 	FILE_SPREAD_PAGE,
 	FILE_SPREAD_SLAB,
+	FILE_ADAPTIVE_NOHZ,
 } cpuset_filetype_t;
 
 static int cpuset_write_u64(struct cgroup *cgrp, struct cftype *cft, u64 val)
@@ -1527,6 +1616,11 @@ static int cpuset_write_u64(struct cgroup *cgrp, struct cftype *cft, u64 val)
 	case FILE_SPREAD_SLAB:
 		retval = update_flag(CS_SPREAD_SLAB, cs, val);
 		break;
+#ifdef CONFIG_CPUSETS_NO_HZ
+	case FILE_ADAPTIVE_NOHZ:
+		retval = update_flag(CS_ADAPTIVE_NOHZ, cs, val);
+		break;
+#endif
 	default:
 		retval = -EINVAL;
 		break;
@@ -1686,6 +1780,10 @@ static u64 cpuset_read_u64(struct cgroup *cont, struct cftype *cft)
 		return is_spread_page(cs);
 	case FILE_SPREAD_SLAB:
 		return is_spread_slab(cs);
+#ifdef CONFIG_CPUSETS_NO_HZ
+	case FILE_ADAPTIVE_NOHZ:
+		return is_adaptive_nohz(cs);
+#endif
 	default:
 		BUG();
 	}
@@ -1794,6 +1892,15 @@ static struct cftype files[] = {
 		.write_u64 = cpuset_write_u64,
 		.private = FILE_SPREAD_SLAB,
 	},
+
+#ifdef CONFIG_CPUSETS_NO_HZ
+	{
+		.name = "adaptive_nohz",
+		.read_u64 = cpuset_read_u64,
+		.write_u64 = cpuset_write_u64,
+		.private = FILE_ADAPTIVE_NOHZ,
+	},
+#endif
 };
 
 static struct cftype cft_memory_pressure_enabled = {

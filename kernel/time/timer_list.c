@@ -167,9 +167,10 @@ static void print_cpu(struct seq_file *m, int cpu, u64 now)
 	{
 		struct tick_sched *ts = tick_get_tick_sched(cpu);
 		P(nohz_mode);
-		P_ns(idle_tick);
+		P_ns(last_tick);
 		P(tick_stopped);
-		P(idle_jiffies);
+		/* CHECKME: Do we want saved_jiffies_whence as well? */
+		P(saved_jiffies);
 		P(idle_calls);
 		P(idle_sleeps);
 		P_ns(idle_entrytime);
@@ -259,7 +260,7 @@ static int timer_list_show(struct seq_file *m, void *v)
 	u64 now = ktime_to_ns(ktime_get());
 	int cpu;
 
-	SEQ_printf(m, "Timer List Version: v0.6\n");
+	SEQ_printf(m, "Timer List Version: v0.7\n");
 	SEQ_printf(m, "HRTIMER_MAX_CLOCK_BASES: %d\n", HRTIMER_MAX_CLOCK_BASES);
 	SEQ_printf(m, "now at %Ld nsecs\n", (unsigned long long)now);
 

@@ -184,11 +184,19 @@ static inline int rcu_preempt_depth(void)
 extern void rcu_sched_qs(int cpu);
 extern void rcu_bh_qs(int cpu);
 extern void rcu_check_callbacks(int cpu, int user);
+extern int rcu_pending(int cpu);
 struct notifier_block;
 extern void rcu_idle_enter(void);
 extern void rcu_idle_exit(void);
 extern void rcu_irq_enter(void);
 extern void rcu_irq_exit(void);
+
+#ifdef CONFIG_CPUSETS_NO_HZ
+void rcu_user_enter(void);
+void rcu_user_exit(void);
+void rcu_user_enter_irq(void);
+void rcu_user_exit_irq(void);
+#endif
 
 /*
  * Infrastructure to implement the synchronize_() primitives in
