@@ -1,3 +1,18 @@
+linux-3.3 (3.3.1-1+vyatta+2) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * enable cpusets
+
+  [ Pablo Neira Ayuso ]
+  * netfilter: xt_CT: remove a compile warning
+  * netfilter: xt_CT: allocation has to be GFP_ATOMIC under
+    rcu_read_lock section
+
+  [ Gaurav Sinha ]
+  * netfilter: xt_CT: fix missing put timeout object in error path
+
+ -- Gaurav Sinha <gaurav.sinha@vyatta.com>  Thu, 12 Apr 2012 13:58:50 -0700
+
 linux-3.3 (3.3.1-1+vyatta+1) unstable; urgency=low
 
   [ Meng Zhang ]
