@@ -1,3 +1,217 @@
+linux-3.3 (3.3.2-1+vyatta+1) unstable; urgency=low
+
+  [ Feiran Zhuang ]
+  * x86 bpf_jit: fix a bug in emitting the 16-bit immediate operand of AND
+
+  [ Andreas Mohr ]
+  * via-rhine: fix wait-bit inversion.
+
+  [ Matt Carlson ]
+  * tg3: Fix 5717 serdes powerdown problem
+
+  [ Lino Sanfilippo ]
+  * sky2: dont overwrite settings for PHY Quick link
+
+  [ danborkmann@iogearbox.net ]
+  * rose_dev: fix memcpy-bug in rose_set_mac_address
+
+  [ Rabin Vincent ]
+  * net: usb: cdc_eem: fix mtu
+
+  [ Kenth Eriksson ]
+  * Fix non TBI PHY access; a bad merge undid bug fix in a previous commit.
+
+  [ Takashi Iwai ]
+  * ALSA: hda/realtek - Fix ADC assignment with a shared HP/Mic pin
+
+  [ Mark Brown ]
+  * ASoC: wm8994: Update WM8994 DCS calibration
+
+  [ Marc Kleine-Budde ]
+  * mtd: ixp4xx: oops in ixp4xx_flash_probe
+
+  [ Daniel Schwierzeck ]
+  * mtd: mips: lantiq: reintroduce support for cmdline partitions
+
+  [ Wolfram Sang ]
+  * mtd: nand: gpmi: use correct member for checking NAND_BBT_USE_FLASH
+
+  [ Artem Bityutskiy ]
+  * mtd: sst25l: initialize writebufsize
+  * mtd: doc2001plus: initialize writebufsize
+  * mtd: doc2000: initialize writebufsize
+  * mtd: doc2001: initialize writebufsize
+  * mtd: docg3: initialize writebufsize
+  * mtd: block2mtd: initialize writebufsize
+  * mtd: lart: initialize writebufsize
+
+  [ Brian Norris ]
+  * mtd: m25p80: set writebufsize
+
+  [ Andi Kleen ]
+  * ACPI: Do cpufreq clamping for throttling per package v2
+
+  [ Yinghai Lu ]
+  * PNPACPI: Fix device ref leaking in acpi_pnp_match
+
+  [ Julian Anastasov ]
+  * ACPICA: Fix regression in FADT revision checks
+
+  [ Jan Beulich ]
+  * modpost: fix ALL_INIT_DATA_SECTIONS
+
+  [ Jiang Liu ]
+  * genirq: Adjust irq thread affinity on IRQ_SET_MASK_OK_NOCOPY return value
+
+  [ Wolfgang Mauerer ]
+  * tracing: Fix ftrace stack trace entries
+
+  [ Steven Rostedt ]
+  * tracing: Fix ent_size in trace output
+
+  [ Geert Uytterhoeven ]
+  * m68k/mac: Add missing platform check before registering platform devices
+
+  [ Stanislaw Gruszka ]
+  * mac80211: fix possible tid_rx->reorder_timer use after free
+
+  [ Larry Finger ]
+  * rtlwifi: rtl8192ce: rtl8192cu: rtl8192de: Fix low-gain setting when scanning
+
+  [ Rajkumar Manoharan ]
+  * ath9k: fix max noise floor threshold
+
+  [ Chris Wilson ]
+  * drm: Validate requested virtual size against allocated fb size
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: fix fans after resume
+
+  [ Anisse Astier ]
+  * drm/i915: no-lvds quirk on MSI DC500
+
+  [ Jesse Barnes ]
+  * drm/i915: treat src w & h as fixed point in sprite handling code
+
+  [ Chris Wilson ]
+  * drm/i915: Sanitize BIOS debugging bits from PIPECONF
+
+  [ Sean Paul ]
+  * drm/i915: Add lock on drm_helper_resume_force_mode
+
+  [ Daniel Vetter ]
+  * drm/i915: quirk away broken OpRegion VBT
+
+  [ Rafael J. Wysocki ]
+  * firmware_class: Rework usermodehelper check
+  * firmware_class: Split _request_firmware() into three functions, v2
+  * firmware_class: Do not warn that system is not ready from async loads
+
+  [ Alan Stern ]
+  * PM / Runtime: don't forget to wake up waitqueue on failure
+
+  [ Rafael J. Wysocki ]
+  * PM / Hibernate: Disable usermode helpers right before freezing tasks
+  * PM / Sleep: Move disabling of usermode helpers to the freezer
+  * PM / Sleep: Mitigate race between the freezer and request_firmware()
+
+  [ Jason Wessel ]
+  * kgdb,debug_core: pass the breakpoint struct instead of address and memory
+  * kgdbts: Fix kernel oops with CONFIG_DEBUG_RODATA
+  * kgdbts: (1 of 2) fix single step awareness to work correctly with SMP
+  * kgdbts: (2 of 2) fix single step awareness to work correctly with SMP
+  * x86,kgdb: Fix DEBUG_RODATA limitation using text_poke()
+
+  [ Pavel Shilovsky ]
+  * CIFS: Fix VFS lock usage for oplocked files
+
+  [ Nicolas Ferre ]
+  * USB: ohci-at91: fix vbus_pin_active_low handling
+  * ARM: at91/USB host: specify and handle properly vbus_pin_active_low
+
+  [ Rafael J. Wysocki ]
+  * mmc: sdio: Use empty system suspend/resume callbacks at the bus level
+
+  [ Alf Høgemark ]
+  * mmc: sdhci-dove: Fix compile error by including module.h
+
+  [ Ludovic Desroches ]
+  * mmc: atmel-mci: correct data timeout computation
+
+  [ Mark Rustad ]
+  * tcm_fc: Add abort flag for gracefully handling exchange timeout
+  * tcm_fc: Do not free tpg structure during wq allocation failure
+
+  [ Kees Cook ]
+  * sysctl: fix write access to dmesg_restrict/kptr_restrict
+
+  [ Stephen Warren ]
+  * regmap: prevent division by zero in rbtree_show
+
+  [ Frank Rowand ]
+  * modpost: Fix modpost license checking of vmlinux.o
+
+  [ Axel Lin ]
+  * mfd: Fix section mismatch warning for da9052-spi
+
+  [ David Rientjes ]
+  * android, lowmemorykiller: remove task handoff notifier
+
+  [ Tetsuo Handa ]
+  * TOMOYO: Fix mount flags checking order.
+
+  [ Stanislaw Gruszka ]
+  * iwlegacy: do not nulify il->vif on reset
+
+  [ Greg Kroah-Hartman ]
+  * Revert "x86/ioapic: Add register level checks to detect bogus io-apic entries"
+
+  [ Lee, Chun-Yi ]
+  * acer-wmi: No wifi rfkill on Sony machines
+
+  [ Sachin Prabhu ]
+  * Fix length of buffer copied in __nfs4_get_acl_uncached
+
+  [ Salman Qazi ]
+  * sched/x86: Fix overflow in cyc2ns_offset
+
+  [ Nishanth Menon ]
+  * mfd: Clear twl6030 IRQ status register only once
+
+  [ Guan Xin ]
+  * USB: Add Motorola Rokr E6 Id to the USBNet driver "zaurus"
+
+  [ Dan Williams ]
+  * ioat: fix size of 'completion' for Xen
+
+  [ Laurent Pinchart ]
+  * uvcvideo: Fix race-related crash in uvc_video_clock_update()
+
+  [ Kuninori Morimoto ]
+  * ASoC: ak4642: fixup: mute needs +1 step
+
+  [ Stephen Warren ]
+  * ASoC: tegra: fix i2s compilation when !CONFIG_DEBUG_FS
+
+  [ Chris Rankin ]
+  * media: dvb_frontend: regression fix: userspace ABI broken for xine
+
+  [ Simon Arlott ]
+  * media: dvb-core: fix DVBFE_ALGO_HW retune bug
+
+  [ Oleg Nesterov ]
+  * cred: copy_process() should clear child->replacement_session_keyring
+
+  [ Sujith Manoharan ]
+  * Revert "ath9k: fix going to full-sleep on PS idle"
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.3.2
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Fri, 13 Apr 2012 11:46:00 -0700
+
 linux-3.3 (3.3.1-1+vyatta+2) unstable; urgency=low
 
   [ Stephen Hemminger ]
