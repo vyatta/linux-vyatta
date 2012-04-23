@@ -1,3 +1,205 @@
+linux-3.3 (3.3.3-1+vyatta+1) unstable; urgency=low
+
+  [ Jan Schmidt ]
+  * Btrfs: fix regression in scrub path resolving
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: fix DVO setup on some r4xx chips
+
+  [ acreese ]
+  * drm/i915: Removed IVB forced enable of sprite dest key.
+
+  [ Chris Wilson ]
+  * drm/i915/ringbuffer: Exclude last 2 cachlines of ring on 845g
+
+  [ Alex Deucher ]
+  * drm/radeon: only add the mm i2c bus if the hw_i2c module param is set
+
+  [ Daniel Vetter ]
+  * drm/i915: properly compute dp dithering for user-created modes
+
+  [ Jesse Barnes ]
+  * drm/i915: make rc6 module parameter read-only
+
+  [ Larry Finger ]
+  * rtlwifi: Preallocate USB read buffers and eliminate kalloc in read routine
+  * rtlwifi: Add missing DMA buffer unmapping for PCI drivers
+
+  [ Marc Zyngier ]
+  * ARM: 7379/1: DT: fix atags_to_fdt() second call site
+
+  [ Jonathan Austin ]
+  * ARM: 7384/1: ThumbEE: Disable userspace TEEHBR access for !CONFIG_ARM_THUMBEE
+
+  [ majianpeng ]
+  * md/raid1,raid10: Fix calculation of 'vcnt' when processing error recovery.
+
+  [ NeilBrown ]
+  * md/bitmap: prevent bitmap_daemon_work running while initialising bitmap
+
+  [ Johan Hovold ]
+  * Bluetooth: uart-ldisc: Fix memory leak
+  * Bluetooth: hci_ldisc: fix NULL-pointer dereference on tty_close
+  * Bluetooth: hci_core: fix NULL-pointer dereference at unregister
+
+  [ Andre Guedes ]
+  * Bluetooth: Remove unneeded locking
+
+  [ Chris Mason ]
+  * Revert "Btrfs: increase the global block reserve estimates"
+
+  [ Takashi Iwai ]
+  * ALSA: hda/realtek - Add a fixup entry for Acer Aspire 8940G
+
+  [ Theodore Ts'o ]
+  * ext4: address scalability issue by removing extent cache statistics
+
+  [ Luck, Tony ]
+  * ia64: fix futex_atomic_cmpxchg_inatomic()
+
+  [ Jason Wessel ]
+  * panic: fix stack dump print on direct call to panic()
+
+  [ Linus Walleij ]
+  * drivers/rtc/rtc-pl031.c: enable clock on all ST variants
+
+  [ Chris Metcalf ]
+  * hugetlb: fix race condition in hugetlb_fault()
+
+  [ Marek Belisko ]
+  * staging: iio: hmc5843: Fix crash in probe function.
+
+  [ Dan Williams ]
+  * Revert "serial/8250_pci: init-quirk msi support for kt serial controller"
+
+  [ Kukjin Kim ]
+  * serial: samsung: fix omission initialize ulcon in reset port fn()
+
+  [ Dan Williams ]
+  * Revert "serial/8250_pci: setup-quirk workaround for the kt serial controller"
+  * serial/8250_pci: add a "force background timer" flag and use it for the "kt" serial port
+
+  [ Yuriy Kozlov ]
+  * tty: serial: altera_uart: Check for NULL platform_data in probe.
+
+  [ Paul E. McKenney ]
+  * sparc64: Eliminate obsolete __handle_softirq() function
+
+  [ David S. Miller ]
+  * sparc64: Fix bootup crash on sun4v.
+
+  [ Stephen M. Cameron ]
+  * cciss: Initialize scsi host max_sectors for tape drive support
+  * cciss: Fix scsi tape io with more than 255 scatter gather elements
+
+  [ David Miller ]
+  * perf hists: Catch and handle out-of-date hist entry maps.
+
+  [ Wang YanQing ]
+  * video:uvesafb: Fix oops that uvesafb try to execute NX-protected page
+
+  [ Roland Dreier ]
+  * IB/srpt: Set srq_type to IB_SRQT_BASIC
+
+  [ Neal Cardwell ]
+  * nohz: Fix stale jiffies update in tick_nohz_restart()
+
+  [ Tomoya MORINAGA ]
+  * pch_uart: Fix MSI setting issue
+
+  [ Jeremy Fitzhardinge ]
+  * x86: Use correct byte-sized register constraint in __xchg_op()
+
+  [ H. Peter Anvin ]
+  * x86: Use correct byte-sized register constraint in __add()
+
+  [ Johan Hovold ]
+  * USB: serial: fix race between probe and open
+  * USB: pl2303: fix DTR/RTS being raised on baud rate change
+
+  [ Santiago Garcia Mantinan ]
+  * USB: option: re-add NOVATELWIRELESS_PRODUCT_HSPA_HIGHSPEED to option_id array
+
+  [ Simon Arlott ]
+  * USB: ftdi_sio: fix status line change handling for TIOCMIWAIT and TIOCGICOUNT
+  * USB: ftdi_sio: fix race condition in TIOCMIWAIT, and abort of TIOCMIWAIT when the device is removed
+
+  [ Anton Samokhvalov ]
+  * USB: sierra: add support for Sierra Wireless MC7710
+
+  [ Alan Stern ]
+  * USB: don't clear urb->dev in scatter-gather library
+  * USB: don't ignore suspend errors for root hubs
+
+  [ Felipe Balbi ]
+  * xhci: don't re-enable IE constantly
+
+  [ Sarah Sharp ]
+  * xhci: Don't write zeroed pointers to xHC registers.
+  * xhci: Restore event ring dequeue pointer on resume.
+
+  [ Elric Fu ]
+  * USB: fix bug of device descriptor got from superspeed device
+  * xHCI: add XHCI_RESET_ON_RESUME quirk for VIA xHCI host
+
+  [ Alex He ]
+  * xHCI: Correct the #define XHCI_LEGACY_DISABLE_SMI
+
+  [ Martin Schwidefsky ]
+  * fix tlb flushing for page table pages
+
+  [ Hugh Dickins ]
+  * memcg: fix Bad page state after replace_page_cache
+
+  [ Linus Walleij ]
+  * serial: PL011: clear pending interrupts
+  * serial: PL011: move interrupt clearing
+
+  [ Eric Paris ]
+  * fcaps: clear the same personality flags as suid when fcaps are used
+
+  [ Sarah Sharp ]
+  * xhci: Fix register save/restore order.
+
+  [ Tomoya MORINAGA ]
+  * usb: gadget: pch_udc: Fix disconnect issue
+  * usb: gadget: pch_udc: Fix wrong return value
+  * usb: gadget: pch_udc: Fix USB suspend issue
+  * usb: gadget: pch_udc: Fix usb/gadget/pch_udc: Fix ether gadget connect/disconnect issue
+  * usb: gadget: pch_udc: Reduce redundant interrupt
+
+  [ Jonghwan Choi ]
+  * security: fix compile error in commoncap.c
+
+  [ Danny Kukawka ]
+  * spi-topcliff-pch: fix -Wuninitialized warning
+
+  [ Eran ]
+  * Bluetooth: Adding USB device 13d3:3375 as an Atheros AR3012.
+
+  [ Cho, Yu-Chen ]
+  * Bluetooth: Add Atheros maryann PIDVID support
+
+  [ Kees Cook ]
+  * futex: Do not leak robust list to unprivileged process
+
+  [ Chris Wilson ]
+  * drm/i915: Hold mode_config lock whilst changing mode for lastclose()
+
+  [ Takashi Iwai ]
+  * drm/radeon/kms: fix the regression of DVI connector check
+
+  [ Dave Airlie ]
+  * drm/radeon: disable MSI on RV515
+  * drm/radeon: fix load detect on rn50 with hardcoded EDIDs.
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.3.3
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 23 Apr 2012 09:38:01 -0700
+
 linux-3.3 (3.3.2-1+vyatta+1) unstable; urgency=low
 
   [ Feiran Zhuang ]
