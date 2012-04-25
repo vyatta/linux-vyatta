@@ -179,7 +179,26 @@ struct pcpu_tstats {
 static struct rtnl_link_stats64 *ipgre_get_stats64(struct net_device *dev,
 						   struct rtnl_link_stats64 *tot)
 {
+	struct ip_tunnel *t = netdev_priv(dev);
 	int i;
+
+	if (t->link_stats) {
+		/* Stats received from device */
+		*tot = *t->link_stats;
+		
+		/* Add tunnel detected errors to mix */
+		tot->rx_crc_errors += dev->stats.rx_crc_errors;
+		tot->rx_length_errors += dev->stats.rx_length_errors;
+		tot->rx_fifo_errors += dev->stats.rx_fifo_errors;
+		tot->rx_errors += dev->stats.rx_errors;
+		tot->rx_dropped += dev->stats.rx_dropped;
+		tot->tx_carrier_errors += dev->stats.tx_carrier_errors;
+		tot->tx_fifo_errors += dev->stats.tx_fifo_errors;
+		tot->tx_errors += dev->stats.tx_errors;
+		tot->tx_dropped += dev->stats.tx_dropped;
+
+		return tot;
+	}
 
 	for_each_possible_cpu(i) {
 		const struct pcpu_tstats *tstats = per_cpu_ptr(dev->tstats, i);
@@ -1535,10 +1554,40 @@ static int ipgre_tap_init(struct net_device *dev)
 	return 0;
 }
 
+/*
+ * Vyatta extension to allow an ioctl to set interface statistics
+ */
+static int
+ipgre_tap_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
+{
+	struct ip_tunnel *t = netdev_priv(dev);
+	struct rtnl_link_stats64 *stats;
+
+	if (cmd != SIOCTUNNELSTATS)
+		return -EOPNOTSUPP;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	stats = kmalloc(sizeof(*stats), GFP_USER);
+	if (!stats)
+		return -ENOMEM;
+
+	if (copy_from_user(stats, ifr->ifr_ifru.ifru_data, sizeof(*stats))) {
+		kfree(stats);
+		return -EFAULT;
+	}
+
+	stats = xchg(&t->link_stats, stats);
+	kfree(stats);
+	return 0;
+}
+
 static const struct net_device_ops ipgre_tap_netdev_ops = {
 	.ndo_init		= ipgre_tap_init,
 	.ndo_uninit		= ipgre_tunnel_uninit,
 	.ndo_start_xmit		= ipgre_tunnel_xmit,
+	.ndo_do_ioctl		= ipgre_tap_ioctl,
 	.ndo_set_mac_address 	= eth_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_change_mtu		= ipgre_tunnel_change_mtu,
