@@ -30,6 +30,9 @@ struct ip_tunnel {
 
 	struct ip_tunnel_parm	parms;
 
+	/* Vyatta extension to allow giving stats from daemon */
+	struct rtnl_link_stats64 *link_stats;
+
 	/* for SIT */
 #ifdef CONFIG_IPV6_SIT_6RD
 	struct ip_tunnel_6rd_parm	ip6rd;
