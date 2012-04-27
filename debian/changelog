@@ -1,3 +1,240 @@
+linux-3.3 (3.3.4-1+vyatta+1) unstable; urgency=low
+
+  [ Zeev Tarantov ]
+  * Perf: fix build breakage
+
+  [ Kent Yoder ]
+  * crypto: sha512 - Fix byte counter overflow in SHA-512
+
+  [ Takashi Iwai ]
+  * ALSA: hda/conexant - Don't set HP pin-control bit unconditionally
+  * ALSA: hda/conexant - Set up the missing docking-station pins
+
+  [ Tejun Heo ]
+  * memblock: memblock should be able to handle zero length operations
+
+  [ Alexander Shiyan ]
+  * ARM: clps711x: serial driver hungs are a result of call disable_irq within ISR
+
+  [ Jean-Christophe PLAGNIOL-VILLARD ]
+  * ARM: at91: fix at91sam9261ek Ethernet dm9000 irq
+
+  [ Paul Walmsley ]
+  * ARM: OMAP1: DMTIMER: fix broken timer clock source selection
+
+  [ Santosh Shilimkar ]
+  * ARM: OMAP: serial: Fix the ocp smart idlemode handling bug
+
+  [ Adrian Hunter ]
+  * mmc: fixes for eMMC v4.5 discard operation
+  * mmc: fixes for eMMC v4.5 sanitize operation
+
+  [ Daniel Drake ]
+  * mmc: sdhci: refine non-removable card checking for card detection
+
+  [ Eric Bénard ]
+  * mmc: unbreak sdhci-esdhc-imx on i.MX25
+
+  [ Stefano Stabellini ]
+  * xen/gntdev: do not set VM_PFNMAP
+
+  [ Konrad Rzeszutek Wilk ]
+  * xen/xenbus: Add quirk to deal with misconfigured backends.
+
+  [ Tomoki Sekiyama ]
+  * USB: yurex: Remove allocation of coherent buffer for setup-packet buffer
+  * USB: yurex: Fix missing URB_NO_TRANSFER_DMA_MAP flag in urb
+
+  [ Oliver Neukum ]
+  * uwb: fix use of del_timer_sync() in interrupt
+  * uwb: fix error handling
+
+  [ Christian Riesch ]
+  * davinci_mdio: Fix MDIO timeout check
+
+  [ Bing Zhao ]
+  * mwifiex: update pcie8766 scratch register addresses
+
+  [ Arend van Spriel ]
+  * brcm80211: smac: resume transmit fifo upon receiving frames
+
+  [ Felix Fietkau ]
+  * mac80211: fix logic error in ibss channel type check
+
+  [ David Härdeman ]
+  * media: rc-core: set mode for winbond-cir
+
+  [ Alexey Khoroshilov ]
+  * media: drxk: Does not unlock mutex if sanity check failed in scu_command()
+
+  [ Mauro Carvalho Chehab ]
+  * media: dvb_frontend: Fix a regression when switching back to DVB-S
+
+  [ Lukasz Kucharczyk ]
+  * cfg80211: fix interface combinations check.
+
+  [ Larry Finger ]
+  * staging: r8712u: Fix regression caused by commit 8c213fa
+
+  [ David Miller ]
+  * Fix modpost failures in fedora 17
+
+  [ Hugh Dickins ]
+  * mm: fix s390 BUG by __set_page_dirty_no_writeback on swap
+
+  [ NeilBrown ]
+  * md: don't call ->add_disk unless there is good reason.
+  * md: fix possible corruption of array metadata on shutdown.
+
+  [ Shaohua Li ]
+  * jbd2: use GFP_NOFS for blkdev_issue_flush
+
+  [ Yuri Matylitski ]
+  * USB: serial: cp210x: Fixed usb_control_msg timeout values
+
+  [ Tomoya MORINAGA ]
+  * pch_uart: Fix dma channel unallocated issue
+
+  [ Julia Lawall ]
+  * drivers/tty/amiserial.c: add missing tty_unlock
+
+  [ Bjørn Mork ]
+  * USB: sierra: avoid QMI/wwan interface on MC77xx
+
+  [ Alan Stern ]
+  * EHCI: fix criterion for resuming the root hub
+  * EHCI: always clear the STS_FLR status bit
+  * USB: fix deadlock in bConfigurationValue attribute method
+
+  [ Felipe Balbi ]
+  * usb: gadget: udc-core: stop UDC on device-initiated disconnect
+
+  [ Kishon Vijay Abraham I ]
+  * usb: gadget: udc-core: fix asymmetric calls in remove_driver
+
+  [ Andrzej Pietrasiewicz ]
+  * usb: gadget: eliminate NULL pointer dereference (bugfix)
+
+  [ Kishon Vijay Abraham I ]
+  * usb: musb: omap: fix crash when musb glue (omap) gets initialized
+
+  [ Shubhrajyoti D ]
+  * usb: musb: omap: fix the error check for pm_runtime_get_sync
+
+  [ Thomas Jarosch ]
+  * PCI: Add quirk for still enabled interrupts on Intel Sandy Bridge GPUs
+
+  [ Al Viro ]
+  * ext4: fix endianness breakage in ext4_split_extent_at()
+
+  [ Alex Williamson ]
+  * KVM: unmap pages from the iommu when slots are removed
+
+  [ AceLan Kao ]
+  * dell-laptop: add 3 machines that has touchpad LED
+  * dell-laptop: touchpad LED should persist its status after S3
+  * Bluetooth: Add support for Atheros [04ca:3005]
+
+  [ Al Viro ]
+  * nfsd: fix b0rken error value for setattr on read-only mount
+  * nfsd: fix error values returned by nfsd4_lockt() when nfsd_open() fails
+  * nfsd: fix endianness breakage in TEST_STATEID handling
+  * nfsd: fix compose_entry_fh() failure exits
+  * btrfs: btrfs_root_readonly() broken on big-endian
+  * ocfs2: ->l_next_free_req breakage on big-endian
+  * ocfs: ->rl_used breakage on big-endian
+  * ocfs2: ->rl_count endianness breakage
+  * ocfs2: ->e_leaf_clusters endianness breakage
+  * lockd: fix the endianness bug
+
+  [ Felipe Balbi ]
+  * usb: dwc3: ep0: increment "actual" on bounced ep0 case
+
+  [ Eric Dumazet ]
+  * net: fix /proc/net/dev regression
+
+  [ David Woodhouse ]
+  * ppp: Don't stop and restart queue on every TX packet
+
+  [ Eric Dumazet ]
+  * tcp: allow splice() to build full TSO packets
+
+  [ Srinivas Kandagatla ]
+  * phy:icplus:fix Auto Power Saving in ip101a_config_init.
+
+  [ Thomas Graf ]
+  * sctp: Allow struct sctp_event_subscribe to grow without breaking binaries
+
+  [ Herbert Xu ]
+  * bridge: Do not send queries on multicast group leaves
+
+  [ RongQing.Li ]
+  * ipv6: fix array index in ip6_mc_add_src()
+
+  [ Sasha Levin ]
+  * phonet: Check input from user before allocating
+
+  [ Veaceslav Falico ]
+  * bonding: properly unset current_arp_slave on slave link up
+
+  [ Phil Sutter ]
+  * wimax: i2400m - prevent a possible kernel bug due to missing fw_name string
+
+  [ Eric Dumazet ]
+  * netlink: fix races after skb queueing
+  * net: fix a race in sock_queue_err_skb()
+  * tcp: restore correct limit
+
+  [ Neal Cardwell ]
+  * tcp: fix tcp_rcv_rtt_update() use of an unscaled RTT sample
+
+  [ Tony Zelenoff ]
+  * atl1: fix kernel panic in case of DMA errors
+
+  [ Jason Wang ]
+  * 8139cp: set intr mask after its handler is registered
+
+  [ Will Deacon ]
+  * net: smsc911x: fix skb handling in receive path
+
+  [ Davide Ciminaghi ]
+  * net/ethernet: ks8851_mll fix rx frame buffer overflow
+
+  [ David Ward ]
+  * net_sched: gred: Fix oops in gred_dump() in WRED mode
+
+  [ Stephane Fillod ]
+  * net: usb: smsc75xx: fix mtu
+
+  [ Hiroaki SHIMODA ]
+  * dummy: Add ndo_uninit().
+
+  [ Eric Dumazet ]
+  * tcp: fix tcp_grow_window() for large incoming frames
+
+  [ Julian Anastasov ]
+  * netns: do not leak net_generic data on failed init
+
+  [ Dan Carpenter ]
+  * ksz884x: don't copy too much in netdev_set_mac_address()
+
+  [ Eric W. Biederman ]
+  * net ax25: Reorder ax25_exit to remove races.
+
+  [ Neal Cardwell ]
+  * tcp: fix TCP_MAXSEG for established IPv6 passive sockets
+
+  [ Eric Dumazet ]
+  * net: allow pskb_expand_head() to get maximum tailroom
+  * tcp: avoid order-1 allocations on wifi and tx path
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.3.4
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Fri, 27 Apr 2012 12:18:52 -0700
+
 linux-3.3 (3.3.3-1+vyatta+1) unstable; urgency=low
 
   [ Jan Schmidt ]
