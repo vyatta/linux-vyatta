@@ -38,6 +38,10 @@
 #include "../bridge/br_private.h"
 #endif
 
+#ifdef CONFIG_NF_NAT_NEEDED
+#include <net/netfilter/nf_nat_helper.h>
+#endif
+
 #define NFQNL_QMAX_DEFAULT 1024
 
 struct nfqnl_instance {
@@ -477,12 +481,10 @@ err_out:
 }
 
 static int
-nfqnl_mangle(void *data, int data_len, struct nf_queue_entry *e)
+nfqnl_mangle(void *data, int data_len, struct nf_queue_entry *e, int diff)
 {
 	struct sk_buff *nskb;
-	int diff;
 
-	diff = data_len - e->skb->len;
 	if (diff < 0) {
 		if (pskb_trim(e->skb, data_len))
 			return -ENOMEM;
@@ -655,6 +657,8 @@ nfqnl_recv_verdict(struct sock *ctnl, struct sk_buff *skb,
 	unsigned int verdict;
 	struct nf_queue_entry *entry;
 	struct nfq_ct_hook *nfq_ct;
+	enum ip_conntrack_info uninitialized_var(ctinfo);
+	struct nf_conn *ct = NULL;
 	int err;
 
 	rcu_read_lock();
@@ -689,26 +693,36 @@ nfqnl_recv_verdict(struct sock *ctnl, struct sk_buff *skb,
 	}
 	rcu_read_unlock();
 
+	rcu_read_lock();
+	nfq_ct = rcu_dereference(nfq_ct_hook);
+	if (nfq_ct != NULL && (queue->flags & NFQNL_F_CONNTRACK) &&
+	    nfqa[NFQA_CT]) {
+		ct = nf_ct_get(entry->skb, &ctinfo);
+		if (ct && nf_ct_is_untracked(ct))
+			ct = NULL;
+	}
+
 	if (nfqa[NFQA_PAYLOAD]) {
+		u16 payload_len = nla_len(nfqa[NFQA_PAYLOAD]);
+		int diff = payload_len - entry->skb->len;
+
 		if (nfqnl_mangle(nla_data(nfqa[NFQA_PAYLOAD]),
-				 nla_len(nfqa[NFQA_PAYLOAD]), entry) < 0)
+				 payload_len, entry, diff) < 0)
 			verdict = NF_DROP;
+
+#ifdef CONFIG_NF_NAT_NEEDED
+		/* Adjust sequence numbers to avoid puzzling conntrack */
+		if (ct && (ct->status & IPS_NAT_MASK) && diff)
+			nf_nat_tcp_seq_adjust(skb, ct, ctinfo, diff);
+#endif
 	}
 
 	if (nfqa[NFQA_MARK])
 		entry->skb->mark = ntohl(nla_get_be32(nfqa[NFQA_MARK]));
 
-	rcu_read_lock();
-	nfq_ct = rcu_dereference(nfq_ct_hook);
-	if (nfq_ct != NULL &&
-	    (queue->flags & NFQNL_F_CONNTRACK) && nfqa[NFQA_CT]) {
-		enum ip_conntrack_info ctinfo;
-		struct nf_conn *ct;
+	if (ct)
+		nfq_ct->parse(nfqa[NFQA_CT], ct);
 
-		ct = nf_ct_get(entry->skb, &ctinfo);
-		if (ct && !nf_ct_is_untracked(ct))
-			nfq_ct->parse(nfqa[NFQA_CT], ct);
-	}
 	rcu_read_unlock();
 
 	nf_reinject(entry, verdict);
