@@ -46,6 +46,13 @@ extern int (*nf_nat_seq_adjust_hook)(struct sk_buff *skb,
 				     struct nf_conn *ct,
 				     enum ip_conntrack_info ctinfo);
 
+extern void nf_nat_tcp_seq_adjust(struct sk_buff *skb,
+				  struct nf_conn *ct,
+				  enum ip_conntrack_info ctinfo,
+				  int off);
+
+struct nf_conntrack_expect;
+
 /* Setup NAT on this expected conntrack so it follows master, but goes
  * to port ct->master->saved_proto. */
 extern void nf_nat_follow_master(struct nf_conn *ct,
