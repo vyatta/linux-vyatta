@@ -1,3 +1,9 @@
+linux-3.3 (3.3.4-1+vyatta+2) unstable; urgency=low
+
+  * Add special macvlan mode for VRRP.
+
+ -- John Southworth <john.southworth@vyatta.com>  Mon, 07 May 2012 21:06:35 -0700
+
 linux-3.3 (3.3.4-1+vyatta+1) unstable; urgency=low
 
   [ Zeev Tarantov ]
