@@ -1,3 +1,208 @@
+linux-3.3 (3.3.5-1+vyatta+1) unstable; urgency=low
+
+  [ Jan Kara ]
+  * nfs: Enclose hostname in brackets when needed in nfs_do_root_mount
+
+  [ Trond Myklebust ]
+  * NFSv4: Ensure that the LOCK code sets exception->inode
+  * NFSv4: Ensure that we check lock exclusive/shared type against open modes
+
+  [ Fred Isaman ]
+  * NFS: put open context on error in nfs_pagein_multi
+  * NFS: put open context on error in nfs_flush_multi
+
+  [ Andreas Herrmann ]
+  * x86, microcode: Fix sysfs warning during module unload on unsupported CPUs
+  * x86, microcode: Ensure that module is only loaded on supported AMD CPUs
+
+  [ Bryan O'Donoghue ]
+  * x86, apic: APIC code touches invalid MSR on P5 class machines
+
+  [ Andreas Herrmann ]
+  * x86/platform: Remove incorrect error message in x86_default_fixup_cpu_id()
+
+  [ Linus Torvalds ]
+  * Revert "autofs: work around unhappy compat problem on x86-64"
+
+  [ David Vrabel ]
+  * xen: correctly check for pending events when restoring irq flags
+
+  [ Konrad Rzeszutek Wilk ]
+  * xen/smp: Fix crash when booting with ACPI hotplug CPUs.
+
+  [ Mark Brown ]
+  * ASoC: dapm: Ensure power gets managed for line widgets
+  * ASoC: wm8994: Improve sequencing of AIF channel enables
+
+  [ Nicolas Ferre ]
+  * dmaengine: at_hdmac: remove clear-on-read in atc_dostart()
+
+  [ he, bo ]
+  * sched: Fix OOPS when build_sched_domains() percpu allocation fails
+
+  [ Steven Rostedt ]
+  * tracing: Fix stacktrace of latency tracers (irqsoff and friends)
+
+  [ Andre Przywara ]
+  * hwmon: fam15h_power: fix bogus values with current BIOSes
+
+  [ Guenter Roeck ]
+  * hwmon: (fam15h_power) Fix pci_device_id array
+
+  [ Martin Nyhus ]
+  * dell-laptop: Terminate quirks list properly
+
+  [ Alex Deucher ]
+  * drm/radeon/kms: need to set up ss on DP bridges as well
+
+  [ Daniel Vetter ]
+  * drm/i915: handle input/output sdvo timings separately in mode_set
+
+  [ Kenneth Graunke ]
+  * drm/i915: Set the Stencil Cache eviction policy to non-LRA mode.
+
+  [ Xi Wang ]
+  * drm/i915: fix integer overflow in i915_gem_execbuffer2()
+  * drm/i915: fix integer overflow in i915_gem_do_execbuffer()
+
+  [ Oleg Nesterov ]
+  * i387: ptrace breaks the lazy-fpu-restore logic
+
+  [ Johannes Berg ]
+  * nl80211: ensure interface is up in various APIs
+
+  [ David Henningsson ]
+  * ALSA: HDA: Add external mic quirk for Asus Zenbook UX31E
+
+  [ Oliver Neukum ]
+  * USB: cdc-wdm: fix race leading leading to memory corruption
+
+  [ Alan Stern ]
+  * USB: EHCI: fix crash during suspend on ASUS computers
+  * USB: gadget: storage gadgets send wrong error code for unknown commands
+
+  [ Felipe Balbi ]
+  * usb: gadget: dummy: do not call pullup() on udc_stop()
+
+  [ Laurent Pinchart ]
+  * usb gadget: uvc: uvc_request_data::length field must be signed
+
+  [ Linus Torvalds ]
+  * pipes: add a "packetized pipe" mode for writing
+  * autofs: make the autofsv5 packet file descriptor use a packetized pipe
+
+  [ Horia Geanta ]
+  * crypto: talitos - properly lock access to global talitos registers
+
+  [ Benjamin Herrenschmidt ]
+  * Input: synaptics - fix regression with "image sensor" trackpads
+
+  [ Stephen Warren ]
+  * USB: ehci-tegra: remove redundant gpio_set_value
+
+  [ Will Deacon ]
+  * ARM: 7396/1: errata: only handle ARM erratum #326103 on affected cores
+  * ARM: 7403/1: tls: remove covert channel via TPIDRURW
+  * ARM: 7406/1: hotplug: copy the affinity mask when forcefully migrating IRQs
+
+  [ Gabor Juhos ]
+  * MIPS: ath79: fix AR933X WMAC reset code
+
+  [ Thomas Jackson ]
+  * SCSI: libsas: fix sas_find_bcast_phy() in the presence of 'vacant' phys
+
+  [ Dan Williams ]
+  * SCSI: libsas: fix false positive 'device attached' conditions
+
+  [ Matthew Garrett ]
+  * efi: Add new variable attributes
+  * efi: Validate UEFI boot variables
+
+  [ Dan Carpenter ]
+  * x86, efi: Fix pointer math issue in handle_ramdisks()
+
+  [ Matt Fleming ]
+  * tools/include: Add byteshift headers for endian access
+  * x86, mkpiggy: Don't open code put_unaligned_le32()
+  * x86, boot: Restrict CFLAGS for hostprogs
+  * x86, efi: Fix endian issues and unaligned accesses
+
+  [ H. Peter Anvin ]
+  * x86, boot: Correct CFLAGS for hostprogs
+
+  [ Matt Fleming ]
+  * x86, efi: Add dedicated EFI stub entry point
+
+  [ Timur Tabi ]
+  * powerpc/85xx: don't call of_platform_bus_probe() twice
+
+  [ Bojan Smojver ]
+  * PM / Hibernate: fix the number of pages used for hibernate/thaw buffering
+
+  [ Peter Zijlstra ]
+  * sched: Fix nohz load accounting -- again!
+
+  [ Oleg Nesterov ]
+  * exit_signal: simplify the "we have changed execution domain" logic
+  * exit_signal: fix the "parent has changed security domain" logic
+
+  [ majianpeng ]
+  * md/raid5: Fix a bug about judging if the operation is syncing or replacing
+
+  [ Matthew Garrett ]
+  * efivars: Improve variable validation
+
+  [ Guenter Roeck ]
+  * hwmon: (coretemp) Increase CPU core limit
+
+  [ Dave Airlie ]
+  * nouveau: initialise has_optimus variable.
+
+  [ Kirill A. Shutemov ]
+  * hwmon: (coretemp) fix oops on cpu unplug
+
+  [ Lin Ming ]
+  * libata: skip old error history when counting probe trials
+
+  [ Seth Forshee ]
+  * b43: only reload config after successful initialization
+
+  [ Roland Stigge ]
+  * i2c: pnx: Disable clk in suspend
+
+  [ Stanislav Yakovlev ]
+  * ipw2200: Fix race condition in the command completion acknowledge
+
+  [ Felix Fietkau ]
+  * mac80211: fix AP mode EAP tx for VLAN stations
+
+  [ Larry Finger ]
+  * rtlwifi: Fix oops on unload
+
+  [ Grazvydas Ignotas ]
+  * wl1251: fix crash on remove due to premature kfree
+  * wl1251: fix crash on remove due to leftover work item
+
+  [ Stanislaw Gruszka ]
+  * iwlwifi: do not nulify ctx->vif on reset
+
+  [ Meenakshi Venkataraman ]
+  * iwlwifi: use correct released ucode version
+
+  [ Johannes Berg ]
+  * iwlwifi: fix hardware queue programming
+
+  [ Wey-Yi Guy ]
+  * iwlwifi: use 6000G2B for 6030 device series
+
+  [ Greg Kroah-Hartman ]
+  * hfsplus: Fix potential buffer overflows
+  * Linux 3.3.5
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Tue, 08 May 2012 15:57:12 -0700
+
 linux-3.3 (3.3.4-1+vyatta+2) unstable; urgency=low
 
   * Add special macvlan mode for VRRP.
