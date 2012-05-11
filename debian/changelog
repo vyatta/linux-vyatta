@@ -1,3 +1,16 @@
+linux-3.3 (3.3.5-1+vyatta+dp+2) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * tunnel: implement 64 bits statistics
+  * ipgre: add statistics offload ioctl
+
+  [ David Miller ]
+  * Revert "net: maintain namespace isolation between vlan and real device"
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Fri, 11 May 2012 10:32:34 -0700
+
 linux-3.3 (3.3.5-1+vyatta+1) unstable; urgency=low
 
   [ Jan Kara ]
