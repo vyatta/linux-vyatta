@@ -1,3 +1,160 @@
+linux-3.3 (3.3.6-1+vyatta+1) unstable; urgency=low
+
+  [ Paulo Zanoni ]
+  * drm/i915: enable dip before writing data on gen4
+
+  [ Paolo Pisati ]
+  * smsc95xx: mark link down on startup and let PHY interrupt deal with carrier changes
+
+  [ Jiri Pirko ]
+  * e1000: fix vlan processing regression
+
+  [ Konrad Rzeszutek Wilk ]
+  * xen/pte: Fix crashes when trying to see non-existent PGD/PMD/PUD/PTEs
+
+  [ David Vrabel ]
+  * xen/pci: don't use PCI BIOS service for configuration space accesses
+
+  [ Daniel Vetter ]
+  * drm/i915: disable sdvo hotplug on i945g/gm
+  * drm/i915: Do no set Stencil Cache eviction LRA w/a on gen7+
+
+  [ Richard Zhao ]
+  * ASoC: core: check of_property_count_strings failure
+
+  [ Eric Bénard ]
+  * ASoC: tlv312aic23: unbreak resume
+
+  [ Stefan Metzmacher ]
+  * fs/cifs: fix parsing of dfs referrals
+
+  [ Kusanagi Kouichi ]
+  * x86, relocs: Remove an unused variable
+
+  [ Tejun Heo ]
+  * percpu, x86: don't use PMD_SIZE as embedded atom_size on 32bit
+
+  [ H. Peter Anvin ]
+  * asm-generic: Use __BITS_PER_LONG in statfs.h
+
+  [ Linus Torvalds ]
+  * Fix __read_seqcount_begin() to use ACCESS_ONCE for sequence value read
+
+  [ Tim Bird ]
+  * ARM: 7410/1: Add extra clobber registers for assembly in kernel_execve
+
+  [ Will Deacon ]
+  * ARM: 7411/1: audit: fix treatment of saved ip register during syscall tracing
+  * ARM: 7412/1: audit: use only AUDIT_ARCH_ARM regardless of endianness
+
+  [ Colin Cross ]
+  * ARM: 7414/1: SMP: prevent use of the console when using idmap_pgd
+
+  [ Axel Lin ]
+  * regulator: Fix the logic to ensure new voltage setting in valid range
+
+  [ Ben Hutchings ]
+  * ARM: orion5x: Fix GPIO enable bits for MPP9
+
+  [ Archit Taneja ]
+  * ARM: OMAP: Revert "ARM: OMAP: ctrl: Fix CONTROL_DSIPHY register fields"
+
+  [ Ingo van Lil ]
+  * asix: Fix tx transfer padding for full-speed USB
+
+  [ Eric Dumazet ]
+  * netem: fix possible skb leak
+
+  [ Eric W. Biederman ]
+  * net: In unregister_netdevice_notifier unregister the netdevices.
+
+  [ Sasha Levin ]
+  * net: l2tp: unlock socket lock before returning from l2tp_ip_sendmsg
+
+  [ stephen hemminger ]
+  * sky2: propogate rx hash when packet is copied
+  * sky2: fix receive length error in mixed non-VLAN/VLAN traffic
+
+  [ Gerard Lledo ]
+  * sungem: Fix WakeOnLan
+
+  [ Matt Carlson ]
+  * tg3: Avoid panic from reserved statblk field access
+
+  [ Yuchung Cheng ]
+  * tcp: fix infinite cwnd in tcp_complete_cwr()
+
+  [ Eric Dumazet ]
+  * tcp: change tcp_adv_win_scale and tcp_rmem[2]
+
+  [ Alexander Duyck ]
+  * net: Add memory barriers to prevent possible race in byte queue limits
+  * net: Fix issue with netdev_tx_reset_queue not resetting queue from XOFF state
+
+  [ Jens Freimann ]
+  * KVM: s390: do store status after handling STOP_ON_STOP bit
+
+  [ Christian Borntraeger ]
+  * KVM: s390: Sanitize fpc registers for KVM_SET_FPU
+
+  [ Takuya Yoshikawa ]
+  * KVM: Fix write protection race during dirty logging
+  * KVM: mmu_notifier: Flush TLBs before releasing mmu_lock
+
+  [ Gleb Natapov ]
+  * KVM: x86 emulator: correctly mask pmc index bits in RDPMC instruction emulation
+
+  [ Avi Kivity ]
+  * KVM: Ensure all vcpus are consistent with in-kernel irqchip settings
+  * KVM: VMX: Fix delayed load of shared MSRs
+
+  [ Nadav Har'El ]
+  * KVM: nVMX: Fix erroneous exception bitmap check
+
+  [ Marcelo Tosatti ]
+  * KVM: VMX: vmx_set_cr0 expects kvm->srcu locked
+
+  [ Avi Kivity ]
+  * KVM: VMX: Fix kvm_set_shared_msr() called in preemptible context
+
+  [ Alex Williamson ]
+  * KVM: lock slots_lock around device assignment
+
+  [ Josh Boyer ]
+  * sony-laptop: Enable keyboard backlight by default
+
+  [ David Gibson ]
+  * hugepages: fix use after free bug in "quota" handling
+
+  [ Asai Thambi S P ]
+  * mtip32xx: fix incorrect value set for drv_cleanup_done, and re-initialize and start port in mtip_restart_port()
+
+  [ Ryosuke Saito ]
+  * mtip32xx: fix error handling in mtip_init()
+
+  [ Greg Kroah-Hartman ]
+  * block: mtip32xx: remove HOTPLUG_PCI_PCIE dependancy
+
+  [ J. Bruce Fields ]
+  * nfsd: don't fail unchecked creates of non-special files
+
+  [ Will Deacon ]
+  * ARM: 7397/1: l2x0: only apply workaround for erratum #753970 on PL310
+  * ARM: 7398/1: l2x0: only write to debug registers on PL310
+
+  [ Felipe Balbi ]
+  * usb: gadget: udc-core: fix wrong call order
+
+  [ Alan Stern ]
+  * usb: gadget: udc-core: fix incompatibility with dummy-hcd
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.3.6
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 14 May 2012 13:30:35 -0700
+
 linux-3.3 (3.3.5-1+vyatta+1) unstable; urgency=low
 
   [ Jan Kara ]
