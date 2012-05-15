@@ -15,6 +15,40 @@
 #include <net/ip.h>
 #include <net/xfrm.h>
 
+static struct xfrm_tunnel *input_handler;
+static DEFINE_MUTEX(xfrm4_mode_tunnel_input_mutex);
+
+int xfrm4_mode_tunnel_input_register (struct xfrm_tunnel *handler)
+{
+    int ret = -EEXIST;
+
+    mutex_lock(&xfrm4_mode_tunnel_input_mutex);
+    if (!input_handler) {
+        input_handler = handler;
+        ret = 0;
+    }
+    mutex_unlock(&xfrm4_mode_tunnel_input_mutex);
+    return ret;
+}
+EXPORT_SYMBOL(xfrm4_mode_tunnel_input_register);
+
+int xfrm4_mode_tunnel_input_deregister (struct xfrm_tunnel *handler)
+{
+    int ret = -ENOENT;
+
+    mutex_lock(&xfrm4_mode_tunnel_input_mutex);
+    if (input_handler == handler) {
+        input_handler = NULL;
+        ret = 0;
+    }
+    mutex_unlock(&xfrm4_mode_tunnel_input_mutex);
+    synchronize_net();
+
+    return ret;
+}
+EXPORT_SYMBOL(xfrm4_mode_tunnel_input_deregister);
+
+
 static inline void ipip_ecn_decapsulate(struct sk_buff *skb)
 {
 	struct iphdr *inner_iph = ipip_hdr(skb);
@@ -73,6 +107,9 @@ static int xfrm4_mode_tunnel_input(struct xfrm_state *x, struct sk_buff *skb)
 
 	if (!pskb_may_pull(skb, sizeof(struct iphdr)))
 		goto out;
+
+    if (input_handler)
+        input_handler->handler(skb);
 
 	if (skb_cloned(skb) &&
 	    (err = pskb_expand_head(skb, 0, 0, GFP_ATOMIC)))
