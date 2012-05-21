@@ -1,3 +1,166 @@
+linux-3.0 (3.0.32-1+vyatta+1) unstable; urgency=low
+
+  [ Paolo Pisati ]
+  * smsc95xx: mark link down on startup and let PHY interrupt deal with carrier changes
+
+  [ Konrad Rzeszutek Wilk ]
+  * xen/pte: Fix crashes when trying to see non-existent PGD/PMD/PUD/PTEs
+
+  [ David Vrabel ]
+  * xen/pci: don't use PCI BIOS service for configuration space accesses
+
+  [ Tejun Heo ]
+  * percpu, x86: don't use PMD_SIZE as embedded atom_size on 32bit
+
+  [ H. Peter Anvin ]
+  * asm-generic: Use __BITS_PER_LONG in statfs.h
+
+  [ Linus Torvalds ]
+  * Fix __read_seqcount_begin() to use ACCESS_ONCE for sequence value read
+
+  [ Tim Bird ]
+  * ARM: 7410/1: Add extra clobber registers for assembly in kernel_execve
+
+  [ Colin Cross ]
+  * ARM: 7414/1: SMP: prevent use of the console when using idmap_pgd
+
+  [ Axel Lin ]
+  * regulator: Fix the logic to ensure new voltage setting in valid range
+
+  [ Ben Hutchings ]
+  * ARM: orion5x: Fix GPIO enable bits for MPP9
+
+  [ Ingo van Lil ]
+  * asix: Fix tx transfer padding for full-speed USB
+
+  [ Eric Dumazet ]
+  * netem: fix possible skb leak
+
+  [ Eric W. Biederman ]
+  * net: In unregister_netdevice_notifier unregister the netdevices.
+
+  [ Sasha Levin ]
+  * net: l2tp: unlock socket lock before returning from l2tp_ip_sendmsg
+
+  [ stephen hemminger ]
+  * sky2: propogate rx hash when packet is copied
+  * sky2: fix receive length error in mixed non-VLAN/VLAN traffic
+
+  [ Matt Carlson ]
+  * tg3: Avoid panic from reserved statblk field access
+
+  [ Gerard Lledo ]
+  * sungem: Fix WakeOnLan
+
+  [ Eric Dumazet ]
+  * tcp: change tcp_adv_win_scale and tcp_rmem[2]
+
+  [ Josh Boyer ]
+  * sony-laptop: Enable keyboard backlight by default
+
+  [ Mark Hills ]
+  * ALSA: echoaudio: Remove incorrect part of assertion
+
+  [ David Henningsson ]
+  * ALSA: HDA: Lessen CPU usage when waiting for chip to respond
+
+  [ Ming Lei ]
+  * usbnet: fix skb traversing races during unlink(v2)
+
+  [ Mike Galbraith ]
+  * namespaces, pid_ns: fix leakage on fork() failure
+
+  [ David S. Miller ]
+  * sparc64: Do not clobber %g2 in xcall_fetch_glob_regs().
+
+  [ Russell King ]
+  * ARM: prevent VM_GROWSDOWN mmaps extending below FIRST_USER_ADDRESS
+
+  [ Luis Henriques ]
+  * media: rc: Postpone ISR registration
+
+  [ Bjørn Mork ]
+  * cdc_ether: Ignore bogus union descriptor for RNDIS devices
+
+  [ Dan Williams ]
+  * cdc_ether: add Novatel USB551L device IDs for FLAG_WWAN
+
+  [ Tejun Heo ]
+  * percpu: pcpu_embed_first_chunk() should free unused parts after all allocs are complete
+
+  [ Chris Metcalf ]
+  * hugetlb: prevent BUG_ON in hugetlb_fault() -> hugetlb_cow()
+
+  [ Russ Anderson ]
+  * mm: nobootmem: fix sign extend problem in __free_pages_memory()
+
+  [ Josh Cartwright ]
+  * jffs2: Fix lock acquisition order bug in gc path
+
+  [ Chris Metcalf ]
+  * arch/tile: apply commit 74fca9da0 to the compat signal handling as well
+
+  [ Alexander Clouter ]
+  * crypto: mv_cesa requires on CRYPTO_HASH to build
+
+  [ Jonathan Brassow ]
+  * MD: Add del_timer_sync to mddev_suspend (fix nasty panic)
+
+  [ Willy Tarreau ]
+  * tcp: do_tcp_sendpages() must try to push data out on oom conditions
+
+  [ Sasha Levin ]
+  * init: don't try mounting device as nfs root unless type fully matches
+
+  [ Eric Sandeen ]
+  * ext4: avoid deadlock on sync-mounted FS w/o journal
+
+  [ Jonathan Nieder ]
+  * NFSv4: Revalidate uid/gid after open
+
+  [ Sha Zhengju ]
+  * memcg: free spare array to avoid memory leak
+
+  [ Jan Kiszka ]
+  * compat: Fix RT signal mask corruption via sigprocmask
+
+  [ Jan Kara ]
+  * ext3: Fix error handling on inode bitmap corruption
+  * ext4: fix error handling on inode bitmap corruption
+
+  [ Lan Tianyu ]
+  * ACPI / PM: Add Sony Vaio VPCCW29FX to nonvs blacklist.
+
+  [ Stephen M. Cameron ]
+  * SCSI: hpsa: Add IRQF_SHARED back in for the non-MSI(X) interrupt handler
+
+  [ Kazuya Mio ]
+  * wake up s_wait_unfrozen when ->freeze_fs fails
+
+  [ Tomoya MORINAGA ]
+  * pch_gpio: Support new device LAPIS Semiconductor ML7831 IOH
+
+  [ Toshiharu Okada ]
+  * pch_gbe: fixed the issue which receives an unnecessary packet.
+  * pch_gbe: support ML7831 IOH
+  * pch_gbe: Fixed the issue on which PC was frozen when link was downed.
+
+  [ Darren Hart ]
+  * pch_gbe: Do not abort probe on bad MAC
+
+  [ Dan Carpenter ]
+  * pch_gbe: memory corruption calling pch_gbe_validate_option()
+
+  [ Émeric Maschino ]
+  * ia64: Add accept4() syscall
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.0.32
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 21 May 2012 11:30:00 -0700
+
 linux-3.0 (3.0.31-1+vyatta+2) unstable; urgency=low
 
   * Add special macvlan mode for VRRP.
