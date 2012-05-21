@@ -1,3 +1,19 @@
+linux-3.0 (3.0.32-1+vyatta+2) unstable; urgency=low
+
+  [ Huang Ying ]
+  * Subject: ACPI, APEI, GHES, Support disable GHES at boot time
+  * Subject: ACPI, APEI, GHES, Prevent GHES to be built as module
+  * Subject: ACPI, APEI, Add APEI bit support in generic _OSC call
+  * Subject: ACPI, APEI, Add WHEA _OSC support
+
+  [ Matthew Garrett ]
+  * Subject: APEI: Fix WHEA _OSC call
+
+  [ Stephen Hemminger ]
+  * Update kernel config for ACPI GHES fix
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 21 May 2012 15:41:51 -0700
+
 linux-3.0 (3.0.32-1+vyatta+1) unstable; urgency=low
 
   [ Paolo Pisati ]
