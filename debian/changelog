@@ -1,3 +1,151 @@
+linux-3.3 (3.3.7-1+vyatta+1) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * tunnel: implement 64 bits statistics
+  * ipgre: add statistics offload ioctl
+
+  [ David Miller ]
+  * Revert "net: maintain namespace isolation between vlan and real device"
+
+  [ Stephen Hemminger ]
+  * 3.3.5-1+vyatta+dp+2
+
+  [ Mark Hills ]
+  * ALSA: echoaudio: Remove incorrect part of assertion
+
+  [ David Henningsson ]
+  * ALSA: HDA: Lessen CPU usage when waiting for chip to respond
+
+  [ Takashi Iwai ]
+  * ALSA: hda/realtek - Add missing CD-input pin for MSI-7350 mobo
+  * ALSA: hda/idt - Fix power-map for speaker-pins with some HP laptops
+
+  [ Ming Lei ]
+  * usbnet: fix skb traversing races during unlink(v2)
+
+  [ Mike Galbraith ]
+  * namespaces, pid_ns: fix leakage on fork() failure
+
+  [ David S. Miller ]
+  * sparc64: Do not clobber %g2 in xcall_fetch_glob_regs().
+
+  [ Jonathan Corbet ]
+  * media: marvell-cam: fix an ARM build error
+
+  [ Will Deacon ]
+  * ARM: 7417/1: vfp: ensure preemption is disabled when enabling VFP access
+
+  [ Russell King ]
+  * ARM: prevent VM_GROWSDOWN mmaps extending below FIRST_USER_ADDRESS
+
+  [ Sylwester Nawrocki ]
+  * media: s5p-fimc: Fix locking in subdev set_crop op
+
+  [ Luis Henriques ]
+  * media: rc: Postpone ISR registration
+
+  [ Mauro Carvalho Chehab ]
+  * media: dvb_frontend: fix a regression with DVB-S zig-zag
+
+  [ Brian Austin ]
+  * ASoC: cs42l73: Sync digital mixer kcontrols to allow for 0dB
+
+  [ Mark Brown ]
+  * ASoC: wm8994: Fix AIF2ADC power down
+
+  [ Bjørn Mork ]
+  * cdc_ether: Ignore bogus union descriptor for RNDIS devices
+
+  [ Dan Williams ]
+  * cdc_ether: add Novatel USB551L device IDs for FLAG_WWAN
+
+  [ Tejun Heo ]
+  * percpu: pcpu_embed_first_chunk() should free unused parts after all allocs are complete
+
+  [ Catalin Marinas ]
+  * kmemleak: Fix the kmemleak tracking of the percpu areas with !SMP
+
+  [ Will Newton ]
+  * mtd: fix oops in dataflash driver
+
+  [ Chris Metcalf ]
+  * hugetlb: prevent BUG_ON in hugetlb_fault() -> hugetlb_cow()
+
+  [ Russ Anderson ]
+  * mm: nobootmem: fix sign extend problem in __free_pages_memory()
+
+  [ Josh Cartwright ]
+  * jffs2: Fix lock acquisition order bug in gc path
+
+  [ Chris Metcalf ]
+  * arch/tile: apply commit 74fca9da0 to the compat signal handling as well
+
+  [ Alexander Clouter ]
+  * crypto: mv_cesa requires on CRYPTO_HASH to build
+
+  [ Nicholas Bellinger ]
+  * target: Drop incorrect se_lun_acl release for dynamic -> explict ACL conversion
+
+  [ Bernhard Kohl ]
+  * target: Fix SPC-2 RELEASE bug for multi-session iSCSI client setups
+
+  [ Nicholas Bellinger ]
+  * target: Fix bug in handling of FILEIO + block_device resize ops
+
+  [ Amit Shah ]
+  * virtio: console: tell host of open ports after resume from s3/s4
+
+  [ Mike Snitzer ]
+  * dm mpath: check if scsi_dh module already loaded before trying to load
+
+  [ Tushar Dave ]
+  * e1000: Prevent reset task killing itself.
+
+  [ Jonathan Brassow ]
+  * MD: Add del_timer_sync to mddev_suspend (fix nasty panic)
+
+  [ Willy Tarreau ]
+  * tcp: do_tcp_sendpages() must try to push data out on oom conditions
+
+  [ Sasha Levin ]
+  * init: don't try mounting device as nfs root unless type fully matches
+
+  [ Eric Sandeen ]
+  * ext4: avoid deadlock on sync-mounted FS w/o journal
+
+  [ Sha Zhengju ]
+  * memcg: free spare array to avoid memory leak
+
+  [ Dan Carpenter ]
+  * cifs: fix revalidation test in cifs_llseek()
+
+  [ Jan Kiszka ]
+  * compat: Fix RT signal mask corruption via sigprocmask
+
+  [ Jeff Mahoney ]
+  * dl2k: Clean up rio_ioctl
+
+  [ Danny Kukawka ]
+  * OMAPDSS: VENC: fix NULL pointer dereference in DSS2 VENC sysfs debug attr on OMAP4
+
+  [ Tomoya MORINAGA ]
+  * i2c-eg20t: change timeout value 50msec to 1000msec
+  * spi-topcliff-pch: Modify pci-bus number dynamically to get DMA device info
+  * spi-topcliff-pch: Fix issue for transmitting over 4KByte
+  * spi-topcliff-pch: supports a spi mode setup and bit order setup by IO control
+  * spi-topcliff-pch: add recovery processing in case wait-event timeout
+
+  [ Sachin Prabhu ]
+  * Avoid beyond bounds copy while caching ACL
+  * Avoid reading past buffer when calling GETACL
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.3.7
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Tue, 22 May 2012 08:19:08 -0700
+
 linux-3.3 (3.3.6-1+vyatta+3) unstable; urgency=low
 
   * ACPI config changes
