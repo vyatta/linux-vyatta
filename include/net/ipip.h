@@ -30,6 +30,9 @@ struct ip_tunnel {
 
 	struct ip_tunnel_parm	parms;
 
+	/* Vyatta extension to allow giving stats from daemon */
+	struct rtnl_link_stats64 *link_stats;
+
 	/* for SIT */
 #ifdef CONFIG_IPV6_SIT_6RD
 	struct ip_tunnel_6rd_parm	ip6rd;
@@ -54,8 +57,10 @@ struct ip_tunnel_prl_entry {
 									\
 	err = ip_local_out(skb);					\
 	if (likely(net_xmit_eval(err) == 0)) {				\
+		u64_stats_update_begin(&(stats1)->syncp);		\
 		(stats1)->tx_bytes += pkt_len;				\
 		(stats1)->tx_packets++;					\
+		u64_stats_update_end(&(stats1)->syncp);			\
 	} else {							\
 		(stats2)->tx_errors++;					\
 		(stats2)->tx_aborted_errors++;				\
