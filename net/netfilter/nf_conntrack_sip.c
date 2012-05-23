@@ -1075,12 +1075,12 @@ static int process_invite_response(struct sk_buff *skb, unsigned int dataoff,
 {
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct = nf_ct_get(skb, &ctinfo);
-	struct nf_conn_help *help = nfct_help(ct);
+	struct nf_ct_sip_master *ct_sip_info = nfct_help_data(ct);
 
 	if ((code >= 100 && code <= 199) ||
 	    (code >= 200 && code <= 299))
 		return process_sdp(skb, dataoff, dptr, datalen, cseq);
-	else if (help->help.ct_sip_info.invite_cseq == cseq)
+	else if (ct_sip_info->invite_cseq == cseq)
 		flush_expectations(ct, true);
 	return NF_ACCEPT;
 }
@@ -1091,12 +1091,12 @@ static int process_update_response(struct sk_buff *skb, unsigned int dataoff,
 {
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct = nf_ct_get(skb, &ctinfo);
-	struct nf_conn_help *help = nfct_help(ct);
+	struct nf_ct_sip_master *ct_sip_info = nfct_help_data(ct);
 
 	if ((code >= 100 && code <= 199) ||
 	    (code >= 200 && code <= 299))
 		return process_sdp(skb, dataoff, dptr, datalen, cseq);
-	else if (help->help.ct_sip_info.invite_cseq == cseq)
+	else if (ct_sip_info->invite_cseq == cseq)
 		flush_expectations(ct, true);
 	return NF_ACCEPT;
 }
@@ -1107,12 +1107,12 @@ static int process_prack_response(struct sk_buff *skb, unsigned int dataoff,
 {
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct = nf_ct_get(skb, &ctinfo);
-	struct nf_conn_help *help = nfct_help(ct);
+	struct nf_ct_sip_master *ct_sip_info = nfct_help_data(ct);
 
 	if ((code >= 100 && code <= 199) ||
 	    (code >= 200 && code <= 299))
 		return process_sdp(skb, dataoff, dptr, datalen, cseq);
-	else if (help->help.ct_sip_info.invite_cseq == cseq)
+	else if (ct_sip_info->invite_cseq == cseq)
 		flush_expectations(ct, true);
 	return NF_ACCEPT;
 }
@@ -1123,13 +1123,13 @@ static int process_invite_request(struct sk_buff *skb, unsigned int dataoff,
 {
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct = nf_ct_get(skb, &ctinfo);
-	struct nf_conn_help *help = nfct_help(ct);
+	struct nf_ct_sip_master *ct_sip_info = nfct_help_data(ct);
 	unsigned int ret;
 
 	flush_expectations(ct, true);
 	ret = process_sdp(skb, dataoff, dptr, datalen, cseq);
 	if (ret == NF_ACCEPT)
-		help->help.ct_sip_info.invite_cseq = cseq;
+		ct_sip_info->invite_cseq = cseq;
 	return ret;
 }
 
@@ -1154,7 +1154,7 @@ static int process_register_request(struct sk_buff *skb, unsigned int dataoff,
 {
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct = nf_ct_get(skb, &ctinfo);
-	struct nf_conn_help *help = nfct_help(ct);
+	struct nf_ct_sip_master *ct_sip_info = nfct_help_data(ct);
 	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
 	unsigned int matchoff, matchlen;
 	struct nf_conntrack_expect *exp;
@@ -1235,7 +1235,7 @@ static int process_register_request(struct sk_buff *skb, unsigned int dataoff,
 
 store_cseq:
 	if (ret == NF_ACCEPT)
-		help->help.ct_sip_info.register_cseq = cseq;
+		ct_sip_info->register_cseq = cseq;
 	return ret;
 }
 
@@ -1245,7 +1245,7 @@ static int process_register_response(struct sk_buff *skb, unsigned int dataoff,
 {
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct = nf_ct_get(skb, &ctinfo);
-	struct nf_conn_help *help = nfct_help(ct);
+	struct nf_ct_sip_master *ct_sip_info = nfct_help_data(ct);
 	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
 	union nf_inet_addr addr;
 	__be16 port;
@@ -1262,7 +1262,7 @@ static int process_register_response(struct sk_buff *skb, unsigned int dataoff,
 	 * responses, so we store the sequence number of the last valid
 	 * request and compare it here.
 	 */
-	if (help->help.ct_sip_info.register_cseq != cseq)
+	if (ct_sip_info->register_cseq != cseq)
 		return NF_ACCEPT;
 
 	if (code >= 100 && code <= 199)
@@ -1363,7 +1363,7 @@ static int process_sip_request(struct sk_buff *skb, unsigned int dataoff,
 {
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct = nf_ct_get(skb, &ctinfo);
-	struct nf_conn_help *help = nfct_help(ct);
+	struct nf_ct_sip_master *ct_sip_info = nfct_help_data(ct);
 	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
 	unsigned int matchoff, matchlen;
 	unsigned int cseq, i;
@@ -1381,7 +1381,7 @@ static int process_sip_request(struct sk_buff *skb, unsigned int dataoff,
 				    &matchlen, &addr, &port) > 0 &&
 	    port != ct->tuplehash[dir].tuple.src.u.udp.port &&
 	    nf_inet_addr_cmp(&addr, &ct->tuplehash[dir].tuple.src.u3))
-		help->help.ct_sip_info.forced_dport = port;
+		ct_sip_info->forced_dport = port;
 
 	for (i = 0; i < ARRAY_SIZE(sip_handlers); i++) {
 		const struct sip_handler *handler;
@@ -1595,6 +1595,7 @@ static int __init nf_conntrack_sip_init(void)
 		sip[i][3].help = sip_help_tcp;
 
 		for (j = 0; j < ARRAY_SIZE(sip[i]); j++) {
+			sip[i][j].data_len = sizeof(struct nf_ct_sip_master);
 			sip[i][j].tuple.src.u.udp.port = htons(ports[i]);
 			sip[i][j].expect_policy = sip_exp_policy;
 			sip[i][j].expect_class_max = SIP_EXPECT_MAX;
