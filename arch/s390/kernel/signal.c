@@ -59,15 +59,8 @@ typedef struct
 SYSCALL_DEFINE3(sigsuspend, int, history0, int, history1, old_sigset_t, mask)
 {
 	sigset_t blocked;
-
-	current->saved_sigmask = current->blocked;
-	mask &= _BLOCKABLE;
 	siginitset(&blocked, mask);
-	set_current_blocked(&blocked);
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule();
-	set_restore_sigmask();
-	return -ERESTARTNOHAND;
+	return sigsuspend(&blocked);
 }
 
 SYSCALL_DEFINE3(sigaction, int, sig, const struct old_sigaction __user *, act,
@@ -233,13 +226,6 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 	if (ka->sa.sa_flags & SA_ONSTACK) {
 		if (! sas_ss_flags(sp))
 			sp = current->sas_ss_sp + current->sas_ss_size;
-	}
-
-	/* This is the legacy signal stack switching. */
-	else if (!user_mode(regs) &&
-		 !(ka->sa.sa_flags & SA_RESTORER) &&
-		 ka->sa.sa_restorer) {
-		sp = (unsigned long) ka->sa.sa_restorer;
 	}
 
 	return (void __user *)((sp - frame_size) & -8ul);
@@ -414,15 +400,6 @@ void do_signal(struct pt_regs *regs)
 	struct k_sigaction ka;
 	sigset_t *oldset;
 
-	/*
-	 * We want the common case to go fast, which
-	 * is why we may in certain cases get here from
-	 * kernel mode. Just return without doing anything
-	 * if so.
-	 */
-	if (!user_mode(regs))
-		return;
-
 	if (test_thread_flag(TIF_RESTORE_SIGMASK))
 		oldset = &current->saved_sigmask;
 	else
@@ -517,6 +494,4 @@ void do_notify_resume(struct pt_regs *regs)
 {
 	clear_thread_flag(TIF_NOTIFY_RESUME);
 	tracehook_notify_resume(regs);
-	if (current->replacement_session_keyring)
-		key_replace_session_keyring();
 }
