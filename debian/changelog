@@ -1,3 +1,22 @@
+linux-3.0 (3.0.32-1+vyatta+3) unstable; urgency=low
+
+  [ Pablo Neira Ayuso ]
+  * netfilter: nf_ct_helper: allocate 16 bytes for the helper and policy
+    names
+  * netfilter: nf_ct_ext: support variable length extensions
+  * netfilter: nf_ct_helper: implement variable length helper private
+    data
+  * netfilter: add glue code to integrate nfnetlink_queue and ctnetlink
+  * netfilter: nfnl_queue: support NAT TCP sequence adjustment if packet
+    mangled
+  * netfilter: ctnetlink: add CTA_HELP_INFO attribute
+  * netfilter: add user-space connection tracking helper infrastructure
+
+  [ Gaurav Sinha ]
+  * Added CTHELPER CONFIG to kernel config
+
+ -- Gaurav Sinha <gaurav.sinha@vyatta.com>  Fri, 01 Jun 2012 14:17:33 -0700
+
 linux-3.0 (3.0.32-1+vyatta+2) unstable; urgency=low
 
   [ Huang Ying ]
