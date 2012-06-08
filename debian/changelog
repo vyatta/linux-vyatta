@@ -1,3 +1,17 @@
+linux-3.0 (3.0.32-1+vyatta+4) unstable; urgency=low
+
+  [ Gaurav Sinha ]
+  * Revert "netfilter: add user-space connection tracking helper
+    infrastructure"
+
+  [ Pablo Neira Ayuso ]
+  * netfilter: add user-space connection tracking helper infrastructure
+  * netfilter: xt_CT: fix wrong checking in the timeout assignment path
+
+  [ Gaurav Sinha ]
+
+ -- Gaurav Sinha <gaurav.sinha@vyatta.com>  Thu, 07 Jun 2012 22:00:11 -0700
+
 linux-3.0 (3.0.32-1+vyatta+3) unstable; urgency=low
 
   [ Pablo Neira Ayuso ]
