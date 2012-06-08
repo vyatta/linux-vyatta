@@ -8,7 +8,6 @@ header-y += nf_conntrack_tuple_common.h
 header-y += nfnetlink.h
 header-y += nfnetlink_compat.h
 header-y += nfnetlink_conntrack.h
-header-y += nfnetlink_cthelper.h
 header-y += nfnetlink_cttimeout.h
 header-y += nfnetlink_log.h
 header-y += nfnetlink_queue.h
