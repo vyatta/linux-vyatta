@@ -1,3 +1,9 @@
+linux-3.3 (3.3.8-1+vyatta+3) unstable; urgency=low
+
+  * Add USB serial console to kernel config
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Tue, 12 Jun 2012 14:44:56 -0700
+
 linux-3.3 (3.3.8-1+vyatta+2) unstable; urgency=low
 
   [ Gaurav Sinha ]
