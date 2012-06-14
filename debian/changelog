@@ -1,3 +1,12 @@
+linux-3.3 (3.3.8-1+vyatta+4) unstable; urgency=low
+
+  [ Vincent Bernat ]
+  * snmp: fix OutOctets counter to include forwarded datagrams
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Thu, 14 Jun 2012 16:41:33 -0700
+
 linux-3.3 (3.3.8-1+vyatta+3) unstable; urgency=low
 
   * Add USB serial console to kernel config
