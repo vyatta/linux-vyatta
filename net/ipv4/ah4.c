@@ -406,8 +406,9 @@ static void ah4_err(struct sk_buff *skb, u32 info)
 			      ah->spi, IPPROTO_AH, AF_INET);
 	if (!x)
 		return;
-	printk(KERN_DEBUG "pmtu discovery on SA AH/%08x/%08x\n",
-	       ntohl(ah->spi), ntohl(iph->daddr));
+	pr_debug("pmtu discovery on SA AH/%08x/%08x\n",
+		 ntohl(ah->spi), ntohl(iph->daddr));
+	ipv4_update_pmtu(skb, net, info, 0, 0, IPPROTO_AH, 0);
 	xfrm_state_put(x);
 }
 
