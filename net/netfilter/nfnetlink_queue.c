@@ -656,6 +656,8 @@ nfqnl_recv_verdict(struct sock *ctnl, struct sk_buff *skb,
 	unsigned int verdict;
 	struct nf_queue_entry *entry;
 	struct nfq_ct_hook *nfq_ct;
+	struct nf_conn *ct = NULL;
+	enum ip_conntrack_info ctinfo = 0; /* make gcc happy. */
 	int err;
 
 	rcu_read_lock();
