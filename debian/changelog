@@ -1,3 +1,12 @@
+linux-3.0 (3.0.32-1+vyatta+6) unstable; urgency=low
+
+  [ Kelvie Wong ]
+  * netfilter: nf_ct_expect: partially implement ctnetlink_change_expect
+
+  [ Gaurav Sinha ]
+
+ -- Gaurav Sinha <gaurav.sinha@vyatta.com>  Wed, 20 Jun 2012 19:36:42 -0700
+
 linux-3.0 (3.0.32-1+vyatta+5) unstable; urgency=low
 
   [ Gaurav Sinha ]
