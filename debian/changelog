@@ -1,3 +1,9 @@
+linux-3.0 (3.0.32-1+vyatta+7) unstable; urgency=low
+
+  * fix expect entry creation, x.patch issued by Pablo
+
+ -- Gaurav Sinha <gaurav.sinha@vyatta.com>  Thu, 21 Jun 2012 18:40:54 -0700
+
 linux-3.0 (3.0.32-1+vyatta+6) unstable; urgency=low
 
   [ Kelvie Wong ]
