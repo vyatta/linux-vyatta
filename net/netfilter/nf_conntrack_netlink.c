@@ -1704,6 +1704,11 @@ ctnetlink_nfqueue_parse(const struct nlattr *attr, struct nf_conn *ct)
 			return err;
 	}
 #endif
+	if (cda[CTA_HELP]) {
+		err = ctnetlink_change_helper(ct, cda);
+		if (err < 0)
+			return err;
+	}
 	return 0;
 }
 
