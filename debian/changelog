@@ -1,3 +1,13 @@
+linux-3.3 (3.3.8-1+vyatta+5) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * Remove duplicate text in Documentation/networking/ipsysctl.txt
+
+  [ Saurabh Mohan ]
+  * VTI ko update with net-dev comments.
+
+ -- Saurabh Mohan <saurabh@vyatta.com>  Mon, 16 Jul 2012 14:46:56 -0700
+
 linux-3.3 (3.3.8-1+vyatta+4) unstable; urgency=low
 
   [ Vincent Bernat ]
