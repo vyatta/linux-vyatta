@@ -15,39 +15,67 @@
 #include <net/ip.h>
 #include <net/xfrm.h>
 
-static struct xfrm_tunnel *input_handler;
+/*
+ * Informational hook. The decap is still done here.
+ */
+static struct xfrm_tunnel __rcu *rcv_notify_handlers __read_mostly;
 static DEFINE_MUTEX(xfrm4_mode_tunnel_input_mutex);
 
-int xfrm4_mode_tunnel_input_register (struct xfrm_tunnel *handler)
+int xfrm4_mode_tunnel_input_register(struct xfrm_tunnel *handler)
 {
-    int ret = -EEXIST;
+	struct xfrm_tunnel __rcu **pprev;
+	struct xfrm_tunnel *t;
 
-    mutex_lock(&xfrm4_mode_tunnel_input_mutex);
-    if (!input_handler) {
-        input_handler = handler;
-        ret = 0;
-    }
-    mutex_unlock(&xfrm4_mode_tunnel_input_mutex);
-    return ret;
+	int ret = -EEXIST;
+	int priority = handler->priority;
+
+	mutex_lock(&xfrm4_mode_tunnel_input_mutex);
+
+	for (pprev = &rcv_notify_handlers;
+	     (t = rcu_dereference_protected(*pprev,
+	     lockdep_is_held(&xfrm4_mode_tunnel_input_mutex))) != NULL;
+	     pprev = &t->next) {
+		if (t->priority > priority)
+			break;
+		if (t->priority == priority)
+			goto err;
+
+	}
+
+	handler->next = *pprev;
+	rcu_assign_pointer(*pprev, handler);
+
+	ret = 0;
+
+err:
+	mutex_unlock(&xfrm4_mode_tunnel_input_mutex);
+	return ret;
 }
-EXPORT_SYMBOL(xfrm4_mode_tunnel_input_register);
+EXPORT_SYMBOL_GPL(xfrm4_mode_tunnel_input_register);
 
-int xfrm4_mode_tunnel_input_deregister (struct xfrm_tunnel *handler)
+int xfrm4_mode_tunnel_input_deregister(struct xfrm_tunnel *handler)
 {
-    int ret = -ENOENT;
+	struct xfrm_tunnel __rcu **pprev;
+	struct xfrm_tunnel *t;
+	int ret = -ENOENT;
 
-    mutex_lock(&xfrm4_mode_tunnel_input_mutex);
-    if (input_handler == handler) {
-        input_handler = NULL;
-        ret = 0;
-    }
-    mutex_unlock(&xfrm4_mode_tunnel_input_mutex);
-    synchronize_net();
+	mutex_lock(&xfrm4_mode_tunnel_input_mutex);
+	for (pprev = &rcv_notify_handlers;
+	     (t = rcu_dereference_protected(*pprev,
+	     lockdep_is_held(&xfrm4_mode_tunnel_input_mutex))) != NULL;
+	     pprev = &t->next) {
+		if (t == handler) {
+			*pprev = handler->next;
+			ret = 0;
+			break;
+		}
+	}
+	mutex_unlock(&xfrm4_mode_tunnel_input_mutex);
+	synchronize_net();
 
-    return ret;
+	return ret;
 }
-EXPORT_SYMBOL(xfrm4_mode_tunnel_input_deregister);
-
+EXPORT_SYMBOL_GPL(xfrm4_mode_tunnel_input_deregister);
 
 static inline void ipip_ecn_decapsulate(struct sk_buff *skb)
 {
@@ -98,8 +126,14 @@ static int xfrm4_mode_tunnel_output(struct xfrm_state *x, struct sk_buff *skb)
 	return 0;
 }
 
+#define for_each_input_rcu(head, handler)	\
+	for (handler = rcu_dereference(head);	\
+	     handler != NULL;			\
+	     handler = rcu_dereference(handler->next))
+
 static int xfrm4_mode_tunnel_input(struct xfrm_state *x, struct sk_buff *skb)
 {
+	struct xfrm_tunnel *handler;
 	int err = -EINVAL;
 
 	if (XFRM_MODE_SKB_CB(skb)->protocol != IPPROTO_IPIP)
@@ -108,8 +142,9 @@ static int xfrm4_mode_tunnel_input(struct xfrm_state *x, struct sk_buff *skb)
 	if (!pskb_may_pull(skb, sizeof(struct iphdr)))
 		goto out;
 
-    if (input_handler)
-        input_handler->handler(skb);
+	/* The handlers do not consume the skb. */
+	for_each_input_rcu(rcv_notify_handlers, handler)
+		handler->handler(skb);
 
 	if (skb_cloned(skb) &&
 	    (err = pskb_expand_head(skb, 0, 0, GFP_ATOMIC)))
