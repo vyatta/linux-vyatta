@@ -340,10 +340,18 @@ static int vti_rcv(struct sk_buff *skb)
 	if (tunnel != NULL) {
 		struct pcpu_tstats *tstats;
 
+		if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
+			rcu_read_unlock();
+			return -1;
+		}
+
 		tstats = this_cpu_ptr(tunnel->dev->tstats);
 		tstats->rx_packets++;
 		tstats->rx_bytes += skb->len;
 
+		skb->mark = 0;
+		secpath_reset(skb);
+		
 		skb->dev = tunnel->dev;
 		rcu_read_unlock();
 		/* We do not eat the packet here therefore return 1 */
