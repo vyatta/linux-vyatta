@@ -1,3 +1,9 @@
+linux-3.3 (3.3.8-1+vyatta+6) unstable; urgency=low
+
+  * Bugfix: 8223: VTI fix post-decryption forwarding.
+
+ -- Saurabh Mohan <saurabh@vyatta.com>  Mon, 23 Jul 2012 17:59:46 -0700
+
 linux-3.3 (3.3.8-1+vyatta+5) unstable; urgency=low
 
   [ Stephen Hemminger ]
