@@ -1,3 +1,9 @@
+linux-3.3 (3.3.8-1+vyatta+7) unstable; urgency=low
+
+  * Fix __rcu warnings detected by sparse.
+
+ -- Saurabh Mohan <saurabh@vyatta.com>  Tue, 24 Jul 2012 11:23:36 -0700
+
 linux-3.3 (3.3.8-1+vyatta+6) unstable; urgency=low
 
   * Bugfix: 8223: VTI fix post-decryption forwarding.
