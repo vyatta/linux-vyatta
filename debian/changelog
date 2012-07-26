@@ -1,3 +1,9 @@
+linux-3.3 (3.3.8-1+vyatta+8) unstable; urgency=low
+
+  * Disable FIB_TRIE_STATS
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Thu, 26 Jul 2012 15:36:36 -0700
+
 linux-3.3 (3.3.8-1+vyatta+7) unstable; urgency=low
 
   * Fix __rcu warnings detected by sparse.
