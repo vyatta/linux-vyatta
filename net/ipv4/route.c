@@ -1873,7 +1873,7 @@ void ip_rt_get_source(u8 *addr, struct sk_buff *skb, struct rtable *rt)
 		fl4.saddr = iph->saddr;
 		fl4.flowi4_tos = RT_TOS(iph->tos);
 		fl4.flowi4_oif = rt->dst.dev->ifindex;
-		fl4.flowi4_iif = skb->dev->ifindex;
+		fl4.flowi4_iif = rt->rt_iif;
 		fl4.flowi4_mark = skb->mark;
 
 		rcu_read_lock();
