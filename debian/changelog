@@ -1,3 +1,9 @@
+linux-3.0 (3.0.32-1+vyatta+8) unstable; urgency=low
+
+  * Fix kernel oops from NULL dereference
+
+ -- James Davidson <james.davidson@vyatta.com>  Sun, 29 Jul 2012 14:10:37 -0700
+
 linux-3.0 (3.0.32-1+vyatta+7) unstable; urgency=low
 
   * fix expect entry creation, x.patch issued by Pablo
