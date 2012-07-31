@@ -24,6 +24,7 @@
 #ifndef _ROUTE_H
 #define _ROUTE_H
 
+#include <net/ip.h>
 #include <net/dst.h>
 #include <net/inetpeer.h>
 #include <net/flow.h>
@@ -208,7 +209,10 @@ extern const __u8 ip_tos2prio[16];
 
 static inline char rt_tos2priority(u8 tos)
 {
-	return ip_tos2prio[IPTOS_TOS(tos)>>1];
+	if (sysctl_ip_dscp_queue)
+		return tos >> 5;
+	else
+        	return ip_tos2prio[IPTOS_TOS(tos)>>1];
 }
 
 /* ip_route_connect() and ip_route_newports() work in tandem whilst

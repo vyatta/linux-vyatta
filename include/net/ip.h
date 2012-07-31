@@ -221,6 +221,7 @@ static inline int inet_is_reserved_local_port(int port)
 }
 
 extern int sysctl_ip_nonlocal_bind;
+extern int sysctl_ip_dscp_queue;
 
 extern struct ctl_path net_core_path[];
 extern struct ctl_path net_ipv4_ctl_path[];

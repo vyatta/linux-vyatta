@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <net/pkt_sched.h>
 #include <net/dst.h>
+#include <net/ip.h>
 
 /* Main transmission queue. */
 
@@ -416,6 +417,10 @@ static const u8 prio2band[TC_PRIO_MAX + 1] = {
 	1, 2, 2, 2, 1, 2, 0, 0 , 1, 1, 1, 1, 1, 1, 1, 1
 };
 
+static const u8 dscp2band[TC_PRIO_MAX + 1] = {
+	2, 2, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1
+};
+
 /* 3-band FIFO queue: old style, but should be a bit faster than
    generic prio+fifo combination.
  */
@@ -449,7 +454,11 @@ static inline struct sk_buff_head *band2list(struct pfifo_fast_priv *priv,
 static int pfifo_fast_enqueue(struct sk_buff *skb, struct Qdisc *qdisc)
 {
 	if (skb_queue_len(&qdisc->q) < qdisc_dev(qdisc)->tx_queue_len) {
-		int band = prio2band[skb->priority & TC_PRIO_MAX];
+                int band;
+		if (sysctl_ip_dscp_queue)
+			band = dscp2band[skb->priority & TC_PRIO_MAX];
+		else
+			band = prio2band[skb->priority & TC_PRIO_MAX];
 		struct pfifo_fast_priv *priv = qdisc_priv(qdisc);
 		struct sk_buff_head *list = band2list(priv, band);
 
@@ -511,7 +520,10 @@ static int pfifo_fast_dump(struct Qdisc *qdisc, struct sk_buff *skb)
 {
 	struct tc_prio_qopt opt = { .bands = PFIFO_FAST_BANDS };
 
-	memcpy(&opt.priomap, prio2band, TC_PRIO_MAX + 1);
+	if (sysctl_ip_dscp_queue)
+		memcpy(&opt.priomap, dscp2band, TC_PRIO_MAX + 1);
+	else
+		memcpy(&opt.priomap, prio2band, TC_PRIO_MAX + 1);
 	NLA_PUT(skb, TCA_OPTIONS, sizeof(opt), &opt);
 	return skb->len;
 

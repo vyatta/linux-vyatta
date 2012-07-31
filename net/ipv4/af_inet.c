@@ -447,6 +447,9 @@ EXPORT_SYMBOL(inet_release);
 int sysctl_ip_nonlocal_bind __read_mostly;
 EXPORT_SYMBOL(sysctl_ip_nonlocal_bind);
 
+int sysctl_ip_dscp_queue __read_mostly;
+EXPORT_SYMBOL(sysctl_ip_dscp_queue);
+
 int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sockaddr_in *addr = (struct sockaddr_in *)uaddr;

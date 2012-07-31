@@ -343,6 +343,7 @@ static const struct bin_table bin_net_ipv4_table[] = {
 	{ CTL_INT,	NET_IPV4_DEFAULT_TTL,			"ip_default_ttl" },
 	/* NET_IPV4_AUTOCONFIG unused */
 	{ CTL_INT,	NET_IPV4_NO_PMTU_DISC,			"ip_no_pmtu_disc" },
+	{ CTL_INT,	NET_IPV4_DSCP_QUEUE,	        	"ip_dscp_queue" },
 	{ CTL_INT,	NET_IPV4_NONLOCAL_BIND,			"ip_nonlocal_bind" },
 	{ CTL_INT,	NET_IPV4_TCP_SYN_RETRIES,		"tcp_syn_retries" },
 	{ CTL_INT,	NET_TCP_SYNACK_RETRIES,			"tcp_synack_retries" },
