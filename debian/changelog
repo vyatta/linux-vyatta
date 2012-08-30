@@ -1,3 +1,9 @@
+linux-3.3 (3.3.8-1+vyatta+11) unstable; urgency=low
+
+  * Add Microsoft Hyper-V storage driver to the 32 bit kernel
+
+ -- Stephen Hemminger <stephen.hemminger@vyatta.com>  Thu, 30 Aug 2012 16:13:33 -0700
+
 linux-3.3 (3.3.8-1+vyatta+10) unstable; urgency=low
 
   * Bugfix 8198: Setup pfifo_fast to use ip precedence
