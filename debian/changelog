@@ -1,3 +1,19 @@
+linux-3.3 (3.3.8-1+vyatta+12) unstable; urgency=low
+
+  [ Patrick McHardy ]
+  * netfilter: nf_ct_sip: fix IPv6 address parsing
+  * netfilter: nf_ct_sip: fix helper name
+  * netfilter: nf_nat_sip: fix via header translation with multiple
+    parameters
+
+  [ Pablo Neira Ayuso ]
+  * netfilter: nf_ct_expect: fix possible access to uninitialized timer
+
+  [ Gaurav Sinha ]
+  * sip helper patch
+
+ -- Gaurav Sinha <gaurav.sinha@vyatta.com>  Tue, 04 Sep 2012 16:33:46 -0700
+
 linux-3.3 (3.3.8-1+vyatta+11) unstable; urgency=low
 
   * Add Microsoft Hyper-V storage driver to the 32 bit kernel
