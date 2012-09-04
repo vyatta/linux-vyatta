@@ -1658,8 +1658,8 @@ nla_put_failure:
 	return -ENOSPC;
 }
 
-static int
-ctnetlink_nfqueue_parse(const struct nlattr *attr, struct nf_conn *ct)
+static inline int
+__ctnetlink_nfqueue_parse(const struct nlattr *attr, struct nf_conn *ct)
 {
 	const struct nlattr * const cda[CTA_MAX+1];
 	struct nf_conntrack_tuple otuple, rtuple;
@@ -1710,6 +1710,17 @@ ctnetlink_nfqueue_parse(const struct nlattr *attr, struct nf_conn *ct)
 			return err;
 	}
 	return 0;
+}
+static int
+ctnetlink_nfqueue_parse(const struct nlattr *attr, struct nf_conn *ct)
+{
+	int ret;
+
+	spin_lock_bh(&nf_conntrack_lock);
+        ret = __ctnetlink_nfqueue_parse(attr, ct);
+	spin_unlock_bh(&nf_conntrack_lock);
+
+	return ret;
 }
 
 static struct nfq_ct_hook ctnetlink_nfqueue_hook = {
