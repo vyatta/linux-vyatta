@@ -1,3 +1,12 @@
+linux-3.3 (3.3.8-1+vyatta+13) unstable; urgency=low
+
+  [ Ian Campbell ]
+  * xen/netfront: teardown the device before unregistering it.
+
+  [ James Davidson ]
+
+ -- James Davidson <james.davidson@vyatta.com>  Thu, 13 Sep 2012 13:10:17 -0700
+
 linux-3.3 (3.3.8-1+vyatta+12) unstable; urgency=low
 
   [ Patrick McHardy ]
