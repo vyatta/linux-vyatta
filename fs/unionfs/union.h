@@ -48,8 +48,6 @@
 #include <linux/splice.h>
 #include <linux/sched.h>
 
-#include <asm/system.h>
-
 #include <linux/union_fs.h>
 
 /* the file system name */

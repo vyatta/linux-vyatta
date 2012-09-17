@@ -756,67 +756,6 @@ out:
 	return err;
 }
 
-/*
- * return to user-space the branch indices containing the file in question
- *
- * We use fd_set and therefore we are limited to the number of the branches
- * to FD_SETSIZE, which is currently 1024 - plenty for most people
- */
-static int unionfs_ioctl_queryfile(struct file *file, struct dentry *parent,
-				   unsigned int cmd, unsigned long arg)
-{
-	int err = 0;
-	fd_set branchlist;
-	int bstart = 0, bend = 0, bindex = 0;
-	int orig_bstart, orig_bend;
-	struct dentry *dentry, *lower_dentry;
-	struct vfsmount *mnt;
-
-	dentry = file->f_path.dentry;
-	orig_bstart = dbstart(dentry);
-	orig_bend = dbend(dentry);
-	err = unionfs_partial_lookup(dentry, parent);
-	if (err)
-		goto out;
-	bstart = dbstart(dentry);
-	bend = dbend(dentry);
-
-	FD_ZERO(&branchlist);
-
-	for (bindex = bstart; bindex <= bend; bindex++) {
-		lower_dentry = unionfs_lower_dentry_idx(dentry, bindex);
-		if (!lower_dentry)
-			continue;
-		if (likely(lower_dentry->d_inode))
-			FD_SET(bindex, &branchlist);
-		/* purge any lower objects after partial_lookup */
-		if (bindex < orig_bstart || bindex > orig_bend) {
-			dput(lower_dentry);
-			unionfs_set_lower_dentry_idx(dentry, bindex, NULL);
-			iput(unionfs_lower_inode_idx(dentry->d_inode, bindex));
-			unionfs_set_lower_inode_idx(dentry->d_inode, bindex,
-						    NULL);
-			mnt = unionfs_lower_mnt_idx(dentry, bindex);
-			if (!mnt)
-				continue;
-			unionfs_mntput(dentry, bindex);
-			unionfs_set_lower_mnt_idx(dentry, bindex, NULL);
-		}
-	}
-	/* restore original dentry's offsets */
-	dbstart(dentry) = orig_bstart;
-	dbend(dentry) = orig_bend;
-	ibstart(dentry->d_inode) = orig_bstart;
-	ibend(dentry->d_inode) = orig_bend;
-
-	err = copy_to_user((void __user *)arg, &branchlist, sizeof(fd_set));
-	if (unlikely(err))
-		err = -EFAULT;
-
-out:
-	return err < 0 ? err : bend;
-}
-
 long unionfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	long err;
@@ -841,8 +780,11 @@ long unionfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 
 	case UNIONFS_IOCTL_QUERYFILE:
-		/* Return list of branches containing the given file */
-		err = unionfs_ioctl_queryfile(file, parent, cmd, arg);
+		/*Return list of branches containing the given file */
+
+		/* broken on 64 bit (sizeof(int) != sizeof(void *) */
+		pr_info("unionfs: query file ioctl deprecated\n");
+		err = -ENOSYS;
 		break;
 
 	default:

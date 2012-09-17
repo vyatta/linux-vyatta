@@ -599,7 +599,7 @@ static int unionfs_read_super(struct super_block *sb, void *raw_data,
 		err = PTR_ERR(inode);
 		goto out_dput;
 	}
-	sb->s_root = d_alloc_root(inode);
+	sb->s_root = d_make_root(inode);
 	if (unlikely(!sb->s_root)) {
 		err = -ENOMEM;
 		goto out_iput;
