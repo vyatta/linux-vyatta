@@ -1,3 +1,247 @@
+linux-3.4 (3.4.11-1+vyatta+1) unstable; urgency=low
+
+  [ Greg Kroah-Hartman ]
+  * USB: vt6656: remove __devinit* from the struct usb_device_id table
+  * USB: emi62: remove __devinit* from the struct usb_device_id table
+
+  [ Wang Xingchao ]
+  * ALSA: hda - fix Copyright debug message
+
+  [ Will Deacon ]
+  * ARM: 7483/1: vfp: only advertise VFPv4 in hwcaps if CONFIG_VFPv3 is enabled
+  * ARM: 7487/1: mm: avoid setting nG bit for user mappings that aren't present
+  * ARM: 7488/1: mm: use 5 bits for swapfile type encoding
+  * ARM: 7489/1: errata: fix workaround for erratum #720789 on UP systems
+
+  [ Jon Hunter ]
+  * ARM: OMAP2+: Fix dmtimer set source clock failure
+
+  [ Heiko Stuebner ]
+  * ARM: S3C24XX: Add missing DMACH_DT_PROP
+  * ARM: S3C24XX: Fix s3c2410_dma_enqueue parameters
+
+  [ Fabio Estevam ]
+  * Revert dma: imx-dma: Fix kernel crash due to missing clock conversion
+
+  [ Konrad Rzeszutek Wilk ]
+  * xen/setup: Fix one-off error when adding for-balloon PFNs to the P2M.
+
+  [ Shawn Guo ]
+  * ARM: imx6: spin the cpu until hardware takes it down
+
+  [ Arnd Bergmann ]
+  * ARM: imx: select CPU_FREQ_TABLE when needed
+
+  [ Mark Brown ]
+  * ASoC: wm9712: Fix microphone source selection
+
+  [ Peter Ujfalusi ]
+  * ASoC: omap-mcbsp: Fix 6pin mux configuration
+
+  [ Al Viro ]
+  * vfs: missed source of ->f_pos races
+
+  [ Miklos Szeredi ]
+  * vfs: canonicalize create mode in build_open_flags()
+
+  [ Mike Frysinger ]
+  * alpha: fix fpu.h usage in userspace
+
+  [ Michael Cree ]
+  * alpha: Don't export SOCK_NONBLOCK to user space.
+
+  [ Greg Kroah-Hartman ]
+  * USB: winbond: remove __devinit* from the struct usb_device_id table
+
+  [ Michal Hocko ]
+  * mm: hugetlbfs: correctly populate shared pmd
+
+  [ David Henningsson ]
+  * ALSA: hda - don't create dysfunctional mixer controls for ca0132
+
+  [ Yi Zou ]
+  * target: fix NULL pointer dereference bug alloc_page() fails to get memory
+
+  [ Trond Myklebust ]
+  * NFSv3: Ensure that do_proc_get_root() reports errors correctly
+
+  [ Idan Kedar ]
+  * pnfs: defer release of pages in layoutget
+
+  [ Trond Myklebust ]
+  * NFSv4.1: Remove a bogus BUG_ON() in nfs4_layoutreturn_done
+
+  [ Bryan Schumaker ]
+  * NFS: Clear key construction data if the idmap upcall fails
+  * NFS: return -ENOKEY when the upcall fails to map the name
+
+  [ Artem Bityutskiy ]
+  * UBIFS: fix complaints about too small debug buffer size
+
+  [ Ram Malovany ]
+  * Bluetooth: Fix using NULL inquiry entry
+  * Bluetooth: Fix using a NULL inquiry cache entry
+  * Bluetooth: Set name_state to unknown when entry name is empty
+
+  [ Szymon Janc ]
+  * Bluetooth: Fix legacy pairing with some devices
+
+  [ bjschuma@gmail.com ]
+  * NFS: Alias the nfs module to nfs4
+
+  [ Miklos Szeredi ]
+  * audit: don't free_chunk() after fsnotify_add_mark()
+  * audit: fix refcounting in audit-tree
+
+  [ Alan Cox ]
+  * drm: stop vmgfx driver explosion
+
+  [ Alex Deucher ]
+  * Revert "drm/radeon: fix bo creation retry path"
+
+  [ J. Bruce Fields ]
+  * svcrpc: fix BUG() in svc_tcp_clear_pages
+  * svcrpc: fix svc_xprt_enqueue/svc_recv busy-looping
+  * svcrpc: sends on closed socket should stop immediately
+
+  [ Stephen M. Cameron ]
+  * cciss: fix incorrect scsi status reporting
+
+  [ Alex Deucher ]
+  * ACPI: export symbol acpi_get_table_with_size
+
+  [ Lorenzo Bianconi ]
+  * ath9k: fix decrypt_error initialization in ath_rx_tasklet()
+
+  [ Rafael J. Wysocki ]
+  * PCI: EHCI: Fix crash during hibernation on ASUS computers
+
+  [ Hugh Dickins ]
+  * block: replace __getblk_slow misfix by grow_dev_page fix
+
+  [ Mike Galbraith ]
+  * sched,cgroup: Fix up task_groups list
+
+  [ Stanislaw Gruszka ]
+  * sched: fix divide by zero at {thread_group,task}_times
+
+  [ Jayakrishnan Memana ]
+  * uvcvideo: Reset the bytesused field when recycling an erroneous buffer
+
+  [ Alexandre Bounine ]
+  * rapidio/tsi721: fix inbound doorbell interrupt handling
+  * rapidio/tsi721: fix unused variable compiler warning
+
+  [ Aaro Koskinen ]
+  * regulator: twl-regulator: fix up VINTANA1/VINTANA2
+
+  [ Mike Frysinger ]
+  * x32: Use compat shims for {g,s}etsockopt
+
+  [ Greg Kroah-Hartman ]
+  * USB: spca506: remove __devinit* from the struct usb_device_id table
+  * USB: jl2005bcd: remove __devinit* from the struct usb_device_id table
+  * USB: p54usb: remove __devinit* from the struct usb_device_id table
+  * USB: rtl8187: remove __devinit* from the struct usb_device_id table
+  * USB: smsusb: remove __devinit* from the struct usb_device_id table
+
+  [ Sven Schnelle ]
+  * USB: CDC ACM: Fix NULL pointer dereference
+
+  [ Anton Blanchard ]
+  * powerpc: Update DSCR on all CPUs when writing sysfs dscr_default
+  * powerpc: Keep thread.dscr and thread.dscr_inherit in sync
+  * powerpc: Fix DSCR inheritance in copy_thread()
+  * powerpc: Restore correct DSCR in context switch
+
+  [ Paul Mackerras ]
+  * powerpc: Make sure IPI handlers see data written by IPI senders
+
+  [ Dave Jones ]
+  * Remove user-triggerable BUG from mpol_to_str
+
+  [ Mikulas Patocka ]
+  * Fix order of arguments to compat_put_time[spec|val]
+
+  [ Kashyap Desai ]
+  * SCSI: megaraid_sas: Move poll_aen_lock initializer
+
+  [ Mike Snitzer ]
+  * SCSI: scsi_lib: fix scsi_io_completion's SG_IO error propagation
+
+  [ sreekanth.reddy@lsi.com ]
+  * SCSI: mpt2sas: Fix for Driver oops, when loading driver with max_queue_depth command line option to a very small value
+
+  [ James Bottomley ]
+  * SCSI: Fix 'Device not ready' issue on mpt2sas
+
+  [ Jan Kara ]
+  * udf: Fix data corruption for files in ICB
+  * ext3: Fix fdatasync() for files with only i_size changes
+
+  [ Miklos Szeredi ]
+  * fuse: fix retrieve length
+
+  [ Axel Lin ]
+  * i2c-designware: Fix build error if CONFIG_I2C_DESIGNWARE_PLATFORM=y && CONFIG_I2C_DESIGNWARE_PCI=y
+
+  [ James Ralston ]
+  * i2c-i801: Add Device IDs for Intel Lynx Point-LP PCH
+
+  [ Alan Stern ]
+  * HID: add NOGET quirk for Eaton Ellipse MAX UPS
+
+  [ Dmitry Torokhov ]
+  * Input: i8042 - add Gigabyte T1005 series netbooks to noloop table
+
+  [ Dave Airlie ]
+  * drm/vmwgfx: add MODULE_DEVICE_TABLE so vmwgfx loads at boot
+
+  [ Mel Gorman ]
+  * PARISC: Redefine ATOMIC_INIT and ATOMIC64_INIT to drop the casts
+
+  [ Ronny Hegewald ]
+  * xen: Use correct masking in xen_swiotlb_alloc_coherent.
+
+  [ Konrad Rzeszutek Wilk ]
+  * xen/pciback: Fix proper FLR steps.
+
+  [ Andreas Herrmann ]
+  * x86, microcode, AMD: Fix broken ucode patch size check
+
+  [ Mathias Krause ]
+  * dccp: check ccid before dereferencing
+
+  [ Luca Tettamanti ]
+  * hwmon: (asus_atk0110) Add quirk for Asus M5A78L
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.4.11
+
+  [ John Fastabend ]
+  * net: add generic PF_BRIDGE:RTM_ FDB hooks
+
+  [ Stephen Hemminger ]
+  * igmp: add export symbol for ip_mc_leave_group
+  * Update 32bit config 3.4
+  * Update kernel config
+
+  [ Robert Bays ]
+  * Fix bug 6918.  Mask XSAVE from guest cpu.  See: http://www.mail-archive.com/debian-kernel@lists.debian.org/msg59666.html
+
+  [ John Southworth ]
+  * Add special macvlan mode for VRRP.
+
+  [ Saurabh ]
+  * net/ipv4: VTI support new module for ip_vti.
+  * net/ipv4/ip_vti.c: Fix __rcu warnings detected by sparse.
+
+  [ Stephen Hemminger ]
+  * Add link filter sysctl
+  * Add VTI to kernel config
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Tue, 18 Sep 2012 09:58:07 -0700
+
 linux-3.4 (3.4.10-1+vyatta+1) unstable; urgency=low
 
   * Manual rebase to 3.4.10 kernel
