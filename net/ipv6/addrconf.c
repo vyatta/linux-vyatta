@@ -3916,6 +3916,7 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 	array[DEVCONF_DISABLE_IPV6] = cnf->disable_ipv6;
 	array[DEVCONF_ACCEPT_DAD] = cnf->accept_dad;
 	array[DEVCONF_FORCE_TLLAO] = cnf->force_tllao;
+	array[DEVCONF_LINK_FILTER] = cnf->link_filter;
 }
 
 static inline size_t inet6_ifla6_size(void)
@@ -4582,6 +4583,14 @@ static struct addrconf_sysctl_table
 		{
 			.procname       = "force_tllao",
 			.data           = &ipv6_devconf.force_tllao,
+			.maxlen         = sizeof(int),
+			.mode           = 0644,
+			.proc_handler   = proc_dointvec
+		},
+		/* Vyatta */		
+		{
+			.procname       = "link_filter",
+			.data           = &ipv6_devconf.link_filter,
 			.maxlen         = sizeof(int),
 			.mode           = 0644,
 			.proc_handler   = proc_dointvec
