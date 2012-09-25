@@ -1,3 +1,9 @@
+linux-3.0 (3.0.32-1+vyatta+10) unstable; urgency=low
+
+  * Force build
+
+ -- John Southworth <john.southworth@vyatta.com>  Mon, 24 Sep 2012 20:13:00 -0700
+
 linux-3.0 (3.0.32-1+vyatta+9) unstable; urgency=low
 
   * netfilter: nf_ct_ftp: add sequence tracking pickup facility
