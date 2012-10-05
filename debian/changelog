@@ -1,3 +1,12 @@
+linux-3.3 (3.3.8-1+vyatta+14) unstable; urgency=low
+
+  [ Gaurav Sinha ]
+  * netfilter: nf_ct_ftp: add sequence tracking pickup facility
+
+  [ John Southworth ]
+
+ -- John Southworth <john.southworth@vyatta.com>  Fri, 05 Oct 2012 10:51:26 -0700
+
 linux-3.3 (3.3.8-1+vyatta+13) unstable; urgency=low
 
   [ Ian Campbell ]
