@@ -232,7 +232,6 @@ struct svc_rqst {
 	struct svc_pool *	rq_pool;	/* thread pool */
 	struct svc_procedure *	rq_procinfo;	/* procedure info */
 	struct auth_ops *	rq_authop;	/* authentication flavour */
-	u32			rq_flavor;	/* pseudoflavor */
 	struct svc_cred		rq_cred;	/* auth info */
 	void *			rq_xprt_ctxt;	/* transport specific context ptr */
 	struct svc_deferred_req*rq_deferred;	/* deferred request we are replaying */
@@ -278,6 +277,8 @@ struct svc_rqst {
 	wait_queue_head_t	rq_wait;	/* synchronization */
 	struct task_struct	*rq_task;	/* service thread */
 };
+
+#define SVC_NET(svc_rqst)	(svc_rqst->rq_xprt->xpt_net)
 
 /*
  * Rigorous type checking on sockaddr type conversions

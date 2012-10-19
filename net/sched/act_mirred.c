@@ -174,9 +174,8 @@ static int tcf_mirred(struct sk_buff *skb, const struct tc_action *a,
 	}
 
 	if (!(dev->flags & IFF_UP)) {
-		if (net_ratelimit())
-			pr_notice("tc mirred to Houston: device %s is down\n",
-				  dev->name);
+		net_notice_ratelimited("tc mirred to Houston: device %s is down\n",
+				       dev->name);
 		goto out;
 	}
 
@@ -201,13 +200,12 @@ static int tcf_mirred(struct sk_buff *skb, const struct tc_action *a,
 out:
 	if (err) {
 		m->tcf_qstats.overlimits++;
-		/* should we be asking for packet to be dropped?
-		 * may make sense for redirect case only
-		 */
-		retval = TC_ACT_SHOT;
-	} else {
+		if (m->tcfm_eaction != TCA_EGRESS_MIRROR)
+			retval = TC_ACT_SHOT;
+		else
+			retval = m->tcf_action;
+	} else
 		retval = m->tcf_action;
-	}
 	spin_unlock(&m->tcf_lock);
 
 	return retval;

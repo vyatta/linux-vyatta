@@ -1,8 +1,6 @@
 /*
- *  arch/s390/mm/fault.c
- *
  *  S390 version
- *    Copyright (C) 1999 IBM Deutschland Entwicklung GmbH, IBM Corporation
+ *    Copyright IBM Corp. 1999
  *    Author(s): Hartmut Penner (hp@de.ibm.com)
  *               Ulrich Weigand (uweigand@de.ibm.com)
  *
@@ -51,6 +49,7 @@
 #define VM_FAULT_BADCONTEXT	0x010000
 #define VM_FAULT_BADMAP		0x020000
 #define VM_FAULT_BADACCESS	0x040000
+#define VM_FAULT_SIGNAL	0x080000
 
 static unsigned long store_indication;
 
@@ -112,7 +111,7 @@ static inline int user_space_fault(unsigned long trans_exc_code)
 	if (trans_exc_code == 2)
 		/* Access via secondary space, set_fs setting decides */
 		return current->thread.mm_segment.ar4;
-	if (user_mode == HOME_SPACE_MODE)
+	if (addressing_mode == HOME_SPACE_MODE)
 		/* User space if the access has been done via home space. */
 		return trans_exc_code == 3;
 	/*
@@ -221,7 +220,7 @@ static noinline void do_fault_error(struct pt_regs *regs, int fault)
 	case VM_FAULT_BADACCESS:
 	case VM_FAULT_BADMAP:
 		/* Bad memory access. Check if it is kernel or user space. */
-		if (regs->psw.mask & PSW_MASK_PSTATE) {
+		if (user_mode(regs)) {
 			/* User mode accesses just cause a SIGSEGV */
 			si_code = (fault == VM_FAULT_BADMAP) ?
 				SEGV_MAPERR : SEGV_ACCERR;
@@ -231,15 +230,19 @@ static noinline void do_fault_error(struct pt_regs *regs, int fault)
 	case VM_FAULT_BADCONTEXT:
 		do_no_context(regs);
 		break;
+	case VM_FAULT_SIGNAL:
+		if (!user_mode(regs))
+			do_no_context(regs);
+		break;
 	default: /* fault & VM_FAULT_ERROR */
 		if (fault & VM_FAULT_OOM) {
-			if (!(regs->psw.mask & PSW_MASK_PSTATE))
+			if (!user_mode(regs))
 				do_no_context(regs);
 			else
 				pagefault_out_of_memory();
 		} else if (fault & VM_FAULT_SIGBUS) {
 			/* Kernel mode? Handle exceptions or die */
-			if (!(regs->psw.mask & PSW_MASK_PSTATE))
+			if (!user_mode(regs))
 				do_no_context(regs);
 			else
 				do_sigbus(regs);
@@ -288,13 +291,13 @@ static inline int do_exception(struct pt_regs *regs, int access)
 
 	address = trans_exc_code & __FAIL_ADDR_MASK;
 	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, address);
-	flags = FAULT_FLAG_ALLOW_RETRY;
+	flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_KILLABLE;
 	if (access == VM_WRITE || (trans_exc_code & store_indication) == 0x400)
 		flags |= FAULT_FLAG_WRITE;
 	down_read(&mm->mmap_sem);
 
 #ifdef CONFIG_PGSTE
-	if (test_tsk_thread_flag(current, TIF_SIE) && S390_lowcore.gmap) {
+	if ((current->flags & PF_VCPU) && S390_lowcore.gmap) {
 		address = __gmap_fault(address,
 				     (struct gmap *) S390_lowcore.gmap);
 		if (address == -EFAULT) {
@@ -337,6 +340,11 @@ retry:
 	 * the fault.
 	 */
 	fault = handle_mm_fault(mm, vma, address, flags);
+	/* No reason to continue if interrupted by SIGKILL. */
+	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current)) {
+		fault = VM_FAULT_SIGNAL;
+		goto out;
+	}
 	if (unlikely(fault & VM_FAULT_ERROR))
 		goto out_up;
 
@@ -428,7 +436,7 @@ void __kprobes do_asce_exception(struct pt_regs *regs)
 	}
 
 	/* User mode accesses just cause a SIGSEGV */
-	if (regs->psw.mask & PSW_MASK_PSTATE) {
+	if (user_mode(regs)) {
 		do_sigsegv(regs, SEGV_MAPERR);
 		return;
 	}
@@ -550,19 +558,15 @@ static void pfault_interrupt(struct ext_code ext_code,
 	if ((subcode & 0xff00) != __SUBCODE_MASK)
 		return;
 	kstat_cpu(smp_processor_id()).irqs[EXTINT_PFL]++;
-	if (subcode & 0x0080) {
-		/* Get the token (= pid of the affected task). */
-		pid = sizeof(void *) == 4 ? param32 : param64;
-		rcu_read_lock();
-		tsk = find_task_by_pid_ns(pid, &init_pid_ns);
-		if (tsk)
-			get_task_struct(tsk);
-		rcu_read_unlock();
-		if (!tsk)
-			return;
-	} else {
-		tsk = current;
-	}
+	/* Get the token (= pid of the affected task). */
+	pid = sizeof(void *) == 4 ? param32 : param64;
+	rcu_read_lock();
+	tsk = find_task_by_pid_ns(pid, &init_pid_ns);
+	if (tsk)
+		get_task_struct(tsk);
+	rcu_read_unlock();
+	if (!tsk)
+		return;
 	spin_lock(&pfault_lock);
 	if (subcode & 0x0080) {
 		/* signal bit is set -> a page has been swapped in by VM */
@@ -587,12 +591,13 @@ static void pfault_interrupt(struct ext_code ext_code,
 			if (tsk->state == TASK_RUNNING)
 				tsk->thread.pfault_wait = -1;
 		}
-		put_task_struct(tsk);
 	} else {
 		/* signal bit not set -> a real page is missing. */
+		if (WARN_ON_ONCE(tsk != current))
+			goto out;
 		if (tsk->thread.pfault_wait == 1) {
 			/* Already on the list with a reference: put to sleep */
-			set_task_state(tsk, TASK_UNINTERRUPTIBLE);
+			__set_task_state(tsk, TASK_UNINTERRUPTIBLE);
 			set_tsk_need_resched(tsk);
 		} else if (tsk->thread.pfault_wait == -1) {
 			/* Completion interrupt was faster than the initial
@@ -608,11 +613,13 @@ static void pfault_interrupt(struct ext_code ext_code,
 			get_task_struct(tsk);
 			tsk->thread.pfault_wait = 1;
 			list_add(&tsk->thread.list, &pfault_list);
-			set_task_state(tsk, TASK_UNINTERRUPTIBLE);
+			__set_task_state(tsk, TASK_UNINTERRUPTIBLE);
 			set_tsk_need_resched(tsk);
 		}
 	}
+out:
 	spin_unlock(&pfault_lock);
+	put_task_struct(tsk);
 }
 
 static int __cpuinit pfault_cpu_notify(struct notifier_block *self,

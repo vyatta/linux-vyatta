@@ -390,7 +390,7 @@ static void mpol_rebind_policy(struct mempolicy *pol, const nodemask_t *newmask,
 {
 	if (!pol)
 		return;
-	if (!mpol_store_user_nodemask(pol) && step == 0 &&
+	if (!mpol_store_user_nodemask(pol) && step == MPOL_REBIND_ONCE &&
 	    nodes_equal(pol->w.cpuset_mems_allowed, *newmask))
 		return;
 
@@ -607,6 +607,42 @@ check_range(struct mm_struct *mm, unsigned long start, unsigned long end,
 	return first;
 }
 
+/*
+ * Apply policy to a single VMA
+ * This must be called with the mmap_sem held for writing.
+ */
+static int vma_replace_policy(struct vm_area_struct *vma,
+						struct mempolicy *pol)
+{
+	int err;
+	struct mempolicy *old;
+	struct mempolicy *new;
+
+	pr_debug("vma %lx-%lx/%lx vm_ops %p vm_file %p set_policy %p\n",
+		 vma->vm_start, vma->vm_end, vma->vm_pgoff,
+		 vma->vm_ops, vma->vm_file,
+		 vma->vm_ops ? vma->vm_ops->set_policy : NULL);
+
+	new = mpol_dup(pol);
+	if (IS_ERR(new))
+		return PTR_ERR(new);
+
+	if (vma->vm_ops && vma->vm_ops->set_policy) {
+		err = vma->vm_ops->set_policy(vma, new);
+		if (err)
+			goto err_out;
+	}
+
+	old = vma->vm_policy;
+	vma->vm_policy = new; /* protected by mmap_sem */
+	mpol_put(old);
+
+	return 0;
+ err_out:
+	mpol_put(new);
+	return err;
+}
+
 /* Step 2: apply policy to a range and do splits. */
 static int mbind_range(struct mm_struct *mm, unsigned long start,
 		       unsigned long end, struct mempolicy *new_pol)
@@ -655,23 +691,9 @@ static int mbind_range(struct mm_struct *mm, unsigned long start,
 			if (err)
 				goto out;
 		}
-
-		/*
-		 * Apply policy to a single VMA. The reference counting of
-		 * policy for vma_policy linkages has already been handled by
-		 * vma_merge and split_vma as necessary. If this is a shared
-		 * policy then ->set_policy will increment the reference count
-		 * for an sp node.
-		 */
-		pr_debug("vma %lx-%lx/%lx vm_ops %p vm_file %p set_policy %p\n",
-			vma->vm_start, vma->vm_end, vma->vm_pgoff,
-			vma->vm_ops, vma->vm_file,
-			vma->vm_ops ? vma->vm_ops->set_policy : NULL);
-		if (vma->vm_ops && vma->vm_ops->set_policy) {
-			err = vma->vm_ops->set_policy(vma, new_pol);
-			if (err)
-				goto out;
-		}
+		err = vma_replace_policy(vma, new_pol);
+		if (err)
+			goto out;
 	}
 
  out:
@@ -950,8 +972,8 @@ static int migrate_to_node(struct mm_struct *mm, int source, int dest,
  *
  * Returns the number of page that could not be moved.
  */
-int do_migrate_pages(struct mm_struct *mm,
-	const nodemask_t *from_nodes, const nodemask_t *to_nodes, int flags)
+int do_migrate_pages(struct mm_struct *mm, const nodemask_t *from,
+		     const nodemask_t *to, int flags)
 {
 	int busy = 0;
 	int err;
@@ -963,7 +985,7 @@ int do_migrate_pages(struct mm_struct *mm,
 
 	down_read(&mm->mmap_sem);
 
-	err = migrate_vmas(mm, from_nodes, to_nodes, flags);
+	err = migrate_vmas(mm, from, to, flags);
 	if (err)
 		goto out;
 
@@ -998,14 +1020,34 @@ int do_migrate_pages(struct mm_struct *mm,
 	 * moved to an empty node, then there is nothing left worth migrating.
 	 */
 
-	tmp = *from_nodes;
+	tmp = *from;
 	while (!nodes_empty(tmp)) {
 		int s,d;
 		int source = -1;
 		int dest = 0;
 
 		for_each_node_mask(s, tmp) {
-			d = node_remap(s, *from_nodes, *to_nodes);
+
+			/*
+			 * do_migrate_pages() tries to maintain the relative
+			 * node relationship of the pages established between
+			 * threads and memory areas.
+                         *
+			 * However if the number of source nodes is not equal to
+			 * the number of destination nodes we can not preserve
+			 * this node relative relationship.  In that case, skip
+			 * copying memory from a node that is in the destination
+			 * mask.
+			 *
+			 * Example: [2,3,4] -> [3,4,5] moves everything.
+			 *          [0-7] - > [3,4,5] moves only 0,1,2,6,7.
+			 */
+
+			if ((nodes_weight(*from) != nodes_weight(*to)) &&
+						(node_isset(s, *to)))
+				continue;
+
+			d = node_remap(s, *from, *to);
 			if (s == d)
 				continue;
 
@@ -1065,8 +1107,8 @@ static void migrate_page_add(struct page *page, struct list_head *pagelist,
 {
 }
 
-int do_migrate_pages(struct mm_struct *mm,
-	const nodemask_t *from_nodes, const nodemask_t *to_nodes, int flags)
+int do_migrate_pages(struct mm_struct *mm, const nodemask_t *from,
+		     const nodemask_t *to, int flags)
 {
 	return -ENOSYS;
 }
@@ -1157,7 +1199,7 @@ static long do_mbind(unsigned long start, unsigned long len,
 		if (!list_empty(&pagelist)) {
 			nr_failed = migrate_pages(&pagelist, new_vma_page,
 						(unsigned long)vma,
-						false, true);
+						false, MIGRATE_SYNC);
 			if (nr_failed)
 				putback_lru_pages(&pagelist);
 		}
@@ -1327,8 +1369,8 @@ SYSCALL_DEFINE4(migrate_pages, pid_t, pid, unsigned long, maxnode,
 	 * userid as the target process.
 	 */
 	tcred = __task_cred(task);
-	if (cred->euid != tcred->suid && cred->euid != tcred->uid &&
-	    cred->uid  != tcred->suid && cred->uid  != tcred->uid &&
+	if (!uid_eq(cred->euid, tcred->suid) && !uid_eq(cred->euid, tcred->uid) &&
+	    !uid_eq(cred->uid,  tcred->suid) && !uid_eq(cred->uid,  tcred->uid) &&
 	    !capable(CAP_SYS_NICE)) {
 		rcu_read_unlock();
 		err = -EPERM;
@@ -1510,8 +1552,18 @@ struct mempolicy *get_vma_policy(struct task_struct *task,
 									addr);
 			if (vpol)
 				pol = vpol;
-		} else if (vma->vm_policy)
+		} else if (vma->vm_policy) {
 			pol = vma->vm_policy;
+
+			/*
+			 * shmem_alloc_page() passes MPOL_F_SHARED policy with
+			 * a pseudo vma whose vma->vm_ops=NULL. Take a reference
+			 * count on these policies which will be dropped by
+			 * mpol_cond_put() later
+			 */
+			if (mpol_needs_cond_ref(pol))
+				mpol_get(pol);
+		}
 	}
 	if (!pol)
 		pol = &default_policy;
@@ -1582,8 +1634,14 @@ static unsigned interleave_nodes(struct mempolicy *policy)
  * task can change it's policy.  The system default policy requires no
  * such protection.
  */
-unsigned slab_node(struct mempolicy *policy)
+unsigned slab_node(void)
 {
+	struct mempolicy *policy;
+
+	if (in_interrupt())
+		return numa_node_id();
+
+	policy = current->mempolicy;
 	if (!policy || policy->flags & MPOL_F_LOCAL)
 		return numa_node_id();
 
@@ -2035,7 +2093,7 @@ bool __mpol_equal(struct mempolicy *a, struct mempolicy *b)
  */
 
 /* lookup first element intersecting start-end */
-/* Caller holds sp->lock */
+/* Caller holds sp->mutex */
 static struct sp_node *
 sp_lookup(struct shared_policy *sp, unsigned long start, unsigned long end)
 {
@@ -2099,36 +2157,50 @@ mpol_shared_policy_lookup(struct shared_policy *sp, unsigned long idx)
 
 	if (!sp->root.rb_node)
 		return NULL;
-	spin_lock(&sp->lock);
+	mutex_lock(&sp->mutex);
 	sn = sp_lookup(sp, idx, idx+1);
 	if (sn) {
 		mpol_get(sn->policy);
 		pol = sn->policy;
 	}
-	spin_unlock(&sp->lock);
+	mutex_unlock(&sp->mutex);
 	return pol;
+}
+
+static void sp_free(struct sp_node *n)
+{
+	mpol_put(n->policy);
+	kmem_cache_free(sn_cache, n);
 }
 
 static void sp_delete(struct shared_policy *sp, struct sp_node *n)
 {
 	pr_debug("deleting %lx-l%lx\n", n->start, n->end);
 	rb_erase(&n->nd, &sp->root);
-	mpol_put(n->policy);
-	kmem_cache_free(sn_cache, n);
+	sp_free(n);
 }
 
 static struct sp_node *sp_alloc(unsigned long start, unsigned long end,
 				struct mempolicy *pol)
 {
-	struct sp_node *n = kmem_cache_alloc(sn_cache, GFP_KERNEL);
+	struct sp_node *n;
+	struct mempolicy *newpol;
 
+	n = kmem_cache_alloc(sn_cache, GFP_KERNEL);
 	if (!n)
 		return NULL;
+
+	newpol = mpol_dup(pol);
+	if (IS_ERR(newpol)) {
+		kmem_cache_free(sn_cache, n);
+		return NULL;
+	}
+	newpol->flags |= MPOL_F_SHARED;
+
 	n->start = start;
 	n->end = end;
-	mpol_get(pol);
-	pol->flags |= MPOL_F_SHARED;	/* for unref */
-	n->policy = pol;
+	n->policy = newpol;
+
 	return n;
 }
 
@@ -2136,10 +2208,10 @@ static struct sp_node *sp_alloc(unsigned long start, unsigned long end,
 static int shared_policy_replace(struct shared_policy *sp, unsigned long start,
 				 unsigned long end, struct sp_node *new)
 {
-	struct sp_node *n, *new2 = NULL;
+	struct sp_node *n;
+	int ret = 0;
 
-restart:
-	spin_lock(&sp->lock);
+	mutex_lock(&sp->mutex);
 	n = sp_lookup(sp, start, end);
 	/* Take care of old policies in the same range. */
 	while (n && n->start < end) {
@@ -2152,16 +2224,14 @@ restart:
 		} else {
 			/* Old policy spanning whole new range. */
 			if (n->end > end) {
+				struct sp_node *new2;
+				new2 = sp_alloc(end, n->end, n->policy);
 				if (!new2) {
-					spin_unlock(&sp->lock);
-					new2 = sp_alloc(end, n->end, n->policy);
-					if (!new2)
-						return -ENOMEM;
-					goto restart;
+					ret = -ENOMEM;
+					goto out;
 				}
 				n->end = start;
 				sp_insert(sp, new2);
-				new2 = NULL;
 				break;
 			} else
 				n->end = start;
@@ -2172,12 +2242,9 @@ restart:
 	}
 	if (new)
 		sp_insert(sp, new);
-	spin_unlock(&sp->lock);
-	if (new2) {
-		mpol_put(new2->policy);
-		kmem_cache_free(sn_cache, new2);
-	}
-	return 0;
+out:
+	mutex_unlock(&sp->mutex);
+	return ret;
 }
 
 /**
@@ -2195,7 +2262,7 @@ void mpol_shared_policy_init(struct shared_policy *sp, struct mempolicy *mpol)
 	int ret;
 
 	sp->root = RB_ROOT;		/* empty tree == default mempolicy */
-	spin_lock_init(&sp->lock);
+	mutex_init(&sp->mutex);
 
 	if (mpol) {
 		struct vm_area_struct pvma;
@@ -2249,7 +2316,7 @@ int mpol_set_shared_policy(struct shared_policy *info,
 	}
 	err = shared_policy_replace(info, vma->vm_pgoff, vma->vm_pgoff+sz, new);
 	if (err && new)
-		kmem_cache_free(sn_cache, new);
+		sp_free(new);
 	return err;
 }
 
@@ -2261,16 +2328,14 @@ void mpol_free_shared_policy(struct shared_policy *p)
 
 	if (!p->root.rb_node)
 		return;
-	spin_lock(&p->lock);
+	mutex_lock(&p->mutex);
 	next = rb_first(&p->root);
 	while (next) {
 		n = rb_entry(next, struct sp_node, nd);
 		next = rb_next(&n->nd);
-		rb_erase(&n->nd, &p->root);
-		mpol_put(n->policy);
-		kmem_cache_free(sn_cache, n);
+		sp_delete(p, n);
 	}
-	spin_unlock(&p->lock);
+	mutex_unlock(&p->mutex);
 }
 
 /* assumes fs == KERNEL_DS */

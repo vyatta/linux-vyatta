@@ -15,6 +15,8 @@
  *	Harald Welte		Add neighbour cache statistics like rtstat
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -472,8 +474,8 @@ struct neighbour *neigh_lookup_nodev(struct neigh_table *tbl, struct net *net,
 }
 EXPORT_SYMBOL(neigh_lookup_nodev);
 
-struct neighbour *neigh_create(struct neigh_table *tbl, const void *pkey,
-			       struct net_device *dev)
+struct neighbour *__neigh_create(struct neigh_table *tbl, const void *pkey,
+				 struct net_device *dev, bool want_ref)
 {
 	u32 hash_val;
 	int key_len = tbl->key_len;
@@ -533,14 +535,16 @@ struct neighbour *neigh_create(struct neigh_table *tbl, const void *pkey,
 	     n1 = rcu_dereference_protected(n1->next,
 			lockdep_is_held(&tbl->lock))) {
 		if (dev == n1->dev && !memcmp(n1->primary_key, pkey, key_len)) {
-			neigh_hold(n1);
+			if (want_ref)
+				neigh_hold(n1);
 			rc = n1;
 			goto out_tbl_unlock;
 		}
 	}
 
 	n->dead = 0;
-	neigh_hold(n);
+	if (want_ref)
+		neigh_hold(n);
 	rcu_assign_pointer(n->next,
 			   rcu_dereference_protected(nht->hash_buckets[hash_val],
 						     lockdep_is_held(&tbl->lock)));
@@ -556,7 +560,7 @@ out_neigh_release:
 	neigh_release(n);
 	goto out;
 }
-EXPORT_SYMBOL(neigh_create);
+EXPORT_SYMBOL(__neigh_create);
 
 static u32 pneigh_hash(const void *pkey, int key_len)
 {
@@ -712,14 +716,13 @@ void neigh_destroy(struct neighbour *neigh)
 	NEIGH_CACHE_STAT_INC(neigh->tbl, destroys);
 
 	if (!neigh->dead) {
-		printk(KERN_WARNING
-		       "Destroying alive neighbour %p\n", neigh);
+		pr_warn("Destroying alive neighbour %p\n", neigh);
 		dump_stack();
 		return;
 	}
 
 	if (neigh_del_timer(neigh))
-		printk(KERN_WARNING "Impossible event.\n");
+		pr_warn("Impossible event\n");
 
 	skb_queue_purge(&neigh->arp_queue);
 	neigh->arp_queue_len_bytes = 0;
@@ -890,7 +893,7 @@ static void neigh_timer_handler(unsigned long arg)
 {
 	unsigned long now, next;
 	struct neighbour *neigh = (struct neighbour *)arg;
-	unsigned state;
+	unsigned int state;
 	int notify = 0;
 
 	write_lock(&neigh->lock);
@@ -1198,10 +1201,23 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 			write_unlock_bh(&neigh->lock);
 
 			rcu_read_lock();
-			/* On shaper/eql skb->dst->neighbour != neigh :( */
-			if (dst && (n2 = dst_get_neighbour_noref(dst)) != NULL)
-				n1 = n2;
+
+			/* Why not just use 'neigh' as-is?  The problem is that
+			 * things such as shaper, eql, and sch_teql can end up
+			 * using alternative, different, neigh objects to output
+			 * the packet in the output path.  So what we need to do
+			 * here is re-lookup the top-level neigh in the path so
+			 * we can reinject the packet there.
+			 */
+			n2 = NULL;
+			if (dst) {
+				n2 = dst_neigh_lookup_skb(dst, skb);
+				if (n2)
+					n1 = n2;
+			}
 			n1->output(n1, skb);
+			if (n2)
+				neigh_release(n2);
 			rcu_read_unlock();
 
 			write_lock_bh(&neigh->lock);
@@ -1500,7 +1516,7 @@ static void neigh_parms_destroy(struct neigh_parms *parms)
 
 static struct lock_class_key neigh_table_proxy_queue_class;
 
-void neigh_table_init_no_netlink(struct neigh_table *tbl)
+static void neigh_table_init_no_netlink(struct neigh_table *tbl)
 {
 	unsigned long now = jiffies;
 	unsigned long phsize;
@@ -1538,7 +1554,6 @@ void neigh_table_init_no_netlink(struct neigh_table *tbl)
 	tbl->last_flush = now;
 	tbl->last_rand	= now + tbl->parms.reachable_time * 20;
 }
-EXPORT_SYMBOL(neigh_table_init_no_netlink);
 
 void neigh_table_init(struct neigh_table *tbl)
 {
@@ -1555,8 +1570,8 @@ void neigh_table_init(struct neigh_table *tbl)
 	write_unlock(&neigh_tbl_lock);
 
 	if (unlikely(tmp)) {
-		printk(KERN_ERR "NEIGH: Registering multiple tables for "
-		       "family %d\n", tbl->family);
+		pr_err("Registering multiple tables for family %d\n",
+		       tbl->family);
 		dump_stack();
 	}
 }
@@ -1572,7 +1587,7 @@ int neigh_table_clear(struct neigh_table *tbl)
 	pneigh_queue_purge(&tbl->proxy_queue);
 	neigh_ifdown(tbl, NULL);
 	if (atomic_read(&tbl->entries))
-		printk(KERN_CRIT "neighbour leakage\n");
+		pr_crit("neighbour leakage\n");
 	write_lock(&neigh_tbl_lock);
 	for (tp = &neigh_tables; *tp; tp = &(*tp)->next) {
 		if (*tp == tbl) {
@@ -2798,7 +2813,6 @@ enum {
 static struct neigh_sysctl_table {
 	struct ctl_table_header *sysctl_header;
 	struct ctl_table neigh_vars[NEIGH_VAR_MAX + 1];
-	char *dev_name;
 } neigh_sysctl_template __read_mostly = {
 	.neigh_vars = {
 		[NEIGH_VAR_MCAST_PROBE] = {
@@ -2924,19 +2938,7 @@ int neigh_sysctl_register(struct net_device *dev, struct neigh_parms *p,
 {
 	struct neigh_sysctl_table *t;
 	const char *dev_name_source = NULL;
-
-#define NEIGH_CTL_PATH_ROOT	0
-#define NEIGH_CTL_PATH_PROTO	1
-#define NEIGH_CTL_PATH_NEIGH	2
-#define NEIGH_CTL_PATH_DEV	3
-
-	struct ctl_path neigh_path[] = {
-		{ .procname = "net",	 },
-		{ .procname = "proto",	 },
-		{ .procname = "neigh",	 },
-		{ .procname = "default", },
-		{ },
-	};
+	char neigh_path[ sizeof("net//neigh/") + IFNAMSIZ + IFNAMSIZ ];
 
 	t = kmemdup(&neigh_sysctl_template, sizeof(*t), GFP_KERNEL);
 	if (!t)
@@ -2964,7 +2966,7 @@ int neigh_sysctl_register(struct net_device *dev, struct neigh_parms *p,
 		memset(&t->neigh_vars[NEIGH_VAR_GC_INTERVAL], 0,
 		       sizeof(t->neigh_vars[NEIGH_VAR_GC_INTERVAL]));
 	} else {
-		dev_name_source = neigh_path[NEIGH_CTL_PATH_DEV].procname;
+		dev_name_source = "default";
 		t->neigh_vars[NEIGH_VAR_GC_INTERVAL].data = (int *)(p + 1);
 		t->neigh_vars[NEIGH_VAR_GC_THRESH1].data = (int *)(p + 1) + 1;
 		t->neigh_vars[NEIGH_VAR_GC_THRESH2].data = (int *)(p + 1) + 2;
@@ -2987,23 +2989,16 @@ int neigh_sysctl_register(struct net_device *dev, struct neigh_parms *p,
 		t->neigh_vars[NEIGH_VAR_BASE_REACHABLE_TIME_MS].extra1 = dev;
 	}
 
-	t->dev_name = kstrdup(dev_name_source, GFP_KERNEL);
-	if (!t->dev_name)
-		goto free;
-
-	neigh_path[NEIGH_CTL_PATH_DEV].procname = t->dev_name;
-	neigh_path[NEIGH_CTL_PATH_PROTO].procname = p_name;
-
+	snprintf(neigh_path, sizeof(neigh_path), "net/%s/neigh/%s",
+		p_name, dev_name_source);
 	t->sysctl_header =
-		register_net_sysctl_table(neigh_parms_net(p), neigh_path, t->neigh_vars);
+		register_net_sysctl(neigh_parms_net(p), neigh_path, t->neigh_vars);
 	if (!t->sysctl_header)
-		goto free_procname;
+		goto free;
 
 	p->sysctl_table = t;
 	return 0;
 
-free_procname:
-	kfree(t->dev_name);
 free:
 	kfree(t);
 err:
@@ -3016,8 +3011,7 @@ void neigh_sysctl_unregister(struct neigh_parms *p)
 	if (p->sysctl_table) {
 		struct neigh_sysctl_table *t = p->sysctl_table;
 		p->sysctl_table = NULL;
-		unregister_sysctl_table(t->sysctl_header);
-		kfree(t->dev_name);
+		unregister_net_sysctl_table(t->sysctl_header);
 		kfree(t);
 	}
 }

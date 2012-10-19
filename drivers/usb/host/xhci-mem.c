@@ -1772,6 +1772,7 @@ void xhci_mem_cleanup(struct xhci_hcd *xhci)
 {
 	struct pci_dev	*pdev = to_pci_dev(xhci_to_hcd(xhci)->self.controller);
 	struct dev_info	*dev_info, *next;
+	struct xhci_cd  *cur_cd, *next_cd;
 	unsigned long	flags;
 	int size;
 	int i, j, num_ports;
@@ -1788,11 +1789,18 @@ void xhci_mem_cleanup(struct xhci_hcd *xhci)
 	xhci->event_ring = NULL;
 	xhci_dbg(xhci, "Freed event ring\n");
 
+	if (xhci->lpm_command)
+		xhci_free_command(xhci, xhci->lpm_command);
 	xhci->cmd_ring_reserved_trbs = 0;
 	if (xhci->cmd_ring)
 		xhci_ring_free(xhci, xhci->cmd_ring);
 	xhci->cmd_ring = NULL;
 	xhci_dbg(xhci, "Freed command ring\n");
+	list_for_each_entry_safe(cur_cd, next_cd,
+			&xhci->cancel_cmd_list, cancel_cmd_list) {
+		list_del(&cur_cd->cancel_cmd_list);
+		kfree(cur_cd);
+	}
 
 	for (i = 1; i < MAX_HC_SLOTS; ++i)
 		xhci_free_virt_device(xhci, i);
@@ -2338,6 +2346,7 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 	xhci->cmd_ring = xhci_ring_alloc(xhci, 1, 1, TYPE_COMMAND, flags);
 	if (!xhci->cmd_ring)
 		goto fail;
+	INIT_LIST_HEAD(&xhci->cancel_cmd_list);
 	xhci_dbg(xhci, "Allocated command ring at %p\n", xhci->cmd_ring);
 	xhci_dbg(xhci, "First segment DMA is 0x%llx\n",
 			(unsigned long long)xhci->cmd_ring->first_seg->dma);
@@ -2350,6 +2359,16 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 	xhci_dbg(xhci, "// Setting command ring address to 0x%x\n", val);
 	xhci_write_64(xhci, val_64, &xhci->op_regs->cmd_ring);
 	xhci_dbg_cmd_ptrs(xhci);
+
+	xhci->lpm_command = xhci_alloc_command(xhci, true, true, flags);
+	if (!xhci->lpm_command)
+		goto fail;
+
+	/* Reserve one command ring TRB for disabling LPM.
+	 * Since the USB core grabs the shared usb_bus bandwidth mutex before
+	 * disabling LPM, we only need to reserve one TRB for all devices.
+	 */
+	xhci->cmd_ring_reserved_trbs++;
 
 	val = xhci_readl(xhci, &xhci->cap_regs->db_off);
 	val &= DBOFF_MASK;

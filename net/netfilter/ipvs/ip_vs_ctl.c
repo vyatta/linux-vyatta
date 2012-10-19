@@ -76,19 +76,19 @@ static void __ip_vs_del_service(struct ip_vs_service *svc);
 
 #ifdef CONFIG_IP_VS_IPV6
 /* Taken from rt6_fill_node() in net/ipv6/route.c, is there a better way? */
-static int __ip_vs_addr_is_local_v6(struct net *net,
-				    const struct in6_addr *addr)
+static bool __ip_vs_addr_is_local_v6(struct net *net,
+				     const struct in6_addr *addr)
 {
-	struct rt6_info *rt;
 	struct flowi6 fl6 = {
 		.daddr = *addr,
 	};
+	struct dst_entry *dst = ip6_route_output(net, NULL, &fl6);
+	bool is_local;
 
-	rt = (struct rt6_info *)ip6_route_output(net, NULL, &fl6);
-	if (rt && rt->dst.dev && (rt->dst.dev->flags & IFF_LOOPBACK))
-		return 1;
+	is_local = !dst->error && dst->dev && (dst->dev->flags & IFF_LOOPBACK);
 
-	return 0;
+	dst_release(dst);
+	return is_local;
 }
 #endif
 
@@ -265,11 +265,11 @@ static struct list_head ip_vs_svc_fwm_table[IP_VS_SVC_TAB_SIZE];
 /*
  *	Returns hash value for virtual service
  */
-static inline unsigned
-ip_vs_svc_hashkey(struct net *net, int af, unsigned proto,
+static inline unsigned int
+ip_vs_svc_hashkey(struct net *net, int af, unsigned int proto,
 		  const union nf_inet_addr *addr, __be16 port)
 {
-	register unsigned porth = ntohs(port);
+	register unsigned int porth = ntohs(port);
 	__be32 addr_fold = addr->ip;
 
 #ifdef CONFIG_IP_VS_IPV6
@@ -286,7 +286,7 @@ ip_vs_svc_hashkey(struct net *net, int af, unsigned proto,
 /*
  *	Returns hash value of fwmark for virtual service lookup
  */
-static inline unsigned ip_vs_svc_fwm_hashkey(struct net *net, __u32 fwmark)
+static inline unsigned int ip_vs_svc_fwm_hashkey(struct net *net, __u32 fwmark)
 {
 	return (((size_t)net>>8) ^ fwmark) & IP_VS_SVC_TAB_MASK;
 }
@@ -298,7 +298,7 @@ static inline unsigned ip_vs_svc_fwm_hashkey(struct net *net, __u32 fwmark)
  */
 static int ip_vs_svc_hash(struct ip_vs_service *svc)
 {
-	unsigned hash;
+	unsigned int hash;
 
 	if (svc->flags & IP_VS_SVC_F_HASHED) {
 		pr_err("%s(): request for already hashed, called from %pF\n",
@@ -361,7 +361,7 @@ static inline struct ip_vs_service *
 __ip_vs_service_find(struct net *net, int af, __u16 protocol,
 		     const union nf_inet_addr *vaddr, __be16 vport)
 {
-	unsigned hash;
+	unsigned int hash;
 	struct ip_vs_service *svc;
 
 	/* Check for "full" addressed entries */
@@ -388,7 +388,7 @@ __ip_vs_service_find(struct net *net, int af, __u16 protocol,
 static inline struct ip_vs_service *
 __ip_vs_svc_fwm_find(struct net *net, int af, __u32 fwmark)
 {
-	unsigned hash;
+	unsigned int hash;
 	struct ip_vs_service *svc;
 
 	/* Check for fwmark addressed entries */
@@ -489,11 +489,11 @@ __ip_vs_unbind_svc(struct ip_vs_dest *dest)
 /*
  *	Returns hash value for real service
  */
-static inline unsigned ip_vs_rs_hashkey(int af,
+static inline unsigned int ip_vs_rs_hashkey(int af,
 					    const union nf_inet_addr *addr,
 					    __be16 port)
 {
-	register unsigned porth = ntohs(port);
+	register unsigned int porth = ntohs(port);
 	__be32 addr_fold = addr->ip;
 
 #ifdef CONFIG_IP_VS_IPV6
@@ -512,7 +512,7 @@ static inline unsigned ip_vs_rs_hashkey(int af,
  */
 static int ip_vs_rs_hash(struct netns_ipvs *ipvs, struct ip_vs_dest *dest)
 {
-	unsigned hash;
+	unsigned int hash;
 
 	if (!list_empty(&dest->d_list)) {
 		return 0;
@@ -555,7 +555,7 @@ ip_vs_lookup_real_service(struct net *net, int af, __u16 protocol,
 			  __be16 dport)
 {
 	struct netns_ipvs *ipvs = net_ipvs(net);
-	unsigned hash;
+	unsigned int hash;
 	struct ip_vs_dest *dest;
 
 	/*
@@ -842,7 +842,7 @@ ip_vs_new_dest(struct ip_vs_service *svc, struct ip_vs_dest_user_kern *udest,
 	       struct ip_vs_dest **dest_p)
 {
 	struct ip_vs_dest *dest;
-	unsigned atype;
+	unsigned int atype;
 
 	EnterFunction(2);
 
@@ -1171,8 +1171,10 @@ ip_vs_add_service(struct net *net, struct ip_vs_service_user_kern *u,
 		goto out_err;
 	}
 	svc->stats.cpustats = alloc_percpu(struct ip_vs_cpu_stats);
-	if (!svc->stats.cpustats)
+	if (!svc->stats.cpustats) {
+		ret = -ENOMEM;
 		goto out_err;
+	}
 
 	/* I'm the first user of the service */
 	atomic_set(&svc->usecnt, 0);
@@ -1521,11 +1523,12 @@ static int ip_vs_dst_event(struct notifier_block *this, unsigned long event,
 {
 	struct net_device *dev = ptr;
 	struct net *net = dev_net(dev);
+	struct netns_ipvs *ipvs = net_ipvs(net);
 	struct ip_vs_service *svc;
 	struct ip_vs_dest *dest;
 	unsigned int idx;
 
-	if (event != NETDEV_UNREGISTER)
+	if (event != NETDEV_UNREGISTER || !ipvs)
 		return NOTIFY_DONE;
 	IP_VS_DBG(3, "%s() dev=%s\n", __func__, dev->name);
 	EnterFunction(2);
@@ -1551,7 +1554,7 @@ static int ip_vs_dst_event(struct notifier_block *this, unsigned long event,
 		}
 	}
 
-	list_for_each_entry(dest, &net_ipvs(net)->dest_trash, n_list) {
+	list_for_each_entry(dest, &ipvs->dest_trash, n_list) {
 		__ip_vs_dev_reset(dest, dev);
 	}
 	mutex_unlock(&__ip_vs_mutex);
@@ -1599,6 +1602,10 @@ static int ip_vs_zero_all(struct net *net)
 }
 
 #ifdef CONFIG_SYSCTL
+
+static int zero;
+static int three = 3;
+
 static int
 proc_do_defense_mode(ctl_table *table, int write,
 		     void __user *buffer, size_t *lenp, loff_t *ppos)
@@ -1632,7 +1639,8 @@ proc_do_sync_threshold(ctl_table *table, int write,
 	memcpy(val, valp, sizeof(val));
 
 	rc = proc_dointvec(table, write, buffer, lenp, ppos);
-	if (write && (valp[0] < 0 || valp[1] < 0 || valp[0] >= valp[1])) {
+	if (write && (valp[0] < 0 || valp[1] < 0 ||
+	    (valp[0] >= valp[1] && valp[1]))) {
 		/* Restore the correct value */
 		memcpy(valp, val, sizeof(val));
 	}
@@ -1652,9 +1660,24 @@ proc_do_sync_mode(ctl_table *table, int write,
 		if ((*valp < 0) || (*valp > 1)) {
 			/* Restore the correct value */
 			*valp = val;
-		} else {
-			struct net *net = current->nsproxy->net_ns;
-			ip_vs_sync_switch_mode(net, val);
+		}
+	}
+	return rc;
+}
+
+static int
+proc_do_sync_ports(ctl_table *table, int write,
+		   void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	int *valp = table->data;
+	int val = *valp;
+	int rc;
+
+	rc = proc_dointvec(table, write, buffer, lenp, ppos);
+	if (write && (*valp != val)) {
+		if (*valp < 1 || !is_power_of_2(*valp)) {
+			/* Restore the correct value */
+			*valp = val;
 		}
 	}
 	return rc;
@@ -1718,6 +1741,24 @@ static struct ctl_table vs_vars[] = {
 		.proc_handler	= &proc_do_sync_mode,
 	},
 	{
+		.procname	= "sync_ports",
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_do_sync_ports,
+	},
+	{
+		.procname	= "sync_qlen_max",
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "sync_sock_size",
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
 		.procname	= "cache_bypass",
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
@@ -1741,6 +1782,20 @@ static struct ctl_table vs_vars[] = {
 			sizeof(((struct netns_ipvs *)0)->sysctl_sync_threshold),
 		.mode		= 0644,
 		.proc_handler	= proc_do_sync_threshold,
+	},
+	{
+		.procname	= "sync_refresh_period",
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_jiffies,
+	},
+	{
+		.procname	= "sync_retries",
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &three,
 	},
 	{
 		.procname	= "nat_icmp_send",
@@ -1846,13 +1901,6 @@ static struct ctl_table vs_vars[] = {
 	{ }
 };
 
-const struct ctl_path net_vs_ctl_path[] = {
-	{ .procname = "net", },
-	{ .procname = "ipv4", },
-	{ .procname = "vs", },
-	{ }
-};
-EXPORT_SYMBOL_GPL(net_vs_ctl_path);
 #endif
 
 #ifdef CONFIG_PROC_FS
@@ -1867,7 +1915,7 @@ struct ip_vs_iter {
  *	Write the contents of the VS rule table to a PROCfs file.
  *	(It is kept just for backward compatibility)
  */
-static inline const char *ip_vs_fwd_name(unsigned flags)
+static inline const char *ip_vs_fwd_name(unsigned int flags)
 {
 	switch (flags & IP_VS_CONN_F_FWD_MASK) {
 	case IP_VS_CONN_F_LOCALNODE:
@@ -2713,6 +2761,7 @@ do_ip_vs_get_ctl(struct sock *sk, int cmd, void __user *user, int *len)
 	{
 		struct ip_vs_timeout_user t;
 
+		memset(&t, 0, sizeof(t));
 		__ip_vs_get_timeouts(net, &t);
 		if (copy_to_user(user, &t, sizeof(t)) != 0)
 			ret = -EFAULT;
@@ -3662,6 +3711,12 @@ int __net_init ip_vs_control_net_init_sysctl(struct net *net)
 	tbl[idx++].data = &ipvs->sysctl_snat_reroute;
 	ipvs->sysctl_sync_ver = 1;
 	tbl[idx++].data = &ipvs->sysctl_sync_ver;
+	ipvs->sysctl_sync_ports = 1;
+	tbl[idx++].data = &ipvs->sysctl_sync_ports;
+	ipvs->sysctl_sync_qlen_max = nr_free_buffer_pages() / 32;
+	tbl[idx++].data = &ipvs->sysctl_sync_qlen_max;
+	ipvs->sysctl_sync_sock_size = 0;
+	tbl[idx++].data = &ipvs->sysctl_sync_sock_size;
 	tbl[idx++].data = &ipvs->sysctl_cache_bypass;
 	tbl[idx++].data = &ipvs->sysctl_expire_nodest_conn;
 	tbl[idx++].data = &ipvs->sysctl_expire_quiescent_template;
@@ -3669,11 +3724,14 @@ int __net_init ip_vs_control_net_init_sysctl(struct net *net)
 	ipvs->sysctl_sync_threshold[1] = DEFAULT_SYNC_PERIOD;
 	tbl[idx].data = &ipvs->sysctl_sync_threshold;
 	tbl[idx++].maxlen = sizeof(ipvs->sysctl_sync_threshold);
+	ipvs->sysctl_sync_refresh_period = DEFAULT_SYNC_REFRESH_PERIOD;
+	tbl[idx++].data = &ipvs->sysctl_sync_refresh_period;
+	ipvs->sysctl_sync_retries = clamp_t(int, DEFAULT_SYNC_RETRIES, 0, 3);
+	tbl[idx++].data = &ipvs->sysctl_sync_retries;
 	tbl[idx++].data = &ipvs->sysctl_nat_icmp_send;
 
 
-	ipvs->sysctl_hdr = register_net_sysctl_table(net, net_vs_ctl_path,
-						     tbl);
+	ipvs->sysctl_hdr = register_net_sysctl(net, "net/ipv4/vs", tbl);
 	if (ipvs->sysctl_hdr == NULL) {
 		if (!net_eq(net, &init_net))
 			kfree(tbl);

@@ -444,7 +444,7 @@ static int evergreen_cs_track_validate_cb(struct radeon_cs_parser *p, unsigned i
 		 * command stream.
 		 */
 		if (!surf.mode) {
-			volatile u32 *ib = p->ib->ptr;
+			volatile u32 *ib = p->ib.ptr;
 			unsigned long tmp, nby, bsize, size, min = 0;
 
 			/* find the height the ddx wants */
@@ -788,6 +788,13 @@ static int evergreen_cs_track_validate_texture(struct radeon_cs_parser *p,
 	case V_030000_SQ_TEX_DIM_1D_ARRAY:
 	case V_030000_SQ_TEX_DIM_2D_ARRAY:
 		depth = 1;
+		break;
+	case V_030000_SQ_TEX_DIM_2D_MSAA:
+	case V_030000_SQ_TEX_DIM_2D_ARRAY_MSAA:
+		surf.nsamples = 1 << llevel;
+		llevel = 0;
+		depth = 1;
+		break;
 	case V_030000_SQ_TEX_DIM_3D:
 		break;
 	default:
@@ -837,6 +844,16 @@ static int evergreen_cs_track_validate_texture(struct radeon_cs_parser *p,
 			depth, radeon_bo_size(texture),
 			surf.nbx, surf.nby);
 		return -EINVAL;
+	}
+
+	if (!mipmap) {
+		if (llevel) {
+			dev_warn(p->dev, "%s:%i got NULL MIP_ADDRESS relocation\n",
+				 __func__, __LINE__);
+			return -EINVAL;
+		} else {
+			return 0; /* everything's ok */
+		}
 	}
 
 	/* check mipmap size */
@@ -961,13 +978,15 @@ static int evergreen_cs_track_check(struct radeon_cs_parser *p)
 
 	if (track->db_dirty) {
 		/* Check stencil buffer */
-		if (G_028800_STENCIL_ENABLE(track->db_depth_control)) {
+		if (G_028044_FORMAT(track->db_s_info) != V_028044_STENCIL_INVALID &&
+		    G_028800_STENCIL_ENABLE(track->db_depth_control)) {
 			r = evergreen_cs_track_validate_stencil(p);
 			if (r)
 				return r;
 		}
 		/* Check depth buffer */
-		if (G_028800_Z_ENABLE(track->db_depth_control)) {
+		if (G_028040_FORMAT(track->db_z_info) != V_028040_Z_INVALID &&
+		    G_028800_Z_ENABLE(track->db_depth_control)) {
 			r = evergreen_cs_track_validate_depth(p);
 			if (r)
 				return r;
@@ -1072,6 +1091,27 @@ static int evergreen_cs_packet_next_reloc(struct radeon_cs_parser *p,
 }
 
 /**
+ * evergreen_cs_packet_next_is_pkt3_nop() - test if the next packet is NOP
+ * @p:		structure holding the parser context.
+ *
+ * Check if the next packet is a relocation packet3.
+ **/
+static bool evergreen_cs_packet_next_is_pkt3_nop(struct radeon_cs_parser *p)
+{
+	struct radeon_cs_packet p3reloc;
+	int r;
+
+	r = evergreen_cs_packet_parse(p, &p3reloc, p->idx);
+	if (r) {
+		return false;
+	}
+	if (p3reloc.type != PACKET_TYPE3 || p3reloc.opcode != PACKET3_NOP) {
+		return false;
+	}
+	return true;
+}
+
+/**
  * evergreen_cs_packet_next_vline() - parse userspace VLINE packet
  * @parser:		parser structure holding parsing context.
  *
@@ -1096,7 +1136,7 @@ static int evergreen_cs_packet_parse_vline(struct radeon_cs_parser *p)
 	uint32_t header, h_idx, reg, wait_reg_mem_info;
 	volatile uint32_t *ib;
 
-	ib = p->ib->ptr;
+	ib = p->ib.ptr;
 
 	/* parse the WAIT_REG_MEM */
 	r = evergreen_cs_packet_parse(p, &wait_reg_mem, p->idx);
@@ -1254,7 +1294,7 @@ static int evergreen_cs_check_reg(struct radeon_cs_parser *p, u32 reg, u32 idx)
 		if (!(evergreen_reg_safe_bm[i] & m))
 			return 0;
 	}
-	ib = p->ib->ptr;
+	ib = p->ib.ptr;
 	switch (reg) {
 	/* force following reg to 0 in an attempt to disable out buffer
 	 * which will need us to better understand how it works to perform
@@ -1937,7 +1977,7 @@ static int evergreen_packet3_check(struct radeon_cs_parser *p,
 	u32 idx_value;
 
 	track = (struct evergreen_cs_track *)p->track;
-	ib = p->ib->ptr;
+	ib = p->ib.ptr;
 	idx = pkt->idx + 1;
 	idx_value = radeon_get_ib_value(p, idx);
 
@@ -2321,7 +2361,7 @@ static int evergreen_packet3_check(struct radeon_cs_parser *p,
 		for (i = 0; i < (pkt->count / 8); i++) {
 			struct radeon_bo *texture, *mipmap;
 			u32 toffset, moffset;
-			u32 size, offset;
+			u32 size, offset, mip_address, tex_dim;
 
 			switch (G__SQ_CONSTANT_TYPE(radeon_get_ib_value(p, idx+1+(i*8)+7))) {
 			case SQ_TEX_VTX_VALID_TEXTURE:
@@ -2350,14 +2390,28 @@ static int evergreen_packet3_check(struct radeon_cs_parser *p,
 				}
 				texture = reloc->robj;
 				toffset = (u32)((reloc->lobj.gpu_offset >> 8) & 0xffffffff);
+
 				/* tex mip base */
-				r = evergreen_cs_packet_next_reloc(p, &reloc);
-				if (r) {
-					DRM_ERROR("bad SET_RESOURCE (tex)\n");
-					return -EINVAL;
+				tex_dim = ib[idx+1+(i*8)+0] & 0x7;
+				mip_address = ib[idx+1+(i*8)+3];
+
+				if ((tex_dim == SQ_TEX_DIM_2D_MSAA || tex_dim == SQ_TEX_DIM_2D_ARRAY_MSAA) &&
+				    !mip_address &&
+				    !evergreen_cs_packet_next_is_pkt3_nop(p)) {
+					/* MIP_ADDRESS should point to FMASK for an MSAA texture.
+					 * It should be 0 if FMASK is disabled. */
+					moffset = 0;
+					mipmap = NULL;
+				} else {
+					r = evergreen_cs_packet_next_reloc(p, &reloc);
+					if (r) {
+						DRM_ERROR("bad SET_RESOURCE (tex)\n");
+						return -EINVAL;
+					}
+					moffset = (u32)((reloc->lobj.gpu_offset >> 8) & 0xffffffff);
+					mipmap = reloc->robj;
 				}
-				moffset = (u32)((reloc->lobj.gpu_offset >> 8) & 0xffffffff);
-				mipmap = reloc->robj;
+
 				r = evergreen_cs_track_validate_texture(p, texture, mipmap, idx+1+(i*8));
 				if (r)
 					return r;
@@ -2651,8 +2705,8 @@ int evergreen_cs_parse(struct radeon_cs_parser *p)
 		}
 	} while (p->idx < p->chunks[p->chunk_ib_idx].length_dw);
 #if 0
-	for (r = 0; r < p->ib->length_dw; r++) {
-		printk(KERN_INFO "%05d  0x%08X\n", r, p->ib->ptr[r]);
+	for (r = 0; r < p->ib.length_dw; r++) {
+		printk(KERN_INFO "%05d  0x%08X\n", r, p->ib.ptr[r]);
 		mdelay(1);
 	}
 #endif

@@ -31,8 +31,7 @@ bool vlan_do_receive(struct sk_buff **skbp, bool last_handler)
 		/* Our lower layer thinks this is not local, let's make sure.
 		 * This allows the VLAN to have a different MAC than the
 		 * underlying device, and still route correctly. */
-		if (!compare_ether_addr(eth_hdr(skb)->h_dest,
-					vlan_dev->dev_addr))
+		if (ether_addr_equal(eth_hdr(skb)->h_dest, vlan_dev->dev_addr))
 			skb->pkt_type = PACKET_HOST;
 	}
 
@@ -106,7 +105,6 @@ static struct sk_buff *vlan_reorder_header(struct sk_buff *skb)
 		return NULL;
 	memmove(skb->data - ETH_HLEN, skb->data - VLAN_ETH_HLEN, 2 * ETH_ALEN);
 	skb->mac_header += VLAN_HLEN;
-	skb_reset_mac_len(skb);
 	return skb;
 }
 
@@ -140,6 +138,8 @@ struct sk_buff *vlan_untag(struct sk_buff *skb)
 
 	skb_reset_network_header(skb);
 	skb_reset_transport_header(skb);
+	skb_reset_mac_len(skb);
+
 	return skb;
 
 err_free:

@@ -224,6 +224,7 @@ struct net_bridge
 	unsigned char			multicast_router;
 
 	u8				multicast_disabled:1;
+	u8				multicast_querier:1;
 
 	u32				hash_elasticity;
 	u32				hash_max;
@@ -315,7 +316,7 @@ static inline void br_netpoll_send_skb(const struct net_bridge_port *p,
 		netpoll_send_skb(np, skb);
 }
 
-extern int br_netpoll_enable(struct net_bridge_port *p);
+extern int br_netpoll_enable(struct net_bridge_port *p, gfp_t gfp);
 extern void br_netpoll_disable(struct net_bridge_port *p);
 #else
 static inline struct netpoll_info *br_netpoll_info(struct net_bridge *br)
@@ -328,7 +329,7 @@ static inline void br_netpoll_send_skb(const struct net_bridge_port *p,
 {
 }
 
-static inline int br_netpoll_enable(struct net_bridge_port *p)
+static inline int br_netpoll_enable(struct net_bridge_port *p, gfp_t gfp)
 {
 	return 0;
 }
@@ -426,6 +427,7 @@ extern int br_multicast_set_router(struct net_bridge *br, unsigned long val);
 extern int br_multicast_set_port_router(struct net_bridge_port *p,
 					unsigned long val);
 extern int br_multicast_toggle(struct net_bridge *br, unsigned long val);
+extern int br_multicast_set_querier(struct net_bridge *br, unsigned long val);
 extern int br_multicast_set_hash_max(struct net_bridge *br, unsigned long val);
 
 static inline bool br_multicast_is_router(struct net_bridge *br)

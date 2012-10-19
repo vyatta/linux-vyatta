@@ -33,7 +33,7 @@ static struct genl_multicast_group nfc_genl_event_mcgrp = {
 	.name = NFC_GENL_MCAST_EVENT_NAME,
 };
 
-struct genl_family nfc_genl_family = {
+static struct genl_family nfc_genl_family = {
 	.id = GENL_ID_GENERATE,
 	.hdrsize = 0,
 	.name = NFC_GENL_NAME,
@@ -49,6 +49,8 @@ static const struct nla_policy nfc_genl_policy[NFC_ATTR_MAX + 1] = {
 	[NFC_ATTR_COMM_MODE] = { .type = NLA_U8 },
 	[NFC_ATTR_RF_MODE] = { .type = NLA_U8 },
 	[NFC_ATTR_DEVICE_POWERED] = { .type = NLA_U8 },
+	[NFC_ATTR_IM_PROTOCOLS] = { .type = NLA_U32 },
+	[NFC_ATTR_TM_PROTOCOLS] = { .type = NLA_U32 },
 };
 
 static int nfc_genl_send_target(struct sk_buff *msg, struct nfc_target *target,
@@ -128,7 +130,7 @@ static int nfc_genl_dump_targets(struct sk_buff *skb,
 		cb->args[1] = (long) dev;
 	}
 
-	spin_lock_bh(&dev->targets_lock);
+	device_lock(&dev->dev);
 
 	cb->seq = dev->targets_generation;
 
@@ -141,7 +143,7 @@ static int nfc_genl_dump_targets(struct sk_buff *skb,
 		i++;
 	}
 
-	spin_unlock_bh(&dev->targets_lock);
+	device_unlock(&dev->dev);
 
 	cb->args[0] = i;
 
@@ -165,7 +167,7 @@ int nfc_genl_targets_found(struct nfc_dev *dev)
 
 	dev->genl_data.poll_req_pid = 0;
 
-	msg = nlmsg_new(NLMSG_GOODSIZE, GFP_ATOMIC);
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_ATOMIC);
 	if (!msg)
 		return -ENOMEM;
 
@@ -188,12 +190,105 @@ free_msg:
 	return -EMSGSIZE;
 }
 
+int nfc_genl_target_lost(struct nfc_dev *dev, u32 target_idx)
+{
+	struct sk_buff *msg;
+	void *hdr;
+
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (!msg)
+		return -ENOMEM;
+
+	hdr = genlmsg_put(msg, 0, 0, &nfc_genl_family, 0,
+			  NFC_EVENT_TARGET_LOST);
+	if (!hdr)
+		goto free_msg;
+
+	if (nla_put_string(msg, NFC_ATTR_DEVICE_NAME, nfc_device_name(dev)) ||
+	    nla_put_u32(msg, NFC_ATTR_TARGET_INDEX, target_idx))
+		goto nla_put_failure;
+
+	genlmsg_end(msg, hdr);
+
+	genlmsg_multicast(msg, 0, nfc_genl_event_mcgrp.id, GFP_KERNEL);
+
+	return 0;
+
+nla_put_failure:
+	genlmsg_cancel(msg, hdr);
+free_msg:
+	nlmsg_free(msg);
+	return -EMSGSIZE;
+}
+
+int nfc_genl_tm_activated(struct nfc_dev *dev, u32 protocol)
+{
+	struct sk_buff *msg;
+	void *hdr;
+
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (!msg)
+		return -ENOMEM;
+
+	hdr = genlmsg_put(msg, 0, 0, &nfc_genl_family, 0,
+			  NFC_EVENT_TM_ACTIVATED);
+	if (!hdr)
+		goto free_msg;
+
+	if (nla_put_u32(msg, NFC_ATTR_DEVICE_INDEX, dev->idx))
+		goto nla_put_failure;
+	if (nla_put_u32(msg, NFC_ATTR_TM_PROTOCOLS, protocol))
+		goto nla_put_failure;
+
+	genlmsg_end(msg, hdr);
+
+	genlmsg_multicast(msg, 0, nfc_genl_event_mcgrp.id, GFP_KERNEL);
+
+	return 0;
+
+nla_put_failure:
+	genlmsg_cancel(msg, hdr);
+free_msg:
+	nlmsg_free(msg);
+	return -EMSGSIZE;
+}
+
+int nfc_genl_tm_deactivated(struct nfc_dev *dev)
+{
+	struct sk_buff *msg;
+	void *hdr;
+
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (!msg)
+		return -ENOMEM;
+
+	hdr = genlmsg_put(msg, 0, 0, &nfc_genl_family, 0,
+			  NFC_EVENT_TM_DEACTIVATED);
+	if (!hdr)
+		goto free_msg;
+
+	if (nla_put_u32(msg, NFC_ATTR_DEVICE_INDEX, dev->idx))
+		goto nla_put_failure;
+
+	genlmsg_end(msg, hdr);
+
+	genlmsg_multicast(msg, 0, nfc_genl_event_mcgrp.id, GFP_KERNEL);
+
+	return 0;
+
+nla_put_failure:
+	genlmsg_cancel(msg, hdr);
+free_msg:
+	nlmsg_free(msg);
+	return -EMSGSIZE;
+}
+
 int nfc_genl_device_added(struct nfc_dev *dev)
 {
 	struct sk_buff *msg;
 	void *hdr;
 
-	msg = nlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
 	if (!msg)
 		return -ENOMEM;
 
@@ -226,7 +321,7 @@ int nfc_genl_device_removed(struct nfc_dev *dev)
 	struct sk_buff *msg;
 	void *hdr;
 
-	msg = nlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
 	if (!msg)
 		return -ENOMEM;
 
@@ -339,7 +434,7 @@ int nfc_genl_dep_link_up_event(struct nfc_dev *dev, u32 target_idx,
 
 	pr_debug("DEP link is up\n");
 
-	msg = nlmsg_new(NLMSG_GOODSIZE, GFP_ATOMIC);
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_ATOMIC);
 	if (!msg)
 		return -ENOMEM;
 
@@ -378,7 +473,7 @@ int nfc_genl_dep_link_down_event(struct nfc_dev *dev)
 
 	pr_debug("DEP link is down\n");
 
-	msg = nlmsg_new(NLMSG_GOODSIZE, GFP_ATOMIC);
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_ATOMIC);
 	if (!msg)
 		return -ENOMEM;
 
@@ -419,7 +514,7 @@ static int nfc_genl_get_device(struct sk_buff *skb, struct genl_info *info)
 	if (!dev)
 		return -ENODEV;
 
-	msg = nlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
 	if (!msg) {
 		rc = -ENOMEM;
 		goto out_putdev;
@@ -488,16 +583,25 @@ static int nfc_genl_start_poll(struct sk_buff *skb, struct genl_info *info)
 	struct nfc_dev *dev;
 	int rc;
 	u32 idx;
-	u32 protocols;
+	u32 im_protocols = 0, tm_protocols = 0;
 
 	pr_debug("Poll start\n");
 
 	if (!info->attrs[NFC_ATTR_DEVICE_INDEX] ||
-	    !info->attrs[NFC_ATTR_PROTOCOLS])
+	    ((!info->attrs[NFC_ATTR_IM_PROTOCOLS] &&
+	      !info->attrs[NFC_ATTR_PROTOCOLS]) &&
+	     !info->attrs[NFC_ATTR_TM_PROTOCOLS]))
 		return -EINVAL;
 
 	idx = nla_get_u32(info->attrs[NFC_ATTR_DEVICE_INDEX]);
-	protocols = nla_get_u32(info->attrs[NFC_ATTR_PROTOCOLS]);
+
+	if (info->attrs[NFC_ATTR_TM_PROTOCOLS])
+		tm_protocols = nla_get_u32(info->attrs[NFC_ATTR_TM_PROTOCOLS]);
+
+	if (info->attrs[NFC_ATTR_IM_PROTOCOLS])
+		im_protocols = nla_get_u32(info->attrs[NFC_ATTR_IM_PROTOCOLS]);
+	else if (info->attrs[NFC_ATTR_PROTOCOLS])
+		im_protocols = nla_get_u32(info->attrs[NFC_ATTR_PROTOCOLS]);
 
 	dev = nfc_get_device(idx);
 	if (!dev)
@@ -505,7 +609,7 @@ static int nfc_genl_start_poll(struct sk_buff *skb, struct genl_info *info)
 
 	mutex_lock(&dev->genl_data.genl_data_mutex);
 
-	rc = nfc_start_poll(dev, protocols);
+	rc = nfc_start_poll(dev, im_protocols, tm_protocols);
 	if (!rc)
 		dev->genl_data.poll_req_pid = info->snd_pid;
 
@@ -529,6 +633,15 @@ static int nfc_genl_stop_poll(struct sk_buff *skb, struct genl_info *info)
 	dev = nfc_get_device(idx);
 	if (!dev)
 		return -ENODEV;
+
+	device_lock(&dev->dev);
+
+	if (!dev->polling) {
+		device_unlock(&dev->dev);
+		return -EINVAL;
+	}
+
+	device_unlock(&dev->dev);
 
 	mutex_lock(&dev->genl_data.genl_data_mutex);
 

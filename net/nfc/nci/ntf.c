@@ -170,7 +170,10 @@ static int nci_add_new_protocol(struct nci_dev *ndev,
 	if (rf_protocol == NCI_RF_PROTOCOL_T2T)
 		protocol = NFC_PROTO_MIFARE_MASK;
 	else if (rf_protocol == NCI_RF_PROTOCOL_ISO_DEP)
-		protocol = NFC_PROTO_ISO14443_MASK;
+		if (rf_tech_and_mode == NCI_NFC_A_PASSIVE_POLL_MODE)
+			protocol = NFC_PROTO_ISO14443_MASK;
+		else
+			protocol = NFC_PROTO_ISO14443_B_MASK;
 	else if (rf_protocol == NCI_RF_PROTOCOL_T3T)
 		protocol = NFC_PROTO_FELICA_MASK;
 	else
@@ -227,7 +230,7 @@ static void nci_add_new_target(struct nci_dev *ndev,
 
 	for (i = 0; i < ndev->n_targets; i++) {
 		target = &ndev->targets[i];
-		if (target->idx == ntf->rf_discovery_id) {
+		if (target->logical_idx == ntf->rf_discovery_id) {
 			/* This target already exists, add the new protocol */
 			nci_add_new_protocol(ndev, target, ntf->rf_protocol,
 					     ntf->rf_tech_and_mode,
@@ -248,10 +251,10 @@ static void nci_add_new_target(struct nci_dev *ndev,
 				  ntf->rf_tech_and_mode,
 				  &ntf->rf_tech_specific_params);
 	if (!rc) {
-		target->idx = ntf->rf_discovery_id;
+		target->logical_idx = ntf->rf_discovery_id;
 		ndev->n_targets++;
 
-		pr_debug("target_idx %d, n_targets %d\n", target->idx,
+		pr_debug("logical idx %d, n_targets %d\n", target->logical_idx,
 			 ndev->n_targets);
 	}
 }
@@ -372,10 +375,11 @@ static void nci_target_auto_activated(struct nci_dev *ndev,
 	if (rc)
 		return;
 
-	target->idx = ntf->rf_discovery_id;
+	target->logical_idx = ntf->rf_discovery_id;
 	ndev->n_targets++;
 
-	pr_debug("target_idx %d, n_targets %d\n", target->idx, ndev->n_targets);
+	pr_debug("logical idx %d, n_targets %d\n",
+		 target->logical_idx, ndev->n_targets);
 
 	nfc_targets_found(ndev->nfc_dev, ndev->targets, ndev->n_targets);
 }
@@ -496,7 +500,7 @@ static void nci_rf_deactivate_ntf_packet(struct nci_dev *ndev,
 	/* drop partial rx data packet */
 	if (ndev->rx_data_reassembly) {
 		kfree_skb(ndev->rx_data_reassembly);
-		ndev->rx_data_reassembly = 0;
+		ndev->rx_data_reassembly = NULL;
 	}
 
 	/* complete the data exchange transaction, if exists */

@@ -548,8 +548,8 @@ static void send_mpa_req(struct c4iw_ep *ep, struct sk_buff *skb,
 	}
 
 	if (mpa_rev_to_use == 2) {
-		mpa->private_data_size +=
-			htons(sizeof(struct mpa_v2_conn_params));
+		mpa->private_data_size = htons(ntohs(mpa->private_data_size) +
+					       sizeof (struct mpa_v2_conn_params));
 		mpa_v2_params.ird = htons((u16)ep->ird);
 		mpa_v2_params.ord = htons((u16)ep->ord);
 
@@ -635,8 +635,8 @@ static int send_mpa_reject(struct c4iw_ep *ep, const void *pdata, u8 plen)
 
 	if (ep->mpa_attr.version == 2 && ep->mpa_attr.enhanced_rdma_conn) {
 		mpa->flags |= MPA_ENHANCED_RDMA_CONN;
-		mpa->private_data_size +=
-			htons(sizeof(struct mpa_v2_conn_params));
+		mpa->private_data_size = htons(ntohs(mpa->private_data_size) +
+					       sizeof (struct mpa_v2_conn_params));
 		mpa_v2_params.ird = htons(((u16)ep->ird) |
 					  (peer2peer ? MPA_V2_PEER2PEER_MODEL :
 					   0));
@@ -715,8 +715,8 @@ static int send_mpa_reply(struct c4iw_ep *ep, const void *pdata, u8 plen)
 
 	if (ep->mpa_attr.version == 2 && ep->mpa_attr.enhanced_rdma_conn) {
 		mpa->flags |= MPA_ENHANCED_RDMA_CONN;
-		mpa->private_data_size +=
-			htons(sizeof(struct mpa_v2_conn_params));
+		mpa->private_data_size = htons(ntohs(mpa->private_data_size) +
+					       sizeof (struct mpa_v2_conn_params));
 		mpa_v2_params.ird = htons((u16)ep->ird);
 		mpa_v2_params.ord = htons((u16)ep->ord);
 		if (peer2peer && (ep->mpa_attr.p2p_type !=
@@ -1361,8 +1361,11 @@ static int abort_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
 	struct tid_info *t = dev->rdev.lldi.tids;
 
 	ep = lookup_tid(t, tid);
+	if (!ep) {
+		printk(KERN_WARNING MOD "Abort rpl to freed endpoint\n");
+		return 0;
+	}
 	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
-	BUG_ON(!ep);
 	mutex_lock(&ep->com.mutex);
 	switch (ep->com.state) {
 	case ABORTING:
@@ -1408,6 +1411,24 @@ static int act_open_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
 		printk(KERN_WARNING MOD "Connection problems for atid %u\n",
 			atid);
 		return 0;
+	}
+
+	/*
+	 * Log interesting failures.
+	 */
+	switch (status) {
+	case CPL_ERR_CONN_RESET:
+	case CPL_ERR_CONN_TIMEDOUT:
+		break;
+	default:
+		printk(KERN_INFO MOD "Active open failure - "
+		       "atid %u status %u errno %d %pI4:%u->%pI4:%u\n",
+		       atid, status, status2errno(status),
+		       &ep->com.local_addr.sin_addr.s_addr,
+		       ntohs(ep->com.local_addr.sin_port),
+		       &ep->com.remote_addr.sin_addr.s_addr,
+		       ntohs(ep->com.remote_addr.sin_port));
+		break;
 	}
 
 	connect_reply_upcall(ep, status2errno(status));
@@ -1572,6 +1593,10 @@ static int import_ep(struct c4iw_ep *ep, __be32 peer_ip, struct dst_entry *dst,
 		struct net_device *pdev;
 
 		pdev = ip_dev_find(&init_net, peer_ip);
+		if (!pdev) {
+			err = -ENODEV;
+			goto out;
+		}
 		ep->l2t = cxgb4_l2t_get(cdev->rdev.lldi.l2t,
 					n, pdev, 0);
 		if (!ep->l2t)

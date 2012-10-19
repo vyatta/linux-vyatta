@@ -32,37 +32,12 @@
 #define DRIVER_AUTHOR "Oliver Neukum"
 #define DRIVER_DESC "USB Abstract Control Model driver for USB WCM Device Management"
 
-#define HUAWEI_VENDOR_ID	0x12D1
-
 static const struct usb_device_id wdm_ids[] = {
 	{
 		.match_flags = USB_DEVICE_ID_MATCH_INT_CLASS |
 				 USB_DEVICE_ID_MATCH_INT_SUBCLASS,
 		.bInterfaceClass = USB_CLASS_COMM,
 		.bInterfaceSubClass = USB_CDC_SUBCLASS_DMM
-	},
-	{
-		/* 
-		 * Huawei E392, E398 and possibly other Qualcomm based modems
-		 * embed the Qualcomm QMI protocol inside CDC on CDC ECM like
-		 * control interfaces.  Userspace access to this is required
-		 * to configure the accompanying data interface
-		 */
-		.match_flags        = USB_DEVICE_ID_MATCH_VENDOR |
-					USB_DEVICE_ID_MATCH_INT_INFO,
-		.idVendor           = HUAWEI_VENDOR_ID,
-		.bInterfaceClass    = USB_CLASS_VENDOR_SPEC,
-		.bInterfaceSubClass = 1,
-		.bInterfaceProtocol = 9, /* NOTE: CDC ECM control interface! */
-	},
-	{
-		 /* Vodafone/Huawei K5005 (12d1:14c8) and similar modems */
-		.match_flags        = USB_DEVICE_ID_MATCH_VENDOR |
-				      USB_DEVICE_ID_MATCH_INT_INFO,
-		.idVendor           = HUAWEI_VENDOR_ID,
-		.bInterfaceClass    = USB_CLASS_VENDOR_SPEC,
-		.bInterfaceSubClass = 1,
-		.bInterfaceProtocol = 57, /* NOTE: CDC ECM control interface! */
 	},
 	{ }
 };
@@ -134,12 +109,14 @@ static struct usb_driver wdm_driver;
 /* return intfdata if we own the interface, else look up intf in the list */
 static struct wdm_device *wdm_find_device(struct usb_interface *intf)
 {
-	struct wdm_device *desc = NULL;
+	struct wdm_device *desc;
 
 	spin_lock(&wdm_device_list_lock);
 	list_for_each_entry(desc, &wdm_device_list, device_list)
 		if (desc->intf == intf)
-			break;
+			goto found;
+	desc = NULL;
+found:
 	spin_unlock(&wdm_device_list_lock);
 
 	return desc;
@@ -147,12 +124,14 @@ static struct wdm_device *wdm_find_device(struct usb_interface *intf)
 
 static struct wdm_device *wdm_find_device_by_minor(int minor)
 {
-	struct wdm_device *desc = NULL;
+	struct wdm_device *desc;
 
 	spin_lock(&wdm_device_list_lock);
 	list_for_each_entry(desc, &wdm_device_list, device_list)
 		if (desc->intf->minor == minor)
-			break;
+			goto found;
+	desc = NULL;
+found:
 	spin_unlock(&wdm_device_list_lock);
 
 	return desc;
@@ -375,6 +354,7 @@ static ssize_t wdm_write
 	r = usb_autopm_get_interface(desc->intf);
 	if (r < 0) {
 		kfree(buf);
+		rv = usb_translate_errors(r);
 		goto outnp;
 	}
 
@@ -390,6 +370,7 @@ static ssize_t wdm_write
 
 	if (r < 0) {
 		kfree(buf);
+		rv = r;
 		goto out;
 	}
 
@@ -421,6 +402,7 @@ static ssize_t wdm_write
 		desc->outbuf = NULL;
 		clear_bit(WDM_IN_USE, &desc->flags);
 		dev_err(&desc->intf->dev, "Tx URB error: %d\n", rv);
+		rv = usb_translate_errors(rv);
 	} else {
 		dev_dbg(&desc->intf->dev, "Tx URB has been submitted index=%d",
 			req->wIndex);
@@ -606,6 +588,7 @@ static int wdm_open(struct inode *inode, struct file *file)
 			desc->count--;
 			dev_err(&desc->intf->dev,
 				"Error submitting int urb - %d\n", rv);
+			rv = usb_translate_errors(rv);
 		}
 	} else {
 		rv = 0;
@@ -922,6 +905,8 @@ static void wdm_disconnect(struct usb_interface *intf)
 
 	if (!desc->count)
 		cleanup(desc);
+	else
+		dev_dbg(&intf->dev, "%s: %d open files - postponing cleanup\n", __func__, desc->count);
 	mutex_unlock(&wdm_mutex);
 }
 
@@ -1039,6 +1024,7 @@ static struct usb_driver wdm_driver = {
 	.post_reset =	wdm_post_reset,
 	.id_table =	wdm_ids,
 	.supports_autosuspend = 1,
+	.disable_hub_initiated_lpm = 1,
 };
 
 module_usb_driver(wdm_driver);

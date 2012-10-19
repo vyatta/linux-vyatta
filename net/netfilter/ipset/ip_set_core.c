@@ -640,6 +640,14 @@ find_free_id(const char *name, ip_set_id_t *index, struct ip_set **set)
 }
 
 static int
+ip_set_none(struct sock *ctnl, struct sk_buff *skb,
+	    const struct nlmsghdr *nlh,
+	    const struct nlattr * const attr[])
+{
+	return -EOPNOTSUPP;
+}
+
+static int
 ip_set_create(struct sock *ctnl, struct sk_buff *skb,
 	      const struct nlmsghdr *nlh,
 	      const struct nlattr * const attr[])
@@ -1539,6 +1547,10 @@ nlmsg_failure:
 }
 
 static const struct nfnl_callback ip_set_netlink_subsys_cb[IPSET_MSG_MAX] = {
+	[IPSET_CMD_NONE]	= {
+		.call		= ip_set_none,
+		.attr_count	= IPSET_ATTR_CMD_MAX,
+	},
 	[IPSET_CMD_CREATE]	= {
 		.call		= ip_set_create,
 		.attr_count	= IPSET_ATTR_CMD_MAX,
@@ -1618,7 +1630,7 @@ static struct nfnetlink_subsystem ip_set_netlink_subsys __read_mostly = {
 static int
 ip_set_sockfn_get(struct sock *sk, int optval, void __user *user, int *len)
 {
-	unsigned *op;
+	unsigned int *op;
 	void *data;
 	int copylen = *len, ret = 0;
 
@@ -1626,7 +1638,7 @@ ip_set_sockfn_get(struct sock *sk, int optval, void __user *user, int *len)
 		return -EPERM;
 	if (optval != SO_IP_SET)
 		return -EBADF;
-	if (*len < sizeof(unsigned))
+	if (*len < sizeof(unsigned int))
 		return -EINVAL;
 
 	data = vmalloc(*len);
@@ -1636,7 +1648,7 @@ ip_set_sockfn_get(struct sock *sk, int optval, void __user *user, int *len)
 		ret = -EFAULT;
 		goto done;
 	}
-	op = (unsigned *) data;
+	op = (unsigned int *) data;
 
 	if (*op < IP_SET_OP_VERSION) {
 		/* Check the version at the beginning of operations */

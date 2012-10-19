@@ -127,9 +127,7 @@ static struct dentry *rpc_setup_pipedir_sb(struct super_block *sb,
 {
 	static uint32_t clntid;
 	char name[15];
-	struct qstr q = {
-		.name = name,
-	};
+	struct qstr q = { .name = name };
 	struct dentry *dir, *dentry;
 	int error;
 
@@ -387,7 +385,7 @@ out_no_rpciod:
 	return ERR_PTR(err);
 }
 
-/*
+/**
  * rpc_create - create an RPC client and transport with one call
  * @args: rpc_clnt create argument structure
  *
@@ -719,6 +717,15 @@ void rpc_task_set_client(struct rpc_task *task, struct rpc_clnt *clnt)
 		atomic_inc(&clnt->cl_count);
 		if (clnt->cl_softrtry)
 			task->tk_flags |= RPC_TASK_SOFT;
+		if (sk_memalloc_socks()) {
+			struct rpc_xprt *xprt;
+
+			rcu_read_lock();
+			xprt = rcu_dereference(clnt->cl_xprt);
+			if (xprt->swapper)
+				task->tk_flags |= RPC_TASK_SWAPPER;
+			rcu_read_unlock();
+		}
 		/* Add to the client's list of all tasks */
 		spin_lock(&clnt->cl_lock);
 		list_add_tail(&task->tk_task, &clnt->cl_tasks);
