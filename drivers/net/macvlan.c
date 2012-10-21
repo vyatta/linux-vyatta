@@ -559,6 +559,7 @@ static int macvlan_vlan_rx_kill_vid(struct net_device *dev,
 }
 
 static int macvlan_fdb_add(struct ndmsg *ndm,
+			   struct nlattr *tb[],
 			   struct net_device *dev,
 			   unsigned char *addr,
 			   u16 flags)
