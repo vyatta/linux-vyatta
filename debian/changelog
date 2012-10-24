@@ -1,3 +1,10 @@
+linux-3.6 (3.6.2-1+vyatta+3) unstable; urgency=low
+
+  * gre: propagate state of link back
+  * ipgre: add statistics offload ioctl
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Wed, 24 Oct 2012 09:56:01 -0700
+
 linux-3.6 (3.6.2-1+vyatta+2) unstable; urgency=low
 
   * Force build
