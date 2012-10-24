@@ -60,6 +60,7 @@
 #include <linux/if_arp.h>
 #include <linux/if_ether.h>
 #include <linux/if_tun.h>
+#include <linux/if_tunnel.h>
 #include <linux/crc32.h>
 #include <linux/nsproxy.h>
 #include <linux/virtio_net.h>
@@ -134,6 +135,8 @@ struct tun_struct {
 	struct socket_wq	wq;
 
 	int			vnet_hdr_sz;
+
+	struct rtnl_link_stats64 *link_stats;
 
 #ifdef TUN_DEBUG
 	int debug;
@@ -465,6 +468,49 @@ static netdev_features_t tun_net_fix_features(struct net_device *dev,
 
 	return (features & tun->set_features) | (features & ~TUN_USER_FEATURES);
 }
+
+
+/*
+ * Vyatta extension to allow an ioctl to set interface statistics
+ */
+static int
+tun_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+{
+	struct tun_struct *tun = netdev_priv(dev);
+	struct rtnl_link_stats64 *stats;
+
+	if (cmd != SIOCTUNNELSTATS)
+		return -EOPNOTSUPP;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	stats = kmalloc(sizeof(*stats), GFP_USER);
+	if (!stats)
+		return -ENOMEM;
+
+	if (copy_from_user(stats, ifr->ifr_ifru.ifru_data, sizeof(*stats))) {
+		kfree(stats);
+		return -EFAULT;
+	}
+
+	stats = xchg(&tun->link_stats, stats);
+	kfree(stats);
+	return 0;
+}
+
+static struct rtnl_link_stats64 *
+tun_net_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *storage)
+{
+	struct tun_struct *tun = netdev_priv(dev);
+
+	if (tun->link_stats)
+		return tun->link_stats;
+
+	netdev_stats_to_stats64(storage, &dev->stats);
+	return storage;
+}
+
 #ifdef CONFIG_NET_POLL_CONTROLLER
 static void tun_poll_controller(struct net_device *dev)
 {
@@ -502,6 +548,8 @@ static const struct net_device_ops tap_netdev_ops = {
 	.ndo_change_mtu		= tun_net_change_mtu,
 	.ndo_fix_features	= tun_net_fix_features,
 	.ndo_set_rx_mode	= tun_net_mclist,
+	.ndo_get_stats64	= tun_net_get_stats64,
+	.ndo_do_ioctl		= tun_net_ioctl,
 	.ndo_set_mac_address	= eth_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
 #ifdef CONFIG_NET_POLL_CONTROLLER
