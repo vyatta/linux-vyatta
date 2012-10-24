@@ -1,3 +1,9 @@
+linux-3.6 (3.6.2-1+vyatta+5) unstable; urgency=low
+
+  * Update amd64-virt config for VXLAN
+
+ -- John Southworth <john.southworth@vyatta.com>  Wed, 24 Oct 2012 11:17:06 -0700
+
 linux-3.6 (3.6.2-1+vyatta+4) unstable; urgency=low
 
   * Backport VXLAN driver from net-next
