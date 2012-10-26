@@ -1,3 +1,13 @@
+linux-3.6 (3.6.2-1+vyatta+6) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * tun: add SIOCTUNNELSTATS ioctl
+
+  [ John Southworth ]
+  * vxlan: don't expire permanent entries
+
+ -- John Southworth <john.southworth@vyatta.com>  Fri, 26 Oct 2012 10:54:19 -0700
+
 linux-3.6 (3.6.2-1+vyatta+5) unstable; urgency=low
 
   * Update amd64-virt config for VXLAN
