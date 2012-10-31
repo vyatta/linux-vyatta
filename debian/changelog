@@ -1,3 +1,9 @@
+linux-3.6 (3.6.4-1+vyatta+1) unstable; urgency=low
+
+  * Update to v3.6.4
+
+ -- Vyatta <james.davidson@vyatta.com>  Tue, 30 Oct 2012 14:33:01 -0700
+
 linux-3.6 (3.6.2-1+vyatta+6) unstable; urgency=low
 
   [ Stephen Hemminger ]
