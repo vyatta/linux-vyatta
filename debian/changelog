@@ -1,3 +1,12 @@
+linux-3.3 (3.3.8-1+vyatta+14+pacifica2) unstable; urgency=low
+
+  [ Hiroaki SHIMODA ]
+  * e1000e: Change wthresh to 1 to avoid possible Tx stalls
+
+  [ John Southworth ]
+
+ -- John Southworth <john.southworth@vyatta.com>  Mon, 12 Nov 2012 11:39:18 -0800
+
 linux-3.3 (3.3.8-1+vyatta+14+pacifica1) unstable; urgency=low
 
   * new branch
