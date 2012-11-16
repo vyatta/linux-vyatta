@@ -1,3 +1,74 @@
+linux-3.6 (3.6.6-1+vyatta+1) unstable; urgency=low
+
+  [ Eric Sandeen ]
+  * ext4: fix unjournaled inode bitmap modification
+
+  [ Jun'ichi Nomura ]
+  * blkcg: Fix use-after-free of q->root_blkg and q->root_rl.blkg
+
+  [ Dan Carpenter ]
+  * gpio-timberdale: fix a potential wrapping issue
+
+  [ Mathias Nyman ]
+  * gpiolib: Don't return -EPROBE_DEFER to sysfs, or for invalid gpios
+
+  [ NeilBrown ]
+  * md/raid1: Fix assembling of arrays containing Replacements.
+
+  [ Herton Ronaldo Krzesinski ]
+  * floppy: don't call alloc_ordered_workqueue inside the alloc_disk loop
+  * floppy: do put_disk on current dr if blk_init_queue fails
+  * floppy: properly handle failure on add_disk loop
+
+  [ Alex Elder ]
+  * rbd: reset BACKOFF if unable to re-queue
+
+  [ Sage Weil ]
+  * libceph: avoid NULL kref_put when osd reset races with alloc_msg
+
+  [ David Zafman ]
+  * ceph: fix dentry reference leak in encode_fh()
+
+  [ Yan, Zheng ]
+  * ceph: Fix oops when handling mdsmap that decreases max_mds
+
+  [ Sage Weil ]
+  * libceph: check for invalid mapping
+
+  [ Alex Elder ]
+  * ceph: avoid 32-bit page index overflow
+
+  [ Johan Hovold ]
+  * USB: mos7840: fix port-data memory leak
+  * USB: iuu_phoenix: fix backported patches
+
+  [ Paul Bolle ]
+  * USB: io_edgeport: remove unused variable
+
+  [ Roland Dreier ]
+  * qla2xxx: Update target lookup session tables when a target session changes
+
+  [ Bernhard Kohl ]
+  * target: reintroduce some obsolete SCSI-2 commands
+
+  [ Nicholas Bellinger ]
+  * target: Fix double-free of se_cmd in target_complete_tmr_failure
+
+  [ Jiri Slaby ]
+  * HID: microsoft: fix invalid rdesc for 3k kbd
+
+  [ Ben Skeggs ]
+  * drm/nouveau: silence modesetting spam on pre-gf8 chipsets
+  * drm/nouveau: fix suspend/resume when in headless mode
+  * drm/nouveau: headless mode by default if pci class != vga display
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.6.6
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Fri, 16 Nov 2012 07:59:50 -0800
+
 linux-3.6 (3.6.5-1+vyatta+2) unstable; urgency=low
 
   * Force rebuild
