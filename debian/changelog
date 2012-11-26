@@ -1,3 +1,176 @@
+linux-3.6 (3.6.7-1+vyatta+1) unstable; urgency=low
+
+  [ David Vrabel ]
+  * xen/gntdev: don't leak memory from IOCTL_GNTDEV_MAP_GRANT_REF
+
+  [ Konrad Rzeszutek Wilk ]
+  * xen/mmu: Use Xen specific TLB flush instead of the generic one.
+
+  [ Jacob Keller ]
+  * ixgbe: PTP get_ts_info missing software support
+
+  [ Rolf Eike Beer ]
+  * Input: tsc40 - remove wrong announcement of pressure support
+
+  [ Felix Fietkau ]
+  * ath9k: fix stale pointers potentially causing access to free'd skbs
+
+  [ Sven Eckelmann ]
+  * ath9k: Test for TID only in BlockAcks while checking tx status
+
+  [ Stanislaw Gruszka ]
+  * rt2800: validate step value for temperature compensation
+
+  [ Roland Dreier ]
+  * target: Don't return success from module_init() if setup fails
+  * target: Avoid integer overflow in se_dev_align_max_sectors()
+  * iscsi-target: Fix missed wakeup race in TX thread
+
+  [ Steve Hodgson ]
+  * target: Fix incorrect usage of nested IRQ spinlocks in ABORT_TASK path
+
+  [ Nicholas Bellinger ]
+  * target: Re-add explict zeroing of INQUIRY bounce buffer memory
+
+  [ Felix Fietkau ]
+  * cfg80211: fix antenna gain handling
+
+  [ Johannes Berg ]
+  * wireless: drop invalid mesh address extension frames
+  * mac80211: use blacklist for duplicate IE check
+
+  [ Javier Cardona ]
+  * mac80211: Only process mesh config header on frames that RA_MATCH
+  * mac80211: don't inspect Sequence Control field on control frames
+
+  [ Egbert Eich ]
+  * DRM/Radeon: Fix Load Detection on legacy primary DAC.
+
+  [ Dave Airlie ]
+  * drm/udl: fix stride issues scanning out stride != width*bpp
+
+  [ Daniel Vetter ]
+  * drm/i915: clear the entire sdvo infoframe buffer
+  * drm/i915: fix overlay on i830M
+
+  [ Chris Wilson ]
+  * drm/i915: Only kick out vesafb if we takeover the fbcon with KMS
+
+  [ Johannes Berg ]
+  * mac80211: check management frame header length
+  * mac80211: verify that skb data is present
+  * mac80211: make sure data is accessible in EAPOL check
+
+  [ Antonio Quartulli ]
+  * mac80211: fix SSID copy on IBSS JOIN
+
+  [ Scott Mayhew ]
+  * nfsv3: Make v3 mounts fail with ETIMEDOUTs instead EIO on mountd timeouts
+
+  [ Ben Hutchings ]
+  * nfs: Show original device name verbatim in /proc/*/mount{s,info}
+
+  [ Trond Myklebust ]
+  * NFSv4: nfs4_locku_done must release the sequence id
+  * NFSv4.1: We must release the sequence id when we fail to get a session slot
+
+  [ Bryan Schumaker ]
+  * NFS: Wait for session recovery to finish before returning
+
+  [ NeilBrown ]
+  * NFS: fix bug in legacy DNS resolver.
+
+  [ Linus Lüssing ]
+  * batman-adv: Fix broadcast packet CRC calculation
+
+  [ Ilija Hadzic ]
+  * drm: restore open_count if drm_setup fails
+  * drm: set dev_mapping before calling drm_open_helper
+
+  [ Jean Delvare ]
+  * hwmon: (w83627ehf) Force initial bank selection
+
+  [ Takashi Iwai ]
+  * ALSA: PCM: Fix some races at disconnection
+  * ALSA: usb-audio: Fix races at disconnection
+  * ALSA: usb-audio: Use rwsem for disconnect protection
+  * ALSA: usb-audio: Fix races at disconnection in mixer_quirks.c
+  * ALSA: Add a reference counter to card instance
+  * ALSA: Avoid endless sleep after disconnect
+
+  [ Zijie Pan ]
+  * sctp: fix call to SCTP_CMD_PROCESS_SACK in sctp_cmd_interpreter()
+
+  [ Steffen Klassert ]
+  * ipv4: Fix flushing of cached routing informations
+
+  [ Eric Dumazet ]
+  * netlink: use kfree_rcu() in netlink_release()
+  * tcp: fix FIONREAD/SIOCINQ
+  * net: fix secpath kmemleak
+
+  [ Li RongQing ]
+  * ipv6: Set default hoplimit as zero.
+
+  [ Hemant Kumar ]
+  * net: usb: Fix memory leak on Tx data path
+
+  [ Jesper Dangaard Brouer ]
+  * net: fix divide by zero in tcp algorithm illinois
+
+  [ Peter Senna Tschudin ]
+  * drivers/net/ethernet/nxp/lpc_eth.c: Call mdiobus_unregister before mdiobus_free
+
+  [ Tom Parkin ]
+  * l2tp: fix oops in l2tp_eth_create() error path
+
+  [ Pavel Emelyanov ]
+  * tcp-repair: Handle zero-length data put in rcv queue
+
+  [ Cyrill Gorcunov ]
+  * net: inet_diag -- Return error code if protocol handler is missed
+
+  [ Eric Leblond ]
+  * af-packet: fix oops when socket is not present
+
+  [ Hannes Frederic Sowa ]
+  * ipv6: send unsolicited neighbour advertisements to all-nodes
+
+  [ Thomas Gleixner ]
+  * futex: Handle futex_pi OWNER_DIED take over correctly
+
+  [ Guennadi Liakhovetski ]
+  * mmc: sh_mmcif: fix use after free
+
+  [ Chris Ball ]
+  * mmc: sdhci: fix NULL dereference in sdhci_request() tuning
+
+  [ Thomas Hellstrom ]
+  * drm/vmwgfx: Fix hibernation device reset
+  * drm/vmwgfx: Fix a case where the code would BUG when trying to pin GMR memory
+
+  [ Alex Deucher ]
+  * drm/radeon/cayman: add some missing regs to the VM reg checker
+  * drm/radeon/si: add some missing regs to the VM reg checker
+
+  [ Benjamin Marzinski ]
+  * GFS2: Test bufdata with buffer locked and gfs2_log_lock held
+
+  [ Dave Chinner ]
+  * xfs: fix reading of wrapped log data
+  * xfs: fix buffer shudown reference count mismatch
+
+  [ Takashi Iwai ]
+  * ALSA: Fix card refcount unbalance
+  * ALSA: usb-audio: Fix mutex deadlock at disconnection
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.6.7
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 26 Nov 2012 09:54:54 -0800
+
 linux-3.6 (3.6.6-1+vyatta+1) unstable; urgency=low
 
   [ Eric Sandeen ]
