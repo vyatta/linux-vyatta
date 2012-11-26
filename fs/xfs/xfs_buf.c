@@ -96,6 +96,7 @@ xfs_buf_lru_add(
 		atomic_inc(&bp->b_hold);
 		list_add_tail(&bp->b_lru, &btp->bt_lru);
 		btp->bt_lru_nr++;
+		bp->b_lru_flags &= ~_XBF_LRU_DISPOSE;
 	}
 	spin_unlock(&btp->bt_lru_lock);
 }
@@ -154,7 +155,8 @@ xfs_buf_stale(
 		struct xfs_buftarg *btp = bp->b_target;
 
 		spin_lock(&btp->bt_lru_lock);
-		if (!list_empty(&bp->b_lru)) {
+		if (!list_empty(&bp->b_lru) &&
+		    !(bp->b_lru_flags & _XBF_LRU_DISPOSE)) {
 			list_del_init(&bp->b_lru);
 			btp->bt_lru_nr--;
 			atomic_dec(&bp->b_hold);
@@ -1195,9 +1197,14 @@ xfs_buf_bio_end_io(
 {
 	xfs_buf_t		*bp = (xfs_buf_t *)bio->bi_private;
 
-	xfs_buf_ioerror(bp, -error);
+	/*
+	 * don't overwrite existing errors - otherwise we can lose errors on
+	 * buffers that require multiple bios to complete.
+	 */
+	if (!bp->b_error)
+		xfs_buf_ioerror(bp, -error);
 
-	if (!error && xfs_buf_is_vmapped(bp) && (bp->b_flags & XBF_READ))
+	if (!bp->b_error && xfs_buf_is_vmapped(bp) && (bp->b_flags & XBF_READ))
 		invalidate_kernel_vmap_range(bp->b_addr, xfs_buf_vmap_len(bp));
 
 	_xfs_buf_ioend(bp, 1);
@@ -1277,6 +1284,11 @@ next_chunk:
 		if (size)
 			goto next_chunk;
 	} else {
+		/*
+		 * This is guaranteed not to be the last io reference count
+		 * because the caller (xfs_buf_iorequest) holds a count itself.
+		 */
+		atomic_dec(&bp->b_io_remaining);
 		xfs_buf_ioerror(bp, EIO);
 		bio_put(bio);
 	}
@@ -1501,6 +1513,7 @@ xfs_buftarg_shrink(
 		 */
 		list_move(&bp->b_lru, &dispose);
 		btp->bt_lru_nr--;
+		bp->b_lru_flags |= _XBF_LRU_DISPOSE;
 	}
 	spin_unlock(&btp->bt_lru_lock);
 
