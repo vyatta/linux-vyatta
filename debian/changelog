@@ -1,3 +1,244 @@
+linux-3.6 (3.6.8-1+vyatta+1) unstable; urgency=low
+
+  [ Takamori Yamaguchi ]
+  * mm: bugfix: set current->reclaim_state to NULL while returning from
+    kswapd()
+
+  [ Aaron Lu ]
+  * libata-acpi: Fix NULL ptr derference in ata_acpi_dev_handle
+
+  [ Dave Chinner ]
+  * xfs: drop buffer io reference when a bad bio is built
+
+  [ Arik Nemtsov ]
+  * mac80211: sync acccess to tx_filtered/ps_tx_buf queues
+
+  [ Johannes Berg ]
+  * mac80211: don't send null data packet when not associated
+
+  [ Felix Fietkau ]
+  * mac80211: call skb_dequeue/ieee80211_free_txskb instead of
+    __skb_queue_purge
+
+  [ Huang Ying ]
+  * PCI/PM: Resume device before shutdown
+  * PCI/PM: Fix proc config reg access for D3cold and bridge suspending
+
+  [ Eric Paris ]
+  * fanotify: fix missing break
+
+  [ Rusty Russell ]
+  * module: fix out-by-one error in kallsyms
+
+  [ Cornelia Huck ]
+  * virtio: Don't access index after unregister.
+
+  [ Jeff Layton ]
+  * cifs: fix potential buffer overrun in cifs.idmap handling code
+
+  [ Sachin Prabhu ]
+  * cifs: Do not lookup hashed negative dentry in cifs_atomic_open
+
+  [ Jussi Kivilinna ]
+  * crypto: cryptd - disable softirqs in cryptd_queue_worker to prevent
+    data corruption
+
+  [ Nicolas Royer ]
+  * ARM: at91/AT91SAM9G45: fix crypto peripherals irq issue due to
+    sparse irq support
+
+  [ Jacob Keller ]
+  * ptp: update adjfreq callback description
+
+  [ Alexander Stein ]
+  * ALSA: hda: Cirrus: Fix coefficient index for beep configuration
+
+  [ Daniel J Blueman ]
+  * ALSA: HDA: Fix digital microphone on CS420x
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Force to reset IEC958 status bits for AD codecs
+  * ALSA: hda - Fix empty DAC filling in patch_via.c
+  * ALSA: hda - Fix invalid connections in VT1802 codec
+
+  [ Kailang Yang ]
+  * ALSA: hda - Improve HP depop when system enter to S3
+  * ALSA: hda - Add new codec ALC668 and ALC900 (default name ALC1150)
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Add a missing quirk entry for iMac 9,1
+
+  [ Eric Millbrandt ]
+  * ASoC: wm8978: pll incorrectly configured when codec is master
+
+  [ Wei Yongjun ]
+  * ASoC: cs42l52: fix the return value of cs42l52_set_fmt()
+
+  [ Misael Lopez Cruz ]
+  * ASoC: dapm: Use card_list during DAPM shutdown
+
+  [ Mukund Navada ]
+  * ASoC: core: Double control update err for snd_soc_put_volsw_sx
+
+  [ Artem Bityutskiy ]
+  * UBIFS: fix mounting problems after power cuts
+  * UBIFS: introduce categorized lprops counter
+
+  [ Colin Ian King ]
+  * pstore: Fix NULL pointer dereference in console writes
+
+  [ Marek Szyprowski ]
+  * regulator: fix voltage check in regulator_is_supported_voltage()
+
+  [ Guenter Roeck ]
+  * i2c-mux-pinctrl: Fix probe error path
+
+  [ Christoph Fritz ]
+  * ARM: imx: ehci: fix host power mask bit
+
+  [ Pritesh Raithatha ]
+  * ARM: dt: tegra: fix length of pad control and mux registers
+
+  [ Colin Cross ]
+  * Revert "Staging: Android alarm: IOCTL command encoding fix"
+
+  [ Heiko Carstens ]
+  * s390/gup: add missing TASK_SIZE check to get_user_pages_fast()
+
+  [ Bjørn Mork ]
+  * USB: keyspan: fix typo causing GPF on open
+
+  [ Johan Hovold ]
+  * USB: usb_wwan: fix bulk-urb allocation
+
+  [ Dan Williams ]
+  * USB: option: add Novatel E362 and Dell Wireless 5800 USB IDs
+  * USB: option: add Alcatel X220/X500D USB IDs
+
+  [ Jani Nikula ]
+  * drm/i915/sdvo: clean up connectors on intel_sdvo_init() failures
+
+  [ Alex Deucher ]
+  * drm/radeon: fix logic error in atombios_encoders.c
+
+  [ Hugh Dickins ]
+  * tmpfs: fix shmem_getpage_gfp() VM_BUG_ON
+
+  [ Takashi Iwai ]
+  * KVM: x86: Fix invalid secondary exec controls in vmx_cpuid_update()
+
+  [ Zhao Yakui ]
+  * ttm: Clear the ttm page allocated from high memory zone correctly
+
+  [ Michal Hocko ]
+  * memcg: oom: fix totalpages calculation for memory.swappiness==0
+
+  [ Hugh Dickins ]
+  * memcg: fix hotplugged memory zone oops
+
+  [ Johannes Berg ]
+  * iwlwifi: handle DMA mapping failures
+  * wireless: allow 40 MHz on world roaming channels 12/13
+
+  [ Johan Hedberg ]
+  * Bluetooth: Fix having bogus entries in mgmt_read_index_list reply
+
+  [ Andreas Schwab ]
+  * m68k: fix sigset_t accessor functions
+
+  [ Xi Wang ]
+  * ipv4: avoid undefined behavior in do_ip_setsockopt()
+
+  [ Saurabh Mohan ]
+  * ipv4/ip_vti.c: VTI fix post-decryption forwarding
+
+  [ Hannes Frederic Sowa ]
+  * ipv6: setsockopt(IPIPPROTO_IPV6, IPV6_MINHOPCOUNT) forgot to set
+    return value
+
+  [ Jiri Pirko ]
+  * net: correct check in dev_addr_del()
+
+  [ Tom Herbert ]
+  * net-rps: Fix brokeness causing OOO packets
+
+  [ Andrew Vagin ]
+  * tcp: fix retransmission in repair mode
+
+  [ Eric Dumazet ]
+  * tcp: handle tcp_net_metrics_init() order-5 memory allocation
+    failures
+
+  [ Hugh Dickins ]
+  * tmpfs: change final i_blocks BUG to WARNING
+
+  [ Takashi Iwai ]
+  * ALSA: usb-audio: Fix crash at re-preparing the PCM stream
+
+  [ Benjamin Marzinski ]
+  * GFS2: Don't call file_accessed() with a shared glock
+
+  [ Michal Schmidt ]
+  * r8169: use unlimited DMA burst for TX
+
+  [ Mojiong Qiu ]
+  * xen/events: fix RCU warning, or Call idle notifier after irq_enter()
+
+  [ Jeff Skirvin ]
+  * SCSI: isci: Allow SSP tasks into the task management path.
+
+  [ Paul Gortmaker ]
+  * tg3: unconditionally select HWMON support when tg3 is enabled.
+
+  [ Cyril Brulebois ]
+  * r8169: Fix WoL on RTL8168d/8111d.
+
+  [ Nathan Walp ]
+  * r8169: allow multicast packets on sub-8168f chipset.
+
+  [ Ulrich Weber ]
+  * netfilter: nf_nat: don't check for port change on ICMP tuples
+
+  [ Eric Dumazet ]
+  * netfilter: xt_TEE: don't use destination address found in header
+
+  [ Julian Anastasov ]
+  * netfilter: nf_conntrack: fix rt_gateway checks for H.323 helper
+
+  [ Martin Schwidefsky ]
+  * s390/signal: set correct address space control
+
+  [ Szymon Janc ]
+  * NFC: Use dynamic initialization for rwlocks
+
+  [ Jan Kara ]
+  * reiserfs: Fix lock ordering during remount
+  * reiserfs: Protect reiserfs_quota_on() with write lock
+  * reiserfs: Move quota calls out of write lock
+  * reiserfs: Protect reiserfs_quota_write() with write lock
+
+  [ Alex Williamson ]
+  * intel-iommu: Fix lookup in add device
+
+  [ Dave Jones ]
+  * selinux: fix sel_netnode_insert() suspicious rcu dereference
+
+  [ Igor Murzov ]
+  * ACPI video: Ignore errors after _DOD evaluation.
+
+  [ Felipe Balbi ]
+  * Revert "serial: omap: fix software flow control"
+
+  [ Theodore Ts'o ]
+  * ext4: fix metadata checksum calculation for the superblock
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.6.8
+
+  [ James Davidson ]
+
+ -- James Davidson <james.davidson@vyatta.com>  Mon, 26 Nov 2012 17:32:37 -0800
+
 linux-3.6 (3.6.7-1+vyatta+2) unstable; urgency=low
 
   [ Alexander Duyck ]
