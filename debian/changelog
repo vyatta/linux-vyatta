@@ -1,3 +1,238 @@
+linux-3.6 (3.6.10-1+vyatta+1) unstable; urgency=low
+
+  [ Johannes Berg ]
+  * wireless: add back sysfs directory
+
+  [ Robert Richter ]
+  * x86-32: Fix invalid stack address while in softirq
+
+  [ Matt Fleming ]
+  * x86, efi: Fix processor-specific memcpy() build error
+
+  [ Boris Ostrovsky ]
+  * x86, microcode, AMD: Add support for family 16h processors
+
+  [ H. Peter Anvin ]
+  * x86-32: Export kernel_stack_pointer() for modules
+
+  [ Emmanuel Grumbach ]
+  * iwlwifi: don't WARN when a non empty queue is disabled
+
+  [ Johannes Berg ]
+  * iwlwifi: fix monitor mode FCS flag
+
+  [ Albert Pool ]
+  * rtlwifi: rtl8192cu: Add new USB ID
+
+  [ Bing Zhao ]
+  * mwifiex: report error to MMC core if we cannot suspend
+  * mwifiex: fix system hang issue in cmd timeout error case
+
+  [ Maciej Patelczyk ]
+  * SCSI: isci: copy fis 0x34 response into proper buffer
+
+  [ Alex Deucher ]
+  * drm/radeon: add new SI pci id
+
+  [ Clemens Ladisch ]
+  * ALSA: ua101, usx2y: fix broken MIDI output
+
+  [ David Henningsson ]
+  * ALSA: hda - Cirrus: Correctly clear line_out_pins when moving to speaker
+
+  [ James Bottomley ]
+  * PARISC: fix virtual aliasing issue in get_shared_area()
+
+  [ Al Viro ]
+  * PARISC: fix user-triggerable panic on parisc
+
+  [ Jiri Engelthaler ]
+  * mtd: slram: invalid checking of absolute end address
+
+  [ Sachin Kamat ]
+  * mtd: ofpart: Fix incorrect NULL check in parse_ofoldpart_partitions()
+
+  [ Thomas Betker ]
+  * jffs2: Fix lock acquisition order bug in jffs2_write_begin
+
+  [ majianpeng ]
+  * md: Reassigned the parameters if read_seqretry returned true in func md_is_badblock.
+  * md: Avoid write invalid address if read_seqretry returned true.
+
+  [ NeilBrown ]
+  * md/raid10: decrement correct pending counter when writing to replacement.
+
+  [ Roland Dreier ]
+  * block: Don't access request after it might be freed
+
+  [ Jens Axboe ]
+  * dm: fix deadlock with request based dm and queue request_fn recursion
+
+  [ Darren Hart ]
+  * futex: avoid wake_futex() for a PI futex_q
+
+  [ Simon Wunderlich ]
+  * mac80211: deinitialize ibss-internals after emptiness check
+
+  [ Paul Bolle ]
+  * radeon: add AGPMode 1 quirk for RV250
+
+  [ Oliver Hartkopp ]
+  * can: peak_usb: fix hwtstamp assignment
+  * can: bcm: initialize ifindex for timeouts without previous frame reception
+
+  [ Jan Kara ]
+  * jbd: Fix lock ordering bug in journal_unmap_buffer()
+
+  [ Al Viro ]
+  * sparc64: not any error from do_sigaltstack() should fail rt_sigreturn()
+
+  [ Guennadi Liakhovetski ]
+  * PM / QoS: fix wrong error-checking condition
+
+  [ Jan Kara ]
+  * writeback: put unused inodes to LRU after writeback completion
+
+  [ Kailang Yang ]
+  * ALSA: hda - Add new codec ALC283 ALC290 support
+
+  [ Duncan Roe ]
+  * ALSA: hda - Fix missing beep on ASUS X43U notebook
+
+  [ David Henningsson ]
+  * ALSA: hda - Add support for Realtek ALC292
+
+  [ Tilman Schmidt ]
+  * bas_gigaset: fix pre_reset handling
+
+  [ Randy Dunlap ]
+  * pstore/ram: Fix printk format warning
+
+  [ Marek Vasut ]
+  * HID: add quirk for Freescale i.MX28 ROM recovery
+
+  [ Petr Matousek ]
+  * KVM: x86: invalid opcode oops on SET_SREGS with OSXSAVE bit set (CVE-2012-4461)
+
+  [ joshua.a.hay@intel.com ]
+  * ixgbe: add support for X540-AT1
+
+  [ David Milburn ]
+  * sata_svw: check DMA start bit before reset
+
+  [ Mauro Carvalho Chehab ]
+  * get_dvb_firmware: fix download site for tda10046 firmware
+
+  [ Szymon Janc ]
+  * NFC: pn533: Fix use after free
+
+  [ Thierry Escande ]
+  * NFC: Fix pn533 target mode memory leak
+
+  [ Waldemar Rymarkiewicz ]
+  * NFC: pn533: Fix mem leak in pn533_in_dep_link_up
+
+  [ Thierry Escande ]
+  * NFC: Fix nfc_llcp_local chained list insertion
+
+  [ Mel Gorman ]
+  * mm: vmscan: check for fatal signals iff the process was throttled
+
+  [ Chuansheng Liu ]
+  * watchdog: using u64 in get_sample_period()
+
+  [ Manuel Lauss ]
+  * MPI: Fix compilation on MIPS with GCC 4.4 and newer
+
+  [ Tao Ma ]
+  * ext4: remove erroneous ext4_superblock_csum_set() in update_backups()
+
+  [ Gavin Shan ]
+  * powerpc/eeh: Lock module while handling EEH event
+
+  [ Jaehoon Chung ]
+  * mmc: sdhci-s3c: fix the wrong number of max bus clocks
+
+  [ NeilBrown ]
+  * md/raid10: close race that lose writes lost when replacement completes.
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.6.9
+
+  [ Russell King - ARM Linux ]
+  * Dove: Attempt to fix PMU/RTC interrupts
+  * Dove: Fix irq_to_pmu()
+
+  [ Alex Deucher ]
+  * drm/radeon/dce4+: don't use radeon_crtc for vblank callback
+  * drm/radeon: properly handle mc_stop/mc_resume on evergreen+ (v2)
+  * drm/radeon: properly track the crtc not_enabled case evergreen_mc_stop()
+
+  [ Jianguo Wu ]
+  * mm/vmemmap: fix wrong use of virt_to_page
+
+  [ Johannes Weiner ]
+  * mm: vmscan: fix endless loop in kswapd balancing
+
+  [ Naoya Horiguchi ]
+  * mm: soft offline: split thp at the beginning of soft_offline_page()
+
+  [ Roland Dreier ]
+  * target: Fix handling of aborted commands
+
+  [ Emmanuel Grumbach ]
+  * iwlwifi: fix the basic CCK rates calculation
+
+  [ Jason Gunthorpe ]
+  * ARM: Kirkwood: Update PCI-E fixup
+
+  [ Vincent Palatin ]
+  * x86, fpu: Avoid FPU lazy restore after suspend
+
+  [ Mike Galbraith ]
+  * workqueue: exit rescuer_thread() as TASK_RUNNING
+
+  [ Johannes Berg ]
+  * mac80211: fix remain-on-channel (non-)cancelling
+
+  [ NeilBrown ]
+  * md/raid1{,0}: fix deadlock in bitmap_unplug.
+
+  [ Jean Delvare ]
+  * i7300_edac: Fix error flag testing
+
+  [ Mike Galbraith ]
+  * Revert "sched, autogroup: Stop going ahead if autogroup is disabled"
+
+  [ Ariel Elior ]
+  * bnx2x: remove redundant warning log
+
+  [ Prarit Bhargava ]
+  * i7core_edac: fix panic when accessing sysfs files
+
+  [ Bjørn Mork ]
+  * net: qmi_wwan: adding more ZTE devices
+  * net: qmi_wwan: add Huawei E173
+
+  [ Alan Cox ]
+  * ACPI: missing break
+
+  [ Chris Wilson ]
+  * drm/i915: Add no-lvds quirk for Supermicro X7SPA-H
+
+  [ Andre Przywara ]
+  * x86, amd: Disable way access filter on Piledriver CPUs
+
+  [ Francois Romieu ]
+  * 8139cp: revert "set ring address before enabling receiver"
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.6.10
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 10 Dec 2012 21:27:37 -0800
+
 linux-3.6 (3.6.8-1+vyatta+3) unstable; urgency=low
 
   * gre: allow live address change
