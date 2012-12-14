@@ -1,3 +1,15 @@
+linux-3.3 (3.3.8-1+vyatta+14+daisy2) unstable; urgency=low
+
+  [ James Davidson ]
+  * From dc07d4334885b6991e2822958a7681614c0100a8 Mon Sep 17 00:00:00
+    2001
+
+  [ Gaurav Sinha ]
+  * patch to allow tracking dying and unconfirmed lists in conntrack for
+    leak detection.
+
+ -- Gaurav Sinha <gaurav.sinha@vyatta.com>  Thu, 13 Dec 2012 18:04:17 -0800
+
 linux-3.3 (3.3.8-1+vyatta+14+daisy1) unstable; urgency=low
 
   * new branch
