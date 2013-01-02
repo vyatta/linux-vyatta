@@ -1,3 +1,160 @@
+linux-3.6 (3.6.11-1+vyatta+1) unstable; urgency=low
+
+  [ Mel Gorman ]
+  * tmpfs: fix shared mempolicy leak
+
+  [ Chris Ball ]
+  * Revert misapplied "mmc: sh-mmcif: avoid oops on spurious interrupts"
+
+  [ Guennadi Liakhovetski ]
+  * mmc: sh-mmcif: avoid oops on spurious interrupts (second try)
+
+  [ Paul Walmsley ]
+  * ARM: 7566/1: vfp: fix save and restore when running on pre-VFPv3 and CONFIG_VFPv3 set
+
+  [ Peter Ujfalusi ]
+  * ASoC: dmaengine: Correct Makefile when sound is built as module
+
+  [ Samuel Iglesias Gonsálvez ]
+  * Staging: ipack/bridges/tpci200: avoid kernel bug when uninstalling a device
+
+  [ Florian Fainelli ]
+  * Input: matrix-keymap - provide proper module license
+
+  [ Mauro Carvalho Chehab ]
+  * i82975x_edac: Fix dimm label initialization
+  * edac: Fix the dimm filling for csrows-based layouts
+
+  [ Tejun Heo ]
+  * workqueue: convert BUG_ON()s in __queue_delayed_work() to WARN_ON_ONCE()s
+
+  [ Jani Nikula ]
+  * drm/i915: do not ignore eDP bpc settings from vbt
+  * drm/i915: do not default to 18 bpp for eDP if missing from VBT
+
+  [ Marek Szyprowski ]
+  * mm: dmapool: use provided gfp flags for all dma_alloc_coherent() calls
+
+  [ Boris Ostrovsky ]
+  * x86,AMD: Power driver support for AMD's family 16h processors
+
+  [ Jiri Kosina ]
+  * floppy: destroy floppy workqueue before cleaning up the queue
+
+  [ Jan Beulich ]
+  * x86: hpet: Fix masking of MSI interrupts
+
+  [ li.rui27@zte.com.cn ]
+  * USB: add new zte 3g-dongle's pid to option.c
+
+  [ Bjørn Mork ]
+  * USB: option: blacklist network interface on Huawei E173
+
+  [ Martin Teichmann ]
+  * USB: ftdi_sio: Add support for Newport AGILIS motor drivers
+
+  [ Peter Korsgaard ]
+  * usb: ftdi_sio: fixup BeagleBone A5+ quirk
+
+  [ Markus Becker ]
+  * USB: cp210x: add Virtenio Preon32 device id
+
+  [ Greg Kroah-Hartman ]
+  * USB: mark uas driver as BROKEN
+
+  [ Kamil Iskra ]
+  * ACPI / battery: Correct battery capacity values on Thinkpads
+
+  [ Lan Tianyu ]
+  * ACPI / PM: Add Sony Vaio VPCEB1S1E to nonvs blacklist.
+
+  [ Rafael J. Wysocki ]
+  * ACPI / PNP: Do not crash due to stale pointer use during system resume
+
+  [ Zhang Rui ]
+  * ACPI / video: ignore BIOS initial backlight value for HP Folio 13-2000
+
+  [ Lan Tianyu ]
+  * ACPI / video: Add "Asus UL30VT" to ACPI video detect blacklist
+
+  [ Alan Stern ]
+  * USB: OHCI: workaround for hardware bug: retired TDs not added to the Done Queue
+
+  [ Sarah Sharp ]
+  * xhci: Extend Fresco Logic MSI quirk.
+
+  [ Dan Carpenter ]
+  * ftrace: Clear bits properly in reset_iter_read()
+
+  [ Steven Rostedt ]
+  * ring-buffer: Fix NULL pointer if rb_set_head_page() fails
+  * ring-buffer: Fix race between integrity check and readers
+
+  [ Dan Williams ]
+  * cdc-acm: implement TIOCSSERIAL to avoid blocking close(2)
+
+  [ Zheng Liu ]
+  * perf test: fix a build error on builtin-test
+
+  [ Alan Stern ]
+  * USB: EHCI: bugfix: urb->hcpriv should not be NULL
+
+  [ Eric Dumazet ]
+  * rcu: Fix batch-limit size problem
+
+  [ Huang Ying ]
+  * PCI/PM: Fix deadlock when unbinding device if parent in D3cold
+
+  [ Francois Romieu ]
+  * sis900: fix sis900_set_mode call parameters.
+
+  [ Alan Cox ]
+  * ne2000: add the right platform device
+
+  [ Eric Dumazet ]
+  * ipv6: fix inet6_csk_update_pmtu() return value
+
+  [ Alexander Shiyan ]
+  * irda: sir_dev: Fix copy/paste typo
+
+  [ Julian Anastasov ]
+  * ipv4: do not cache looped multicasts
+
+  [ Neal Cardwell ]
+  * ipv4: avoid passing NULL to inet_putpeer() in icmpv4_xrlim_allow()
+
+  [ Johannes Berg ]
+  * ipv4: ip_check_defrag must not modify skb before unsharing
+
+  [ Neal Cardwell ]
+  * inet_diag: fix oops for IPv4 AF_INET6 TCP SYN-RECV state
+  * inet_diag: validate byte code to prevent oops in inet_diag_bc_run()
+  * inet_diag: avoid unsafe and nonsensical prefix matches in inet_diag_bc_run()
+  * inet_diag: validate port comparison byte code to prevent unsafe reads
+
+  [ Jay Purohit ]
+  * usb/ipheth: Add iPhone 5 support
+
+  [ Bjørn Mork ]
+  * net: cdc_ncm: add Huawei devices
+
+  [ Sarveshwar Bandi ]
+  * bonding: Bonding driver does not consider the gso_max_size/gso_max_segs setting of slave devices.
+
+  [ nikolay@redhat.com ]
+  * bonding: fix race condition in bonding_store_slaves_active
+
+  [ Tommi Rantala ]
+  * sctp: fix memory leak in sctp_datamsg_from_user() when copy from user space fails
+  * sctp: fix -ENOMEM result with invalid user space pointer in sendto() syscall
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.6.11
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Wed, 02 Jan 2013 12:46:28 -0800
+
 linux-3.6 (3.6.10-1+vyatta+2) unstable; urgency=low
 
   * bridge: respect RFC2863 operational state
