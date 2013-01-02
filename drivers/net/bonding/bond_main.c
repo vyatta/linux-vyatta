@@ -127,7 +127,7 @@ module_param(downdelay, int, 0);
 MODULE_PARM_DESC(downdelay, "Delay before considering link down, "
 			    "in milliseconds");
 module_param(use_carrier, int, 0);
-MODULE_PARM_DESC(use_carrier, "Use netif_carrier_ok (vs MII ioctls) in miimon; "
+MODULE_PARM_DESC(use_carrier, "Use netif_oper_ok (vs MII ioctls) in miimon; "
 			      "0 for off, 1 for on (default)");
 module_param(mode, charp, 0);
 MODULE_PARM_DESC(mode, "Mode of operation; 0 for balance-rr, "
@@ -587,7 +587,7 @@ static void bond_update_speed_duplex(struct slave *slave)
 /*
  * if <dev> supports MII link status reporting, check its link status.
  *
- * We either do MII/ETHTOOL ioctls, or check netif_carrier_ok(),
+ * We either do MII/ETHTOOL ioctls, or check netif_oper_up(),
  * depending upon the setting of the use_carrier parameter.
  *
  * Return either BMSR_LSTATUS, meaning that the link is up (or we
@@ -612,7 +612,7 @@ static int bond_check_dev_link(struct bonding *bond,
 		return 0;
 
 	if (bond->params.use_carrier)
-		return netif_carrier_ok(slave_dev) ? BMSR_LSTATUS : 0;
+		return netif_oper_up(slave_dev) ? BMSR_LSTATUS : 0;
 
 	/* Try to get link status using Ethtool first. */
 	if (slave_dev->ethtool_ops) {
@@ -1766,7 +1766,7 @@ int bond_enslave(struct net_device *bond_dev, struct net_device *slave_dev)
 			new_slave->link = BOND_LINK_DOWN;
 		}
 	} else if (bond->params.arp_interval) {
-		new_slave->link = (netif_carrier_ok(slave_dev) ?
+		new_slave->link = (netif_oper_up(slave_dev) ?
 			BOND_LINK_UP : BOND_LINK_DOWN);
 	} else {
 		new_slave->link = BOND_LINK_UP;

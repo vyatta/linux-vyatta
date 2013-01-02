@@ -1477,7 +1477,7 @@ static int agg_device_up(const struct aggregator *agg)
 	if (!port)
 		return 0;
 	return (netif_running(port->slave->dev) &&
-		netif_carrier_ok(port->slave->dev));
+		netif_oper_up(port->slave->dev));
 }
 
 /**
