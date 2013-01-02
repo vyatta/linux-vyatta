@@ -1,3 +1,10 @@
+linux-3.6 (3.6.10-1+vyatta+2) unstable; urgency=low
+
+  * bridge: respect RFC2863 operational state
+  * bonding: respect RFC2864 operational state of slave
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Wed, 02 Jan 2013 12:45:00 -0800
+
 linux-3.6 (3.6.10-1+vyatta+1) unstable; urgency=low
 
   [ Johannes Berg ]
