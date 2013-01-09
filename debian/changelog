@@ -1,3 +1,414 @@
+linux-3.6 (3.6.11-1+vyatta+1) unstable; urgency=low
+
+  [ Mel Gorman ]
+  * tmpfs: fix shared mempolicy leak
+
+  [ Chris Ball ]
+  * Revert misapplied "mmc: sh-mmcif: avoid oops on spurious interrupts"
+
+  [ Guennadi Liakhovetski ]
+  * mmc: sh-mmcif: avoid oops on spurious interrupts (second try)
+
+  [ Paul Walmsley ]
+  * ARM: 7566/1: vfp: fix save and restore when running on pre-VFPv3 and CONFIG_VFPv3 set
+
+  [ Peter Ujfalusi ]
+  * ASoC: dmaengine: Correct Makefile when sound is built as module
+
+  [ Samuel Iglesias Gonsálvez ]
+  * Staging: ipack/bridges/tpci200: avoid kernel bug when uninstalling a device
+
+  [ Florian Fainelli ]
+  * Input: matrix-keymap - provide proper module license
+
+  [ Mauro Carvalho Chehab ]
+  * i82975x_edac: Fix dimm label initialization
+  * edac: Fix the dimm filling for csrows-based layouts
+
+  [ Tejun Heo ]
+  * workqueue: convert BUG_ON()s in __queue_delayed_work() to WARN_ON_ONCE()s
+
+  [ Jani Nikula ]
+  * drm/i915: do not ignore eDP bpc settings from vbt
+  * drm/i915: do not default to 18 bpp for eDP if missing from VBT
+
+  [ Marek Szyprowski ]
+  * mm: dmapool: use provided gfp flags for all dma_alloc_coherent() calls
+
+  [ Boris Ostrovsky ]
+  * x86,AMD: Power driver support for AMD's family 16h processors
+
+  [ Jiri Kosina ]
+  * floppy: destroy floppy workqueue before cleaning up the queue
+
+  [ Jan Beulich ]
+  * x86: hpet: Fix masking of MSI interrupts
+
+  [ li.rui27@zte.com.cn ]
+  * USB: add new zte 3g-dongle's pid to option.c
+
+  [ Bjørn Mork ]
+  * USB: option: blacklist network interface on Huawei E173
+
+  [ Martin Teichmann ]
+  * USB: ftdi_sio: Add support for Newport AGILIS motor drivers
+
+  [ Peter Korsgaard ]
+  * usb: ftdi_sio: fixup BeagleBone A5+ quirk
+
+  [ Markus Becker ]
+  * USB: cp210x: add Virtenio Preon32 device id
+
+  [ Greg Kroah-Hartman ]
+  * USB: mark uas driver as BROKEN
+
+  [ Kamil Iskra ]
+  * ACPI / battery: Correct battery capacity values on Thinkpads
+
+  [ Lan Tianyu ]
+  * ACPI / PM: Add Sony Vaio VPCEB1S1E to nonvs blacklist.
+
+  [ Rafael J. Wysocki ]
+  * ACPI / PNP: Do not crash due to stale pointer use during system resume
+
+  [ Zhang Rui ]
+  * ACPI / video: ignore BIOS initial backlight value for HP Folio 13-2000
+
+  [ Lan Tianyu ]
+  * ACPI / video: Add "Asus UL30VT" to ACPI video detect blacklist
+
+  [ Alan Stern ]
+  * USB: OHCI: workaround for hardware bug: retired TDs not added to the Done Queue
+
+  [ Sarah Sharp ]
+  * xhci: Extend Fresco Logic MSI quirk.
+
+  [ Dan Carpenter ]
+  * ftrace: Clear bits properly in reset_iter_read()
+
+  [ Steven Rostedt ]
+  * ring-buffer: Fix NULL pointer if rb_set_head_page() fails
+  * ring-buffer: Fix race between integrity check and readers
+
+  [ Dan Williams ]
+  * cdc-acm: implement TIOCSSERIAL to avoid blocking close(2)
+
+  [ Zheng Liu ]
+  * perf test: fix a build error on builtin-test
+
+  [ Alan Stern ]
+  * USB: EHCI: bugfix: urb->hcpriv should not be NULL
+
+  [ Eric Dumazet ]
+  * rcu: Fix batch-limit size problem
+
+  [ Huang Ying ]
+  * PCI/PM: Fix deadlock when unbinding device if parent in D3cold
+
+  [ Francois Romieu ]
+  * sis900: fix sis900_set_mode call parameters.
+
+  [ Alan Cox ]
+  * ne2000: add the right platform device
+
+  [ Eric Dumazet ]
+  * ipv6: fix inet6_csk_update_pmtu() return value
+
+  [ Alexander Shiyan ]
+  * irda: sir_dev: Fix copy/paste typo
+
+  [ Julian Anastasov ]
+  * ipv4: do not cache looped multicasts
+
+  [ Neal Cardwell ]
+  * ipv4: avoid passing NULL to inet_putpeer() in icmpv4_xrlim_allow()
+
+  [ Johannes Berg ]
+  * ipv4: ip_check_defrag must not modify skb before unsharing
+
+  [ Neal Cardwell ]
+  * inet_diag: fix oops for IPv4 AF_INET6 TCP SYN-RECV state
+  * inet_diag: validate byte code to prevent oops in inet_diag_bc_run()
+  * inet_diag: avoid unsafe and nonsensical prefix matches in inet_diag_bc_run()
+  * inet_diag: validate port comparison byte code to prevent unsafe reads
+
+  [ Jay Purohit ]
+  * usb/ipheth: Add iPhone 5 support
+
+  [ Bjørn Mork ]
+  * net: cdc_ncm: add Huawei devices
+
+  [ Sarveshwar Bandi ]
+  * bonding: Bonding driver does not consider the gso_max_size/gso_max_segs setting of slave devices.
+
+  [ nikolay@redhat.com ]
+  * bonding: fix race condition in bonding_store_slaves_active
+
+  [ Tommi Rantala ]
+  * sctp: fix memory leak in sctp_datamsg_from_user() when copy from user space fails
+  * sctp: fix -ENOMEM result with invalid user space pointer in sendto() syscall
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.6.11
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Wed, 02 Jan 2013 12:46:28 -0800
+
+linux-3.6 (3.6.10-1+vyatta+2) unstable; urgency=low
+
+  * bridge: respect RFC2863 operational state
+  * bonding: respect RFC2864 operational state of slave
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Wed, 02 Jan 2013 12:45:00 -0800
+
+linux-3.6 (3.6.10-1+vyatta+1) unstable; urgency=low
+
+  [ Johannes Berg ]
+  * wireless: add back sysfs directory
+
+  [ Robert Richter ]
+  * x86-32: Fix invalid stack address while in softirq
+
+  [ Matt Fleming ]
+  * x86, efi: Fix processor-specific memcpy() build error
+
+  [ Boris Ostrovsky ]
+  * x86, microcode, AMD: Add support for family 16h processors
+
+  [ H. Peter Anvin ]
+  * x86-32: Export kernel_stack_pointer() for modules
+
+  [ Emmanuel Grumbach ]
+  * iwlwifi: don't WARN when a non empty queue is disabled
+
+  [ Johannes Berg ]
+  * iwlwifi: fix monitor mode FCS flag
+
+  [ Albert Pool ]
+  * rtlwifi: rtl8192cu: Add new USB ID
+
+  [ Bing Zhao ]
+  * mwifiex: report error to MMC core if we cannot suspend
+  * mwifiex: fix system hang issue in cmd timeout error case
+
+  [ Maciej Patelczyk ]
+  * SCSI: isci: copy fis 0x34 response into proper buffer
+
+  [ Alex Deucher ]
+  * drm/radeon: add new SI pci id
+
+  [ Clemens Ladisch ]
+  * ALSA: ua101, usx2y: fix broken MIDI output
+
+  [ David Henningsson ]
+  * ALSA: hda - Cirrus: Correctly clear line_out_pins when moving to speaker
+
+  [ James Bottomley ]
+  * PARISC: fix virtual aliasing issue in get_shared_area()
+
+  [ Al Viro ]
+  * PARISC: fix user-triggerable panic on parisc
+
+  [ Jiri Engelthaler ]
+  * mtd: slram: invalid checking of absolute end address
+
+  [ Sachin Kamat ]
+  * mtd: ofpart: Fix incorrect NULL check in parse_ofoldpart_partitions()
+
+  [ Thomas Betker ]
+  * jffs2: Fix lock acquisition order bug in jffs2_write_begin
+
+  [ majianpeng ]
+  * md: Reassigned the parameters if read_seqretry returned true in func md_is_badblock.
+  * md: Avoid write invalid address if read_seqretry returned true.
+
+  [ NeilBrown ]
+  * md/raid10: decrement correct pending counter when writing to replacement.
+
+  [ Roland Dreier ]
+  * block: Don't access request after it might be freed
+
+  [ Jens Axboe ]
+  * dm: fix deadlock with request based dm and queue request_fn recursion
+
+  [ Darren Hart ]
+  * futex: avoid wake_futex() for a PI futex_q
+
+  [ Simon Wunderlich ]
+  * mac80211: deinitialize ibss-internals after emptiness check
+
+  [ Paul Bolle ]
+  * radeon: add AGPMode 1 quirk for RV250
+
+  [ Oliver Hartkopp ]
+  * can: peak_usb: fix hwtstamp assignment
+  * can: bcm: initialize ifindex for timeouts without previous frame reception
+
+  [ Jan Kara ]
+  * jbd: Fix lock ordering bug in journal_unmap_buffer()
+
+  [ Al Viro ]
+  * sparc64: not any error from do_sigaltstack() should fail rt_sigreturn()
+
+  [ Guennadi Liakhovetski ]
+  * PM / QoS: fix wrong error-checking condition
+
+  [ Jan Kara ]
+  * writeback: put unused inodes to LRU after writeback completion
+
+  [ Kailang Yang ]
+  * ALSA: hda - Add new codec ALC283 ALC290 support
+
+  [ Duncan Roe ]
+  * ALSA: hda - Fix missing beep on ASUS X43U notebook
+
+  [ David Henningsson ]
+  * ALSA: hda - Add support for Realtek ALC292
+
+  [ Tilman Schmidt ]
+  * bas_gigaset: fix pre_reset handling
+
+  [ Randy Dunlap ]
+  * pstore/ram: Fix printk format warning
+
+  [ Marek Vasut ]
+  * HID: add quirk for Freescale i.MX28 ROM recovery
+
+  [ Petr Matousek ]
+  * KVM: x86: invalid opcode oops on SET_SREGS with OSXSAVE bit set (CVE-2012-4461)
+
+  [ joshua.a.hay@intel.com ]
+  * ixgbe: add support for X540-AT1
+
+  [ David Milburn ]
+  * sata_svw: check DMA start bit before reset
+
+  [ Mauro Carvalho Chehab ]
+  * get_dvb_firmware: fix download site for tda10046 firmware
+
+  [ Szymon Janc ]
+  * NFC: pn533: Fix use after free
+
+  [ Thierry Escande ]
+  * NFC: Fix pn533 target mode memory leak
+
+  [ Waldemar Rymarkiewicz ]
+  * NFC: pn533: Fix mem leak in pn533_in_dep_link_up
+
+  [ Thierry Escande ]
+  * NFC: Fix nfc_llcp_local chained list insertion
+
+  [ Mel Gorman ]
+  * mm: vmscan: check for fatal signals iff the process was throttled
+
+  [ Chuansheng Liu ]
+  * watchdog: using u64 in get_sample_period()
+
+  [ Manuel Lauss ]
+  * MPI: Fix compilation on MIPS with GCC 4.4 and newer
+
+  [ Tao Ma ]
+  * ext4: remove erroneous ext4_superblock_csum_set() in update_backups()
+
+  [ Gavin Shan ]
+  * powerpc/eeh: Lock module while handling EEH event
+
+  [ Jaehoon Chung ]
+  * mmc: sdhci-s3c: fix the wrong number of max bus clocks
+
+  [ NeilBrown ]
+  * md/raid10: close race that lose writes lost when replacement completes.
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.6.9
+
+  [ Russell King - ARM Linux ]
+  * Dove: Attempt to fix PMU/RTC interrupts
+  * Dove: Fix irq_to_pmu()
+
+  [ Alex Deucher ]
+  * drm/radeon/dce4+: don't use radeon_crtc for vblank callback
+  * drm/radeon: properly handle mc_stop/mc_resume on evergreen+ (v2)
+  * drm/radeon: properly track the crtc not_enabled case evergreen_mc_stop()
+
+  [ Jianguo Wu ]
+  * mm/vmemmap: fix wrong use of virt_to_page
+
+  [ Johannes Weiner ]
+  * mm: vmscan: fix endless loop in kswapd balancing
+
+  [ Naoya Horiguchi ]
+  * mm: soft offline: split thp at the beginning of soft_offline_page()
+
+  [ Roland Dreier ]
+  * target: Fix handling of aborted commands
+
+  [ Emmanuel Grumbach ]
+  * iwlwifi: fix the basic CCK rates calculation
+
+  [ Jason Gunthorpe ]
+  * ARM: Kirkwood: Update PCI-E fixup
+
+  [ Vincent Palatin ]
+  * x86, fpu: Avoid FPU lazy restore after suspend
+
+  [ Mike Galbraith ]
+  * workqueue: exit rescuer_thread() as TASK_RUNNING
+
+  [ Johannes Berg ]
+  * mac80211: fix remain-on-channel (non-)cancelling
+
+  [ NeilBrown ]
+  * md/raid1{,0}: fix deadlock in bitmap_unplug.
+
+  [ Jean Delvare ]
+  * i7300_edac: Fix error flag testing
+
+  [ Mike Galbraith ]
+  * Revert "sched, autogroup: Stop going ahead if autogroup is disabled"
+
+  [ Ariel Elior ]
+  * bnx2x: remove redundant warning log
+
+  [ Prarit Bhargava ]
+  * i7core_edac: fix panic when accessing sysfs files
+
+  [ Bjørn Mork ]
+  * net: qmi_wwan: adding more ZTE devices
+  * net: qmi_wwan: add Huawei E173
+
+  [ Alan Cox ]
+  * ACPI: missing break
+
+  [ Chris Wilson ]
+  * drm/i915: Add no-lvds quirk for Supermicro X7SPA-H
+
+  [ Andre Przywara ]
+  * x86, amd: Disable way access filter on Piledriver CPUs
+
+  [ Francois Romieu ]
+  * 8139cp: revert "set ring address before enabling receiver"
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.6.10
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 10 Dec 2012 21:27:37 -0800
+
+linux-3.6 (3.6.8-1+vyatta+3) unstable; urgency=low
+
+  * gre: allow live address change
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 10 Dec 2012 21:25:46 -0800
+
+linux-3.6 (3.6.8-1+vyatta+2) unstable; urgency=low
+
+  * tun: allow changing ethernet address at run time
+
+ -- Stephen Hemminger <shemminger@vyatta.com>  Mon, 10 Dec 2012 16:04:15 -0800
+
 linux-3.6 (3.6.8-1+vyatta+1) unstable; urgency=low
 
   [ Takamori Yamaguchi ]
