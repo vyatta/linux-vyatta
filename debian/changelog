@@ -1,3 +1,14 @@
+linux-3.6 (3.6.11-1+vyatta+2) unstable; urgency=low
+
+  [ Nicolas Dichtel ]
+  * rtnl/ipv6: use netconf msg to advertise forwarding status
+  * rtnl/ipv6: add support of RTM_GETNETCONF
+  * rtnl: add a new type of msg to advertise protocol configuration
+
+  [ Saurabh Mohan ]
+
+ -- Saurabh Mohan <saurabh@vyatta.com>  Thu, 10 Jan 2013 13:54:05 -0800
+
 linux-3.6 (3.6.11-1+vyatta+1) unstable; urgency=low
 
   [ Mel Gorman ]
