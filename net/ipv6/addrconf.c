@@ -489,12 +489,12 @@ static int inet6_netconf_fill_devconf(struct sk_buff *skb, int ifindex,
 	ncm = nlmsg_data(nlh);
 	ncm->ncm_family = AF_INET6;
 
-	if (nla_put_s32(skb, NETCONFA_IFINDEX, ifindex) < 0)
+	if (nla_put_u32(skb, NETCONFA_IFINDEX, ifindex) < 0)
 		goto nla_put_failure;
 
 	/* type -1 is used for ALL */
 	if ((type == -1 || type == NETCONFA_FORWARDING) &&
-	    nla_put_s32(skb, NETCONFA_FORWARDING, devconf->forwarding) < 0)
+	    nla_put_u32(skb, NETCONFA_FORWARDING, devconf->forwarding) < 0)
 		goto nla_put_failure;
 
 	return nlmsg_end(skb, nlh);
@@ -557,7 +557,7 @@ static int inet6_netconf_get_devconf(struct sk_buff *in_skb,
 	if (!tb[NETCONFA_IFINDEX])
 		goto errout;
 
-	ifindex = nla_get_s32(tb[NETCONFA_IFINDEX]);
+	ifindex = nla_get_u32(tb[NETCONFA_IFINDEX]);
 	switch (ifindex) {
 	case NETCONFA_IFINDEX_ALL:
 		devconf = net->ipv6.devconf_all;
@@ -582,7 +582,7 @@ static int inet6_netconf_get_devconf(struct sk_buff *in_skb,
 		goto errout;
 
 	err = inet6_netconf_fill_devconf(skb, ifindex, devconf,
-					 NETLINK_CB(in_skb).portid,
+					 0,
 					 nlh->nlmsg_seq, RTM_NEWNETCONF, 0,
 					 -1);
 	if (err < 0) {
@@ -591,7 +591,7 @@ static int inet6_netconf_get_devconf(struct sk_buff *in_skb,
 		kfree_skb(skb);
 		goto errout;
 	}
-	err = rtnl_unicast(skb, net, NETLINK_CB(in_skb).portid);
+	err = rtnl_unicast(skb, net, 0);
 errout:
 	return err;
 }
