@@ -1,3 +1,9 @@
+linux-3.3 (3.3.8-1+vyatta+14+daisy4) unstable; urgency=low
+
+  * Update Vyatta logo
+
+ -- James Davidson <james.davidson@vyatta.com>  Wed, 13 Mar 2013 10:12:54 -0700
+
 linux-3.3 (3.3.8-1+vyatta+14+daisy3) unstable; urgency=low
 
   * Enable ARPD support because it is needed by OpenNHRP
