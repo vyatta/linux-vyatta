@@ -136,6 +136,9 @@ struct tun_struct {
 
 	int			vnet_hdr_sz;
 
+	/* Vyatta extensions for remote */
+	uint8_t			duplex;
+	uint32_t		speed;
 	struct rtnl_link_stats64 *link_stats;
 
 #ifdef TUN_DEBUG
@@ -1104,6 +1107,8 @@ static void tun_setup(struct net_device *dev)
 
 	tun->owner = -1;
 	tun->group = -1;
+	tun->speed = SPEED_UNKNOWN;
+	tun->duplex = DUPLEX_UNKNOWN;
 
 	dev->ethtool_ops = &tun_ethtool_ops;
 	dev->destructor = tun_free_netdev;
@@ -1780,16 +1785,31 @@ static struct miscdevice tun_miscdev = {
 
 static int tun_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
+	struct tun_struct *tun = netdev_priv(dev);
+
 	cmd->supported		= 0;
 	cmd->advertising	= 0;
-	ethtool_cmd_speed_set(cmd, SPEED_10);
-	cmd->duplex		= DUPLEX_FULL;
+	ethtool_cmd_speed_set(cmd, tun->speed);
+	cmd->duplex		= tun->duplex;
 	cmd->port		= PORT_TP;
 	cmd->phy_address	= 0;
 	cmd->transceiver	= XCVR_INTERNAL;
-	cmd->autoneg		= AUTONEG_DISABLE;
+	cmd->autoneg		= AUTONEG_ENABLE;
 	cmd->maxtxpkt		= 0;
 	cmd->maxrxpkt		= 0;
+	return 0;
+}
+
+static int tun_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct tun_struct *tun = netdev_priv(dev);
+
+	if (ecmd->autoneg != AUTONEG_ENABLE)
+		return -EOPNOTSUPP;
+
+	tun->speed = ethtool_cmd_speed(ecmd);
+	tun->duplex = ecmd->duplex;
+
 	return 0;
 }
 
@@ -1830,6 +1850,7 @@ static void tun_set_msglevel(struct net_device *dev, u32 value)
 
 static const struct ethtool_ops tun_ethtool_ops = {
 	.get_settings	= tun_get_settings,
+	.set_settings	= tun_set_settings,
 	.get_drvinfo	= tun_get_drvinfo,
 	.get_msglevel	= tun_get_msglevel,
 	.set_msglevel	= tun_set_msglevel,
