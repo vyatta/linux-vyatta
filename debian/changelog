@@ -1,3 +1,9 @@
+linux-3.6 (3.6.11-1+vyatta+4) unstable; urgency=low
+
+  * use RCU for remote statistics
+
+ -- Stephen Hemminger <shemming@brocade.com>  Mon, 01 Apr 2013 16:32:50 -0700
+
 linux-3.6 (3.6.11-1+vyatta+3) unstable; urgency=low
 
   [ Nicolas Dichtel ]
