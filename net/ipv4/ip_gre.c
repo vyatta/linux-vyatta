@@ -180,12 +180,16 @@ static struct rtnl_link_stats64 *ipgre_get_stats64(struct net_device *dev,
 						   struct rtnl_link_stats64 *tot)
 {
 	struct ip_tunnel *t = netdev_priv(dev);
+	struct rtnl_link_stats64 *stats;
 	int i;
 
-	if (t->link_stats) {
+	rcu_read_lock();
+	stats = rcu_dereference(t->link_stats);
+	if (stats) {
 		/* Stats received from device */
-		*tot = *t->link_stats;
-		
+		*tot = *stats;
+		rcu_read_unlock();
+
 		/* Add tunnel detected errors to mix */
 		tot->rx_crc_errors += dev->stats.rx_crc_errors;
 		tot->rx_length_errors += dev->stats.rx_length_errors;
@@ -199,6 +203,7 @@ static struct rtnl_link_stats64 *ipgre_get_stats64(struct net_device *dev,
 
 		return tot;
 	}
+	rcu_read_unlock();
 
 	for_each_possible_cpu(i) {
 		const struct pcpu_tstats *tstats = per_cpu_ptr(dev->tstats, i);
@@ -1312,6 +1317,9 @@ static const struct net_device_ops ipgre_netdev_ops = {
 
 static void ipgre_dev_free(struct net_device *dev)
 {
+	struct ip_tunnel *t = netdev_priv(dev);
+	kfree(t->link_stats);
+
 	free_percpu(dev->tstats);
 	free_netdev(dev);
 }
@@ -1561,7 +1569,11 @@ static int
 ipgre_tap_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct ip_tunnel *t = netdev_priv(dev);
-	struct rtnl_link_stats64 *stats;
+	struct link_stats_rcu {
+		struct rtnl_link_stats64 link;
+		struct rcu_head rcu;
+	} *stats;
+	struct rtnl_link_stats64 *old;
 
 	if (cmd != SIOCTUNNELSTATS)
 		return -EOPNOTSUPP;
@@ -1573,13 +1585,17 @@ ipgre_tap_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 	if (!stats)
 		return -ENOMEM;
 
-	if (copy_from_user(stats, ifr->ifr_ifru.ifru_data, sizeof(*stats))) {
+	if (copy_from_user(&stats->link, ifr->ifr_ifru.ifru_data,
+			   sizeof(struct rtnl_link_stats64))) {
 		kfree(stats);
 		return -EFAULT;
 	}
 
-	stats = xchg(&t->link_stats, stats);
-	kfree(stats);
+	old = xchg(&t->link_stats, &stats->link);
+	if (old)
+	    kfree_rcu(container_of(old, struct link_stats_rcu, link),
+		      rcu);
+
 	return 0;
 }
 

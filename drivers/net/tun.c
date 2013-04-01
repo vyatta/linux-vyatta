@@ -364,6 +364,7 @@ static void tun_free_netdev(struct net_device *dev)
 
 	BUG_ON(!test_bit(SOCK_EXTERNALLY_ALLOCATED, &tun->socket.flags));
 
+	kfree(tun->link_stats);
 	sk_release_kernel(tun->socket.sk);
 }
 
@@ -477,7 +478,11 @@ static int
 tun_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct tun_struct *tun = netdev_priv(dev);
-	struct rtnl_link_stats64 *stats;
+	struct link_stats_rcu {
+		struct rtnl_link_stats64 link;
+		struct rcu_head rcu;
+	} *stats;
+	struct rtnl_link_stats64 *old;
 
 	if (cmd != SIOCTUNNELSTATS)
 		return -EOPNOTSUPP;
@@ -489,13 +494,17 @@ tun_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	if (!stats)
 		return -ENOMEM;
 
-	if (copy_from_user(stats, ifr->ifr_ifru.ifru_data, sizeof(*stats))) {
+	if (copy_from_user(&stats->link, ifr->ifr_ifru.ifru_data,
+			   sizeof(struct rtnl_link_stats64))) {
 		kfree(stats);
 		return -EFAULT;
 	}
 
-	stats = xchg(&tun->link_stats, stats);
-	kfree(stats);
+	old = xchg(&tun->link_stats, &stats->link);
+	if (old)
+		kfree_rcu(container_of(old, struct link_stats_rcu, link),
+			  rcu);
+
 	return 0;
 }
 
@@ -503,9 +512,22 @@ static struct rtnl_link_stats64 *
 tun_net_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *storage)
 {
 	struct tun_struct *tun = netdev_priv(dev);
+	struct rtnl_link_stats64 *stats;
 
-	if (tun->link_stats)
-		return tun->link_stats;
+	rcu_read_lock();
+	stats = rcu_dereference(tun->link_stats);
+	if (stats) {
+		/* Stats received from device */
+		*storage = *stats;
+		rcu_read_unlock();
+
+		/* Add tunnel detected errors to mix */
+		storage->tx_dropped += dev->stats.tx_dropped;
+		storage->rx_dropped += dev->stats.rx_dropped;
+		storage->rx_frame_errors += dev->stats.rx_frame_errors;
+		return storage;
+	}
+	rcu_read_unlock();
 
 	netdev_stats_to_stats64(storage, &dev->stats);
 	return storage;
