@@ -1,3 +1,10 @@
+linux-3.6 (3.6.11-1+vyatta+5) unstable; urgency=low
+
+  * tun: add ability to set speed/duplex
+  * gre: add basic ethtool support
+
+ -- Stephen Hemminger <shemming@brocade.com>  Tue, 02 Apr 2013 14:37:29 -0700
+
 linux-3.6 (3.6.11-1+vyatta+4) unstable; urgency=low
 
   * use RCU for remote statistics
