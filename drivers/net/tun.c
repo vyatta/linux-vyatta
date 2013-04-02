@@ -140,6 +140,7 @@ struct tun_struct {
 	uint8_t			duplex;
 	uint32_t		speed;
 	struct rtnl_link_stats64 *link_stats;
+	struct ip_tunnel_info	info;
 
 #ifdef TUN_DEBUG
 	int debug;
@@ -474,11 +475,9 @@ static netdev_features_t tun_net_fix_features(struct net_device *dev,
 }
 
 
-/*
- * Vyatta extension to allow an ioctl to set interface statistics
- */
+/* Vyatta extension to allow an ioctl to set interface statistics */
 static int
-tun_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+tun_net_set_stats(struct net_device *dev, const void __user *data)
 {
 	struct tun_struct *tun = netdev_priv(dev);
 	struct link_stats_rcu {
@@ -487,9 +486,6 @@ tun_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	} *stats;
 	struct rtnl_link_stats64 *old;
 
-	if (cmd != SIOCTUNNELSTATS)
-		return -EOPNOTSUPP;
-
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
@@ -497,7 +493,7 @@ tun_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	if (!stats)
 		return -ENOMEM;
 
-	if (copy_from_user(&stats->link, ifr->ifr_ifru.ifru_data,
+	if (copy_from_user(&stats->link, data,
 			   sizeof(struct rtnl_link_stats64))) {
 		kfree(stats);
 		return -EFAULT;
@@ -509,6 +505,36 @@ tun_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 			  rcu);
 
 	return 0;
+}
+
+static int
+tun_net_set_info(struct net_device *dev, const void __user *data)
+{
+	struct tun_struct *tun = netdev_priv(dev);
+	struct ip_tunnel_info info;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	if (copy_from_user(&info, data, sizeof(info)))
+		return -EFAULT;
+	
+	strlcpy(tun->info.driver, info.driver, sizeof(tun->info.driver));
+	strlcpy(tun->info.bus, info.bus, sizeof(tun->info.bus));
+	return 0;
+}
+
+static int
+tun_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+{
+	switch(cmd) {
+	case SIOCTUNNELSTATS:
+		return tun_net_set_stats(dev, ifr->ifr_ifru.ifru_data);
+	case SIOCTUNNELINFO:
+		return tun_net_set_info(dev, ifr->ifr_ifru.ifru_data);
+	default:
+		return -EOPNOTSUPP;
+	}
 }
 
 static struct rtnl_link_stats64 *
@@ -1317,6 +1343,11 @@ static int tun_set_iff(struct net *net, struct file *file, struct ifreq *ifr)
 		tun->vnet_hdr_sz = sizeof(struct virtio_net_hdr);
 		set_bit(SOCK_EXTERNALLY_ALLOCATED, &tun->socket.flags);
 
+		strlcpy(tun->info.driver, DRV_NAME, sizeof(tun->info.driver));
+		strlcpy(tun->info.bus,
+			(ifr->ifr_flags & IFF_TUN) ? "tun" : "tap",
+			sizeof(tun->info.bus));
+
 		err = -ENOMEM;
 		sk = sk_alloc(&init_net, AF_UNSPEC, GFP_KERNEL, &tun_proto);
 		if (!sk)
@@ -1817,17 +1848,9 @@ static void tun_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info
 {
 	struct tun_struct *tun = netdev_priv(dev);
 
-	strlcpy(info->driver, DRV_NAME, sizeof(info->driver));
+	strlcpy(info->driver, tun->info.driver, sizeof(info->driver));
 	strlcpy(info->version, DRV_VERSION, sizeof(info->version));
-
-	switch (tun->flags & TUN_TYPE_MASK) {
-	case TUN_TUN_DEV:
-		strlcpy(info->bus_info, "tun", sizeof(info->bus_info));
-		break;
-	case TUN_TAP_DEV:
-		strlcpy(info->bus_info, "tap", sizeof(info->bus_info));
-		break;
-	}
+	strlcpy(info->bus_info, tun->info.bus, sizeof(info->bus_info));
 }
 
 static u32 tun_get_msglevel(struct net_device *dev)

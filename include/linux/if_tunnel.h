@@ -23,6 +23,12 @@
 #define SIOCCHG6RD      (SIOCDEVPRIVATE + 11)
 
 #define SIOCTUNNELSTATS	(SIOCDEVPRIVATE + 14)
+#define SIOCTUNNELINFO	(SIOCDEVPRIVATE + 15)
+
+struct ip_tunnel_info {
+	char driver[32];
+	char bus[32];
+};
 
 #define GRE_CSUM	__cpu_to_be16(0x8000)
 #define GRE_ROUTING	__cpu_to_be16(0x4000)
