@@ -1610,6 +1610,52 @@ static const struct net_device_ops ipgre_tap_netdev_ops = {
 	.ndo_get_stats64	= ipgre_get_stats64,
 };
 
+static int gretap_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct ip_tunnel *t = netdev_priv(dev);
+
+	cmd->supported		= 0;
+	cmd->advertising	= 0;
+	ethtool_cmd_speed_set(cmd, t->speed);
+	cmd->duplex		= t->duplex;
+	cmd->port		= PORT_TP;
+	cmd->phy_address	= 0;
+	cmd->transceiver	= XCVR_INTERNAL;
+	cmd->autoneg		= AUTONEG_ENABLE;
+	cmd->maxtxpkt		= 0;
+	cmd->maxrxpkt		= 0;
+	return 0;
+}
+
+static int gretap_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct ip_tunnel *t = netdev_priv(dev);
+
+	if (ecmd->autoneg != AUTONEG_ENABLE)
+		return -EOPNOTSUPP;
+
+	t->speed = ethtool_cmd_speed(ecmd);
+	t->duplex = ecmd->duplex;
+
+	return 0;
+}
+
+static void gretap_get_drvinfo(struct net_device *dev,
+			       struct ethtool_drvinfo *info)
+{
+	strlcpy(info->driver, "gre", sizeof(info->driver));
+	strlcpy(info->version, "1.0", sizeof(info->version));
+	strlcpy(info->bus_info, "gretap", sizeof(info->bus_info));
+}
+
+
+static const struct ethtool_ops gretap_ethtool_ops = {
+	.get_settings	= gretap_get_settings,
+	.set_settings	= gretap_set_settings,
+	.get_drvinfo	= gretap_get_drvinfo,
+	.get_link	= ethtool_op_get_link,
+};
+
 static void ipgre_tap_setup(struct net_device *dev)
 {
 
@@ -1617,6 +1663,7 @@ static void ipgre_tap_setup(struct net_device *dev)
 
 	dev->netdev_ops		= &ipgre_tap_netdev_ops;
 	dev->destructor 	= ipgre_dev_free;
+	dev->ethtool_ops 	= &gretap_ethtool_ops;
 
 	dev->iflink		= 0;
 	dev->features		|= NETIF_F_NETNS_LOCAL;

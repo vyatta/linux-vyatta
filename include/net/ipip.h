@@ -30,7 +30,9 @@ struct ip_tunnel {
 
 	struct ip_tunnel_parm	parms;
 
-	/* Vyatta extension to allow giving stats from daemon */
+	/* Vyatta extensions */
+	uint32_t		 speed;
+	uint8_t			 duplex;
 	struct rtnl_link_stats64 *link_stats;
 
 	/* for SIT */
