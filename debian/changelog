@@ -1,3 +1,10 @@
+linux-3.6 (3.6.11-1+vyatta+6) unstable; urgency=low
+
+  * tun: add recording of bus info
+  * gre: add recording of bus info
+
+ -- Stephen Hemminger <shemming@brocade.com>  Tue, 02 Apr 2013 16:36:15 -0700
+
 linux-3.6 (3.6.11-1+vyatta+5) unstable; urgency=low
 
   * tun: add ability to set speed/duplex
