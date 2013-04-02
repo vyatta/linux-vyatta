@@ -11,6 +11,7 @@
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+#define DRV_VERSION "1.0"
 
 #include <linux/capability.h>
 #include <linux/module.h>
@@ -1562,11 +1563,9 @@ static int ipgre_tap_init(struct net_device *dev)
 	return 0;
 }
 
-/*
- * Vyatta extension to allow an ioctl to set interface statistics
- */
+/* Vyatta extension to allow an ioctl to set interface statistics */
 static int
-ipgre_tap_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
+ipgre_tap_set_stats(struct net_device *dev, const void __user *data)
 {
 	struct ip_tunnel *t = netdev_priv(dev);
 	struct link_stats_rcu {
@@ -1575,9 +1574,6 @@ ipgre_tap_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 	} *stats;
 	struct rtnl_link_stats64 *old;
 
-	if (cmd != SIOCTUNNELSTATS)
-		return -EOPNOTSUPP;
-
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
@@ -1585,7 +1581,7 @@ ipgre_tap_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 	if (!stats)
 		return -ENOMEM;
 
-	if (copy_from_user(&stats->link, ifr->ifr_ifru.ifru_data,
+	if (copy_from_user(&stats->link, data,
 			   sizeof(struct rtnl_link_stats64))) {
 		kfree(stats);
 		return -EFAULT;
@@ -1597,6 +1593,36 @@ ipgre_tap_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 		      rcu);
 
 	return 0;
+}
+
+static int
+ipgre_tap_set_info(struct net_device *dev, const void __user *data)
+{
+	struct ip_tunnel *t = netdev_priv(dev);
+	struct ip_tunnel_info info;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	if (copy_from_user(&info, data, sizeof(info)))
+		return -EFAULT;
+
+	strlcpy(t->info.driver, info.driver, sizeof(t->info.driver));
+	strlcpy(t->info.bus, info.bus, sizeof(t->info.bus));
+	return 0;
+}
+
+static int
+ipgre_tap_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+{
+	switch(cmd) {
+	case SIOCTUNNELSTATS:
+		return ipgre_tap_set_stats(dev, ifr->ifr_ifru.ifru_data);
+	case SIOCTUNNELINFO:
+		return ipgre_tap_set_info(dev, ifr->ifr_ifru.ifru_data);
+	default:
+		return -EOPNOTSUPP;
+	}
 }
 
 static const struct net_device_ops ipgre_tap_netdev_ops = {
@@ -1643,9 +1669,11 @@ static int gretap_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
 static void gretap_get_drvinfo(struct net_device *dev,
 			       struct ethtool_drvinfo *info)
 {
-	strlcpy(info->driver, "gre", sizeof(info->driver));
-	strlcpy(info->version, "1.0", sizeof(info->version));
-	strlcpy(info->bus_info, "gretap", sizeof(info->bus_info));
+	struct ip_tunnel *t = netdev_priv(dev);
+
+	strlcpy(info->driver, t->info.driver, sizeof(info->driver));
+	strlcpy(info->version, DRV_VERSION, sizeof(info->version));
+	strlcpy(info->bus_info, t->info.bus, sizeof(info->bus_info));
 }
 
 
@@ -1658,6 +1686,7 @@ static const struct ethtool_ops gretap_ethtool_ops = {
 
 static void ipgre_tap_setup(struct net_device *dev)
 {
+	struct ip_tunnel *t = netdev_priv(dev);
 
 	ether_setup(dev);
 
@@ -1668,6 +1697,10 @@ static void ipgre_tap_setup(struct net_device *dev)
 	dev->iflink		= 0;
 	dev->features		|= NETIF_F_NETNS_LOCAL;
 	dev->priv_flags 	|= IFF_LIVE_ADDR_CHANGE;
+
+	strlcpy(t->info.driver, "gre", sizeof(t->info.driver));
+	strlcpy(t->info.bus, "gretap", sizeof(t->info.bus));
+
 }
 
 static int ipgre_newlink(struct net *src_net, struct net_device *dev, struct nlattr *tb[],

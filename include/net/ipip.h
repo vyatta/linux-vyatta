@@ -30,17 +30,18 @@ struct ip_tunnel {
 
 	struct ip_tunnel_parm	parms;
 
-	/* Vyatta extensions */
-	uint32_t		 speed;
-	uint8_t			 duplex;
-	struct rtnl_link_stats64 *link_stats;
-
 	/* for SIT */
 #ifdef CONFIG_IPV6_SIT_6RD
 	struct ip_tunnel_6rd_parm	ip6rd;
 #endif
 	struct ip_tunnel_prl_entry __rcu *prl;		/* potential router list */
 	unsigned int			prl_count;	/* # of entries in PRL */
+
+	/* Vyatta extensions */
+	uint32_t		 speed;
+	uint8_t			 duplex;
+	struct rtnl_link_stats64 *link_stats;
+	struct ip_tunnel_info	 info;
 };
 
 struct ip_tunnel_prl_entry {
