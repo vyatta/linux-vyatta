@@ -1,3 +1,13 @@
+linux-3.6 (3.6.11-1+vyatta+7) unstable; urgency=low
+
+  [ Nicolas Dichtel ]
+  * rtnl/ipv4: use netconf msg to advertise forwarding status
+  * netconf: advertise mc_forwarding status
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <shemming@brocade.com>  Mon, 15 Apr 2013 16:35:05 -0700
+
 linux-3.6 (3.6.11-1+vyatta+6) unstable; urgency=low
 
   * tun: add recording of bus info
