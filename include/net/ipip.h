@@ -39,6 +39,12 @@ struct ip_tunnel {
 	unsigned int			prl_count;	/* # of entries in PRL */
 
 	struct gro_cells		gro_cells;
+
+	/* Vyatta extensions */
+	uint32_t		 speed;
+	uint8_t			 duplex;
+	struct rtnl_link_stats64 *link_stats;
+	struct ip_tunnel_info	 info;
 };
 
 struct ip_tunnel_prl_entry {

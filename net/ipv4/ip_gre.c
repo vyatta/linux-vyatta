@@ -11,6 +11,7 @@
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+#define DRV_VERSION "1.0"
 
 #include <linux/capability.h>
 #include <linux/module.h>
@@ -168,7 +169,31 @@ struct ipgre_net {
 static struct rtnl_link_stats64 *ipgre_get_stats64(struct net_device *dev,
 						   struct rtnl_link_stats64 *tot)
 {
+	struct ip_tunnel *t = netdev_priv(dev);
+	struct rtnl_link_stats64 *stats;
 	int i;
+
+	rcu_read_lock();
+	stats = rcu_dereference(t->link_stats);
+	if (stats) {
+		/* Stats received from device */
+		*tot = *stats;
+		rcu_read_unlock();
+
+		/* Add tunnel detected errors to mix */
+		tot->rx_crc_errors += dev->stats.rx_crc_errors;
+		tot->rx_length_errors += dev->stats.rx_length_errors;
+		tot->rx_fifo_errors += dev->stats.rx_fifo_errors;
+		tot->rx_errors += dev->stats.rx_errors;
+		tot->rx_dropped += dev->stats.rx_dropped;
+		tot->tx_carrier_errors += dev->stats.tx_carrier_errors;
+		tot->tx_fifo_errors += dev->stats.tx_fifo_errors;
+		tot->tx_errors += dev->stats.tx_errors;
+		tot->tx_dropped += dev->stats.tx_dropped;
+
+		return tot;
+	}
+	rcu_read_unlock();
 
 	for_each_possible_cpu(i) {
 		const struct pcpu_tstats *tstats = per_cpu_ptr(dev->tstats, i);
@@ -1082,6 +1107,7 @@ static int ipgre_tunnel_bind_dev(struct net_device *dev)
 	if (tdev) {
 		hlen = tdev->hard_header_len + tdev->needed_headroom;
 		mtu = tdev->mtu;
+		netif_stacked_transfer_operstate(tdev, dev);
 	}
 	dev->iflink = tunnel->parms.link;
 
@@ -1377,6 +1403,7 @@ static void ipgre_dev_free(struct net_device *dev)
 {
 	struct ip_tunnel *tunnel = netdev_priv(dev);
 
+	kfree(tunnel->link_stats);
 	gro_cells_destroy(&tunnel->gro_cells);
 	free_percpu(dev->tstats);
 	free_netdev(dev);
@@ -1635,29 +1662,146 @@ static int ipgre_tap_init(struct net_device *dev)
 	return 0;
 }
 
+/* Vyatta extension to allow an ioctl to set interface statistics */
+static int
+ipgre_tap_set_stats(struct net_device *dev, const void __user *data)
+{
+	struct ip_tunnel *t = netdev_priv(dev);
+	struct link_stats_rcu {
+		struct rtnl_link_stats64 link;
+		struct rcu_head rcu;
+	} *stats;
+	struct rtnl_link_stats64 *old;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	stats = kmalloc(sizeof(*stats), GFP_USER);
+	if (!stats)
+		return -ENOMEM;
+
+	if (copy_from_user(&stats->link, data,
+			   sizeof(struct rtnl_link_stats64))) {
+		kfree(stats);
+		return -EFAULT;
+	}
+
+	old = xchg(&t->link_stats, &stats->link);
+	if (old)
+	    kfree_rcu(container_of(old, struct link_stats_rcu, link),
+		      rcu);
+
+	return 0;
+}
+
+static int
+ipgre_tap_set_info(struct net_device *dev, const void __user *data)
+{
+	struct ip_tunnel *t = netdev_priv(dev);
+	struct ip_tunnel_info info;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	if (copy_from_user(&info, data, sizeof(info)))
+		return -EFAULT;
+
+	strlcpy(t->info.driver, info.driver, sizeof(t->info.driver));
+	strlcpy(t->info.bus, info.bus, sizeof(t->info.bus));
+	return 0;
+}
+
+static int
+ipgre_tap_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+{
+	switch(cmd) {
+	case SIOCTUNNELSTATS:
+		return ipgre_tap_set_stats(dev, ifr->ifr_ifru.ifru_data);
+	case SIOCTUNNELINFO:
+		return ipgre_tap_set_info(dev, ifr->ifr_ifru.ifru_data);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
 static const struct net_device_ops ipgre_tap_netdev_ops = {
 	.ndo_init		= ipgre_tap_init,
 	.ndo_uninit		= ipgre_tunnel_uninit,
 	.ndo_start_xmit		= ipgre_tunnel_xmit,
+	.ndo_do_ioctl		= ipgre_tap_ioctl,
 	.ndo_set_mac_address 	= eth_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_change_mtu		= ipgre_tunnel_change_mtu,
 	.ndo_get_stats64	= ipgre_get_stats64,
 };
 
+static int gretap_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct ip_tunnel *t = netdev_priv(dev);
+
+	cmd->supported		= 0;
+	cmd->advertising	= 0;
+	ethtool_cmd_speed_set(cmd, t->speed);
+	cmd->duplex		= t->duplex;
+	cmd->port		= PORT_TP;
+	cmd->phy_address	= 0;
+	cmd->transceiver	= XCVR_INTERNAL;
+	cmd->autoneg		= AUTONEG_ENABLE;
+	cmd->maxtxpkt		= 0;
+	cmd->maxrxpkt		= 0;
+	return 0;
+}
+
+static int gretap_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct ip_tunnel *t = netdev_priv(dev);
+
+	if (ecmd->autoneg != AUTONEG_ENABLE)
+		return -EOPNOTSUPP;
+
+	t->speed = ethtool_cmd_speed(ecmd);
+	t->duplex = ecmd->duplex;
+
+	return 0;
+}
+
+static void gretap_get_drvinfo(struct net_device *dev,
+			       struct ethtool_drvinfo *info)
+{
+	struct ip_tunnel *t = netdev_priv(dev);
+
+	strlcpy(info->driver, t->info.driver, sizeof(info->driver));
+	strlcpy(info->version, DRV_VERSION, sizeof(info->version));
+	strlcpy(info->bus_info, t->info.bus, sizeof(info->bus_info));
+}
+
+
+static const struct ethtool_ops gretap_ethtool_ops = {
+	.get_settings	= gretap_get_settings,
+	.set_settings	= gretap_set_settings,
+	.get_drvinfo	= gretap_get_drvinfo,
+	.get_link	= ethtool_op_get_link,
+};
+
 static void ipgre_tap_setup(struct net_device *dev)
 {
+	struct ip_tunnel *t = netdev_priv(dev);
 
 	ether_setup(dev);
 
 	dev->netdev_ops		= &ipgre_tap_netdev_ops;
 	dev->destructor 	= ipgre_dev_free;
+	dev->ethtool_ops 	= &gretap_ethtool_ops;
 
 	dev->iflink		= 0;
 	dev->features		|= NETIF_F_NETNS_LOCAL;
 
 	dev->features		|= GRE_FEATURES;
 	dev->hw_features	|= GRE_FEATURES;
+	dev->priv_flags 	|= IFF_LIVE_ADDR_CHANGE;
+
+	strlcpy(t->info.driver, "gre", sizeof(t->info.driver));
+	strlcpy(t->info.bus, "gretap", sizeof(t->info.bus));
 }
 
 static int ipgre_newlink(struct net *src_net, struct net_device *dev, struct nlattr *tb[],
@@ -1692,6 +1836,7 @@ static int ipgre_newlink(struct net *src_net, struct net_device *dev, struct nla
 
 	dev_hold(dev);
 	ipgre_tunnel_link(ign, nt);
+	linkwatch_fire_event(dev); /* _MUST_ call rfc2863_policy() */
 
 out:
 	return err;
@@ -1849,6 +1994,34 @@ static struct rtnl_link_ops ipgre_tap_ops __read_mostly = {
 	.fill_info	= ipgre_fill_info,
 };
 
+/* If lower device changes state, reflect that to the tunnel. */
+static int ipgre_notify(struct notifier_block *unused,
+			unsigned long event, void *ptr)
+{
+	struct net_device *dev = ptr;
+	struct net *net = dev_net(dev);
+	struct ipgre_net *ign = net_generic(net, ipgre_net_id);
+	unsigned int i, h;
+	struct ip_tunnel *t;
+
+	if (event != NETDEV_CHANGE)
+		return NOTIFY_DONE;
+
+	for (i = 0; i < 4; i++)
+		for (h = 0; h < HASH_SIZE; h++)
+			for(t = ign->tunnels[i][h]; t; t = t->next) {
+				if (dev->ifindex != t->dev->iflink)
+					continue;
+				netif_stacked_transfer_operstate(dev, t->dev);
+			}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block ipgre_notifier = {
+	.notifier_call = ipgre_notify,
+};
+
 /*
  *	And now the modules code and kernel interface.
  */
@@ -1877,9 +2050,15 @@ static int __init ipgre_init(void)
 	if (err < 0)
 		goto tap_ops_failed;
 
+	err = register_netdevice_notifier(&ipgre_notifier);
+	if (err < 0)
+		goto notify_failed;
+
 out:
 	return err;
 
+notify_failed:
+	rtnl_link_unregister(&ipgre_tap_ops);
 tap_ops_failed:
 	rtnl_link_unregister(&ipgre_link_ops);
 rtnl_link_failed:
@@ -1891,6 +2070,7 @@ add_proto_failed:
 
 static void __exit ipgre_fini(void)
 {
+	unregister_netdevice_notifier(&ipgre_notifier);
 	rtnl_link_unregister(&ipgre_tap_ops);
 	rtnl_link_unregister(&ipgre_link_ops);
 	if (gre_del_protocol(&ipgre_protocol, GREPROTO_CISCO) < 0)
