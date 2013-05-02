@@ -1,3 +1,11 @@
+linux-3.9 (3.9.0-1+vyatta+2) unstable; urgency=low
+
+  * amd64 config changes
+  * i386: config update
+  * amd64: build ext4 into kernel
+
+ -- Stephen Hemminger <stephen@networkplumber.org>  Thu, 02 May 2013 15:46:00 -0700
+
 linux-3.9 (3.9.0-1+vyatta+1) unstable; urgency=low
 
   * Rebase on 3.9
