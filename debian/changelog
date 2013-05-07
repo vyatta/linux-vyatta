@@ -1,3 +1,12 @@
+linux-3.9 (3.9.0-1+vyatta+3) unstable; urgency=low
+
+  [ Damian Hobson-Garcia ]
+  * drivers: uio: Fix UIO device registration failure
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen@networkplumber.org>  Tue, 07 May 2013 11:17:15 -0700
+
 linux-3.9 (3.9.0-1+vyatta+2) unstable; urgency=low
 
   * amd64 config changes
