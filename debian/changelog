@@ -1,3 +1,317 @@
+linux-3.9 (3.9.1-1+vyatta+1) unstable; urgency=low
+
+  [ Filippo Turato ]
+  * USB: serial: option: Added support Olivetti Olicard 145
+
+  [ Bjørn Mork ]
+  * USB: option: add a D-Link DWM-156 variant
+
+  [ Joerg Roedel ]
+  * staging: zsmalloc: Fix link error on ARM
+
+  [ Daniel Lezcano ]
+  * ARM: omap3: cpuidle: enable time keeping
+
+  [ Linus Walleij ]
+  * ARM: u300: fix ages old copy/paste bug
+
+  [ Douglas Gilbert ]
+  * ARM: at91/at91sam9260.dtsi: fix u(s)art pinctrl encoding
+
+  [ Nicolas Ferre ]
+  * ARM: at91: remove partial parameter in bootargs for at91sam9x5ek.dtsi
+
+  [ Maxime Ripard ]
+  * ARM: at91: Fix typo in restart code panic message
+
+  [ Nicolas Ferre ]
+  * ARM: at91/trivial: fix model name for SAM9G15-EK
+  * ARM: at91/trivial: typos in compatible property
+
+  [ Michael Neuling ]
+  * powerpc: Add isync to copy_and_flush
+  * powerpc: Fix hardware IRQs with MMU on exceptions when HV=0
+  * powerpc/power8: Fix secondary CPUs hanging on boot for HV=0
+
+  [ Michael Ellerman ]
+  * powerpc/spufs: Initialise inode->i_ino in spufs_new_inode()
+
+  [ Stanislaw Gruszka ]
+  * iwlwifi: fix freeing uninitialized pointer
+
+  [ Emmanuel Grumbach ]
+  * iwlwifi: dvm: don't send zeroed LQ cmd
+
+  [ Yogesh Ashok Powar ]
+  * mwifiex: Use pci_release_region() instead of a pci_release_regions()
+  * mwifiex: Call pci_release_region after calling pci_disable_device
+
+  [ Johannes Berg ]
+  * mac80211: fix station entry leak/warning while suspending
+
+  [ Bob Copeland ]
+  * mac80211: use synchronize_rcu() with rcu_barrier()
+
+  [ Ben Jencks ]
+  * usb/misc/appledisplay: Add 24" LED Cinema display
+
+  [ Stefani Seibold ]
+  * USB: add ftdi_sio USB ID for GDM Boost V1.x
+
+  [ Adrian Thomasset ]
+  * USB: ftdi_sio: correct ST Micro Connect Lite PIDs
+  * USB: ftdi_sio: enable two UART ports on ST Microconnect Lite
+
+  [ Johan Hovold ]
+  * USB: io_ti: fix TIOCGSERIAL
+
+  [ Hans de Goede ]
+  * usbfs: Always allow ctrl requests with USB_RECIP_ENDPOINT on the ctrl ep
+
+  [ Michael Grzeschik ]
+  * usb: chipidea: udc: fix memory access of shared memory on armv5 machines
+  * usb: chipidea: udc: fix memory leak in _ep_nuke
+
+  [ Shengzhou Liu ]
+  * usb: remove redundant tdi_reset
+
+  [ Tormod Volden ]
+  * usb-storage: CY7C68300A chips do not support Cypress ATACB
+
+  [ Heiko Carstens ]
+  * s390/memory hotplug: prevent offline of active memory increments
+
+  [ Konrad Rzeszutek Wilk ]
+  * xen/time: Fix kasprintf splat when allocating timer%d IRQ line.
+  * xen/smp: Fix leakage of timer interrupt line for every CPU online/offline.
+  * xen/smp/spinlock: Fix leakage of the spinlock interrupt line for every CPU online/offline
+
+  [ Federico Vaga ]
+  * serial_core.c: add put_device() after device_find_child()
+
+  [ Catalin Marinas ]
+  * arm: set the page table freeing ceiling to TASK_SIZE
+
+  [ Richard Cochran ]
+  * gianfar: do not advertise any alarm capability.
+
+  [ Linus Torvalds ]
+  * tty: fix up atime/mtime mess, take three
+
+  [ Mika Kuoppala ]
+  * fbcon: when font is freed, clear also vc_font.data
+
+  [ Steven Rostedt (Red Hat) ]
+  * tracing: Use stack of calling function for stack tracer
+  * tracing: Fix stack tracer with fentry use
+  * tracing: Remove most or all of stack tracer stack size from stack_max_size
+
+  [ Namhyung Kim ]
+  * tracing: Fix off-by-one on allocating stat->pages
+  * tracing: Check return value of tracing_init_dentry()
+  * tracing: Reset ftrace_graph_filter_enabled if count is zero
+
+  [ Steven A. Falco ]
+  * i2c: xiic: must always write 16-bit words to TX_FIFO
+
+  [ Sandy Wu ]
+  * crypto: crc32-pclmul - Use gas macro for pclmulqdq
+
+  [ K. Y. Srinivasan ]
+  * Drivers: hv: vmbus: Fix a bug in hv_need_to_signal()
+
+  [ Ming Lei ]
+  * sysfs: fix use after free in case of concurrent read/write and readdir
+
+  [ Tony Luck ]
+  * Fix initialization of CMCI/CMCP interrupts
+
+  [ Yinghai Lu ]
+  * PCI / ACPI: Don't query OSC support with all possible controls
+
+  [ Rafael J. Wysocki ]
+  * PCI/PM: Fix fallback to PCI_D0 in pci_platform_power_transition()
+
+  [ Alex A. Mihaylov ]
+  * rt2x00: Fix transmit power troubles on some Ralink RT30xx cards
+
+  [ Stephan Schreiber ]
+  * Wrong asm register contraints in the futex implementation
+  * Wrong asm register contraints in the kvm implementation
+
+  [ Anurup m ]
+  * fs/fscache/stats.c: fix memory leak
+
+  [ Hugh Dickins ]
+  * mm: allow arch code to control the user page table ceiling
+
+  [ Duncan Laurie ]
+  * TPM: Retry SaveState command in suspend path
+
+  [ Takashi Iwai ]
+  * ALSA: emu10k1: Fix dock firmware loading
+
+  [ Daniel Mack ]
+  * ALSA: snd-usb: try harder to find USB_DT_CS_ENDPOINT
+
+  [ Calvin Owens ]
+  * ALSA: usb: Add quirk for 192KHz recording on E-Mu devices
+
+  [ Clemens Ladisch ]
+  * ALSA: usb-audio: disable autopm for MIDI devices
+
+  [ Takashi Iwai ]
+  * ALSA: usb-audio: Fix autopm error during probing
+
+  [ Clemens Ladisch ]
+  * ALSA: USB: adjust for changed 3.8 USB API
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Fix aamix activation with loopback control on VIA codecs
+
+  [ Kailang Yang ]
+  * ALSA: hda - Add the support for ALC286 codec
+
+  [ Dylan Reid ]
+  * ASoC: max98088: Fix logging of hardware revision.
+
+  [ David Engraf ]
+  * hrtimer: Fix ktime_add_ns() overflow on 32bit architectures
+
+  [ Prarit Bhargava ]
+  * hrtimer: Add expiry time overflow check in hrtimer_interrupt
+
+  [ Jerome Marchand ]
+  * swap: redirty page if page write fails on swap file
+
+  [ Mel Gorman ]
+  * mm: swap: mark swap pages writeback before queueing for direct IO
+
+  [ Derek Basehore ]
+  * drivers/rtc/rtc-cmos.c: don't disable hpet emulation on suspend
+
+  [ Johan Hovold ]
+  * drivers/rtc/rtc-at91rm9200.c: fix missing iounmap
+
+  [ Aaron Lu ]
+  * libata: acpi: make ata_ap_acpi_handle not block
+
+  [ Wang YanQing ]
+  * ACPI: Fix wrong parameter passed to memblock_reserve
+
+  [ Zhang Rui ]
+  * ACPI / thermal: do not always return THERMAL_TREND_RAISING for active trip points
+
+  [ Li Zefan ]
+  * cgroup: fix an off-by-one bug which may trigger BUG_ON()
+  * cgroup: fix broken file xattrs
+
+  [ Steven Rostedt ]
+  * localmodconfig: Process source kconfig files as they are found
+
+  [ Thomas Gleixner ]
+  * clockevents: Set dummy handler on CPU_DEAD shutdown
+
+  [ Robert Richter ]
+  * sata_highbank: Rename proc_name to the module name
+
+  [ Zhao Hongjiang ]
+  * inotify: invalid mask should return a error number but not set it
+
+  [ Greg Thelen ]
+  * fs/dcache.c: add cond_resched() to shrink_dcache_parent()
+
+  [ Oleg Nesterov ]
+  * exec: do not abuse ->cred_guard_mutex in threadgroup_lock()
+
+  [ Trond Myklebust ]
+  * LOCKD: Ensure that nlmclnt_block resets block->b_status after a server reboot
+
+  [ NeilBrown ]
+  * md: bad block list should default to disabled.
+
+  [ Shaohua Li ]
+  * MD: ignore discard request for hard disks of hybid raid1/raid10 array
+
+  [ Trond Myklebust ]
+  * NFSv4: Handle NFS4ERR_DELAY and NFS4ERR_GRACE in nfs4_lock_delegation_recall
+  * NFSv4: Handle NFS4ERR_DELAY and NFS4ERR_GRACE in nfs4_open_delegation_recall
+
+  [ J. Bruce Fields ]
+  * nfsd4: don't close read-write opens too soon
+
+  [ fanchaoting ]
+  * nfsd: don't run get_file if nfs4_preprocess_stateid_op return error
+
+  [ Wei Yongjun ]
+  * nfsd: use kmem_cache_free() instead of kfree()
+
+  [ Bryan Schumaker ]
+  * nfsd: Decode and send 64bit time values
+
+  [ Johannes Berg ]
+  * wireless: regulatory: fix channel disabling race condition
+
+  [ Robin Holt ]
+  * ipc: sysv shared memory limited to 8TiB
+
+  [ Jacob Keller ]
+  * ixgbe: fix EICR write in ixgbe_msix_other
+
+  [ Richard Cochran ]
+  * e1000e: fix numeric overflow in phc settime method
+
+  [ H. Peter Anvin ]
+  * x86-64, init: Do not set NX bits on non-NX capable hardware
+
+  [ Theodore Ts'o ]
+  * ext4/jbd2: don't wait (forever) for stale tid caused by wraparound
+
+  [ Dmitry Monakhov ]
+  * jbd2: fix race between jbd2_journal_remove_checkpoint and ->j_commit_callback
+  * ext4: fix journal callback list traversal
+  * ext4: unregister es_shrinker if mount failed
+  * ext4: fix big-endian bug in metadata checksum calculations
+
+  [ Theodore Ts'o ]
+  * ext4: fix online resizing for ext3-compat file systems
+  * ext4: fix Kconfig documentation for CONFIG_EXT4_DEBUG
+
+  [ Al Viro ]
+  * do_mount(): fix a leak introduced in 3.9 ("mount: consolidate permission checks")
+
+  [ Johan Hovold ]
+  * mmc: at91/avr32/atmel-mci: fix DMA-channel leak on module unload
+
+  [ David Howells ]
+  * Give the OID registry file module info to avoid kernel tainting
+
+  [ Gleb Natapov ]
+  * KVM: X86 emulator: fix source operand decoding for 8bit mov[zs]x instructions
+
+  [ Li Fei ]
+  * x86: Eliminate irq_mis_count counted in arch_irq_stat
+
+  [ Philip Rakity ]
+  * mmc: core: Fix bit width test failing on old eMMC cards
+
+  [ Terry Barnaby ]
+  * mmc: atmel-mci: pio hang on block errors
+
+  [ Al Viro ]
+  * rcutrace: single_open() leaks
+
+  [ Lars-Peter Clausen ]
+  * mfd: adp5520: Restore mode bits on resume
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.9.1
+
+  [ Stephen Hemminger ]
+  * virtio: don't expose u16 in userspace api
+
+ -- Stephen Hemminger <stephen@networkplumber.org>  Wed, 08 May 2013 09:57:25 -0700
+
 linux-3.9 (3.9.0-1+vyatta+3) unstable; urgency=low
 
   [ Damian Hobson-Garcia ]
