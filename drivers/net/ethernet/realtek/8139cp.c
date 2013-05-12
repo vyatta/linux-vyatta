@@ -1122,6 +1122,7 @@ static void cp_clean_rings (struct cp_private *cp)
 			dev_kfree_skb(cp->rx_skb[i]);
 		}
 	}
+	netdev_reset_queue(cp->dev);
 
 	for (i = 0; i < CP_TX_RING_SIZE; i++) {
 		if (cp->tx_skb[i]) {
