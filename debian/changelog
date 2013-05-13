@@ -1,3 +1,194 @@
+linux-3.9 (3.9.2-1+vyatta+2) unstable; urgency=low
+
+  * 8139cp: reset BQL when ring tx ring cleared
+
+ -- Stephen Hemminger <stephen@networkplumber.org>  Sun, 12 May 2013 10:21:40 -0700
+
+linux-3.9 (3.9.2-1+vyatta+1) unstable; urgency=low
+
+  [ Stefano Stabellini ]
+  * xen/arm: actually pass a non-NULL percpu pointer to request_percpu_irq
+
+  [ Anton Blanchard ]
+  * powerpc: Emulate non privileged DSCR read and write
+
+  [ Michael Neuling ]
+  * powerpc/tm: Fix null pointer deference in flush_hash_page
+
+  [ Vaidyanathan Srinivasan ]
+  * powerpc: fix numa distance for form0 device tree
+
+  [ Axel Lin ]
+  * pwm: spear: Fix checking return value of clk_enable() and clk_prepare()
+
+  [ David Jeffery ]
+  * autofs - remove autofs dentry mount check
+
+  [ Suman Anna ]
+  * rpmsg: fix kconfig dependencies for VIRTIO
+  * remoteproc: fix kconfig dependencies for VIRTIO
+
+  [ Naoya Horiguchi ]
+  * hugetlbfs: fix mmap failure in unaligned size request
+
+  [ Joerg Roedel ]
+  * iommu/amd: Properly initialize irq-table lock
+
+  [ Benjamin Poirier ]
+  * menuconfig: Fix memory leak introduced by jump keys feature
+
+  [ Benjamin Herrenschmidt ]
+  * net/eth/ibmveth: Fixup retrieval of MAC address
+
+  [ Vince Weaver ]
+  * perf/x86/intel: Add support for IvyBridge model 58 Uncore
+
+  [ Jan-Simon Möller ]
+  * perf/x86/intel: Fix unintended variable name reuse
+
+  [ Peter Zijlstra ]
+  * perf/x86: Blacklist all MEM_*_RETIRED events for Ivy Bridge
+  * perf/x86/intel/lbr: Fix LBR filter
+  * perf/x86/intel/lbr: Demand proper privileges for PERF_SAMPLE_BRANCH_KERNEL
+
+  [ Hans Schillstrom ]
+  * ipvs: ip_vs_sip_fill_param() BUG: bad check of return value
+
+  [ Theodore Ts'o ]
+  * ext4: add check for inodes_count overflow in new resize ioctl
+
+  [ David Cohen ]
+  * MODSIGN: do not send garbage to stderr when enabling modules signature
+
+  [ Stefan Bader ]
+  * r8169: fix 8168evl frame padding.
+
+  [ Thadeu Lima de Souza Cascardo ]
+  * RDMA/cxgb4: Fix SQ allocation when on-chip SQ is disabled
+
+  [ Catalin Marinas ]
+  * arm64: Ignore the 'write' ESR flag on cache maintenance faults
+
+  [ Jun'ichi Nomura ]
+  * blkcg: fix "scheduling while atomic" in blk_queue_bypass_start
+
+  [ James Bottomley ]
+  * block: fix max discard sectors limit
+
+  [ Dave Airlie ]
+  * drm/cirrus: deal with bo reserve fail in dirty update path
+  * drm/mgag200: deal with bo reserve fail in dirty update path
+
+  [ Anisse Astier ]
+  * drm/gma500: fix backlight hotkeys behaviour on netbooks
+
+  [ Imre Deak ]
+  * drm: prime: fix refcounting on the dmabuf import error path
+
+  [ Dave Airlie ]
+  * drm/prime: keep a reference from the handle to exported dma-buf (v6)
+  * drm/ast: deal with bo reserve fail in dirty update path
+
+  [ Daniel Vetter ]
+  * drm/i915: Fix sdvo connector get_hw_state function
+
+  [ Christian Lamparter ]
+  * drm/i915: Add no-lvds quirk for Fujitsu Esprimo Q900
+
+  [ Egbert Eich ]
+  * drm/i915: Fix SDVO connector and encoder get_hw_state functions
+
+  [ Chris Wilson ]
+  * drm/i915: Workaround incoherence between fences and LLC across multiple CPUs
+  * drm/i915: Use MLC (l3$) for context objects
+
+  [ Paulo Zanoni ]
+  * drm/i915: set CPT FDI RX polarity bits based on VBT
+
+  [ Daniel Vetter ]
+  * drm/i915: don't check inconsistent modeset state when force-restoring
+
+  [ Jani Nikula ]
+  * drm/i915: ensure single initialization and cleanup of backlight device
+
+  [ Paulo Zanoni ]
+  * drm/i915: don't intel_crt_init on any ULT machines
+
+  [ Daniel Vetter ]
+  * drm/i915: Fixup Oops in the pipe config computation
+
+  [ David Müller ]
+  * drm/i915: Fall back to bit banging mode for DVO transmitter detection
+
+  [ Zhang, Xiong Y ]
+  * drm/i915: correct the calculation of first_pd_entry_in_global_pt
+
+  [ Alex Deucher ]
+  * drm/radeon: don't use get_engine_clock() on APUs
+  * drm/radeon: use frac fb div on RS780/RS880
+  * drm/radeon: fix typo in rv515_mc_resume()
+  * drm/radeon/dce6: add missing display reg for tiling setup
+  * drm/radeon: update wait_for_vblank for r5xx-r7xx
+  * drm/radeon: update wait_for_vblank for evergreen+
+  * drm/radeon: properly lock disp in mc_stop/resume for evergreen+
+  * drm/radeon: properly lock disp in mc_stop/resume for r5xx-r7xx
+  * drm/radeon: update wait_for_vblank for r1xx-r4xx
+  * drm/radeon: disable the crtcs in mc_stop (evergreen+) (v2)
+  * drm/radeon: add some new SI PCI ids
+  * drm/radeon/evergreen+: don't enable HPD interrupts on eDP/LVDS
+  * drm/radeon: cleanup properly if mmio mapping fails
+  * drm/radeon: fix hdmi mode enable on RS600/RS690/RS740
+  * drm/radeon: fix typo in si_select_se_sh()
+
+  [ Jerome Glisse ]
+  * drm/radeon: Always flush the VM
+
+  [ Alex Deucher ]
+  * drm/radeon: disable the crtcs in mc_stop (r5xx-r7xx) (v2)
+  * drm/radeon: fix endian bugs in atom_allocate_fb_scratch()
+  * drm/radeon: fix possible segfault when parsing pm tables
+  * drm/radeon: add new richland pci ids
+  * drm/radeon: fix handling of v6 power tables
+
+  [ Sachin Kamat ]
+  * drm/tilcdc: Fix an incorrect condition
+
+  [ Steven Rostedt (Red Hat) ]
+  * tracing: Fix ftrace_dump()
+
+  [ Josef Bacik ]
+  * Btrfs: compare relevant parts of delayed tree refs
+  * Btrfs: fix extent logging with O_DIRECT into prealloc
+
+  [ Srivatsa S. Bhat ]
+  * EDAC: Don't give write permission to read-only files
+
+  [ Yinghai Lu ]
+  * PCI: Delay final fixups until resources are assigned
+
+  [ Dan Williams ]
+  * qmi_wwan/cdc_ether: add device IDs for Dell 5804 (Novatel E371) WWAN card
+
+  [ Trond Myklebust ]
+  * NFSv4.x: Fix handling of partially delegated locks
+
+  [ Chen Gang ]
+  * kernel/audit_tree.c: tree will leak memory when failure occurs in audit_trim_trees()
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.9.2
+
+  [ Stephen Hemminger ]
+  * debug realtek 8139
+
+ -- Stephen Hemminger <stephen@networkplumber.org>  Sun, 12 May 2013 09:13:44 -0700
+
+linux-3.9 (3.9.1-1+vyatta+2) unstable; urgency=low
+
+  * Enable ARPD support because it is needed by OpenNHRP
+
+ -- Saurabh Mohan <saurabh@vyatta.com>  Thu, 09 May 2013 13:54:42 -0700
+
 linux-3.9 (3.9.1-1+vyatta+1) unstable; urgency=low
 
   [ Filippo Turato ]

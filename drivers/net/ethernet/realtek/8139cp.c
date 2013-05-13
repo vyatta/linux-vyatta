@@ -1122,6 +1122,7 @@ static void cp_clean_rings (struct cp_private *cp)
 			dev_kfree_skb(cp->rx_skb[i]);
 		}
 	}
+	netdev_reset_queue(cp->dev);
 
 	for (i = 0; i < CP_TX_RING_SIZE; i++) {
 		if (cp->tx_skb[i]) {
@@ -1136,6 +1137,7 @@ static void cp_clean_rings (struct cp_private *cp)
 			cp->dev->stats.tx_dropped++;
 		}
 	}
+//	netif_reset_queue(cp->dev);
 
 	memset(cp->rx_ring, 0, sizeof(struct cp_desc) * CP_RX_RING_SIZE);
 	memset(cp->tx_ring, 0, sizeof(struct cp_desc) * CP_TX_RING_SIZE);
@@ -1159,6 +1161,7 @@ static int cp_open (struct net_device *dev)
 	const int irq = cp->pdev->irq;
 	int rc;
 
+	netdev_info(dev, "cp_close\n");
 	netif_dbg(cp, ifup, dev, "enabling interface\n");
 
 	rc = cp_alloc_rings(cp);
@@ -1193,6 +1196,7 @@ static int cp_close (struct net_device *dev)
 	struct cp_private *cp = netdev_priv(dev);
 	unsigned long flags;
 
+	netdev_info(dev, "cp_close\n");
 	napi_disable(&cp->napi);
 
 	netif_dbg(cp, ifdown, dev, "disabling interface\n");
@@ -1239,6 +1243,7 @@ static int cp_change_mtu(struct net_device *dev, int new_mtu)
 {
 	struct cp_private *cp = netdev_priv(dev);
 
+	netdev_info(dev, "change mtu %u\n", new_mtu);
 	/* check for invalid MTU, according to hardware limits */
 	if (new_mtu < CP_MIN_MTU || new_mtu > CP_MAX_MTU)
 		return -EINVAL;
