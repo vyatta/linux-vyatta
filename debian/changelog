@@ -1,3 +1,13 @@
+linux-3.9 (3.9.2-1+vyatta+4) unstable; urgency=low
+
+  [ Daniel Vetter ]
+  * drm: don't check modeset locks in panic handler
+
+  [ Stephen Hemminger ]
+  * 8139cp: check length of received packet
+
+ -- Stephen Hemminger <stephen@networkplumber.org>  Fri, 17 May 2013 10:35:06 -0700
+
 linux-3.9 (3.9.2-1+vyatta+3) unstable; urgency=low
 
   * disable Intel Pstate driver
