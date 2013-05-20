@@ -344,18 +344,25 @@ static const struct file_operations inotify_fops = {
 /*
  * find_inode - resolve a user-given path to a specific inode
  */
-static int inotify_find_inode(const char __user *dirname, struct path *path, unsigned flags)
+static struct file *inotify_find_inode(const char __user *dirname, unsigned flags)
 {
 	int error;
+	struct file *filp;
+	struct path path;
 
-	error = user_path_at(AT_FDCWD, dirname, flags, path);
+	error = user_path_at(AT_FDCWD, dirname, flags, &path);
 	if (error)
-		return error;
+		return ERR_PTR(error);
 	/* you can only watch an inode if you have read permissions on it */
-	error = inode_permission(path->dentry->d_inode, MAY_READ);
+	error = inode_permission(path.dentry->d_inode, MAY_READ);
 	if (error)
-		path_put(path);
-	return error;
+		filp = ERR_PTR(error);
+	else
+		filp = dentry_open(&path, O_PATH, current_cred());
+
+	path_put(&path);
+
+	return filp;
 }
 
 static int inotify_add_to_idr(struct idr *idr, spinlock_t *idr_lock,
@@ -744,7 +751,7 @@ SYSCALL_DEFINE3(inotify_add_watch, int, fd, const char __user *, pathname,
 {
 	struct fsnotify_group *group;
 	struct inode *inode;
-	struct path path;
+	struct file *i_filp;
 	struct fd f;
 	int ret;
 	unsigned flags = 0;
@@ -768,17 +775,19 @@ SYSCALL_DEFINE3(inotify_add_watch, int, fd, const char __user *, pathname,
 	if (mask & IN_ONLYDIR)
 		flags |= LOOKUP_DIRECTORY;
 
-	ret = inotify_find_inode(pathname, &path, flags);
-	if (ret)
+	i_filp = inotify_find_inode(pathname, flags);
+	if (IS_ERR(i_filp)) {
+		ret = PTR_ERR(i_filp);
 		goto fput_and_out;
+	}
 
-	/* inode held in place by reference to path; group by fget on fd */
-	inode = path.dentry->d_inode;
+	/* inode held in place by reference to i_filp; group by fget on fd */
+	inode = file_inode(i_filp);
 	group = f.file->private_data;
 
 	/* create/update an inode mark */
 	ret = inotify_update_watch(group, inode, mask);
-	path_put(&path);
+	fput(i_filp);
 fput_and_out:
 	fdput(f);
 	return ret;
