@@ -1,3 +1,304 @@
+linux-3.9 (3.9.3-1+vyatta+1) unstable; urgency=low
+
+  [ Sven-Thorsten Dietrich ]
+  * This is a temporary file for testing build services.
+
+  [ Gleb Natapov ]
+  * KVM: VMX: fix halt emulation while emulating invalid guest sate
+
+  [ Paolo Bonzini ]
+  * KVM: emulator: emulate AAM
+  * KVM: emulator: emulate XLAT
+  * KVM: emulator: emulate SALC
+
+  [ Fernando Luis Vazquez Cao ]
+  * HID: reintroduce fix-up for certain Sony RF receivers
+
+  [ Aaro Koskinen ]
+  * ARM: OMAP: RX-51: change probe order of touchscreen and panel SPI devices
+
+  [ Dan Carpenter ]
+  * ASoC: wm8994: missing break in wm8994_aif3_hw_params()
+
+  [ Bob Moore ]
+  * ACPICA: Fix possible buffer overflow during a field unit read operation
+
+  [ Takashi Iwai ]
+  * Revert "ALSA: hda - Don't set up active streams twice"
+
+  [ Wang YanQing ]
+  * ALSA: HDA: Fix Oops caused by dereference NULL pointer
+
+  [ Takashi Iwai ]
+  * ALSA: hda - Fix 3.9 regression of EAPD init on Conexant codecs
+
+  [ Viresh Kumar ]
+  * DMA: OF: Check properties value before running be32_to_cpup() on it
+
+  [ Mike Snitzer ]
+  * dm table: fix write same support
+  * dm stripe: fix regression in stripe_width calculation
+
+  [ Mikulas Patocka ]
+  * dm bufio: avoid a possible __vmalloc deadlock
+
+  [ Wei Yongjun ]
+  * dm snapshot: fix error return code in snapshot_ctr
+  * dm cache: fix error return code in cache_create
+
+  [ Frederic Weisbecker ]
+  * math64: New div64_u64_rem helper
+  * sched: Lower chances of cputime scaling overflow
+
+  [ Stanislaw Gruszka ]
+  * sched: Avoid cputime scaling overflow
+  * sched: Do not account bogus utime
+  * Revert "math64: New div64_u64_rem helper"
+  * sched: Avoid prev->stime underflow
+
+  [ J. Bruce Fields ]
+  * nfsd4: don't allow owner override on 4.1 CLAIM_FH opens
+
+  [ Jeff Layton ]
+  * nfsd: fix oops when legacy_recdir_name_error is passed a -ENOENT error
+
+  [ Shuah Khan ]
+  * hp_accel: Ignore the error from lis3lv02d_poweron() at resume
+
+  [ Li Zefan ]
+  * shm: fix null pointer deref when userspace specifies invalid hugepage size
+
+  [ Konrad Rzeszutek Wilk ]
+  * xen/vcpu/pvhvm: Fix vcpu hotplugging hanging.
+
+  [ James Bottomley ]
+  * SCSI: sd: fix array cache flushing bug causing performance problems
+
+  [ Anton Blanchard ]
+  * audit: Syscall rules are not applied to existing processes on non-x86
+
+  [ Jeff Layton ]
+  * audit: vfs: fix audit_inode call in O_CREAT case of do_last
+
+  [ John Stultz ]
+  * time: Revert ALWAYS_USE_PERSISTENT_CLOCK compile time optimizaitons
+
+  [ Tirupathi Reddy ]
+  * timer: Don't reinitialize the cpu base lock during CPU_UP_PREPARE
+
+  [ Thomas Gleixner ]
+  * tick: Cleanup NOHZ per cpu data on cpu down
+
+  [ Steven Rostedt (Red Hat) ]
+  * tracing: Fix leaks of filter preds
+
+  [ Lachlan McIlroy ]
+  * ext4: limit group search loop for non-extent files
+
+  [ Konrad Rzeszutek Wilk ]
+  * x86/microcode: Add local mutex to fix physical CPU hot-add deadlock
+
+  [ Jaccon Bastiaansen ]
+  * ARM: 7720/1: ARM v6/v7 cmpxchg64 shouldn't clear upper 32 bits of the old/new value
+
+  [ Robert Jennings ]
+  * powerpc: Bring all threads online prior to migration/hibernation
+
+  [ Anton Blanchard ]
+  * powerpc/kexec: Fix kexec when using VMX optimised memcpy
+
+  [ Felix Fietkau ]
+  * ath9k: fix key allocation error handling for powersave keys
+
+  [ Bing Zhao ]
+  * mwifiex: clear is_suspended flag when interrupt is received early
+
+  [ Amitkumar Karwar ]
+  * mwifiex: fix memory leak issue when driver unload
+
+  [ Daniel Drake ]
+  * mwifiex: fix setting of multicast filter
+
+  [ Chris Metcalf ]
+  * tile: support new Tilera hypervisor
+
+  [ Thommy Jakobsson ]
+  * B43: Handle DMA RX descriptor underrun
+
+  [ Stanislaw Gruszka ]
+  * iwl4965: workaround connection regression on passive channel
+
+  [ Christopher Harvey ]
+  * drm/mgag200: Fix writes into MGA1064_PIX_CLK_CTL register
+  * drm/mgag200: Fix framebuffer base address programming
+
+  [ Daniel Vetter ]
+  * drm/mm: fix dump table BUG
+  * drm: don't check modeset locks in panic handler
+
+  [ Jani Nikula ]
+  * drm/i915: clear the stolen fb before resuming
+
+  [ Eric Dumazet ]
+  * tcp: force a dst refcount when prequeue packet
+
+  [ Ben Hutchings ]
+  * sfc: Fix naming of MTD partitions for FPGA bitfiles
+
+  [ Gao feng ]
+  * net: tun: release the reference of tun device in tun_recvmsg
+
+  [ Chen Gang ]
+  * net: mac802154: comparision issue of type cast, finding by EXTRA_CFLAGS=-W
+
+  [ Yuchung Cheng ]
+  * tcp: reset timer after any SYNACK retransmit
+
+  [ Matthew Whitehead ]
+  * 3c509.c: call SET_NETDEV_DEV for all device types (ISA/ISAPnP/EISA)
+
+  [ Jamal Hadi Salim ]
+  * net_sched: act_ipt forward compat with xtables
+
+  [ Patrick McHardy ]
+  * net: use netdev_features_t in skb_needs_linearize()
+
+  [ Bjørn Mork ]
+  * net: vlan,ethtool: netdev_features_t is more than 32 bit
+
+  [ stephen hemminger ]
+  * bridge: fix race with topology change timer
+
+  [ holger@eitzenberger.org ]
+  * asix: fix BUG in receive path when lowering MTU
+
+  [ Daniel Borkmann ]
+  * packet: tpacket_v3: do not trigger bug() on wrong header status
+
+  [ stephen hemminger ]
+  * virtio: don't expose u16 in userspace api
+
+  [ Konstantin Khlebnikov ]
+  * net: frag, fix race conditions in LRU list maintenance
+
+  [ Sergei Shtylyov ]
+  * 3c59x: fix freeing nonexistent resource on driver unload
+  * 3c59x: fix PCI resource management
+
+  [ Josh Boyer ]
+  * if_cablemodem.h: Add parenthesis around ioctl macros
+
+  [ Jiri Pirko ]
+  * macvlan: fix passthru mode race between dev removal and rx path
+
+  [ Eric Dumazet ]
+  * ipv6: do not clear pinet6 field
+
+  [ Amerigo Wang ]
+  * ipv6,gre: do not leak info to user-space
+
+  [ Cong Wang ]
+  * xfrm6: release dev before returning error
+
+  [ Tomoya MORINAGA ]
+  * pch_dma: Use GFP_ATOMIC because called from interrupt context
+
+  [ Guenter Roeck ]
+  * watchdog: Fix race condition in registration code
+
+  [ Philipp Reisner ]
+  * drbd: Fix build error when CONFIG_CRYPTO_HMAC is not set
+
+  [ Lars Ellenberg ]
+  * drbd: fix memory leak
+
+  [ Philipp Reisner ]
+  * drbd: fix for deadlock when using automatic split-brain-recovery
+
+  [ Geert Uytterhoeven ]
+  * VSOCK: Drop bogus __init annotation from vsock_init_tables()
+
+  [ Inderpal Singh ]
+  * ARM: EXYNOS5: Fix kernel dump in AFTR idle mode
+
+  [ Wei Yongjun ]
+  * drivers/rtc/rtc-pcf2123.c: fix error return code in pcf2123_probe()
+
+  [ Dirk Brandewie ]
+  * cpufreq / intel_pstate: remove idle time and duration from sample and calculations
+  * cpufreq / intel_pstate: use lowest requested max performance
+  * cpufreq / intel_pstate: fix ffmpeg regression
+
+  [ Shlomo Pongratz ]
+  * iscsi-target: Fix processing of OOO commands
+
+  [ Joern Engel ]
+  * target: close target_put_sess_cmd() vs. core_tmr_abort_task() race
+
+  [ Nicholas Bellinger ]
+  * target/iblock: Fix WCE=1 + DPOFUA=1 backend WRITE regression
+
+  [ Lan Tianyu ]
+  * ACPI / EC: Restart transaction even when the IBF flag set
+
+  [ Chen Gang ]
+  * drivers/char/ipmi: memcpy, need additional 2 bytes to avoid memory overflow
+
+  [ Benjamin LaHaise ]
+  * ipmi: ipmi_devintf: compat_ioctl method fails to take ipmi_mutex
+
+  [ Axel Lin ]
+  * ASoC: da7213: Fix setting dmic_samplephase and dmic_clk_rate
+
+  [ Kees Cook ]
+  * drm/radeon: check incoming cliprects pointer
+
+  [ Dave Airlie ]
+  * drm/radeon: restore nomodeset operation (v2)
+
+  [ Oleg Nesterov ]
+  * usermodehelper: check subprocess_info->path != NULL
+
+  [ John David Anglin ]
+  * parisc: only re-enable interrupts if we need to schedule or deliver signals when returning to userspace
+  * parisc: fix SMP races when updating PTE and TLB entries in entry.S
+  * parisc: use long branch in fork_like macro
+
+  [ Mike Frysinger ]
+  * parisc: fix NATIVE set up in build
+
+  [ Helge Deller ]
+  * parisc: make default cross compiler search more robust (v3)
+
+  [ Eric W. Biederman ]
+  * audit: Make testing for a valid loginuid explicit.
+
+  [ Andy Grover ]
+  * target: Use FD_MAX_SECTORS/FD_BLOCKSIZE for blockdevs using fileio
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.9.3
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen@networkplumber.org>  Mon, 20 May 2013 08:24:59 -0700
+
+linux-3.9 (3.9.2-1+vyatta+4) unstable; urgency=low
+
+  [ Daniel Vetter ]
+  * drm: don't check modeset locks in panic handler
+
+  [ Stephen Hemminger ]
+  * 8139cp: check length of received packet
+
+ -- Stephen Hemminger <stephen@networkplumber.org>  Fri, 17 May 2013 10:35:06 -0700
+
+linux-3.9 (3.9.2-1+vyatta+3) unstable; urgency=low
+
+  * disable Intel Pstate driver
+
+ -- Stephen Hemminger <stephen@networkplumber.org>  Mon, 13 May 2013 14:47:43 -0700
+
 linux-3.9 (3.9.2-1+vyatta+2) unstable; urgency=low
 
   * 8139cp: reset BQL when ring tx ring cleared

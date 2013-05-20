@@ -511,6 +511,11 @@ rx_status_loop:
 			goto rx_next;
 		}
 
+		if (len > buflen) {
+			dev->stats.rx_over_errors++;
+			goto rx_next;
+		}
+
 		netif_dbg(cp, rx_status, dev, "rx slot %d status 0x%x len %d\n",
 			  rx_tail, status, len);
 
