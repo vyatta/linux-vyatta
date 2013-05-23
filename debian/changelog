@@ -1,3 +1,18 @@
+linux-3.9 (3.9.3-1+vyatta+4) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * inotify/overlayfs fix
+  * Revert "inotify/overlayfs fix"
+  * config: disable old cpufreq modules
+
+  [ Nicolas Dichtel ]
+  * netconf: add the handler to dump entries
+
+  [ Stephen Hemminger ]
+  * amd64: drop support for unsupported WAN devices
+
+ -- Stephen Hemminger <stephen@networkplumber.org>  Thu, 23 May 2013 13:52:19 -0700
+
 linux-3.9 (3.9.3-1+vyatta+3) unstable; urgency=low
 
   * update i386 config
