@@ -115,3 +115,7 @@ clean-configs:
 	rm -rf '$(CheckConfs_DIR)'
 
 .PHONY: clean build setup binary-indep binary-arch binary
+
+override_dh_prep:
+	debian/bin/build-flavour.sh all
+	dh_prep
