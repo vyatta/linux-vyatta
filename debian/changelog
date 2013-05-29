@@ -1,3 +1,76 @@
+linux-3.9 (3.9.4-1+vyatta+1) unstable; urgency=low
+
+  [ Will Deacon ]
+  * arm64: debug: clear mdscr_el1 instead of taking the OS lock
+
+  [ Sukanto Ghosh ]
+  * arm64: mm: Fix operands of clz in __flush_dcache_all
+
+  [ Gabriel de Perthuis ]
+  * btrfs: don't stop searching after encountering the wrong item
+
+  [ Wei Yongjun ]
+  * hwmon: fix error return code in abituguru_probe()
+
+  [ Josef Ahmad ]
+  * i2c: designware: fix RX FIFO overrun
+
+  [ Mika Westerberg ]
+  * i2c: designware: always clear interrupts before enabling them
+
+  [ Linus Torvalds ]
+  * x86: Fix bit corruption at CPU resume time
+
+  [ Ben Skeggs ]
+  * drm/nouveau/bios: fix thinko in ZM_MASK_ADD opcode
+
+  [ Niels Ole Salscheider ]
+  * drm/radeon: Fix VRAM size calculation for VRAM >= 4GB
+
+  [ Michael S. Tsirkin ]
+  * virtio_console: fix uapi header
+
+  [ Jon Mason ]
+  * NTB: variable dereferenced before check
+
+  [ Dan Carpenter ]
+  * ntb: off by one sanity checks
+  * NTB: fix pointer math issues
+
+  [ Jon Mason ]
+  * NTB: Handle 64bit BAR sizes
+  * NTB: Link toggle memory leak
+  * NTB: reset tx_index on link toggle
+  * NTB: Correctly handle receive buffers of the minimal size
+  * NTB: memcpy lockup workaround
+  * ntb_netdev: remove from list on exit
+  * NTB: Multiple NTB client fix
+
+  [ Alexander van Heukelum ]
+  * x86, vm86: fix VM86 syscalls: use SYSCALL_DEFINEx(...)
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.9.4
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen@networkplumber.org>  Fri, 24 May 2013 13:43:56 -0700
+
+linux-3.9 (3.9.3-1+vyatta+4) unstable; urgency=low
+
+  [ Stephen Hemminger ]
+  * inotify/overlayfs fix
+  * Revert "inotify/overlayfs fix"
+  * config: disable old cpufreq modules
+
+  [ Nicolas Dichtel ]
+  * netconf: add the handler to dump entries
+
+  [ Stephen Hemminger ]
+  * amd64: drop support for unsupported WAN devices
+
+ -- Stephen Hemminger <stephen@networkplumber.org>  Thu, 23 May 2013 13:52:19 -0700
+
 linux-3.9 (3.9.3-1+vyatta+3) unstable; urgency=low
 
   * update i386 config
