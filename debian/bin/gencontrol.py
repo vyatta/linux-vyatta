@@ -206,6 +206,7 @@ class Gencontrol(Base):
         return
 
     def process_changelog(self):
+        print VersionLinux
         in_changelog = Changelog(version = VersionLinux)
         act_upstream = in_changelog[0].version.linux_upstream
         changelog = []
