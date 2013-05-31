@@ -94,7 +94,7 @@ debian/control-real: debian/bin/gencontrol.py $(CONTROL_FILES)
 	@echo ignore the following error, the debian/control file has
 	@echo been generated SUCCESSFULLY.
 	@echo
-	exit 1
+#	exit 1
 
 #
 # Rule to check all configs snipplets in debian/arch
