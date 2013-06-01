@@ -52,10 +52,11 @@ maintainerclean:
 	rm -f debian/control debian/control.md5sum debian/rules.gen debian/bin/patch.* debian/linux-*
 	rm -rf $(filter-out debian .svn, $(wildcard * .[^.]*))
 
-clean: debian/control
+clean: 
 	dh_testdir
 	rm -rf $(BUILD_DIR) $(STAMPS_DIR) debian/lib/python/debian_linux/*.pyc
 	dh_clean
+	debian/bin/build-flavour.sh all
 
 binary-indep: $(STAMPS_DIR)/source-base
 	dh_testdir
@@ -94,7 +95,6 @@ debian/control-real: debian/bin/gencontrol.py $(CONTROL_FILES)
 	@echo ignore the following error, the debian/control file has
 	@echo been generated SUCCESSFULLY.
 	@echo
-	exit 0
 
 #
 # Rule to check all configs snipplets in debian/arch
@@ -116,6 +116,3 @@ clean-configs:
 
 .PHONY: clean build setup binary-indep binary-arch binary
 
-override_dh_prep:
-	debian/bin/build-flavour.sh all
-	dh_prep
