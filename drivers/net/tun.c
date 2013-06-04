@@ -458,7 +458,6 @@ static void __tun_detach(struct tun_file *tfile, bool clean)
 
 		BUG_ON(!test_bit(SOCK_EXTERNALLY_ALLOCATED,
 				 &tfile->socket.flags));
-		kfree(tun->link_stats);
 		sk_release_kernel(&tfile->sk);
 	}
 }
@@ -1494,6 +1493,7 @@ static void tun_free_netdev(struct net_device *dev)
 	tun_flow_uninit(tun);
 	security_tun_dev_free_security(tun->security);
 	free_netdev(dev);
+	kfree(tun->link_stats);
 }
 
 static void tun_setup(struct net_device *dev)
