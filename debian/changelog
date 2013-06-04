@@ -1,3 +1,9 @@
+linux-3.9 (3.9.4-1+vyatta+3) unstable; urgency=low
+
+  * Revert "Revert "inotify/overlayfs fix""
+
+ -- Stephen Hemminger <stephen@networkplumber.org>  Tue, 04 Jun 2013 09:21:48 -0700
+
 linux-3.9 (3.9.4-1+vyatta+2) unstable; urgency=low
 
   * tun: fix double free of link_stats
