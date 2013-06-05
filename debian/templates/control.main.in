@@ -2,6 +2,8 @@ Package: linux-vyatta-kbuild
 Architecture: any
 Section: devel
 Priority: optional
+Provides: linux-vyatta-kbuild
+Replaces: linux-kbuild
 Description: Header/support files of Vyatta kernel build
  This package includes the header/support files of the Vyatta kernel build.
 
