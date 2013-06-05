@@ -56,7 +56,7 @@ clean:
 	dh_testdir
 	rm -rf $(BUILD_DIR) $(STAMPS_DIR) debian/lib/python/debian_linux/*.pyc
 	dh_clean
-	debian/bin/build-flavour.sh all
+	debian/bin/build-flavour.sh amd64-vyatta
 
 binary-indep: $(STAMPS_DIR)/source-base
 	dh_testdir
@@ -115,7 +115,7 @@ clean-configs:
 	rm -rf '$(CheckConfs_DIR)'
 
 prebuild:
-	./debian/bin/gencontrol.py
+	./debian/bin/build-flavour.sh amd64-vyatta
 
 .PHONY: clean build setup binary-indep binary-arch binary prebuild
 
