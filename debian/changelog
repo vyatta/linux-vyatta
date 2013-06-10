@@ -1,3 +1,12 @@
+linux-3.3 (3.3.8-1+vyatta+14+pacifica4) unstable; urgency=low
+
+  [ Tommi Rantala ]
+  * perf: Treat attr.config as u64 in perf_swevent_init()
+
+  [ James Davidson ]
+
+ -- James Davidson <james.davidson@vyatta.com>  Mon, 10 Jun 2013 13:16:59 -0700
+
 linux-3.3 (3.3.8-1+vyatta+14+pacifica3) unstable; urgency=low
 
   [ John Southworth ]
