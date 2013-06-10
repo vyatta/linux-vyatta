@@ -1,3 +1,343 @@
+linux-3.9 (3.9.5-1+vyatta+1) unstable; urgency=low
+
+  [ Hans-Christian Egtvedt ]
+  * avr32: fix relocation check for signed 18-bit offset
+
+  [ Alan Stern ]
+  * USB: OHCI: fix logic for scheduling isochronous URBs
+  * USB: fix latency in uhci-hcd and ohci-hcd
+
+  [ Gregory CLEMENT ]
+  * ARM: plat-orion: Fix num_resources and id for ge10 and ge11
+
+  [ jean-philippe francois ]
+  * ARM: OMAP: fix __init section mismatch for _enable_preprogram
+
+  [ Vaibhav Hiremath ]
+  * ARM: AM33XX: Add missing .clkdm_name to clkdiv32k_ick clock
+
+  [ Ard Biesheuvel ]
+  * ARM: 7723/1: crypto: sha1-armv4-large.S: fix SP handling
+
+  [ Jean-Christophe PLAGNIOL-VILLARD ]
+  * ARM: at91/trivial: fix model name for SAM9X25-EK
+  * ARM: at91: rm9200 fix time support
+
+  [ Boris BREZILLON ]
+  * ARM: at91/dt: fix macb pinctrl_macb_rmii_mii_alt definition
+
+  [ Johannes Berg ]
+  * cfg80211: fix WoWLAN wakeup tracing
+  * cfg80211: fix wiphy_register error path
+  * cfg80211: fix sending WoWLAN TCP wakeup settings
+  * mac80211: use just spin_lock() in ieee80211_get_tkip_p2k()
+  * mac80211: fix AP-mode frame matching
+
+  [ Ilan Peer ]
+  * iwlwifi: mvm: Always use SCAN_TYPE_FORCED
+
+  [ Alexander Bondar ]
+  * iwlwifi: mvm: Prevent setting assoc flag in MAC_CONTEXT_CMD
+
+  [ Malcolm Priestley ]
+  * staging: vt6656: [bug] Fix missing spin lock in iwctl_siwpower.
+
+  [ Hema Prathaban ]
+  * staging: vt6656: use free_netdev instead of kfree
+
+  [ David Rientjes ]
+  * usb, chipidea: fix link error when USB_EHCI_HCD is a module
+
+  [ Teppo Kotilainen ]
+  * usb: option: Add Telewell TW-LTE 4G
+
+  [ Dan Williams ]
+  * USB: option: add device IDs for Dell 5804 (Novatel E371) WWAN card
+
+  [ Gomella, Andrew (NIH/NHLBI) [F] ]
+  * USB: ftdi_sio: Add support for Newport CONEX motor drivers
+
+  [ Dan Carpenter ]
+  * USB: cxacru: potential underflow in cxacru_cm_get_array()
+
+  [ Wang YanQing ]
+  * TTY: Fix tty miss restart after we turn off flow-control
+
+  [ Schemmel Hans-Christoph ]
+  * USB: Blacklisted Cinterion's PLxx WWAN Interface
+
+  [ Oliver Neukum ]
+  * USB: reset resume quirk needed by a hub
+
+  [ Alan Stern ]
+  * USB: xHCI: override bogus bulk wMaxPacketSize values
+  * USB: UHCI: fix for suspend of virtual HP controller
+
+  [ Heiko Abraham ]
+  * Input: egalax_ts - ABS_MT_POSITION_Y not reported well
+
+  [ K. Y. Srinivasan ]
+  * Drivers: hv: Fix a bug in get_vp_index()
+
+  [ Jeff Layton ]
+  * cifs: only set ops for inodes in I_NEW state
+
+  [ Vineet Gupta ]
+  * ARC: copy_(to|from)_user() to honor usermode-access permissions
+
+  [ Jarod Wilson ]
+  * drivers/char/random.c: fix priming of last_data
+
+  [ Jiri Kosina ]
+  * random: fix accounting race condition with lockless irq entropy_count update
+
+  [ OGAWA Hirofumi ]
+  * fat: fix possible overflow for fat_clusters
+
+  [ Nithin Sujir ]
+  * tg3: Skip powering down function 0 on certain serdes devices
+
+  [ Michael Chan ]
+  * tg3: Fix data corruption on 5725 with TSO
+
+  [ Ben Hutchings ]
+  * perf: net_dropmonitor: Fix trace parameter order
+  * perf: net_dropmonitor: Fix symbol-relative addresses
+
+  [ Sujith Manoharan ]
+  * ath9k: Fix crash on module unload
+  * ath9k_hw: Enable manual peak calibration for AR9485
+
+  [ Joseph Qi ]
+  * ocfs2: goto out_unlock if ocfs2_get_clusters_nocache() failed in ocfs2_fiemap()
+
+  [ Martin Michlmayr ]
+  * Kirkwood: Enable PCIe port 1 on QNAP TS-11x/TS-21x
+
+  [ Christian Gmeiner ]
+  * drivers/leds/leds-ot200.c: fix error caused by shifted mask
+
+  [ Alexandre Bounine ]
+  * rapidio/tsi721: fix bug in MSI interrupt handling
+
+  [ Leonid Yegoshin ]
+  * mm compaction: fix of improper cache flush in migration code
+
+  [ wang, biao ]
+  * klist: del waiter from klist_remove_waiters before wakeup waitting process
+
+  [ Imre Deak ]
+  * wait: fix false timeouts when using wait_event_timeout()
+
+  [ Ryusuke Konishi ]
+  * nilfs2: fix issue of nilfs_set_page_dirty() for page at EOF boundary
+
+  [ Xiao Guangrong ]
+  * mm: mmu_notifier: re-fix freed page still mapped in secondary MMU
+
+  [ Johannes Weiner ]
+  * mm: memcg: remove incorrect VM_BUG_ON for swap cache pages in uncharge
+
+  [ Brian Behlendorf ]
+  * drivers/block/brd.c: fix brd_lookup_page() race
+
+  [ Cliff Wickman ]
+  * mm/pagewalk.c: walk_page_range should avoid VM_PFNMAP areas
+
+  [ Aneesh Kumar K.V ]
+  * mm/THP: use pmd_populate() to update the pmd with pgtable_t pointer
+
+  [ wenxiong@linux.vnet.ibm.com ]
+  * SCSI: ipr: Need to reset adapter after the 6th EEH error
+
+  [ Pekka Riikonen ]
+  * x86: Allow FPU to be used at interrupt time even with eagerfpu
+
+  [ Zhang Yanfei ]
+  * x86-64, init: Fix a possible wraparound bug in switchover in head_64.S
+
+  [ Yinghai Lu ]
+  * x86, range: fix missing merge during add range
+
+  [ Jan Beulich ]
+  * x86, crc32-pclmul: Fix build with older binutils
+
+  [ Rusty Russell ]
+  * module: don't unlink the module until we've removed all exposure.
+
+  [ Dave Chinner ]
+  * xfs: kill suid/sgid through the truncate path.
+
+  [ Mark Rutland ]
+  * arm64: don't kill the kernel on a bad esr from el0
+
+  [ Sylwester Nawrocki ]
+  * ARM: SAMSUNG: Export MIPI CSIS/DSIM PHY control functions
+
+  [ Trond Myklebust ]
+  * SUNRPC: Prevent an rpc_task wakeup race
+
+  [ J. Bruce Fields ]
+  * svcrpc: fix failures to handle -1 uid's and gid's
+
+  [ Nicolas Schichan ]
+  * ASoC: cs42l52: fix default value for MASTERA_VOL.
+
+  [ Charles Keepax ]
+  * ASoC: wm5110: Correct DSP4R Mixer control name
+
+  [ Rodrigo Vivi ]
+  * drm/i915: Adding more reserved PCI IDs for Haswell.
+
+  [ Alex Deucher ]
+  * drm/radeon: fix typo in cu_per_sh on verde
+  * drm/radeon: fix card_posted check for newer asics
+
+  [ Horia Geanta ]
+  * crypto: caam - fix inconsistent assoc dma mapping direction
+
+  [ Jeff Layton ]
+  * cifs: fix potential buffer overrun when composing a new options string
+
+  [ Sergei Shtylyov ]
+  * sata_rcar: clear STOP bit in bmdma_start() method
+  * sata_rcar: fix interrupt handling
+
+  [ Chew, Chiau Ee ]
+  * ata_piix: add PCI IDs for Intel BayTail
+
+  [ Vincent Pelletier ]
+  * libata: make ata_exec_internal_sg honor DMADIR
+
+  [ Finn Thain ]
+  * m68k/mac: Fix unexpected interrupt with CONFIG_EARLY_PRINTK
+
+  [ Christian Borntraeger ]
+  * s390/pgtable: Fix check for pgste/storage key handling
+
+  [ Li Zefan ]
+  * cgroup: initialize xattr before calling d_instantiate()
+
+  [ Tejun Heo ]
+  * cgroup: fix a subtle bug in descendant pre-order walk
+
+  [ Priyanka Jain ]
+  * powerpc/32bit:Store temporary result in r0 instead of r8
+
+  [ Michael Neuling ]
+  * powerpc/tm: Make room for hypervisor in abort cause codes
+  * powerpc/tm: Update cause codes documentation
+  * powerpc/tm: Fix userspace stack corruption on signal delivery for active transactions
+  * powerpc/tm: Abort on emulation and alignment faults
+  * powerpc/tm: Move TM abort cause codes to uapi
+
+  [ Kees Cook ]
+  * iscsi-target: fix heap buffer overflow on error
+
+  [ Nicholas Bellinger ]
+  * ib_srpt: Call target_sess_cmd_list_set_waiting during shutdown_session
+
+  [ Trond Myklebust ]
+  * NFSv4: Fix a thinko in nfs4_try_open_cached
+
+  [ Paolo Bonzini ]
+  * KVM: Emulate multibyte NOP
+  * KVM: fix sil/dil/bpl/spl in the mod/rm fields
+
+  [ Kishon Vijay Abraham I ]
+  * regulator: palmas: Fix "enable_reg" to point to the correct reg for SMPS10
+
+  [ Srivatsa S. Bhat ]
+  * powerpc/pseries: Always enable CONFIG_HOTPLUG_CPU on PSERIES SMP
+
+  [ Jeff Mahoney ]
+  * reiserfs: fix deadlock with nfs racing on create/lookup
+  * reiserfs: fix problems with chowning setuid file w/ xattrs
+  * reiserfs: fix spurious multiple-fill in reiserfs_readdir_dentry
+
+  [ Dave Kleikamp ]
+  * jfs: fix a couple races
+
+  [ Wei Liu ]
+  * xen-netback: remove skb in xen_netbk_alloc_page
+
+  [ Emmanuel Grumbach ]
+  * iwlwifi: mvm: fix aggregation drain flow
+
+  [ Suravee Suthikulpanit ]
+  * iommu/amd: Re-enable IOMMU event log interrupt after handling.
+
+  [ Joerg Roedel ]
+  * iommu/amd: Workaround for ERBT1312
+
+  [ Rafael J. Wysocki ]
+  * ACPI / PM: Allow device power states to be used for CONFIG_PM unset
+
+  [ Bastian Triller ]
+  * ACPI / video: Add "Asus UL30A" to ACPI video detect blacklist
+
+  [ Ben Skeggs ]
+  * drm/nvc0/ce: disable ce1 on a number of chipsets
+
+  [ Stanislaw Gruszka ]
+  * mac80211: fix direct probe auth
+
+  [ Johannes Berg ]
+  * mac80211: close AP_VLAN interfaces before unregistering all
+
+  [ Emmanuel Grumbach ]
+  * iwlwifi: dvm: fix zero LQ CMD sending avoidance
+  * iwlwifi: mvm: tell firmware to let multicast frames in
+
+  [ Johannes Berg ]
+  * cfg80211: check wdev->netdev in connection work
+
+  [ Gabor Juhos ]
+  * ath9k: use correct OTP register offsets for AR9550
+
+  [ Nithin Sujir ]
+  * tg3: Add read dma workaround for 5720
+
+  [ Jonas Peterson ]
+  * net: can: kvaser_usb: fix reception on "USBcan Pro" and "USBcan R" type hardware.
+
+  [ Or Gerlitz ]
+  * IB/iser: Return error to upper layers on EAGAIN registration failures
+
+  [ Daniel Mack ]
+  * ASoC: davinci: fix sample rotation
+
+  [ Miklos Szeredi ]
+  * fuse: fix readdirplus Oops in fuse_dentry_revalidate
+
+  [ Nicholas Bellinger ]
+  * target: Re-instate sess_wait_list for target_wait_for_sess_cmds
+  * target/file: Fix off-by-one READ_CAPACITY bug for !S_ISBLK export
+
+  [ Timo Teräs ]
+  * leds: leds-gpio: reserve gpio before using it
+
+  [ Wei Liu ]
+  * xen-netback: coalesce slots in TX path and fix regressions
+  * xen-netback: don't disconnect frontend when seeing oversize packet
+  * xen-netback: remove redundent parameter in netbk_count_requests
+  * xen-netback: avoid allocating variable size array on stack
+  * xen-netfront: reduce gso_max_size to account for max TCP header
+
+  [ Johannes Berg ]
+  * iwlwifi: mvm: remove P2P_DEVICE support
+  * mac80211_hwsim: remove P2P_DEVICE support
+
+  [ Wei Liu ]
+  * xen-netback: better names for thresholds
+
+  [ Greg Kroah-Hartman ]
+  * Linux 3.9.5
+
+  [ Stephen Hemminger ]
+
+ -- Stephen Hemminger <stephen@networkplumber.org>  Mon, 10 Jun 2013 11:36:29 -0700
+
 linux-3.9 (3.9.4-1+vyatta+3) unstable; urgency=low
 
   * Revert "Revert "inotify/overlayfs fix""
