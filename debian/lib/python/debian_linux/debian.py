@@ -115,6 +115,7 @@ $
 
     def __init__(self, version):
         super(VersionLinux, self).__init__(version)
+        print "kernel version = %s" % version
         match = self._version_linux_re.match(version)
         if match is None:
             raise RuntimeError, "Invalid debian linux version"
