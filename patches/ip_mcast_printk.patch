@@ -1,0 +1,33 @@
+---
+ net/ipv4/ipmr.c  |    3 +++
+ net/ipv4/route.c |    3 +++
+ 2 files changed, 6 insertions(+)
+
+Index: linux-image/net/ipv4/ipmr.c
+===================================================================
+--- linux-image.orig/net/ipv4/ipmr.c	2013-05-02 16:54:31.000000000 -0700
++++ linux-image/net/ipv4/ipmr.c	2013-05-03 17:36:14.000000000 -0700
+@@ -1949,6 +1949,9 @@
+ 	int local = skb_rtable(skb)->rt_flags & RTCF_LOCAL;
+ 	struct mr_table *mrt;
+ 
++	printk("Multicast packet %x -> %x\n", ntohl(ip_hdr(skb)->saddr),
++					ntohl(ip_hdr(skb)->daddr));
++
+ 	/* Packet is looped back after forward, it should not be
+ 	 * forwarded second time, but still can be delivered locally.
+ 	 */
+Index: linux-image/net/ipv4/route.c
+===================================================================
+--- linux-image.orig/net/ipv4/route.c	2013-05-02 16:54:31.000000000 -0700
++++ linux-image/net/ipv4/route.c	2013-05-03 17:36:14.000000000 -0700
+@@ -1775,6 +1775,9 @@
+ 	if (ipv4_is_multicast(daddr)) {
+ 		struct in_device *in_dev = __in_dev_get_rcu(dev);
+ 
++		printk("ip_route_input_noref: %x->%x\n",
++			ntohl(ip_hdr(skb)->saddr), ntohl(ip_hdr(skb)->daddr));
++
+ 		if (in_dev) {
+ 			int our = ip_check_mc_rcu(in_dev, daddr, saddr,
+ 						  ip_hdr(skb)->protocol);
