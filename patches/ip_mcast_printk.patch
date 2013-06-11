@@ -1,13 +1,83 @@
 ---
- net/ipv4/ipmr.c  |    3 +++
- net/ipv4/route.c |    3 +++
- 2 files changed, 6 insertions(+)
+ net/ipv4/ipmr.c  |   18 +++++++++++++++++-
+ net/ipv4/route.c |    4 ++++
+ 2 files changed, 21 insertions(+), 1 deletion(-)
 
-Index: linux-image/net/ipv4/ipmr.c
-===================================================================
---- linux-image.orig/net/ipv4/ipmr.c	2013-05-02 16:54:31.000000000 -0700
-+++ linux-image/net/ipv4/ipmr.c	2013-05-03 17:36:14.000000000 -0700
-@@ -1949,6 +1949,9 @@
+--- a/net/ipv4/ipmr.c
++++ b/net/ipv4/ipmr.c
+@@ -1270,6 +1270,8 @@ int ip_mroute_setsockopt(struct sock *sk
+ 	struct net *net = sock_net(sk);
+ 	struct mr_table *mrt;
+ 
++	printk("ip_mroute_setsockopt\n");
++
+ 	if (sk->sk_type != SOCK_RAW ||
+ 	    inet_sk(sk)->inet_num != IPPROTO_IGMP)
+ 		return -EOPNOTSUPP;
+@@ -1280,12 +1282,15 @@ int ip_mroute_setsockopt(struct sock *sk
+ 
+ 	if (optname != MRT_INIT) {
+ 		if (sk != rcu_access_pointer(mrt->mroute_sk) &&
+-		    !ns_capable(net->user_ns, CAP_NET_ADMIN))
++		    !ns_capable(net->user_ns, CAP_NET_ADMIN)) {
++			printk("rcu_access_pointer\n");
+ 			return -EACCES;
++		}
+ 	}
+ 
+ 	switch (optname) {
+ 	case MRT_INIT:
++		printk("ip_mroute_setsockopt: MRT_INIT");
+ 		if (optlen != sizeof(int))
+ 			return -EINVAL;
+ 
+@@ -1306,11 +1311,13 @@ int ip_mroute_setsockopt(struct sock *sk
+ 		rtnl_unlock();
+ 		return ret;
+ 	case MRT_DONE:
++		printk("ip_mroute_setsockopt: MRT_DONE");
+ 		if (sk != rcu_access_pointer(mrt->mroute_sk))
+ 			return -EACCES;
+ 		return ip_ra_control(sk, 0, NULL);
+ 	case MRT_ADD_VIF:
+ 	case MRT_DEL_VIF:
++		printk("ip_mroute_setsockopt: VIF");
+ 		if (optlen != sizeof(vif))
+ 			return -EINVAL;
+ 		if (copy_from_user(&vif, optval, sizeof(vif)))
+@@ -1334,6 +1341,7 @@ int ip_mroute_setsockopt(struct sock *sk
+ 	case MRT_ADD_MFC:
+ 	case MRT_DEL_MFC:
+ 		parent = -1;
++		printk("ip_mroute_setsockopt: MFC");
+ 	case MRT_ADD_MFC_PROXY:
+ 	case MRT_DEL_MFC_PROXY:
+ 		if (optlen != sizeof(mfc))
+@@ -1367,6 +1375,7 @@ int ip_mroute_setsockopt(struct sock *sk
+ #ifdef CONFIG_IP_PIMSM
+ 	case MRT_PIM:
+ 	{
++		printk("ip_mroute_setsockopt: PIM");
+ 		int v;
+ 
+ 		if (optlen != sizeof(v))
+@@ -1388,6 +1397,7 @@ int ip_mroute_setsockopt(struct sock *sk
+ #ifdef CONFIG_IP_MROUTE_MULTIPLE_TABLES
+ 	case MRT_TABLE:
+ 	{
++		printk("ip_mroute_setsockopt: TABL");
+ 		u32 v;
+ 
+ 		if (optlen != sizeof(u32))
+@@ -1418,6 +1428,7 @@ int ip_mroute_setsockopt(struct sock *sk
+ 	 *	set.
+ 	 */
+ 	default:
++		printk("ip_mroute_setsockopt: SPURIOUS");
+ 		return -ENOPROTOOPT;
+ 	}
+ }
+@@ -1949,6 +1960,9 @@ int ip_mr_input(struct sk_buff *skb)
  	int local = skb_rtable(skb)->rt_flags & RTCF_LOCAL;
  	struct mr_table *mrt;
  
@@ -17,17 +87,32 @@ Index: linux-image/net/ipv4/ipmr.c
  	/* Packet is looped back after forward, it should not be
  	 * forwarded second time, but still can be delivered locally.
  	 */
-Index: linux-image/net/ipv4/route.c
-===================================================================
---- linux-image.orig/net/ipv4/route.c	2013-05-02 16:54:31.000000000 -0700
-+++ linux-image/net/ipv4/route.c	2013-05-03 17:36:14.000000000 -0700
-@@ -1775,6 +1775,9 @@
+@@ -2321,6 +2335,8 @@ static void mroute_netlink_event(struct
+ 	struct sk_buff *skb;
+ 	int err = -ENOBUFS;
+ 
++	printk("mroute_netlink_event %d\n");
++
+ 	skb = nlmsg_new(mroute_msgsize(mfc->mfc_parent >= MAXVIFS, mrt->maxvif),
+ 			GFP_ATOMIC);
+ 	if (skb == NULL)
+--- a/net/ipv4/route.c
++++ b/net/ipv4/route.c
+@@ -1775,6 +1775,9 @@ int ip_route_input_noref(struct sk_buff
  	if (ipv4_is_multicast(daddr)) {
  		struct in_device *in_dev = __in_dev_get_rcu(dev);
  
-+		printk("ip_route_input_noref: %x->%x\n",
++		net_info_ratelimited("ip_route_input_noref: %x->%x\n",
 +			ntohl(ip_hdr(skb)->saddr), ntohl(ip_hdr(skb)->daddr));
 +
  		if (in_dev) {
  			int our = ip_check_mc_rcu(in_dev, daddr, saddr,
  						  ip_hdr(skb)->protocol);
+@@ -1794,6 +1797,7 @@ int ip_route_input_noref(struct sk_buff
+ 		rcu_read_unlock();
+ 		return -EINVAL;
+ 	}
++	net_info_ratelimited("ip_route_input_slow");
+ 	res = ip_route_input_slow(skb, daddr, saddr, tos, dev);
+ 	rcu_read_unlock();
+ 	return res;
