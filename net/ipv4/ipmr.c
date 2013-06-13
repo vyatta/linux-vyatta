@@ -1270,6 +1270,8 @@ int ip_mroute_setsockopt(struct sock *sk, int optname, char __user *optval, unsi
 	struct net *net = sock_net(sk);
 	struct mr_table *mrt;
 
+	printk("ip_mroute_setsockopt\n");
+
 	if (sk->sk_type != SOCK_RAW ||
 	    inet_sk(sk)->inet_num != IPPROTO_IGMP)
 		return -EOPNOTSUPP;
@@ -1280,12 +1282,15 @@ int ip_mroute_setsockopt(struct sock *sk, int optname, char __user *optval, unsi
 
 	if (optname != MRT_INIT) {
 		if (sk != rcu_access_pointer(mrt->mroute_sk) &&
-		    !ns_capable(net->user_ns, CAP_NET_ADMIN))
+		    !ns_capable(net->user_ns, CAP_NET_ADMIN)) {
+			printk("rcu_access_pointer\n");
 			return -EACCES;
+		}
 	}
 
 	switch (optname) {
 	case MRT_INIT:
+		printk("ip_mroute_setsockopt: MRT_INIT");
 		if (optlen != sizeof(int))
 			return -EINVAL;
 
@@ -1306,11 +1311,13 @@ int ip_mroute_setsockopt(struct sock *sk, int optname, char __user *optval, unsi
 		rtnl_unlock();
 		return ret;
 	case MRT_DONE:
+		printk("ip_mroute_setsockopt: MRT_DONE");
 		if (sk != rcu_access_pointer(mrt->mroute_sk))
 			return -EACCES;
 		return ip_ra_control(sk, 0, NULL);
 	case MRT_ADD_VIF:
 	case MRT_DEL_VIF:
+		printk("ip_mroute_setsockopt: VIF");
 		if (optlen != sizeof(vif))
 			return -EINVAL;
 		if (copy_from_user(&vif, optval, sizeof(vif)))
@@ -1334,6 +1341,7 @@ int ip_mroute_setsockopt(struct sock *sk, int optname, char __user *optval, unsi
 	case MRT_ADD_MFC:
 	case MRT_DEL_MFC:
 		parent = -1;
+		printk("ip_mroute_setsockopt: MFC");
 	case MRT_ADD_MFC_PROXY:
 	case MRT_DEL_MFC_PROXY:
 		if (optlen != sizeof(mfc))
@@ -1367,6 +1375,7 @@ int ip_mroute_setsockopt(struct sock *sk, int optname, char __user *optval, unsi
 #ifdef CONFIG_IP_PIMSM
 	case MRT_PIM:
 	{
+		printk("ip_mroute_setsockopt: PIM");
 		int v;
 
 		if (optlen != sizeof(v))
@@ -1388,6 +1397,7 @@ int ip_mroute_setsockopt(struct sock *sk, int optname, char __user *optval, unsi
 #ifdef CONFIG_IP_MROUTE_MULTIPLE_TABLES
 	case MRT_TABLE:
 	{
+		printk("ip_mroute_setsockopt: TABL");
 		u32 v;
 
 		if (optlen != sizeof(u32))
@@ -1418,6 +1428,7 @@ int ip_mroute_setsockopt(struct sock *sk, int optname, char __user *optval, unsi
 	 *	set.
 	 */
 	default:
+		printk("ip_mroute_setsockopt: SPURIOUS");
 		return -ENOPROTOOPT;
 	}
 }
@@ -1949,6 +1960,9 @@ int ip_mr_input(struct sk_buff *skb)
 	int local = skb_rtable(skb)->rt_flags & RTCF_LOCAL;
 	struct mr_table *mrt;
 
+	printk("Multicast packet %x -> %x\n", ntohl(ip_hdr(skb)->saddr),
+					ntohl(ip_hdr(skb)->daddr));
+
 	/* Packet is looped back after forward, it should not be
 	 * forwarded second time, but still can be delivered locally.
 	 */
@@ -2320,6 +2334,8 @@ static void mroute_netlink_event(struct mr_table *mrt, struct mfc_cache *mfc,
 	struct net *net = read_pnet(&mrt->net);
 	struct sk_buff *skb;
 	int err = -ENOBUFS;
+	int mlen = mroute_msgsize(mfc->mfc_parent >= MAXVIFS, mrt->maxvif);
+	printk("mroute_netlink_event size %d\n", mlen);
 
 	skb = nlmsg_new(mroute_msgsize(mfc->mfc_parent >= MAXVIFS, mrt->maxvif),
 			GFP_ATOMIC);

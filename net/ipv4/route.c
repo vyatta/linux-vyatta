@@ -1775,6 +1775,9 @@ int ip_route_input_noref(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 	if (ipv4_is_multicast(daddr)) {
 		struct in_device *in_dev = __in_dev_get_rcu(dev);
 
+		net_info_ratelimited("ip_route_input_noref: %x->%x\n",
+			ntohl(ip_hdr(skb)->saddr), ntohl(ip_hdr(skb)->daddr));
+
 		if (in_dev) {
 			int our = ip_check_mc_rcu(in_dev, daddr, saddr,
 						  ip_hdr(skb)->protocol);
@@ -1794,6 +1797,7 @@ int ip_route_input_noref(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 		rcu_read_unlock();
 		return -EINVAL;
 	}
+	net_info_ratelimited("ip_route_input_slow");
 	res = ip_route_input_slow(skb, daddr, saddr, tos, dev);
 	rcu_read_unlock();
 	return res;
