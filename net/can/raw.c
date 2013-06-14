@@ -52,7 +52,6 @@
 #include <linux/can/core.h>
 #include <linux/can/skb.h>
 #include <linux/can/raw.h>
-#include <net/raw.h>
 #include <net/sock.h>
 #include <net/net_namespace.h>
 
@@ -103,6 +102,11 @@ static inline unsigned int *raw_flags(struct sk_buff *skb)
 
 	/* return pointer after struct sockaddr_can */
 	return (unsigned int *)(&((struct sockaddr_can *)skb->cb)[1]);
+}
+
+static inline struct raw_sock *raw_sk(const struct sock *sk)
+{
+	return (struct raw_sock *)sk;
 }
 
 static void raw_rcv(struct sk_buff *oskb, void *data)
