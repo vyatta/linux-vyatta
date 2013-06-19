@@ -1,3 +1,13 @@
+linux-3.3 (3.3.8-1+vyatta+14+daisy8) unstable; urgency=low
+
+  [ Hannes Frederic Sowa ]
+  * ipv6: don't accept multicast traffic with scope 0
+  * ipv6: don't accept node local multicast traffic from the wire
+
+  [ Sven-Thorsten Dietrich ]
+
+ -- Sven-Thorsten Dietrich <sven@vyatta.com>  Wed, 19 Jun 2013 15:43:20 -0700
+
 linux-3.3 (3.3.8-1+vyatta+14+daisy7) unstable; urgency=low
 
   * net/ipv4: ip_vti clear the skb cb scratch-pad before tunneling the
